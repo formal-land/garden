@@ -48,14 +48,23 @@ Module BlockUnit.
   | Return (value : F.t).
 End BlockUnit.
 
+Module Access.
+  Inductive t : Set :=
+  | Component (name : string)
+  | Array (index : F.t).
+End Access.
+
 Module Primitive.
   (** We group together primitives that share being impure functions operating over the state. *)
   Inductive t : Set -> Set :=
   | OpenScope : t unit
   | CloseScope : t unit
-  | DeclareVar (names : list string) (values : list F.t) : t unit
-  | AssignVar (names : list string) (values : list F.t) : t unit
-  | GetVar (name : string) : t F.t.
+  | DeclareVar (name : string) (value : F.t) : t unit
+  | DeclareSignal (name : string) (dimensions : list F.t) : t unit
+  | SubstituteVar (name : string) (value : F.t) : t unit
+  | GetVarAccess (name : string) (access : list Access.t) : t F.t
+  | GetPrime : t F.t
+  | EqualityConstraint (value1 value2 : F.t) : t unit.
 End Primitive.
 
 Module M.
@@ -84,9 +93,13 @@ Module M.
   Arguments Call {_ _}.
   Arguments Impossible {_}.
 
+  Definition pure {A : Set} (output : A) : t A :=
+    Pure output.
+
+  (** A soft version of the [Let], where we unfold definitions *)
   Fixpoint let_ {A B : Set} (e1 : t A) (e2 : A -> t B) : t B :=
     match e1 with
-    | Pure (output) =>
+    | Pure output =>
       e2 output
     | Primitive primitive k =>
       Primitive primitive (fun result => let_ (k result) e2)
@@ -106,6 +119,12 @@ Module M.
     | BlockUnit.Return _ => block1
     end).
 
+  Definition call {A : Set} (e : t A) : t A :=
+    Call e Pure.
+
+  (** This axiom is only used as a marker, we eliminate it later. *)
+  Parameter run : forall {A : Set}, t A -> A.
+
   Definition function_body (block : t BlockUnit.t) : t F.t :=
     Primitive Primitive.OpenScope (fun _ =>
     Let block (fun (result : BlockUnit.t) =>
@@ -114,4 +133,173 @@ Module M.
     | BlockUnit.Tt => Impossible "Expected a return in the function body"
     | BlockUnit.Return value => Pure value
     end))).
+
+  (* TODO: use the dimensions *)
+  Definition declare_var (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+    let_ dimensions (fun dimensions =>
+    Primitive (Primitive.DeclareVar name 0) (fun _ =>
+    Pure BlockUnit.Tt)).
+
+  Definition declare_signal (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+    let_ dimensions (fun dimensions =>
+    Primitive (Primitive.DeclareSignal name dimensions) (fun _ =>
+    Pure BlockUnit.Tt)).
+
+  Definition substitute_var (name : string) (value : t F.t) : t BlockUnit.t :=
+    let_ value (fun value =>
+    Primitive (Primitive.SubstituteVar name value) (fun _ =>
+    Pure BlockUnit.Tt)).
+
+  Definition var (name : string) : t F.t :=
+    Primitive (Primitive.GetVarAccess name []) Pure.
+
+  Definition var_access (name : string) (access : list Access.t) : t F.t :=
+    Primitive (Primitive.GetVarAccess name access) Pure.
+
+  Parameter while : t F.t -> t BlockUnit.t -> t BlockUnit.t.
+
+  Definition return_ (result : t F.t) : t BlockUnit.t :=
+    let_ result (fun result =>
+    Pure (BlockUnit.Return result)).
+
+  Definition get_prime : t F.t :=
+    Primitive Primitive.GetPrime Pure.
+
+  Definition equality_constraint (value1 value2 : t F.t) : t BlockUnit.t :=
+    let_ value1 (fun value1 =>
+    let_ value2 (fun value2 =>
+    Primitive (Primitive.EqualityConstraint value1 value2) (fun _ =>
+    Pure BlockUnit.Tt))).
+
+  (** A tactic that replaces all [run] markers with a bind operation.
+    This allows to represent programs without introducing
+    explicit names for all intermediate computation results. *)
+  Ltac monadic e :=
+    lazymatch e with
+    | context ctxt [let v := ?x in @?f v] =>
+      refine (let_ _ _);
+        [ monadic x
+        | let v' := fresh v in
+          intro v';
+          let y := (eval cbn beta in (f v')) in
+          lazymatch context ctxt [let v := x in y] with
+          | let _ := x in y => monadic y
+          | _ =>
+            refine (let_ _ _);
+              [ monadic y
+              | let w := fresh "v" in
+                intro w;
+                let z := context ctxt [w] in
+                monadic z
+              ]
+          end
+        ]
+    | context ctxt [run ?x] =>
+      lazymatch context ctxt [run x] with
+      | run x => monadic x
+      | _ =>
+        refine (let_ _ _);
+          [ monadic x
+          | let v := fresh "v" in
+            intro v;
+            let y := context ctxt [v] in
+            monadic y
+          ]
+      end
+    | _ =>
+      lazymatch type of e with
+      | t _ => exact e
+      | _ => exact (pure e)
+      end
+    end.
 End M.
+
+Module Notations.
+  Notation "'let*' x ':=' e 'in' k" :=
+    (M.let_ e (fun x => k))
+    (at level 200, x ident, e at level 200, k at level 200).
+
+  Notation "'let~' x ':=' e 'in' k" :=
+    (M.Let e (fun x => k))
+    (at level 200, x ident, e at level 200, k at level 200).
+
+  Notation "'do~' a 'in' b" :=
+    (M.do a b)
+    (at level 200).
+
+  Notation "e ~(| e1 , .. , en |)" :=
+    (M.run (M.call ((.. (e e1) ..) en)))
+    (at level 100).
+
+  Notation "e ~(||)" :=
+    (M.run (M.call e))
+    (at level 100).
+
+  Notation "[[ e ]]" :=
+    (ltac:(M.monadic e))
+    (only parsing).
+End Notations.
+
+Export Notations.
+
+Module InfixOp.
+  Definition add (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a + b) mod p).
+
+  Definition sub (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a - b) mod p).
+
+  Definition mul (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a * b) mod p).
+
+  Definition pow (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a ^ b) mod p).
+
+  Definition lesser (a b : F.t) : M.t F.t :=
+    if a <? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition lessereq (a b : F.t) : M.t F.t :=
+    if a <=? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition greater (a b : F.t) : M.t F.t :=
+    if a >? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition greatereq (a b : F.t) : M.t F.t :=
+    if a >=? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition bitand (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.land a b) mod p).
+
+  Definition bitor (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.lor a b) mod p).
+
+  Definition bitxor (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.lxor a b) mod p).
+
+  Definition shiftl (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftl a b) mod p).
+
+  Definition shiftr (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftr a b) mod p).
+End InfixOp.

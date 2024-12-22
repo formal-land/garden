@@ -7,6 +7,11 @@ import sys
 def indent(text: str) -> str:
     return "\n".join("  " + line for line in text.split("\n"))
 
+def list_with_special_empty(items: list[str]) -> str:
+    if len(items) == 0:
+        return "([] : list F.t)"
+    return "[" + "; ".join(items) + "]"
+
 """
 pub type TagList = Vec<String>;
 """
@@ -75,9 +80,9 @@ pub enum Access {
 """
 def to_coq_access(node) -> str:
     if "ComponentAccess" in node:
-        return f"Access.Component {node['ComponentAccess']}"
+        return f"Access.Component ({node['ComponentAccess']})"
     if "ArrayAccess" in node:
-        return f"Access.Array {to_coq_expression(node['ArrayAccess'])}"
+        return f"Access.Array ({to_coq_expression(node['ArrayAccess'])})"
     return f"Unknown access: {node}"
 
 """
@@ -146,14 +151,14 @@ def to_coq_expression(node) -> str:
     if "InfixOp" in node:
         infix_op = node["InfixOp"]
         return \
-            "InfixOp." + infix_op["infix_op"] + " ~(| " + \
+            "InfixOp." + infix_op["infix_op"].lower() + " ~(| " + \
             to_coq_expression(infix_op["lhe"]) + ", " + \
             to_coq_expression(infix_op["rhe"]) + \
             " |)"
     if "PrefixOp" in node:
         prefix_op = node["PrefixOp"]
         return \
-            "PrefixOp." + prefix_op["prefix_op"] + " ~(| " + \
+            "PrefixOp." + prefix_op["prefix_op"].lower() + " ~(| " + \
             to_coq_expression(prefix_op["rhe"]) + \
             " |)"
     if "InlineSwitchOp" in node:
@@ -206,6 +211,16 @@ def to_coq_expression(node) -> str:
         return \
             "UniformArray " + to_coq_expression(uniform_array["value"]) + " " + to_coq_expression(uniform_array["dimension"])
     return f"Unknown expression: {node}"
+
+def flatten_blocks(node) -> list:
+    if "Block" in node:
+        block = node["Block"]
+        return [
+            flat_stmt
+            for stmt in block["stmts"]
+            for flat_stmt in flatten_blocks(stmt)
+        ]
+    return [node]
 
 """
 pub enum Statement {
@@ -285,11 +300,11 @@ def to_coq_statement(node) -> str:
     if "While" in node:
         while_stmt = node["While"]
         return \
-            "do~ M.while [[ " + to_coq_expression(while_stmt["cond"]) + "]]\n" + \
+            "do~ M.while [[ " + to_coq_expression(while_stmt["cond"]) + " ]] (\n" + \
             indent(to_coq_statement(while_stmt["stmt"])) + "\n" + \
-            "in"
+            ") in"
     if "Return" in node:
-        return "do~ M.return [[ " + to_coq_expression(node["Return"]["value"]) + " ]] in"
+        return "do~ M.return_ [[ " + to_coq_expression(node["Return"]["value"]) + " ]] in"
     if "InitializationBlock" in node:
         init_block = node["InitializationBlock"]
         return \
@@ -311,14 +326,15 @@ def to_coq_statement(node) -> str:
         else:
             declare_function = f"Unknown xtype {xtype}"
         return \
-            "do~ " + declare_function + " \"" + declaration["name"] + "\" " + \
-            "[[ [" + \
-            "; ".join(to_coq_expression(dim) for dim in declaration["dimensions"]) + \
-            "] ]] in"
+            "do~ " + declare_function + " \"" + declaration["name"] + "\" [[ " + \
+            list_with_special_empty([
+                to_coq_expression(dim) for dim in declaration["dimensions"]
+            ]) + \
+            " ]] in"
     if "Substitution" in node:
         substitution = node["Substitution"]
         return \
-            "do~ M.substitute \"" + substitution["var"] + "\" " + \
+            "do~ M.substitute_var \"" + substitution["var"] + "\" " + \
             "[[ " + to_coq_expression(substitution["rhe"]) + " ]] in"
     if "MultSubstitution" in node:
         mult_substitution = node["MultSubstitution"]
@@ -343,10 +359,10 @@ def to_coq_statement(node) -> str:
         return \
             "LogCall " + ", ".join(to_coq_log_argument(arg) for arg in log_call["args"])
     if "Block" in node:
-        block = node["Block"]
+        stmts = flatten_blocks(node)
         return \
-            "\n".join(to_coq_statement(stmt) for stmt in block["stmts"]) + "\n" + \
-            "M.pure tt"
+            "\n".join(to_coq_statement(stmt) for stmt in stmts) + "\n" + \
+            "M.pure BlockUnit.Tt"
     if "Assert" in node:
         return "assert " + to_coq_expression(node["Assert"]["arg"])
     return f"Unknown statement: {node}"
@@ -389,7 +405,7 @@ def to_coq_definition(node) -> str:
         return \
             "(* Template *)\n" + \
             "Definition " + template["name"] + to_coq_definition_args(template["args"]) + \
-            " : Template.t F.t :=\n" + \
+            " : M.t BlockUnit.t :=\n" + \
             indent(
                 to_coq_statement(template["body"]) + "."
             )

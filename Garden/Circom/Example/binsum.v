@@ -6,78 +6,72 @@ Require Import Garden.Garden.
 Definition nbits (a : F.t) : M.t F.t :=
   M.function_body (
     (* Var *)
-    do~ M.declare_var "n" [[ [] ]] in
-    do~ M.substitute "n" [[ 1 ]] in
+    do~ M.declare_var "n" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "n" [[ 1 ]] in
     (* Var *)
-    do~ M.declare_var "r" [[ [] ]] in
-    do~ M.substitute "r" [[ 0 ]] in
-    do~ M.while [[ InfixOp.Lesser ~(| InfixOp.Sub ~(| M.var ~(| "n" |), 1 |), M.var ~(| "a" |) |)]]
-      do~ M.substitute "r" [[ InfixOp.Add ~(| M.var ~(| "r" |), 1 |) ]] in
-      do~ M.substitute "n" [[ InfixOp.Mul ~(| M.var ~(| "n" |), 1 |) ]] in
-      M.pure tt
-    in
-    do~ M.return [[ M.var ~(| "r" |) ]] in
-    M.pure tt
+    do~ M.declare_var "r" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "r" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| InfixOp.sub ~(| M.var ~(| "n" |), 1 |), M.var ~(| "a" |) |) ]] (
+      do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var ~(| "r" |), 1 |) ]] in
+      do~ M.substitute_var "n" [[ InfixOp.mul ~(| M.var ~(| "n" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.return_ [[ M.var ~(| "r" |) ]] in
+    M.pure BlockUnit.Tt
   ).
 
 (* Template *)
-Definition BinSum (n ops : F.t) : Template.t F.t :=
+Definition BinSum (n ops : F.t) : M.t BlockUnit.t :=
   (* Var *)
-  do~ M.declare_var "nout" [[ [] ]] in
-  do~ M.substitute "nout" [[ nbits ~(| InfixOp.Mul ~(| InfixOp.Sub ~(| InfixOp.Pow ~(| 1, M.var ~(| "n" |) |), 1 |), M.var ~(| "ops" |) |) |) ]] in
+  do~ M.declare_var "nout" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "nout" [[ nbits ~(| InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.pow ~(| 1, M.var ~(| "n" |) |), 1 |), M.var ~(| "ops" |) |) |) ]] in
   (* Signal Input *)
   do~ M.declare_signal "in" [[ [M.var ~(| "ops" |); M.var ~(| "n" |)] ]] in
   (* Signal Output *)
   do~ M.declare_signal "out" [[ [M.var ~(| "nout" |)] ]] in
   (* Var *)
-  do~ M.declare_var "lin" [[ [] ]] in
-  do~ M.substitute "lin" [[ 0 ]] in
+  do~ M.declare_var "lin" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "lin" [[ 0 ]] in
   (* Var *)
-  do~ M.declare_var "lout" [[ [] ]] in
-  do~ M.substitute "lout" [[ 0 ]] in
+  do~ M.declare_var "lout" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "lout" [[ 0 ]] in
   (* Var *)
-  do~ M.declare_var "k" [[ [] ]] in
-  do~ M.substitute "k" [[ 0 ]] in
+  do~ M.declare_var "k" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "k" [[ 0 ]] in
   (* Var *)
-  do~ M.declare_var "j" [[ [] ]] in
-  do~ M.substitute "j" [[ 0 ]] in
+  do~ M.declare_var "j" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "j" [[ 0 ]] in
   (* Var *)
-  do~ M.declare_var "e2" [[ [] ]] in
-  do~ M.substitute "e2" [[ 0 ]] in
-  do~ M.substitute "e2" [[ 1 ]] in
-  do~ M.substitute "k" [[ 0 ]] in
-  do~ M.while [[ InfixOp.Lesser ~(| M.var ~(| "k" |), M.var ~(| "n" |) |)]]
-    do~ M.substitute "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.Lesser ~(| M.var ~(| "j" |), M.var ~(| "ops" |) |)]]
-      do~ M.substitute "lin" [[ InfixOp.Add ~(| M.var ~(| "lin" |), InfixOp.Mul ~(| M.var_access ~(| "in", [Access.Array M.var ~(| "j" |); Access.Array M.var ~(| "k" |)] |), M.var ~(| "e2" |) |) |) ]] in
-      M.pure tt
-      do~ M.substitute "j" [[ InfixOp.Add ~(| M.var ~(| "j" |), 1 |) ]] in
-      M.pure tt
-    in
-    M.pure tt
-    do~ M.substitute "e2" [[ InfixOp.Add ~(| M.var ~(| "e2" |), M.var ~(| "e2" |) |) ]] in
-    M.pure tt
-    do~ M.substitute "k" [[ InfixOp.Add ~(| M.var ~(| "k" |), 1 |) ]] in
-    M.pure tt
-  in
-  M.pure tt
-  do~ M.substitute "e2" [[ 1 ]] in
-  do~ M.substitute "k" [[ 0 ]] in
-  do~ M.while [[ InfixOp.Lesser ~(| M.var ~(| "k" |), M.var ~(| "nout" |) |)]]
-    do~ M.substitute "out" [[ InfixOp.BitAnd ~(| InfixOp.ShiftR ~(| M.var ~(| "lin" |), M.var ~(| "k" |) |), 1 |) ]] in
+  do~ M.declare_var "e2" [[ ([] : list F.t) ]] in
+  do~ M.substitute_var "e2" [[ 0 ]] in
+  do~ M.substitute_var "e2" [[ 1 ]] in
+  do~ M.substitute_var "k" [[ 0 ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "k" |), M.var ~(| "n" |) |) ]] (
+    do~ M.substitute_var "j" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "ops" |) |) ]] (
+      do~ M.substitute_var "lin" [[ InfixOp.add ~(| M.var ~(| "lin" |), InfixOp.mul ~(| M.var_access ~(| "in", [Access.Array (M.var ~(| "j" |)); Access.Array (M.var ~(| "k" |))] |), M.var ~(| "e2" |) |) |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "e2" [[ InfixOp.add ~(| M.var ~(| "e2" |), M.var ~(| "e2" |) |) ]] in
+    do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var ~(| "k" |), 1 |) ]] in
+    M.pure BlockUnit.Tt
+  ) in
+  do~ M.substitute_var "e2" [[ 1 ]] in
+  do~ M.substitute_var "k" [[ 0 ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "k" |), M.var ~(| "nout" |) |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.bitand ~(| InfixOp.shiftr ~(| M.var ~(| "lin" |), M.var ~(| "k" |) |), 1 |) ]] in
     do~ M.equality_constraint
-      [[ InfixOp.Mul ~(| M.var_access ~(| "out", [Access.Array M.var ~(| "k" |)] |), InfixOp.Sub ~(| M.var_access ~(| "out", [Access.Array M.var ~(| "k" |)] |), 1 |) |) ]]
+      [[ InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (M.var ~(| "k" |))] |), InfixOp.sub ~(| M.var_access ~(| "out", [Access.Array (M.var ~(| "k" |))] |), 1 |) |) ]]
       [[ 0 ]]
     in
-    do~ M.substitute "lout" [[ InfixOp.Add ~(| M.var ~(| "lout" |), InfixOp.Mul ~(| M.var_access ~(| "out", [Access.Array M.var ~(| "k" |)] |), M.var ~(| "e2" |) |) |) ]] in
-    do~ M.substitute "e2" [[ InfixOp.Add ~(| M.var ~(| "e2" |), M.var ~(| "e2" |) |) ]] in
-    M.pure tt
-    do~ M.substitute "k" [[ InfixOp.Add ~(| M.var ~(| "k" |), 1 |) ]] in
-    M.pure tt
-  in
-  M.pure tt
+    do~ M.substitute_var "lout" [[ InfixOp.add ~(| M.var ~(| "lout" |), InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (M.var ~(| "k" |))] |), M.var ~(| "e2" |) |) |) ]] in
+    do~ M.substitute_var "e2" [[ InfixOp.add ~(| M.var ~(| "e2" |), M.var ~(| "e2" |) |) ]] in
+    do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var ~(| "k" |), 1 |) ]] in
+    M.pure BlockUnit.Tt
+  ) in
   do~ M.equality_constraint
     [[ M.var ~(| "lin" |) ]]
     [[ M.var ~(| "lout" |) ]]
   in
-  M.pure tt.
+  M.pure BlockUnit.Tt.
