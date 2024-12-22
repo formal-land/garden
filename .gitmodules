@@ -1,0 +1,6 @@
+[submodule "third-parties/circom"]
+	path = third-party/circom
+	url = https://github.com/formal-land/circom.git
+[submodule "third-party/circomlib"]
+	path = third-party/circomlib
+	url = https://github.com/iden3/circomlib.git

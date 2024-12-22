@@ -1,0 +1,5 @@
+-R . Garden
+-arg -impredicative-set -arg -w -arg -stdlib-vector
+./Circom/Example/binsum.v
+./Garden.v
+./RecordUpdate.v
