@@ -1,0 +1,23 @@
+opam-version: "2.0"
+name: "coq-garden"
+version: "0.1.0"
+synopsis: "Garden"
+description: """
+Formal verification for zero-knowledge circuits
+"""
+maintainer: "Guillaume Claret <dev@clarus.me>"
+authors: [
+  "Formal Land <contact@formal.land>"
+]
+license: "MIT"
+homepage: "https://github.com/formal-land/garden"
+bug-reports: "https://github.com/formal-land/garden/issues"
+dev-repo: "git+https://github.com/formal-land/garden.git"
+depends: [
+  "coq" {>= "8.20.0" }
+  "coq-coqutil" {>= "0.0.5"}
+  "coq-hammer"
+]
+build: [
+  [make]
+]

@@ -1,0 +1,53 @@
+name: Coq
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+    - name: Download Git submodules
+      run: git submodule update --init --recursive
+    - uses: coq-community/docker-coq-action@v1
+      with:
+        custom_image: coqorg/coq:8.20-ocaml-4.14-flambda
+        custom_script: |
+          startGroup "Install dependencies"
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+            source "$HOME/.cargo/env"
+            cargo --version
+            sudo ln -s `which python3` /usr/bin/python
+            opam install -y --deps-only Garden/coq-garden.opam
+          endGroup
+          startGroup "Set the rights"
+            sudo chown -R $(whoami) .
+          endGroup
+          startGroup "Install Circom"
+            cd third-party/circom
+            cargo install --path circom
+            cd ../..
+          endGroup
+          startGroup "Translate Circom library"
+            cd third-party/circomlib/test/circuits
+            circom greaterthan.circom
+            cd ../../../..
+            python scripts/coq_of_circom.py third-party/circomlib/circuits/binsum.json > Garden/Circom/Example/binsum.v
+          endGroup
+          startGroup "Check that the diff is empty (excluding submodules)"
+            git -c color.ui=always diff --exit-code --ignore-submodules=dirty
+          endGroup
+          startGroup "Compile Coq project"
+            cd Garden
+            make
+            cd ..
+          endGroup
