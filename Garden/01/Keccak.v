@@ -4,6 +4,14 @@ Require Import Coq.Strings.String.
 
 Import ListNotations.
 
+(*
+pub const DIM: usize = 5;
+pub const QUARTERS: usize = 4;
+*)
+
+Definition QUARTERS : Z := 4.
+Definition DIM : Z := 3.
+
 Module Sponges.
     Parameter t : Set.
 End Sponges.
@@ -26,6 +34,15 @@ Module Variable_.
 End Variable_.
 
 Module Keccak.
+    Definition state_c : list (list Variable_.t) :=
+    repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM).
+
+  Definition state_d : list (list Variable_.t) :=
+    repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM).
+
+  Definition state_e : list (list (list Variable_.t)) :=
+    repeat (repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM).
+
     Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)).
     Admitted.
 End Keccak.
