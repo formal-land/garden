@@ -5,47 +5,27 @@ Require Import Coq.Strings.String.
 Import ListNotations.
 
 Module Sponges.
-  Parameter t : Set.
+    Parameter t : Set.
 End Sponges.
 
-Class Mul (A : Type) := {
-  mul : A -> A -> A
-}.
+Module Steps.
+    Inductive t : Set :=
+    | Round (n : Z)
+    | Sponge (s : Sponges.t)
+    .
+End Steps.
 
-Class Add (A : Type) := {
-  add : A -> A -> A
-}.
+Module Variable_.
+    Parameter t : Set.
 
-Class Sub (A : Type) := {
-  sub : A -> A -> A
-}.
+    Parameter add : t -> t -> t.
+    Parameter mul : t -> t -> t.
+    Parameter sub : t -> t -> t.
+    Parameter one : t.
+    Parameter zero : t.
+End Variable_.
 
-Class Clone (A : Type) := {
-  clone : A -> A
-}.
-
-Class Debug (A : Type) := {
-  debug : A -> string (* Assuming Debug generates a string representation *)
-}.
-
-Class One (A : Type) := {
-  one : A
-}.
-
-Class Zero (A : Type) := {
-  zero : A
-}.
-
-
-Class Interpreter_Variable (A : Type) `{Mul A, Add A, Sub A, Clone A, Debug A, One A, Zero A} := {}.
-
-
-Inductive Steps :=
-| Round : nat -> Steps
-| Sponge : Sponges.t -> Steps.
-
-(* Define Keccak Module *)
 Module Keccak.
-  Definition constrain_theta {T : Type} `{Interpreter_Variable T}
-    (self : Type) (step : Steps) : list (list (list T)). Admitted.
+    Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)).
+    Admitted.
 End Keccak.
