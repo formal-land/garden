@@ -10,7 +10,7 @@ pub const QUARTERS: usize = 4;
 *)
 
 Definition QUARTERS : Z := 4.
-Definition DIM : Z := 3.
+Definition DIM : Z := 5.
 
 Module Sponges.
     Parameter t : Set.
