@@ -34,15 +34,15 @@ Module Variable_.
 End Variable_.
 
 Module Keccak.
-    Definition state_c : list (list Variable_.t) :=
-    repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM).
 
-  Definition state_d : list (list Variable_.t) :=
-    repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM).
-
-  Definition state_e : list (list (list Variable_.t)) :=
-    repeat (repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM).
-
-    Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)).
-    Admitted.
+    Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)) :=
+      (*
+          let mut state_c = vec![vec![Self::zero(); QUARTERS]; DIM];
+          let mut state_d = vec![vec![Self::zero(); QUARTERS]; DIM];
+          let mut state_e = vec![vec![vec![Self::zero(); QUARTERS]; DIM]; DIM];
+      *)
+      let state_c := repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+      let state_d := repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+      let state_e := repeat (repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
+                  
 End Keccak.
