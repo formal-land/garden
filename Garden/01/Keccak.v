@@ -1,7 +1,4 @@
-Require Import Coq.Lists.List.
 Require Import Coq.ZArith.ZArith.
-
-Import ListNotations.
 
 (*
 pub const DIM: usize = 5;
@@ -33,15 +30,29 @@ Module Variable_.
 End Variable_.
 
 Module Keccak.
-
   Fixpoint var_two_pow (n : nat) : Variable_.t :=
     match n with
     | 0 => Variable_.one
     | S n' => Variable_.mul (Variable_.add Variable_.one Variable_.one) (var_two_pow n')
     end.
 
-  Definition nth_or_default {A : Type} (default : A) (l : list A) (n : nat) : A :=
-    nth n l default.
+  Definition nth_or_default {A : Set} (default : A) (l : list A) (n : nat) : A :=
+    List.nth n l default.
+
+  (*
+  #[macro_export]
+  macro_rules! grid {
+    [...]
+    (20, $v:expr) => {{
+        |x: usize, q: usize| $v[q + QUARTERS * x].clone()
+    }};
+    [...]
+    (100, $v:expr) => {{
+        |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
+    }};
+    [...]
+  }
+  *)
 
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
     nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
@@ -61,7 +72,7 @@ Module Keccak.
             (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3)))) in Some v
       else None
     | None =>
-      if Nat.eqb (length quarters) 20 then
+      if length quarters =? 20 then
         let v :=
           Variable_.add (grid_20 quarters x 0) (Variable_.add
             (Variable_.mul (var_two_pow 16) (grid_20 quarters x 1))
@@ -72,9 +83,9 @@ Module Keccak.
     end.
 
   Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)) :=
-    let state_c := repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
-    let state_d := repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
-    let state_e := repeat (repeat (repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
+    let state_c := List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+    let state_d := List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+    let state_e := List.repeat (List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
                 
     let indices := seq 0 (Z.to_nat DIM) in
     let '(state_c, state_d, state_e) := 
@@ -82,5 +93,4 @@ Module Keccak.
         let word_c := from_quarters (vec_dense_c) None x_z in
         let rem_c := from_quarters (vec_remainder_c) None x_z in
         let rot_c := from_quarters (vec_dense_rot_c) None x_z).
-      
 End Keccak.
