@@ -63,7 +63,7 @@ Module Keccak.
   Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : option Variable_.t :=
     match y with
     | Some y' =>
-      if Nat.eqb (length quarters) 100 then
+      if length quarters =? 100 then
         let v :=
           Variable_.add (grid_100 quarters y' x 0) (Variable_.add
             (Variable_.mul (var_two_pow 16) (grid_100 quarters y' x 1))
