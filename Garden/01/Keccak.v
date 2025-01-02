@@ -149,26 +149,28 @@ Module Keccak.
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * x).
 
-  Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : option Variable_.t :=
+  Axiom from_quarters_TODO : Variable_.t.
+
+  Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : Variable_.t :=
     match y with
     | Some y' =>
       if length quarters =? 100 then
-        let v :=
           Variable_.add (grid_100 quarters y' x 0) (Variable_.add
             (Variable_.mul (var_two_pow 16) (grid_100 quarters y' x 1))
             (Variable_.add
             (Variable_.mul (var_two_pow 32) (grid_100 quarters y' x 2))
-            (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3)))) in Some v
-      else None
+            (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3))))
+      else
+        from_quarters_TODO
     | None =>
       if length quarters =? 20 then
-        let v :=
           Variable_.add (grid_20 quarters x 0) (Variable_.add
             (Variable_.mul (var_two_pow 16) (grid_20 quarters x 1))
             (Variable_.add
             (Variable_.mul (var_two_pow 32) (grid_20 quarters x 2))
-            (Variable_.mul (var_two_pow 48) (grid_20 quarters x 3)))) in Some v
-        else None
+            (Variable_.mul (var_two_pow 48) (grid_20 quarters x 3))))
+        else
+          from_quarters_TODO
     end.
 
   Definition grid_index (length i y x q : Z) : Z :=
@@ -217,45 +219,45 @@ Module Keccak.
     let state_e := List.repeat (List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
 
     let indices := seq 0 (Z.to_nat DIM) in
-    let self :=
-      fold_left
-        (fun self x =>
-            let word_c := from_quarters (vec_dense_c self) None x in
-            let rem_c := from_quarters (vec_remainder_c self) None x in
-            let rot_c := from_quarters (vec_dense_rot_c self) None x in
-  
-            let self := constrain Constraint.ThetaWordC x (is_round self step)
-                        (word_c * var_two_pow 1 -
-                        (quotient_c self x * var_two_pow 64 + rem_c)) self in
-            let self := constrain Constraint.ThetaRotatedC x (is_round self step)
-                        (rot_c - (quotient_c self x + rem_c)) self in
-            let self := constrain Constraint.ThetaQuotientC x (is_round self step)
-                        (is_boolean (quotient_c self x)) self in
-  
-            let quarters := seq 0 (Z.to_nat QUARTERS) in
-            fold_left
-              (fun self q =>
-                let state_c_q :=
-                  state_a self 0 x q +
-                  state_a self 1 x q +
-                  state_a self 2 x q +
-                  state_a self 3 x q +
-                  state_a self 4 x q in
-  
-                let self := constrain Constraint.ThetaShiftsC x q (is_round self step)
-                              (state_c_q -
-                              from_shifts (vec_shifts_c self) None None (Some x) (Some q)) self in
-  
-                let state_d_q :=
-                  shifts_c self 0 ((x + DIM - 1) mod DIM) q +
-                  expand_rot_c self ((x + 1) mod DIM) q in
-  
-                let state_e_q :=
-                  List.map (fun y => state_a self y x q + state_d_q)
-                            (seq 0 (Z.to_nat DIM)) in
-  
-                self
-              ) self quarters
-        ) self indices in
-    state_e.
+   let self :=
+  fold_left
+    (fun self x =>
+        let word_c := from_quarters (vec_dense_c self) None x in
+        let rem_c := from_quarters (vec_remainder_c self) None x in
+        let rot_c := from_quarters (vec_dense_rot_c self) None x in
+
+        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                    (Variable_.sub (Variable_.mul word_c (var_two_pow 1))
+                      (Variable_.add (Variable_.mul (quotient_c self x) (var_two_pow 64)) rem_c)) in
+        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                    (Variable_.sub rot_c (Variable_.add (quotient_c self x) rem_c)) in
+        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                    (is_boolean (quotient_c self x)) in
+
+        let quarters := seq 0 (Z.to_nat QUARTERS) in
+        fold_left
+          (fun self q =>
+            let state_c_q :=
+              Variable_.add (state_a 0 (Z.of_nat x) q)
+              (Variable_.add (state_a 1 (Z.of_nat x) q)
+              (Variable_.add (state_a 2 (Z.of_nat x) q)
+              (Variable_.add (state_a 3 (Z.of_nat x) q)
+              (state_a 4 (x q)))) in
+
+            let self := constrain self (Constraint.ThetaShiftsC x q) (is_round self step)
+                          (Variable_.sub state_c_q
+                          (from_shifts (vec_shifts_c self) None None (Some x) (Some q))) in
+
+            let state_d_q :=
+              Variable_.add (shifts_c self 0 ((x + DIM - 1) mod DIM) q)
+              (expand_rot_c self ((x + 1) mod DIM) q) in
+
+            let state_e_q :=
+              List.map (fun y => Variable_.add (state_a self y x q) state_d_q)
+                        (seq 0 (Z.to_nat DIM)) in
+
+            self
+          ) self quarters
+    ) self indices in
+state_e.
 End Keccak.
