@@ -149,26 +149,28 @@ Module Keccak.
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * x).
 
-  Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : option Variable_.t :=
+  Axiom from_quarters_TODO : Variable_.t.
+
+  Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : Variable_.t :=
     match y with
     | Some y' =>
       if length quarters =? 100 then
-        let v :=
-          Variable_.add (grid_100 quarters y' x 0) (Variable_.add
-            (Variable_.mul (var_two_pow 16) (grid_100 quarters y' x 1))
-            (Variable_.add
-            (Variable_.mul (var_two_pow 32) (grid_100 quarters y' x 2))
-            (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3)))) in Some v
-      else None
+        Variable_.add (grid_100 quarters y' x 0) (Variable_.add
+          (Variable_.mul (var_two_pow 16) (grid_100 quarters y' x 1))
+          (Variable_.add
+          (Variable_.mul (var_two_pow 32) (grid_100 quarters y' x 2))
+          (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3))))
+      else
+        from_quarters_TODO
     | None =>
       if length quarters =? 20 then
-        let v :=
-          Variable_.add (grid_20 quarters x 0) (Variable_.add
-            (Variable_.mul (var_two_pow 16) (grid_20 quarters x 1))
-            (Variable_.add
-            (Variable_.mul (var_two_pow 32) (grid_20 quarters x 2))
-            (Variable_.mul (var_two_pow 48) (grid_20 quarters x 3)))) in Some v
-        else None
+        Variable_.add (grid_20 quarters x 0) (Variable_.add
+          (Variable_.mul (var_two_pow 16) (grid_20 quarters x 1))
+          (Variable_.add
+          (Variable_.mul (var_two_pow 32) (grid_20 quarters x 2))
+          (Variable_.mul (var_two_pow 48) (grid_20 quarters x 3))))
+      else
+        from_quarters_TODO
     end.
 
   Definition grid_index (length i y x q : Z) : Z :=
@@ -224,9 +226,9 @@ Module Keccak.
             let rem_c := from_quarters (vec_remainder_c self) None x in
             let rot_c := from_quarters (vec_dense_rot_c self) None x in
   
-            let self := constrain Constraint.ThetaWordC x (is_round self step)
+            let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
                         (word_c * var_two_pow 1 -
-                        (quotient_c self x * var_two_pow 64 + rem_c)) self in
+                        (quotient_c self x * var_two_pow 64 + rem_c)) in
             let self := constrain Constraint.ThetaRotatedC x (is_round self step)
                         (rot_c - (quotient_c self x + rem_c)) self in
             let self := constrain Constraint.ThetaQuotientC x (is_round self step)
