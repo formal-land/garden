@@ -236,28 +236,29 @@ Module Keccak.
 
         let quarters := seq 0 (Z.to_nat QUARTERS) in
         fold_left
-          (fun self q =>
-            let state_c_q :=
-              Variable_.add (state_a 0 (Z.of_nat x) q)
-              (Variable_.add (state_a 1 (Z.of_nat x) q)
-              (Variable_.add (state_a 2 (Z.of_nat x) q)
-              (Variable_.add (state_a 3 (Z.of_nat x) q)
-              (state_a 4 (x q)))) in
-
-            let self := constrain self (Constraint.ThetaShiftsC x q) (is_round self step)
-                          (Variable_.sub state_c_q
-                          (from_shifts (vec_shifts_c self) None None (Some x) (Some q))) in
-
-            let state_d_q :=
-              Variable_.add (shifts_c self 0 ((x + DIM - 1) mod DIM) q)
-              (expand_rot_c self ((x + 1) mod DIM) q) in
-
-            let state_e_q :=
-              List.map (fun y => Variable_.add (state_a self y x q) state_d_q)
-                        (seq 0 (Z.to_nat DIM)) in
-
-            self
-          ) self quarters
+        (fun self q =>
+          let state_c_q :=
+            Variable_.add (state_a 0 (Z.of_nat x) q)
+            (Variable_.add (state_a 1 (Z.of_nat x) q)
+            (Variable_.add (state_a 2 (Z.of_nat x) q)
+            (Variable_.add (state_a 3 (Z.of_nat x) q)
+            (state_a 4 (Z.of_nat x) q)))) in
+      
+          let self := constrain self (Constraint.ThetaShiftsC (Z.of_nat x) q) (is_round self step)
+                        (Variable_.sub state_c_q
+                        (from_shifts (vec_shifts_c self) 0 0 (Z.of_nat x) q)) in
+      
+          let state_d_q :=
+            Variable_.add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
+            (expand_rot_c self ((Z.of_nat x + 1) mod DIM) q) in
+      
+          let state_e_q :=
+            List.map
+              (fun y => Variable_.add (state_a y (Z.of_nat x) q) state_d_q)
+              (List.map Z.of_nat (seq 0 (Z.to_nat DIM))) in
+      
+          self
+        ) self quarters
     ) self indices in
 state_e.
 End Keccak.
