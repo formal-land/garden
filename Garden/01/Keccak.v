@@ -129,18 +129,26 @@ Module Keccak.
     List.nth n l default.
 
   (*
-  #[macro_export]
-  macro_rules! grid {
-    [...]
-    (20, $v:expr) => {{
-        |x: usize, q: usize| $v[q + QUARTERS * x].clone()
-    }};
-    [...]
-    (100, $v:expr) => {{
-        |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
-    }};
-    [...]
-  }
+    #[macro_export]
+    macro_rules! grid {
+      (5, $v:expr) => {{
+          |x: usize| $v[x].clone()
+      }};
+      (20, $v:expr) => {{
+          |x: usize, q: usize| $v[q + QUARTERS * x].clone()
+      }};
+      (80, $v:expr) => {{
+          |i: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * i)].clone()
+      }};
+      (100, $v:expr) => {{
+          |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
+      }};
+      (400, $v:expr) => {{
+          |i: usize, y: usize, x: usize, q: usize| {
+              $v[q + QUARTERS * (x + DIM * (y + DIM * i))].clone()
+          }
+      }};
+    }
   *)
 
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
@@ -148,6 +156,12 @@ Module Keccak.
 
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * x).
+
+  Definition grid_80 (quarters : list Variable_.t) (i x q : nat) : Variable_.t :=
+    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
+
+  Definition grid_400 (quarters : list Variable_.t) (i y x q : nat) : Variable_.t :=
+    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
 
   Axiom from_quarters_TODO : Variable_.t.
 
@@ -204,20 +218,20 @@ Module Keccak.
     end.
 
   Definition vec_dense_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
+    List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
 
   Definition vec_remainder_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat DIM)).
+    List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat DIM)).
 
   Definition vec_dense_rot_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat DIM)).
+    List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat DIM)).
 
   Definition vec_shifts_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
+    List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
 
   Definition shifts_c (self : Variable_.t) (i x q : Z) : Variable_.t :=
     let idx := grid_index THETA_SHIFTS_C_LEN i 0 x q in
@@ -228,8 +242,8 @@ Module Keccak.
     variable (ColumnAlias.Input idx).
 
   Definition state_a (y x q : Z) : Variable_.t :=
-      let idx := grid_index THETA_STATE_A_LEN 0 y x q in
-      variable (ColumnAlias.Input idx).
+    let idx := grid_index THETA_STATE_A_LEN 0 y x q in
+    variable (ColumnAlias.Input idx).
   
   (*
   fn from_shifts(
@@ -267,7 +281,49 @@ Module Keccak.
     }
   *)
 
-  Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
+  Definition from_shifts (shifts : list Variable_.t) (i y x q : option Z) : Variable_.t :=
+    if List.length shifts =? 400 then
+      match i with
+      | Some i_z =>
+          let i_nat := Z.to_nat i_z in
+          let shifts_i := nth_or_default Variable_.zero shifts i_nat in
+          let shifts_100_i := nth_or_default Variable_.zero shifts (100 + i_nat) in
+          let shifts_200_i := nth_or_default Variable_.zero shifts (200 + i_nat) in
+          let shifts_300_i := nth_or_default Variable_.zero shifts (300 + i_nat) in
+          Variable_.add shifts_i (Variable_.add (Variable_.mul (var_two_pow 1) shifts_100_i)
+                                                (Variable_.add (Variable_.mul (var_two_pow 2) shifts_200_i)
+                                                              (Variable_.mul (var_two_pow 3) shifts_300_i)))
+      | None =>
+          match y, x, q with
+          | Some y_z, Some x_z, Some q_z =>
+              let y_nat := Z.to_nat y_z in
+              let x_nat := Z.to_nat x_z in
+              let q_nat := Z.to_nat q_z in
+              let shifts_0 := grid_400 shifts 0 y_nat x_nat q_nat in
+              let shifts_1 := grid_400 shifts 1 y_nat x_nat q_nat in
+              let shifts_2 := grid_400 shifts 2 y_nat x_nat q_nat in
+              let shifts_3 := grid_400 shifts 3 y_nat x_nat q_nat in
+              Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
+                                                    (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
+                                                                  (Variable_.mul (var_two_pow 3) shifts_3)))
+          | _, _, _ => Variable_.zero
+          end
+      end
+    else if List.length shifts =? 80 then
+      match x, q with
+      | Some x_z, Some q_z =>
+          let x_nat := Z.to_nat x_z in
+          let q_nat := Z.to_nat q_z in
+          let shifts_0 := grid_80 shifts 0 x_nat q_nat in
+          let shifts_1 := grid_80 shifts 1 x_nat q_nat in
+          let shifts_2 := grid_80 shifts 2 x_nat q_nat in
+          let shifts_3 := grid_80 shifts 3 x_nat q_nat in
+          Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
+                                                (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
+                                                              (Variable_.mul (var_two_pow 3) shifts_3)))
+      | _, _ => Variable_.zero
+      end
+    else Variable_.zero.
 
   (*
   fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
