@@ -140,6 +140,26 @@ Module Keccak.
         |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
     }};
     [...]
+    #[macro_export]
+macro_rules! grid {
+    (5, $v:expr) => {{
+        |x: usize| $v[x].clone()
+    }};
+    (20, $v:expr) => {{
+        |x: usize, q: usize| $v[q + QUARTERS * x].clone()
+    }};
+    (80, $v:expr) => {{
+        |i: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * i)].clone()
+    }};
+    (100, $v:expr) => {{
+        |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
+    }};
+    (400, $v:expr) => {{
+        |i: usize, y: usize, x: usize, q: usize| {
+            $v[q + QUARTERS * (x + DIM * (y + DIM * i))].clone()
+        }
+    }};
+}
   }
   *)
 
@@ -148,6 +168,12 @@ Module Keccak.
 
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * x).
+
+  Definition grid_80 (quarters : list Variable_.t) (i x q : nat) : Variable_.t :=
+    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
+
+  Definition grid_400 (quarters : list Variable_.t) (i y x q : nat) : Variable_.t :=
+    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
 
   Axiom from_quarters_TODO : Variable_.t.
 
@@ -267,7 +293,51 @@ Module Keccak.
     }
   *)
 
-  Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
+  (* 
+    TODO: Define the Axiom from_shifts
+    Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
+  *)
+
+  (* Definition of from_shifts *)
+  Definition from_shifts (shifts : list Variable_.t) (i y x q : option nat) : Variable_.t :=
+    match length shifts with
+    | 400 =>
+        match i with
+        | Some i =>
+            let shifts_i := nth_or_default Variable_.zero shifts i in
+            let shifts_100_i := nth_or_default Variable_.zero shifts (100 + i) in
+            let shifts_200_i := nth_or_default Variable_.zero shifts (200 + i) in
+            let shifts_300_i := nth_or_default Variable_.zero shifts (300 + i) in
+            Variable_.add shifts_i (Variable_.add (Variable_.mul (var_two_pow 1) shifts_100_i)
+                                                  (Variable_.add (Variable_.mul (var_two_pow 2) shifts_200_i)
+                                                                (Variable_.mul (var_two_pow 3) shifts_300_i)))
+        | None =>
+            match y, x, q with
+            | Some y, Some x, Some q =>
+                let shifts_0 := grid_400 shifts 0 y x q in
+                let shifts_1 := grid_400 shifts 1 y x q in
+                let shifts_2 := grid_400 shifts 2 y x q in
+                let shifts_3 := grid_400 shifts 3 y x q in
+                Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
+                                                      (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
+                                                                    (Variable_.mul (var_two_pow 3) shifts_3)))
+            | _, _, _ => Variable_.zero (* Handle invalid cases *)
+            end
+        end
+    | 80 =>
+        match x, q with
+        | Some x, Some q =>
+            let shifts_0 := grid_80 shifts 0 x q in
+            let shifts_1 := grid_80 shifts 1 x q in
+            let shifts_2 := grid_80 shifts 2 x q in
+            let shifts_3 := grid_80 shifts 3 x q in
+            Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
+                                                  (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
+                                                                (Variable_.mul (var_two_pow 3) shifts_3)))
+        | _, _ => Variable_.zero (* Handle invalid cases *)
+        end
+    | _ => Variable_.zero (* Handle invalid length *)
+    end.
 
   (*
   fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
