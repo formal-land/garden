@@ -218,20 +218,20 @@ Module Keccak.
     end.
 
   Definition vec_dense_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
+    List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
 
   Definition vec_remainder_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat DIM)).
+    List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat DIM)).
 
   Definition vec_dense_rot_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat DIM)).
+    List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat DIM)).
 
   Definition vec_shifts_c (self : Variable_.t) : list Variable_.t :=
-      List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
-              (seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
+    List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
+            (seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
 
   Definition shifts_c (self : Variable_.t) (i x q : Z) : Variable_.t :=
     let idx := grid_index THETA_SHIFTS_C_LEN i 0 x q in
@@ -242,8 +242,8 @@ Module Keccak.
     variable (ColumnAlias.Input idx).
 
   Definition state_a (y x q : Z) : Variable_.t :=
-      let idx := grid_index THETA_STATE_A_LEN 0 y x q in
-      variable (ColumnAlias.Input idx).
+    let idx := grid_index THETA_STATE_A_LEN 0 y x q in
+    variable (ColumnAlias.Input idx).
   
   (*
   fn from_shifts(
@@ -281,50 +281,50 @@ Module Keccak.
     }
   *)
 
-  (* 
-    TODO: Define the Axiom from_shifts
-    Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
-  *)
-
-  (* Definition of from_shifts *)
-  Definition from_shifts (shifts : list Variable_.t) (i y x q : option nat) : Variable_.t :=
+  Definition from_shifts (shifts : list Variable_.t) (i y x q : option Z) : Variable_.t :=
     match length shifts with
     | 400 =>
         match i with
-        | Some i =>
-            let shifts_i := nth_or_default Variable_.zero shifts i in
-            let shifts_100_i := nth_or_default Variable_.zero shifts (100 + i) in
-            let shifts_200_i := nth_or_default Variable_.zero shifts (200 + i) in
-            let shifts_300_i := nth_or_default Variable_.zero shifts (300 + i) in
+        | Some i_z =>
+            let i_nat := Z.to_nat(i_z) in
+            let shifts_i := nth_or_default Variable_.zero shifts i_nat in
+            let shifts_100_i := nth_or_default Variable_.zero shifts (100 + i_nat) in
+            let shifts_200_i := nth_or_default Variable_.zero shifts (200 + i_nat) in
+            let shifts_300_i := nth_or_default Variable_.zero shifts (300 + i_nat) in
             Variable_.add shifts_i (Variable_.add (Variable_.mul (var_two_pow 1) shifts_100_i)
                                                   (Variable_.add (Variable_.mul (var_two_pow 2) shifts_200_i)
                                                                 (Variable_.mul (var_two_pow 3) shifts_300_i)))
         | None =>
             match y, x, q with
-            | Some y, Some x, Some q =>
-                let shifts_0 := grid_400 shifts 0 y x q in
-                let shifts_1 := grid_400 shifts 1 y x q in
-                let shifts_2 := grid_400 shifts 2 y x q in
-                let shifts_3 := grid_400 shifts 3 y x q in
+            | Some y_z, Some x_z, Some q_z =>
+                let y_nat := Z.to_nat(y_z) in
+                let x_nat := Z.to_nat(x_z) in
+                let q_nat := Z.to_nat(q_z) in
+                let shifts_0 := grid_400 shifts 0 y_nat x_nat q_nat in
+                let shifts_1 := grid_400 shifts 1 y_nat x_nat q_nat in
+                let shifts_2 := grid_400 shifts 2 y_nat x_nat q_nat in
+                let shifts_3 := grid_400 shifts 3 y_nat x_nat q_nat in
                 Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
                                                       (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
                                                                     (Variable_.mul (var_two_pow 3) shifts_3)))
-            | _, _, _ => Variable_.zero (* Handle invalid cases *)
+            | _, _, _ => Variable_.zero
             end
         end
     | 80 =>
         match x, q with
-        | Some x, Some q =>
-            let shifts_0 := grid_80 shifts 0 x q in
-            let shifts_1 := grid_80 shifts 1 x q in
-            let shifts_2 := grid_80 shifts 2 x q in
-            let shifts_3 := grid_80 shifts 3 x q in
+        | Some x_z, Some q_z =>
+            let x_nat := Z.to_nat(x_z) in
+            let q_nat := Z.to_nat(q_z) in
+            let shifts_0 := grid_80 shifts 0 x_nat q_nat in
+            let shifts_1 := grid_80 shifts 1 x_nat q_nat in
+            let shifts_2 := grid_80 shifts 2 x_nat q_nat in
+            let shifts_3 := grid_80 shifts 3 x_nat q_nat in
             Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
                                                   (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
                                                                 (Variable_.mul (var_two_pow 3) shifts_3)))
-        | _, _ => Variable_.zero (* Handle invalid cases *)
+        | _, _ => Variable_.zero
         end
-    | _ => Variable_.zero (* Handle invalid length *)
+    | _ => Variable_.zero
     end.
 
   (*
