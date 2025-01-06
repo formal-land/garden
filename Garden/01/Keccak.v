@@ -129,38 +129,26 @@ Module Keccak.
     List.nth n l default.
 
   (*
-  #[macro_export]
-  macro_rules! grid {
-    [...]
-    (20, $v:expr) => {{
-        |x: usize, q: usize| $v[q + QUARTERS * x].clone()
-    }};
-    [...]
-    (100, $v:expr) => {{
-        |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
-    }};
-    [...]
     #[macro_export]
-macro_rules! grid {
-    (5, $v:expr) => {{
-        |x: usize| $v[x].clone()
-    }};
-    (20, $v:expr) => {{
-        |x: usize, q: usize| $v[q + QUARTERS * x].clone()
-    }};
-    (80, $v:expr) => {{
-        |i: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * i)].clone()
-    }};
-    (100, $v:expr) => {{
-        |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
-    }};
-    (400, $v:expr) => {{
-        |i: usize, y: usize, x: usize, q: usize| {
-            $v[q + QUARTERS * (x + DIM * (y + DIM * i))].clone()
-        }
-    }};
-}
-  }
+    macro_rules! grid {
+      (5, $v:expr) => {{
+          |x: usize| $v[x].clone()
+      }};
+      (20, $v:expr) => {{
+          |x: usize, q: usize| $v[q + QUARTERS * x].clone()
+      }};
+      (80, $v:expr) => {{
+          |i: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * i)].clone()
+      }};
+      (100, $v:expr) => {{
+          |y: usize, x: usize, q: usize| $v[q + QUARTERS * (x + DIM * y)].clone()
+      }};
+      (400, $v:expr) => {{
+          |i: usize, y: usize, x: usize, q: usize| {
+              $v[q + QUARTERS * (x + DIM * (y + DIM * i))].clone()
+          }
+      }};
+    }
   *)
 
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
