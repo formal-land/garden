@@ -331,7 +331,7 @@ Module Keccak.
     let indices := seq 0 (Z.to_nat DIM) in
    let self :=
   fold_left
-    (fun self x =>
+    (fun self (x : nat) =>
         let word_c := from_quarters (vec_dense_c self) None x in
         let rem_c := from_quarters (vec_remainder_c self) None x in
         let rot_c := from_quarters (vec_dense_rot_c self) None x in
@@ -346,7 +346,8 @@ Module Keccak.
 
         let quarters := seq 0 (Z.to_nat QUARTERS) in
         fold_left
-        (fun self q =>
+        (fun self (q : nat) =>
+          let q := Z.of_nat q in
           let state_c_q :=
             Variable_.add (state_a 0 (Z.of_nat x) q)
             (Variable_.add (state_a 1 (Z.of_nat x) q)
@@ -368,7 +369,7 @@ Module Keccak.
               (List.map Z.of_nat (seq 0 (Z.to_nat DIM))) in
       
           self
-        ) self quarters
-    ) self indices in
+        ) quarters self
+    ) indices self in
 state_e.
 End Keccak.
