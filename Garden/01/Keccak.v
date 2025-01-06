@@ -151,6 +151,26 @@ Module Keccak.
 
   Axiom from_quarters_TODO : Variable_.t.
 
+  (*
+  fn from_quarters(quarters: &[Self::Variable], y: Option<usize>, x: usize) -> Self::Variable {
+        if let Some(y) = y {
+            assert!(quarters.len() == 100, "Invalid length of quarters");
+            let quarters = grid!(100, quarters);
+            quarters(y, x, 0)
+                + Self::two_pow(16) * quarters(y, x, 1)
+                + Self::two_pow(32) * quarters(y, x, 2)
+                + Self::two_pow(48) * quarters(y, x, 3)
+        } else {
+            assert!(quarters.len() == 20, "Invalid length of quarters");
+            let quarters = grid!(20, quarters);
+            quarters(x, 0)
+                + Self::two_pow(16) * quarters(x, 1)
+                + Self::two_pow(32) * quarters(x, 2)
+                + Self::two_pow(48) * quarters(x, 3)
+        }
+    }
+  *)
+
   Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : Variable_.t :=
     match y with
     | Some y' =>
@@ -211,7 +231,61 @@ Module Keccak.
       let idx := grid_index THETA_STATE_A_LEN 0 y x q in
       variable (ColumnAlias.Input idx).
   
-  Axiom from_shifts : list Variable_.t -> Z -> Z -> Z -> Z -> Variable_.t.
+  Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
+
+  (*
+  fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
+        // Define vectors storing expressions which are not in the witness layout for efficiency
+        let mut state_c = vec![vec![Self::zero(); QUARTERS]; DIM];
+        let mut state_d = vec![vec![Self::zero(); QUARTERS]; DIM];
+        let mut state_e = vec![vec![vec![Self::zero(); QUARTERS]; DIM]; DIM];
+
+        for x in 0..DIM {
+            let word_c = Self::from_quarters(&self.vec_dense_c(), None, x);
+            let rem_c = Self::from_quarters(&self.vec_remainder_c(), None, x);
+            let rot_c = Self::from_quarters(&self.vec_dense_rot_c(), None, x);
+
+            self.constrain(
+                ThetaWordC(x),
+                self.is_round(step),
+                word_c * Self::two_pow(1)
+                    - (self.quotient_c(x) * Self::two_pow(64) + rem_c.clone()),
+            );
+            self.constrain(
+                ThetaRotatedC(x),
+                self.is_round(step),
+                rot_c - (self.quotient_c(x) + rem_c),
+            );
+            self.constrain(
+                ThetaQuotientC(x),
+                self.is_round(step),
+                Self::is_boolean(self.quotient_c(x)),
+            );
+
+            for q in 0..QUARTERS {
+                state_c[x][q] = self.state_a(0, x, q)
+                    + self.state_a(1, x, q)
+                    + self.state_a(2, x, q)
+                    + self.state_a(3, x, q)
+                    + self.state_a(4, x, q);
+                self.constrain(
+                    ThetaShiftsC(x, q),
+                    self.is_round(step),
+                    state_c[x][q].clone()
+                        - Self::from_shifts(&self.vec_shifts_c(), None, None, Some(x), Some(q)),
+                );
+
+                state_d[x][q] =
+                    self.shifts_c(0, (x + DIM - 1) % DIM, q) + self.expand_rot_c((x + 1) % DIM, q);
+
+                for (y, column_e) in state_e.iter_mut().enumerate() {
+                    column_e[x][q] = self.state_a(y, x, q) + state_d[x][q].clone();
+                }
+            }
+        }
+        state_e
+    }
+  *)
 
   Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)) :=
     let state_c := List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
@@ -246,7 +320,7 @@ Module Keccak.
       
           let self := constrain self (Constraint.ThetaShiftsC (Z.of_nat x) q) (is_round self step)
                         (Variable_.sub state_c_q
-                        (from_shifts (vec_shifts_c self) 0 0 (Z.of_nat x) q)) in
+                        (from_shifts (vec_shifts_c self) None None (Some (Z.of_nat x)) (Some q))) in
       
           let state_d_q :=
             Variable_.add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
