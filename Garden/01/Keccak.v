@@ -231,6 +231,42 @@ Module Keccak.
       let idx := grid_index THETA_STATE_A_LEN 0 y x q in
       variable (ColumnAlias.Input idx).
   
+  (*
+  fn from_shifts(
+        shifts: &[Self::Variable],
+        i: Option<usize>,
+        y: Option<usize>,
+        x: Option<usize>,
+        q: Option<usize>,
+    ) -> Self::Variable {
+        match shifts.len() {
+            400 => {
+                if let Some(i) = i {
+                    auto_clone_array!(shifts);
+                    shifts(i)
+                        + Self::two_pow(1) * shifts(100 + i)
+                        + Self::two_pow(2) * shifts(200 + i)
+                        + Self::two_pow(3) * shifts(300 + i)
+                } else {
+                    let shifts = grid!(400, shifts);
+                    shifts(0, y.unwrap(), x.unwrap(), q.unwrap())
+                        + Self::two_pow(1) * shifts(1, y.unwrap(), x.unwrap(), q.unwrap())
+                        + Self::two_pow(2) * shifts(2, y.unwrap(), x.unwrap(), q.unwrap())
+                        + Self::two_pow(3) * shifts(3, y.unwrap(), x.unwrap(), q.unwrap())
+                }
+            }
+            80 => {
+                let shifts = grid!(80, shifts);
+                shifts(0, x.unwrap(), q.unwrap())
+                    + Self::two_pow(1) * shifts(1, x.unwrap(), q.unwrap())
+                    + Self::two_pow(2) * shifts(2, x.unwrap(), q.unwrap())
+                    + Self::two_pow(3) * shifts(3, x.unwrap(), q.unwrap())
+            }
+            _ => panic!("Invalid length of shifts"),
+        }
+    }
+  *)
+
   Axiom from_shifts : list Variable_.t -> option Z -> option Z -> option Z -> option Z -> Variable_.t.
 
   (*
