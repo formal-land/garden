@@ -20,7 +20,15 @@ Definition nbits (a : F.t) : M.t F.t :=
     M.pure BlockUnit.Tt
   ).
 
-(* Template *)
+(* Template signals *)
+Module BinSumSignals.
+  Record t : Set := {
+    in_ : list (list F.t);
+    out : list F.t;
+  }.
+End BinSumSignals.
+
+(* Template body *)
 Definition BinSum (n ops : F.t) : M.t BlockUnit.t :=
   (* Var *)
   do~ M.declare_var "nout" [[ ([] : list F.t) ]] in

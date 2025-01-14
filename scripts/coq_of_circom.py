@@ -3,9 +3,20 @@ Translate Circom circuits to Coq code.
 """
 import json
 import sys
+from typing import Tuple
 
 def indent(text: str) -> str:
     return "\n".join("  " + line for line in text.split("\n"))
+
+def escape_coq_name(name: str) -> str:
+    reserved_names = [
+        "as", "at", "cofix", "else", "end", "exists", "fix", "forall", "fun",
+        "if", "in", "let", "match", "mod", "Prop", "return", "Set", "then",
+        "Type", "using", "where", "with"
+    ]
+    if name in reserved_names:
+        return name + "_"
+    return name
 
 def list_with_special_empty(items: list[str]) -> str:
     if len(items) == 0:
@@ -367,6 +378,31 @@ def to_coq_statement(node) -> str:
         return "assert " + to_coq_expression(node["Assert"]["arg"])
     return f"Unknown statement: {node}"
 
+def get_signals_in_template(template) -> list[Tuple[str, int]]:
+    if "Block" in template["body"]:
+        stmts = flatten_blocks(template["body"])
+        return [
+            (
+                init_stmt["Declaration"]["name"],
+                len(init_stmt["Declaration"]["dimensions"]),
+            )
+            for stmt in stmts
+            if "InitializationBlock" in stmt
+            for init_stmt in stmt["InitializationBlock"]["initializations"]
+            if
+               "Declaration" in init_stmt and
+                "Signal" in init_stmt["Declaration"]["xtype"]
+        ]
+
+    return []
+
+def get_signal_type(nb_dimensions: int) -> str:
+    if nb_dimensions == 0:
+        return "F.t"
+    if nb_dimensions == 1:
+        return "list F.t"
+    return "list (" + get_signal_type(nb_dimensions - 1) + ")"
+
 def to_coq_definition_args(args: list[str]) -> str:
     if len(args) == 0:
         return ""
@@ -402,8 +438,24 @@ pub enum Definition {
 def to_coq_definition(node) -> str:
     if "Template" in node:
         template = node["Template"]
+        signals = get_signals_in_template(template)
         return \
-            "(* Template *)\n" + \
+            "(* Template signals *)\n" + \
+            "Module " + template["name"] + "Signals.\n" + \
+            indent(
+                "Record t : Set := {\n" +
+                indent(
+                    "\n".join(
+                        escape_coq_name(signal[0]) + " : " +
+                        get_signal_type(signal[1]) + ";"
+                        for signal in signals
+                    )
+                ) + "\n" +
+                "}."
+            ) + "\n" + \
+            "End " + template["name"] + "Signals.\n" + \
+            "\n" + \
+            "(* Template body *)\n" + \
             "Definition " + template["name"] + to_coq_definition_args(template["args"]) + \
             " : M.t BlockUnit.t :=\n" + \
             indent(
