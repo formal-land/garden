@@ -36,16 +36,18 @@ Notation "{ x : A @ P }" := (sigS (A := A) (fun x => P)) : type_scope.
 Notation "{ ' pat : A @ P }" := (sigS (A := A) (fun pat => P)) : type_scope.
 
 Module F.
+  (** This is only an alias to the [Z] type, to represent field elements *)
   Definition t := Z.
 End F.
 
 Module BlockUnit.
   (** The return value of a code block. *)
-  Inductive t : Set :=
+  Inductive t {R : Set} : Set :=
   (** The default value *)
   | Tt
   (** The instruction `return` was called *)
-  | Return (value : F.t).
+  | Return (value : R).
+  Arguments t : clear implicits.
 End BlockUnit.
 
 Module Access.
@@ -61,10 +63,12 @@ Module Primitive.
   | CloseScope : t unit
   | DeclareVar (name : string) (value : F.t) : t unit
   | DeclareSignal (name : string) (dimensions : list F.t) : t unit
-  | SubstituteVar (name : string) (value : F.t) : t unit
+  | DeclareComponent (name : string) : t unit
+  | SubstituteVar {A : Set} (name : string) (value : A) : t unit
   | GetVarAccess (name : string) (access : list Access.t) : t F.t
   | GetPrime : t F.t
-  | EqualityConstraint (value1 value2 : F.t) : t unit.
+  | EqualityConstraint (value1 value2 : F.t) : t unit
+  | CallFunction (name : string) (parameters : list F.t) : t F.t.
 End Primitive.
 
 Module M.
@@ -112,8 +116,8 @@ Module M.
     | Impossible message => Impossible message
     end.
 
-  Definition do (block1 block2 : t BlockUnit.t) : t BlockUnit.t :=
-    Let block1 (fun (result : BlockUnit.t) =>
+  Definition do {R : Set} (block1 block2 : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
+    Let block1 (fun (result : BlockUnit.t R) =>
     match result with
     | BlockUnit.Tt => block2
     | BlockUnit.Return _ => block1
@@ -125,9 +129,9 @@ Module M.
   (** This axiom is only used as a marker, we eliminate it later. *)
   Parameter run : forall {A : Set}, t A -> A.
 
-  Definition function_body (block : t BlockUnit.t) : t F.t :=
+  Definition function_body {R : Set} (block : t (BlockUnit.t R)) : t R :=
     Primitive Primitive.OpenScope (fun _ =>
-    Let block (fun (result : BlockUnit.t) =>
+    Let block (fun (result : BlockUnit.t R) =>
     Primitive Primitive.CloseScope (fun _ =>
     match result with
     | BlockUnit.Tt => Impossible "Expected a return in the function body"
@@ -135,17 +139,23 @@ Module M.
     end))).
 
   (* TODO: use the dimensions *)
-  Definition declare_var (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+  Definition declare_var {R : Set} (name : string) (dimensions : t (list F.t)) :
+      t (BlockUnit.t R) :=
     let_ dimensions (fun dimensions =>
     Primitive (Primitive.DeclareVar name 0) (fun _ =>
     Pure BlockUnit.Tt)).
 
-  Definition declare_signal (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+  Definition declare_signal {R : Set} (name : string) (dimensions : t (list F.t)) :
+      t (BlockUnit.t R) :=
     let_ dimensions (fun dimensions =>
     Primitive (Primitive.DeclareSignal name dimensions) (fun _ =>
     Pure BlockUnit.Tt)).
 
-  Definition substitute_var (name : string) (value : t F.t) : t BlockUnit.t :=
+  Definition declare_component {R : Set} (name : string) : t (BlockUnit.t R) :=
+    Primitive (Primitive.DeclareComponent name) (fun _ =>
+    Pure BlockUnit.Tt).
+
+  Definition substitute_var {R A : Set} (name : string) (value : t A) : t (BlockUnit.t R) :=
     let_ value (fun value =>
     Primitive (Primitive.SubstituteVar name value) (fun _ =>
     Pure BlockUnit.Tt)).
@@ -156,20 +166,38 @@ Module M.
   Definition var_access (name : string) (access : list Access.t) : t F.t :=
     Primitive (Primitive.GetVarAccess name access) Pure.
 
-  Parameter while : t F.t -> t BlockUnit.t -> t BlockUnit.t.
+  Definition if_ {R : Set} (condition : t F.t) (then_ else_ : t (BlockUnit.t R)) :
+      t (BlockUnit.t R) :=
+    let_ condition (fun condition =>
+    if condition =? 0 then
+      else_
+    else
+      then_).
 
-  Definition return_ (result : t F.t) : t BlockUnit.t :=
+  Parameter while : forall {R : Set}, t F.t -> t (BlockUnit.t R) -> t (BlockUnit.t R).
+
+  Definition return_ {R : Set} (result : t R) : t (BlockUnit.t R) :=
     let_ result (fun result =>
     Pure (BlockUnit.Return result)).
 
   Definition get_prime : t F.t :=
     Primitive Primitive.GetPrime Pure.
 
-  Definition equality_constraint (value1 value2 : t F.t) : t BlockUnit.t :=
+  Definition equality_constraint {R : Set} (value1 value2 : t F.t) : t (BlockUnit.t R) :=
     let_ value1 (fun value1 =>
     let_ value2 (fun value2 =>
     Primitive (Primitive.EqualityConstraint value1 value2) (fun _ =>
     Pure BlockUnit.Tt))).
+
+  Definition call_function (name : string) (parameters : list F.t) : t F.t :=
+    Primitive (Primitive.CallFunction name parameters) Pure.
+
+  Definition assert {R : Set} (condition : t F.t) : t (BlockUnit.t R) :=
+    let_ condition (fun condition =>
+    if condition =? 0 then
+      Impossible "assert failure"
+    else
+      Pure BlockUnit.Tt).
 
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
@@ -236,13 +264,70 @@ Module Notations.
     (at level 100).
 
   Notation "[[ e ]]" :=
-    (ltac:(M.monadic e))
+    (M.Pure e)
+    (* (ltac:(M.monadic e)) *)
     (only parsing).
 End Notations.
 
 Export Notations.
 
+Definition ternary_expression (condition true_value false_value : F.t) : F.t :=
+  if condition =? 0 then
+    false_value
+  else
+    true_value.
+
+Definition array_with_repeat {A : Set} (value : A) (size : F.t) : list A :=
+  List.repeat value (Z.to_nat size).
+
+(*
+pub enum ExpressionPrefixOpcode {
+    Sub,
+    BoolNot,
+    Complement,
+}
+*)
+Module PrefixOp.
+  Definition sub (a : F.t) : M.t F.t :=
+    M.pure (- a).
+
+  Definition boolNot (a : F.t) : M.t F.t :=
+    M.pure (Z.lnot a).
+
+  Parameter complement : F.t -> M.t F.t.
+End PrefixOp.
+
+(*
+pub enum ExpressionInfixOpcode {
+    Mul,
+    Div,
+    Add,
+    Sub,
+    Pow,
+    IntDiv,
+    Mod,
+    ShiftL,
+    ShiftR,
+    LesserEq,
+    GreaterEq,
+    Lesser,
+    Greater,
+    Eq,
+    NotEq,
+    BoolOr,
+    BoolAnd,
+    BitOr,
+    BitAnd,
+    BitXor,
+}
+*)
 Module InfixOp.
+  Definition mul (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a * b) mod p).
+
+  Parameter div : F.t -> F.t -> M.t F.t.
+
   Definition add (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((a + b) mod p).
@@ -251,22 +336,36 @@ Module InfixOp.
     let* p := M.get_prime in
     M.pure ((a - b) mod p).
 
-  Definition mul (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((a * b) mod p).
-
   Definition pow (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((a ^ b) mod p).
 
-  Definition lesser (a b : F.t) : M.t F.t :=
-    if a <? b then
+  Parameter intDiv : F.t -> F.t -> M.t F.t.
+
+  Parameter mod_ : F.t -> F.t -> M.t F.t.
+
+  Definition shiftL (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftl a b) mod p).
+
+  Definition shiftR (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftr a b) mod p).
+
+  Definition lesserEq (a b : F.t) : M.t F.t :=
+    if a <=? b then
       M.pure 1
     else
       M.pure 0.
 
-  Definition lessereq (a b : F.t) : M.t F.t :=
-    if a <=? b then
+  Definition greaterEq (a b : F.t) : M.t F.t :=
+    if a >=? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition lesser (a b : F.t) : M.t F.t :=
+    if a <? b then
       M.pure 1
     else
       M.pure 0.
@@ -277,29 +376,31 @@ Module InfixOp.
     else
       M.pure 0.
 
-  Definition greatereq (a b : F.t) : M.t F.t :=
-    if a >=? b then
+  Definition eq (a b : F.t) : M.t F.t :=
+    if a =? b then
       M.pure 1
     else
       M.pure 0.
 
-  Definition bitand (a b : F.t) : M.t F.t :=
+  Definition notEq (a b : F.t) : M.t F.t :=
+    if a =? b then
+      M.pure 0
+    else
+      M.pure 1.
+
+  Parameter boolOr : F.t -> F.t -> M.t F.t.
+
+  Parameter boolAnd : F.t -> F.t -> M.t F.t.
+
+  Definition bitAnd (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.land a b) mod p).
 
-  Definition bitor (a b : F.t) : M.t F.t :=
+  Definition bitOr (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.lor a b) mod p).
 
-  Definition bitxor (a b : F.t) : M.t F.t :=
+  Definition bitXor (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.lxor a b) mod p).
-
-  Definition shiftl (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((Z.shiftl a b) mod p).
-
-  Definition shiftr (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((Z.shiftr a b) mod p).
 End InfixOp.

@@ -39,9 +39,18 @@ jobs:
           endGroup
           startGroup "Translate Circom library"
             cd third-party/circomlib/test/circuits
-            circom greaterthan.circom
+            # For each Circom circuit
+            for circuit in *.circom; do
+              # Translate the circuit to JSON
+              circom $circuit
+            done
             cd ../../../..
-            python scripts/coq_of_circom.py third-party/circomlib/circuits/binsum.json > Garden/Circom/Example/binsum.v
+            # For each JSON circuit
+            for circuit in third-party/circomlib/circuits/*.json; do
+              # Translate the JSON circuit to Coq
+              echo "Translating $circuit"
+              python scripts/coq_of_circom.py $circuit > Garden/Circom/Example/$(basename $circuit .json).v
+            done
           endGroup
           startGroup "Check that the diff is empty (excluding submodules)"
             git -c color.ui=always diff --exit-code --ignore-submodules=dirty

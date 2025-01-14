@@ -1,0 +1,2 @@
+# Takes too long to compile due to large constants
+Circom/Example/poseidon_constants.v
