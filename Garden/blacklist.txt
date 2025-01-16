@@ -1,2 +1,3 @@
 # Takes too long to compile due to large constants
-Circom/Example/poseidon_constants.v
+Circom/Circomlib/translation/circuits/poseidon_constants.v
+Circom/Circomlib/translation/circuits/poseidon_constants_old.v
