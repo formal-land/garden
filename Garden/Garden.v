@@ -65,7 +65,7 @@ Module Primitive.
   | DeclareSignal (name : string) (dimensions : list F.t) : t unit
   | DeclareComponent (name : string) : t unit
   | SubstituteVar {A : Set} (name : string) (value : A) : t unit
-  | GetVarAccess (name : string) (access : list Access.t) : t F.t
+  | GetVarAccess {A : Set} (name : string) (accesses : list Access.t) : t A
   | GetPrime : t F.t
   | EqualityConstraint (value1 value2 : F.t) : t unit
   | CallFunction (name : string) (parameters : list F.t) : t F.t.
@@ -112,7 +112,7 @@ Module M.
     | Impossible message => Impossible message
     end.
 
-  Definition do {R : Set} (block1 block2 : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
+  Definition Do {R : Set} (block1 block2 : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
     Let block1 (fun (result : BlockUnit.t R) =>
     match result with
     | BlockUnit.Tt => block2
@@ -125,12 +125,30 @@ Module M.
   (** This axiom is only used as a marker, we eliminate it later. *)
   Parameter run : forall {A : Set}, t A -> A.
 
-  Definition function_body {R : Set} (block : t (BlockUnit.t R)) : t R :=
-    Let block (fun (result : BlockUnit.t R) =>
-    match result with
-    | BlockUnit.Tt => Impossible "Expected a return in the function body"
-    | BlockUnit.Return value => Pure value
-    end).
+  Definition wrap_in_scope {R : Set} (block : t R) : t R :=
+    Primitive Primitive.OpenScope (fun _ =>
+    let_ block (fun result =>
+    Primitive Primitive.CloseScope (fun _ =>
+    Pure result))).
+
+  Fixpoint function_init_args (args : list (string * F.t)) : t unit :=
+    match args with
+    | [] => Pure tt
+    | (name, value) :: args =>
+      Primitive (Primitive.DeclareVar name value) (fun _ =>
+      function_init_args args)
+    end.
+
+  Definition function_body {R : Set} (args : list (string * F.t)) (block : t (BlockUnit.t R)) :
+      t R :=
+    wrap_in_scope (
+      let_ (function_init_args args) (fun _ =>
+      Let block (fun (result : BlockUnit.t R) =>
+      match result with
+      | BlockUnit.Tt => Impossible "Expected a return in the function body"
+      | BlockUnit.Return value => Pure value
+      end))
+    ).
 
   Fixpoint init_Set_from_dimensions (dimensions : list F.t) : Set :=
     match dimensions with
@@ -169,16 +187,16 @@ Module M.
   Definition var (name : string) : t F.t :=
     Primitive (Primitive.GetVarAccess name []) Pure.
 
-  Definition var_access (name : string) (access : list Access.t) : t F.t :=
-    Primitive (Primitive.GetVarAccess name access) Pure.
+  Definition var_access (name : string) (accesses : list Access.t) : t F.t :=
+    Primitive (Primitive.GetVarAccess name accesses) Pure.
 
   Definition if_ {R : Set} (condition : t F.t) (then_ else_ : t (BlockUnit.t R)) :
       t (BlockUnit.t R) :=
     Let condition (fun condition =>
     if condition =? 0 then
-      else_
+      wrap_in_scope else_
     else
-      then_).
+      wrap_in_scope then_).
 
   Definition while {R : Set} (condition : t F.t) (body : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
     Loop
@@ -187,7 +205,7 @@ Module M.
         if condition =? 0 then
           Pure (Some BlockUnit.Tt)
         else
-          let_ body (fun result =>
+          let_ (wrap_in_scope body) (fun result =>
           match result with
           | BlockUnit.Tt => Pure None
           | BlockUnit.Return _ => Pure (Some result)
@@ -271,7 +289,7 @@ Module Notations.
     (at level 200, x ident, e at level 200, k at level 200).
 
   Notation "'do~' a 'in' b" :=
-    (M.do a b)
+    (M.Do a b)
     (at level 200).
 
   Notation "e ~(| e1 , .. , en |)" :=
@@ -280,6 +298,14 @@ Module Notations.
 
   Notation "e ~(||)" :=
     (M.run (M.call e))
+    (at level 100).
+
+  Notation "e (| e1 , .. , en |)" :=
+    (M.run ((.. (e e1) ..) en))
+    (at level 100).
+
+  Notation "e (||)" :=
+    (M.run e)
     (at level 100).
 
   Notation "[[ e ]]" :=
@@ -434,6 +460,7 @@ Module Scope.
 
   Definition empty : t :=
     [].
+  Arguments empty /.
 
   Fixpoint get (scope : t) (name : string) : option {A : Set @ A} :=
     match scope with
@@ -445,16 +472,22 @@ Module Scope.
         get scope' name
     end.
 
-  Fixpoint set {A : Set} (scope : t) (name : string) (value : A) : t :=
+  Definition declare {A : Set} (scope : t) (name : string) (value : A) : t :=
+    (name, existS _ value) :: scope.
+  Arguments declare /.
+
+  Fixpoint set {A : Set} (scope : t) (name : string) (value : A) : option t :=
     match scope with
-    | [] => [(name, existS _ value)]
+    | [] => None
     | (name', value') :: scope' =>
       if String.eqb name name' then
-        (name, existS _ value) :: scope'
+        Some ((name, existS _ value) :: scope')
       else
-        (name', value') :: set scope' name value
+        match set scope' name value with
+        | Some scope' => Some ((name', value') :: scope')
+        | None => None
+        end
     end.
-  Arguments set /.
 End Scope.
 
 Module Scopes.
@@ -463,8 +496,49 @@ Module Scopes.
     list Scope.t.
 
   Definition empty : t :=
-    [Scope.empty].
+    [].
+  Arguments empty /.
+
+  Fixpoint get (scopes : t) (name : string) : option {A : Set @ A} :=
+    match scopes with
+    | [] => None
+    | scope :: scopes' =>
+      match Scope.get scope name with
+      | Some value => Some value
+      | None => get scopes' name
+      end
+    end.
+
+  Fixpoint set {A : Set} (scopes : t) (name : string) (value : A) : option t :=
+    match scopes with
+    | [] => None
+    | scope :: scopes' =>
+      match Scope.set scope name value with
+      | Some scope => Some (scope :: scopes')
+      | None =>
+        match set scopes' name value with
+        | Some scopes' => Some (scope :: scopes')
+        | None => None
+        end
+      end
+    end.
 End Scopes.
+
+Module GetVarAccessArrays.
+  Inductive t {Element : Set} :
+      forall {Container : Set}, Container -> list Access.t -> Element -> Prop :=
+  | Nil (element : Element) :
+    t element [] element
+  | Cons {SubContainer : Set}
+      (index : F.t)
+      (container : list SubContainer)
+      (sub_container : SubContainer)
+      (accesses : list Access.t)
+      (element : Element) :
+    t sub_container accesses element ->
+    List.nth_error container (Z.to_nat index) = Some sub_container ->
+    t container (Access.Array index :: accesses) element.
+End GetVarAccessArrays.
 
 Module Run.
   Reserved Notation "{{ p , state_in ⏩ e 🔽 output ⏩ state_out }}".
@@ -474,6 +548,21 @@ Module Run.
   | Pure :
     (* This should be the only case where the input and output states are the same. *)
     {{ p, scopes_out ⏩ M.Pure output 🔽 output ⏩ scopes_out }}
+  | PrimitiveOpenScope
+      (k : unit -> M.t A)
+      (scopes_in : Scopes.t) :
+    {{ p, Scope.empty :: scopes_in ⏩ k tt 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩
+      M.Primitive Primitive.OpenScope k 🔽 output
+    ⏩ scopes_out }}
+  | PrimitiveCloseScope
+      (k : unit -> M.t A)
+      (scope_in : Scope.t)
+      (scopes_in : Scopes.t) :
+    {{ p, scopes_in ⏩ k tt 🔽 output ⏩ scopes_out }} ->
+    {{ p, scope_in :: scopes_in ⏩
+      M.Primitive Primitive.CloseScope k 🔽 output
+    ⏩ scopes_out }}
   | PrimitiveGetPrime
       (k : Z -> M.t A)
       (scopes_in : Scopes.t) :
@@ -487,7 +576,7 @@ Module Run.
       (k : unit -> M.t A)
       (scope_in : Scope.t)
       (scopes_in : Scopes.t) :
-    {{ p, Scope.set scope_in name value :: scopes_in ⏩
+    {{ p, Scope.declare scope_in name value :: scopes_in ⏩
       k tt 🔽 output
     ⏩ scopes_out }} ->
     {{ p, scope_in :: scopes_in ⏩
@@ -497,13 +586,25 @@ Module Run.
       (name : string)
       (value : B)
       (k : unit -> M.t A)
-      (scope_in : Scope.t)
-      (scopes_in : Scopes.t) :
-    {{ p, Scope.set scope_in name value :: scopes_in ⏩
+      (scopes_in scopes_inter : Scopes.t) :
+    Scopes.set scopes_in name value = Some scopes_inter ->
+    {{ p, scopes_inter ⏩
       k tt 🔽 output
     ⏩ scopes_out }} ->
-    {{ p, scope_in :: scopes_in ⏩
+    {{ p, scopes_in ⏩
       M.Primitive (Primitive.SubstituteVar name value) k 🔽 output
+    ⏩ scopes_out }}
+  | PrimitiveGetVarAccess {Container Element : Set}
+      (name : string)
+      (accesses : list Access.t)
+      (k : Element -> M.t A)
+      (container : Container) (element : Element)
+      (scopes_in : Scopes.t) :
+    Scopes.get scopes_in name = Some (existS Container container) ->
+    GetVarAccessArrays.t container accesses element ->
+    {{ p, scopes_in ⏩ k element 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩
+      M.Primitive (Primitive.GetVarAccess name accesses) k 🔽 output
     ⏩ scopes_out }}
   | LoopNext {Out : Set}
       (body : M.t (option Out))
@@ -540,7 +641,51 @@ Module Run.
       (scopes_in : Scopes.t) :
     {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }} ->
     {{ p, scopes_in ⏩ M.let_ e k 🔽 output ⏩ scopes_out }}
+  | Call {B : Set}
+      (e : M.t B)
+      (k : B -> M.t A)
+      (output_inter : B)
+      (scopes_in : Scopes.t) :
+    {{ p, Scopes.empty ⏩ e 🔽 output_inter ⏩ Scopes.empty }} ->
+    {{ p, scopes_in ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.Call e k 🔽 output ⏩ scopes_out }}
 
   where "{{ p , scopes_in ⏩ e 🔽 output ⏩ scopes_out }}" :=
     (t p output scopes_out scopes_in e).
+
+  Lemma Loop {A Out : Set} (p : Z)
+      (body : M.t (option Out))
+      (k : Out -> M.t A)
+      (output : A)
+      (output_inter : option Out)
+      (scopes_in scopes_inter scopes_out : Scopes.t) :
+    {{ p, scopes_in ⏩ body 🔽 output_inter ⏩ scopes_inter }} ->
+    match output_inter with
+    | None =>
+      {{ p, scopes_inter ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+    | Some output_inter =>
+      {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }}
+    end ->
+    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}.
+  Proof.
+    intros H_body H_next.
+    destruct output_inter as [output_inter|].
+    { eapply LoopStop; eauto. }
+    { eapply LoopNext; eauto. }
+  Qed.
 End Run.
+
+Ltac run_deterministic :=
+  repeat (
+    cbn ||
+    apply Run.PrimitiveOpenScope ||
+    apply Run.PrimitiveCloseScope ||
+    apply Run.PrimitiveDeclareVar ||
+    (eapply Run.PrimitiveSubstituteVar; try reflexivity) ||
+    (eapply Run.PrimitiveGetVarAccess; try now repeat constructor) ||
+    eapply Run.PrimitiveGetPrime ||
+    eapply Run.Loop ||
+    eapply Run.Let ||
+    eapply Run.Call ||
+    apply Run.Pure
+  ).

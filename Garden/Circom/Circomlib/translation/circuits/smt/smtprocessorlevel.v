@@ -66,20 +66,20 @@ Definition SMTProcessorLevel : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "newSwitcher" in
   do~ M.substitute_var "newSwitcher" [[ M.call_function ~(| "Switcher", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "oldSwitcher" [[ M.var ~(| "oldChild" |) ]] in
-  do~ M.substitute_var "oldSwitcher" [[ M.var ~(| "sibling" |) ]] in
-  do~ M.substitute_var "oldSwitcher" [[ M.var ~(| "newlrbit" |) ]] in
-  do~ M.substitute_var "oldProofHash" [[ M.var_access ~(| "oldSwitcher", [Access.Component "outL"] |) ]] in
-  do~ M.substitute_var "oldProofHash" [[ M.var_access ~(| "oldSwitcher", [Access.Component "outR"] |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var ~(| "old1leaf" |), InfixOp.add ~(| InfixOp.add ~(| M.var ~(| "st_bot" |), M.var ~(| "st_new1" |) |), M.var ~(| "st_upd" |) |) |) ]] in
-  do~ M.substitute_var "oldRoot" [[ InfixOp.add ~(| M.var_access ~(| "aux", [Access.Array (0)] |), InfixOp.mul ~(| M.var_access ~(| "oldProofHash", [Access.Component "out"] |), M.var ~(| "st_top" |) |) |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var ~(| "newChild" |), InfixOp.add ~(| M.var ~(| "st_top" |), M.var ~(| "st_bot" |) |) |) ]] in
-  do~ M.substitute_var "newSwitcher" [[ InfixOp.add ~(| M.var_access ~(| "aux", [Access.Array (1)] |), InfixOp.mul ~(| M.var ~(| "new1leaf" |), M.var ~(| "st_new1" |) |) |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var ~(| "sibling" |), M.var ~(| "st_top" |) |) ]] in
-  do~ M.substitute_var "newSwitcher" [[ InfixOp.add ~(| M.var_access ~(| "aux", [Access.Array (2)] |), InfixOp.mul ~(| M.var ~(| "old1leaf" |), M.var ~(| "st_new1" |) |) |) ]] in
-  do~ M.substitute_var "newSwitcher" [[ M.var ~(| "newlrbit" |) ]] in
-  do~ M.substitute_var "newProofHash" [[ M.var_access ~(| "newSwitcher", [Access.Component "outL"] |) ]] in
-  do~ M.substitute_var "newProofHash" [[ M.var_access ~(| "newSwitcher", [Access.Component "outR"] |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var_access ~(| "newProofHash", [Access.Component "out"] |), InfixOp.add ~(| InfixOp.add ~(| M.var ~(| "st_top" |), M.var ~(| "st_bot" |) |), M.var ~(| "st_new1" |) |) |) ]] in
-  do~ M.substitute_var "newRoot" [[ InfixOp.add ~(| M.var_access ~(| "aux", [Access.Array (3)] |), InfixOp.mul ~(| M.var ~(| "new1leaf" |), InfixOp.add ~(| M.var ~(| "st_old0" |), M.var ~(| "st_upd" |) |) |) |) ]] in
+  do~ M.substitute_var "oldSwitcher" [[ M.var (| "oldChild" |) ]] in
+  do~ M.substitute_var "oldSwitcher" [[ M.var (| "sibling" |) ]] in
+  do~ M.substitute_var "oldSwitcher" [[ M.var (| "newlrbit" |) ]] in
+  do~ M.substitute_var "oldProofHash" [[ M.var_access (| "oldSwitcher", [Access.Component "outL"] |) ]] in
+  do~ M.substitute_var "oldProofHash" [[ M.var_access (| "oldSwitcher", [Access.Component "outR"] |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var (| "old1leaf" |), InfixOp.add ~(| InfixOp.add ~(| M.var (| "st_bot" |), M.var (| "st_new1" |) |), M.var (| "st_upd" |) |) |) ]] in
+  do~ M.substitute_var "oldRoot" [[ InfixOp.add ~(| M.var_access (| "aux", [Access.Array (0)] |), InfixOp.mul ~(| M.var_access (| "oldProofHash", [Access.Component "out"] |), M.var (| "st_top" |) |) |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var (| "newChild" |), InfixOp.add ~(| M.var (| "st_top" |), M.var (| "st_bot" |) |) |) ]] in
+  do~ M.substitute_var "newSwitcher" [[ InfixOp.add ~(| M.var_access (| "aux", [Access.Array (1)] |), InfixOp.mul ~(| M.var (| "new1leaf" |), M.var (| "st_new1" |) |) |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var (| "sibling" |), M.var (| "st_top" |) |) ]] in
+  do~ M.substitute_var "newSwitcher" [[ InfixOp.add ~(| M.var_access (| "aux", [Access.Array (2)] |), InfixOp.mul ~(| M.var (| "old1leaf" |), M.var (| "st_new1" |) |) |) ]] in
+  do~ M.substitute_var "newSwitcher" [[ M.var (| "newlrbit" |) ]] in
+  do~ M.substitute_var "newProofHash" [[ M.var_access (| "newSwitcher", [Access.Component "outL"] |) ]] in
+  do~ M.substitute_var "newProofHash" [[ M.var_access (| "newSwitcher", [Access.Component "outR"] |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var_access (| "newProofHash", [Access.Component "out"] |), InfixOp.add ~(| InfixOp.add ~(| M.var (| "st_top" |), M.var (| "st_bot" |) |), M.var (| "st_new1" |) |) |) ]] in
+  do~ M.substitute_var "newRoot" [[ InfixOp.add ~(| M.var_access (| "aux", [Access.Array (3)] |), InfixOp.mul ~(| M.var (| "new1leaf" |), InfixOp.add ~(| M.var (| "st_old0" |), M.var (| "st_upd" |) |) |) |) ]] in
   M.pure BlockUnit.Tt.

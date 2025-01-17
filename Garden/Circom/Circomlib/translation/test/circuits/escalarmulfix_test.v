@@ -24,17 +24,17 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
   (* Component *)
   do~ M.declare_component "escalarMul" in
-  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var ~(| "base" |) ] |) ]] in
+  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var (| "base" |) ] |) ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.substitute_var "n2b" [[ M.var ~(| "e" |) ]] in
+  do~ M.substitute_var "n2b" [[ M.var (| "e" |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 253 |) ]] (
-    do~ M.substitute_var "escalarMul" [[ M.var_access ~(| "n2b", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
+    do~ M.substitute_var "escalarMul" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMul", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMul", [Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMul", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMul", [Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

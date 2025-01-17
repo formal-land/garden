@@ -21,7 +21,7 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "sha256_2" in
   do~ M.substitute_var "sha256_2" [[ M.call_function ~(| "Sha256_2", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "sha256_2" [[ M.var ~(| "a" |) ]] in
-  do~ M.substitute_var "sha256_2" [[ M.var ~(| "a" |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "sha256_2", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "sha256_2" [[ M.var (| "a" |) ]] in
+  do~ M.substitute_var "sha256_2" [[ M.var (| "a" |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "sha256_2", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.

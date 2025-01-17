@@ -12,15 +12,15 @@ End PedersenSignals.
 (* Template body *)
 Definition Pedersen (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Output *)
   do~ M.declare_signal "out" [[ [ 2 ] ]] in
   (* Var *)
   do~ M.declare_var "nexps" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "nexps" [[ InfixOp.add ~(| InfixOp.intDiv ~(| InfixOp.sub ~(| M.var ~(| "n" |), 1 |), 250 |), 1 |) ]] in
+  do~ M.substitute_var "nexps" [[ InfixOp.add ~(| InfixOp.intDiv ~(| InfixOp.sub ~(| M.var (| "n" |), 1 |), 250 |), 1 |) ]] in
   (* Var *)
   do~ M.declare_var "nlastbits" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "nlastbits" [[ InfixOp.sub ~(| M.var ~(| "n" |), InfixOp.mul ~(| InfixOp.sub ~(| M.var ~(| "nexps" |), 1 |), 250 |) |) ]] in
+  do~ M.substitute_var "nlastbits" [[ InfixOp.sub ~(| M.var (| "n" |), InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "nexps" |), 1 |), 250 |) |) ]] in
   (* Component *)
   do~ M.declare_component "escalarMuls" in
   (* Var *)
@@ -37,27 +37,27 @@ Definition Pedersen (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_var "nexpbits" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "nexpbits" [[ 0 ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nexps" |) |) ]] (
-    do~ M.substitute_var "nexpbits" [[ ternary_expression (InfixOp.eq ~(| M.var ~(| "i" |), InfixOp.sub ~(| M.var ~(| "nexps" |), 1 |) |)) (M.var ~(| "nlastbits" |)) (250) ]] in
-    do~ M.substitute_var "escalarMuls" [[ M.call_function ~(| "EscalarMul", [ M.var ~(| "nexpbits" |); M.var_access ~(| "PBASE", [Access.Array (M.var ~(| "i" |))] |) ] |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nexps" |) |) ]] (
+    do~ M.substitute_var "nexpbits" [[ ternary_expression (InfixOp.eq ~(| M.var (| "i" |), InfixOp.sub ~(| M.var (| "nexps" |), 1 |) |)) (M.var (| "nlastbits" |)) (250) ]] in
+    do~ M.substitute_var "escalarMuls" [[ M.call_function ~(| "EscalarMul", [ M.var (| "nexpbits" |); M.var_access (| "PBASE", [Access.Array (M.var (| "i" |))] |) ] |) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "nexpbits" |) |) ]] (
-      do~ M.substitute_var "escalarMuls" [[ M.var_access ~(| "in", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 250, M.var ~(| "i" |) |), M.var ~(| "j" |) |))] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "nexpbits" |) |) ]] (
+      do~ M.substitute_var "escalarMuls" [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 250, M.var (| "i" |) |), M.var (| "j" |) |))] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "i" |), 0 |) ]] (* then *) (
+    do~ M.if_ [[ InfixOp.eq ~(| M.var (| "i" |), 0 |) ]] (* then *) (
       do~ M.substitute_var "escalarMuls" [[ 0 ]] in
       do~ M.substitute_var "escalarMuls" [[ 1 ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "escalarMuls" [[ M.var_access ~(| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
-      do~ M.substitute_var "escalarMuls" [[ M.var_access ~(| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Component "out"; Access.Array (1)] |) ]] in
+      do~ M.substitute_var "escalarMuls" [[ M.var_access (| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
+      do~ M.substitute_var "escalarMuls" [[ M.var_access (| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Component "out"; Access.Array (1)] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var ~(| "nexps" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var ~(| "nexps" |), 1 |)); Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var (| "nexps" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMuls", [Access.Array (InfixOp.sub ~(| M.var (| "nexps" |), 1 |)); Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

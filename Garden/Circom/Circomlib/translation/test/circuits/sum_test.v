@@ -33,20 +33,20 @@ Definition A : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "b2n" in
   do~ M.substitute_var "b2n" [[ M.call_function ~(| "Bits2Num", [ 32 ] |) ]] in
-  do~ M.substitute_var "n2ba" [[ M.var ~(| "a" |) ]] in
-  do~ M.substitute_var "n2bb" [[ M.var ~(| "b" |) ]] in
+  do~ M.substitute_var "n2ba" [[ M.var (| "a" |) ]] in
+  do~ M.substitute_var "n2bb" [[ M.var (| "b" |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "n2ba", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "n2bb", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+    do~ M.substitute_var "sum" [[ M.var_access (| "n2ba", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "sum" [[ M.var_access (| "n2bb", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "b2n" [[ M.var_access ~(| "sum", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+    do~ M.substitute_var "b2n" [[ M.var_access (| "sum", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "b2n", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "b2n", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
