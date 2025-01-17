@@ -54,11 +54,11 @@ Definition SMTVerifierSM : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "prev_top_lev_ins" [[ ([] : list F.t) ]] in
   (* Signal Intermediate *)
   do~ M.declare_signal "prev_top_lev_ins_fnc" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "prev_top_lev_ins" [[ InfixOp.mul ~(| M.var ~(| "prev_top" |), M.var ~(| "levIns" |) |) ]] in
-  do~ M.substitute_var "prev_top_lev_ins_fnc" [[ InfixOp.mul ~(| M.var ~(| "prev_top_lev_ins" |), M.var ~(| "fnc" |) |) ]] in
-  do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var ~(| "prev_top" |), M.var ~(| "prev_top_lev_ins" |) |) ]] in
-  do~ M.substitute_var "st_inew" [[ InfixOp.sub ~(| M.var ~(| "prev_top_lev_ins" |), M.var ~(| "prev_top_lev_ins_fnc" |) |) ]] in
-  do~ M.substitute_var "st_iold" [[ InfixOp.mul ~(| M.var ~(| "prev_top_lev_ins_fnc" |), InfixOp.sub ~(| 1, M.var ~(| "is0" |) |) |) ]] in
-  do~ M.substitute_var "st_i0" [[ InfixOp.mul ~(| M.var ~(| "prev_top_lev_ins" |), M.var ~(| "is0" |) |) ]] in
-  do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var ~(| "prev_na" |), M.var ~(| "prev_inew" |) |), M.var ~(| "prev_iold" |) |), M.var ~(| "prev_i0" |) |) ]] in
+  do~ M.substitute_var "prev_top_lev_ins" [[ InfixOp.mul ~(| M.var (| "prev_top" |), M.var (| "levIns" |) |) ]] in
+  do~ M.substitute_var "prev_top_lev_ins_fnc" [[ InfixOp.mul ~(| M.var (| "prev_top_lev_ins" |), M.var (| "fnc" |) |) ]] in
+  do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var (| "prev_top" |), M.var (| "prev_top_lev_ins" |) |) ]] in
+  do~ M.substitute_var "st_inew" [[ InfixOp.sub ~(| M.var (| "prev_top_lev_ins" |), M.var (| "prev_top_lev_ins_fnc" |) |) ]] in
+  do~ M.substitute_var "st_iold" [[ InfixOp.mul ~(| M.var (| "prev_top_lev_ins_fnc" |), InfixOp.sub ~(| 1, M.var (| "is0" |) |) |) ]] in
+  do~ M.substitute_var "st_i0" [[ InfixOp.mul ~(| M.var (| "prev_top_lev_ins" |), M.var (| "is0" |) |) ]] in
+  do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var (| "prev_na" |), M.var (| "prev_inew" |) |), M.var (| "prev_iold" |) |), M.var (| "prev_i0" |) |) ]] in
   M.pure BlockUnit.Tt.

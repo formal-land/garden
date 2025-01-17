@@ -27,7 +27,7 @@ Definition Switcher : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "outR" [[ ([] : list F.t) ]] in
   (* Signal Intermediate *)
   do~ M.declare_signal "aux" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var ~(| "R" |), M.var ~(| "L" |) |), M.var ~(| "sel" |) |) ]] in
-  do~ M.substitute_var "outL" [[ InfixOp.add ~(| M.var ~(| "aux" |), M.var ~(| "L" |) |) ]] in
-  do~ M.substitute_var "outR" [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var ~(| "aux" |) |), M.var ~(| "R" |) |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "R" |), M.var (| "L" |) |), M.var (| "sel" |) |) ]] in
+  do~ M.substitute_var "outL" [[ InfixOp.add ~(| M.var (| "aux" |), M.var (| "L" |) |) ]] in
+  do~ M.substitute_var "outR" [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var (| "aux" |) |), M.var (| "R" |) |) ]] in
   M.pure BlockUnit.Tt.

@@ -21,9 +21,9 @@ Definition Sigma : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "in2" [[ ([] : list F.t) ]] in
   (* Signal Intermediate *)
   do~ M.declare_signal "in4" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "in2" [[ InfixOp.mul ~(| M.var ~(| "in" |), M.var ~(| "in" |) |) ]] in
-  do~ M.substitute_var "in4" [[ InfixOp.mul ~(| M.var ~(| "in2" |), M.var ~(| "in2" |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var ~(| "in4" |), M.var ~(| "in" |) |) ]] in
+  do~ M.substitute_var "in2" [[ InfixOp.mul ~(| M.var (| "in" |), M.var (| "in" |) |) ]] in
+  do~ M.substitute_var "in4" [[ InfixOp.mul ~(| M.var (| "in2" |), M.var (| "in2" |) |) ]] in
+  do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var (| "in4" |), M.var (| "in" |) |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -37,15 +37,15 @@ End ArkSignals.
 (* Template body *)
 Definition Ark (t C r : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "t" |) ] ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "t" |) ] ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |), M.var_access ~(| "C", [Access.Array (InfixOp.add ~(| M.var ~(| "i" |), M.var ~(| "r" |) |))] |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (M.var (| "i" |))] |), M.var_access (| "C", [Access.Array (InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |))] |) |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -61,27 +61,27 @@ End MixSignals.
 (* Template body *)
 Definition Mix (t M : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "t" |) ] ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "t" |) ] ]] in
   (* Var *)
   do~ M.declare_var "lc" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "lc" [[ 0 ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "t" |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "t" |) |) ]] (
     do~ M.substitute_var "lc" [[ 0 ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var ~(| "lc" |), InfixOp.mul ~(| M.var_access ~(| "M", [Access.Array (M.var ~(| "j" |)); Access.Array (M.var ~(| "i" |))] |), M.var_access ~(| "in", [Access.Array (M.var ~(| "j" |))] |) |) |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var (| "lc" |), InfixOp.mul ~(| M.var_access (| "M", [Access.Array (M.var (| "j" |)); Access.Array (M.var (| "i" |))] |), M.var_access (| "in", [Access.Array (M.var (| "j" |))] |) |) |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var ~(| "lc" |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "out" [[ M.var (| "lc" |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -97,7 +97,7 @@ End MixLastSignals.
 (* Template body *)
 Definition MixLast (t M s : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "t" |) ] ]] in
   (* Signal Output *)
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Var *)
@@ -106,12 +106,12 @@ Definition MixLast (t M s : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var ~(| "lc" |), InfixOp.mul ~(| M.var_access ~(| "M", [Access.Array (M.var ~(| "j" |)); Access.Array (M.var ~(| "s" |))] |), M.var_access ~(| "in", [Access.Array (M.var ~(| "j" |))] |) |) |) ]] in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var (| "lc" |), InfixOp.mul ~(| M.var_access (| "M", [Access.Array (M.var (| "j" |)); Access.Array (M.var (| "s" |))] |), M.var_access (| "in", [Access.Array (M.var (| "j" |))] |) |) |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var ~(| "lc" |) ]] in
+  do~ M.substitute_var "out" [[ M.var (| "lc" |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -125,27 +125,27 @@ End MixSSignals.
 (* Template body *)
 Definition MixS (t S r : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "t" |) ] ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "t" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "t" |) ] ]] in
   (* Var *)
   do~ M.declare_var "lc" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "lc" [[ 0 ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var ~(| "lc" |), InfixOp.mul ~(| M.var_access ~(| "S", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "t" |), 2 |), 1 |), M.var ~(| "r" |) |), M.var ~(| "i" |) |))] |), M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |) |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "lc" [[ InfixOp.add ~(| M.var (| "lc" |), InfixOp.mul ~(| M.var_access (| "S", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "t" |), 2 |), 1 |), M.var (| "r" |) |), M.var (| "i" |) |))] |), M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) |) |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var ~(| "lc" |) ]] in
+  do~ M.substitute_var "out" [[ M.var (| "lc" |) ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 1 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |), InfixOp.mul ~(| M.var_access ~(| "in", [Access.Array (0)] |), M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "t" |), 2 |), 1 |), M.var ~(| "r" |) |), M.var ~(| "t" |) |), M.var ~(| "i" |) |), 1 |))] |) |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (M.var (| "i" |))] |), InfixOp.mul ~(| M.var_access (| "in", [Access.Array (0)] |), M.var_access (| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "t" |), 2 |), 1 |), M.var (| "r" |) |), M.var (| "t" |) |), M.var (| "i" |) |), 1 |))] |) |) |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -162,40 +162,40 @@ End PoseidonExSignals.
 (* Template body *)
 Definition PoseidonEx (nInputs nOuts : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "inputs" [[ [ M.var ~(| "nInputs" |) ] ]] in
+  do~ M.declare_signal "inputs" [[ [ M.var (| "nInputs" |) ] ]] in
   (* Signal Input *)
   do~ M.declare_signal "initialState" [[ ([] : list F.t) ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "nOuts" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "nOuts" |) ] ]] in
   (* Var *)
   do~ M.declare_var "N_ROUNDS_P" [[ [ 16 ] ]] in
   do~ M.substitute_var "N_ROUNDS_P" [[ array_with_repeat (0) (16) ]] in
   do~ M.substitute_var "N_ROUNDS_P" [[ [ 56; 57; 56; 60; 60; 63; 64; 63; 60; 66; 60; 65; 70; 60; 64; 68 ] ]] in
   (* Var *)
   do~ M.declare_var "t" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "t" [[ InfixOp.add ~(| M.var ~(| "nInputs" |), 1 |) ]] in
+  do~ M.substitute_var "t" [[ InfixOp.add ~(| M.var (| "nInputs" |), 1 |) ]] in
   (* Var *)
   do~ M.declare_var "nRoundsF" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "nRoundsF" [[ 8 ]] in
   (* Var *)
   do~ M.declare_var "nRoundsP" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "nRoundsP" [[ M.var_access ~(| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var ~(| "t" |), 2 |))] |) ]] in
+  do~ M.substitute_var "nRoundsP" [[ M.var_access (| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var (| "t" |), 2 |))] |) ]] in
   (* Var *)
-  do~ M.declare_var "C" [[ [ InfixOp.add ~(| InfixOp.mul ~(| M.var ~(| "t" |), M.var ~(| "nRoundsF" |) |), M.var ~(| "nRoundsP" |) |) ] ]] in
-  do~ M.substitute_var "C" [[ array_with_repeat (0) (InfixOp.add ~(| InfixOp.mul ~(| M.var ~(| "t" |), M.var ~(| "nRoundsF" |) |), M.var ~(| "nRoundsP" |) |)) ]] in
-  do~ M.substitute_var "C" [[ M.call_function ~(| "POSEIDON_C", [ M.var ~(| "t" |) ] |) ]] in
+  do~ M.declare_var "C" [[ [ InfixOp.add ~(| InfixOp.mul ~(| M.var (| "t" |), M.var (| "nRoundsF" |) |), M.var (| "nRoundsP" |) |) ] ]] in
+  do~ M.substitute_var "C" [[ array_with_repeat (0) (InfixOp.add ~(| InfixOp.mul ~(| M.var (| "t" |), M.var (| "nRoundsF" |) |), M.var (| "nRoundsP" |) |)) ]] in
+  do~ M.substitute_var "C" [[ M.call_function ~(| "POSEIDON_C", [ M.var (| "t" |) ] |) ]] in
   (* Var *)
-  do~ M.declare_var "S" [[ [ InfixOp.mul ~(| M.var_access ~(| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var ~(| "t" |), 2 |))] |), InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "t" |), 2 |), 1 |) |) ] ]] in
-  do~ M.substitute_var "S" [[ array_with_repeat (0) (InfixOp.mul ~(| M.var_access ~(| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var ~(| "t" |), 2 |))] |), InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "t" |), 2 |), 1 |) |)) ]] in
-  do~ M.substitute_var "S" [[ M.call_function ~(| "POSEIDON_S", [ M.var ~(| "t" |) ] |) ]] in
+  do~ M.declare_var "S" [[ [ InfixOp.mul ~(| M.var_access (| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var (| "t" |), 2 |))] |), InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "t" |), 2 |), 1 |) |) ] ]] in
+  do~ M.substitute_var "S" [[ array_with_repeat (0) (InfixOp.mul ~(| M.var_access (| "N_ROUNDS_P", [Access.Array (InfixOp.sub ~(| M.var (| "t" |), 2 |))] |), InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "t" |), 2 |), 1 |) |)) ]] in
+  do~ M.substitute_var "S" [[ M.call_function ~(| "POSEIDON_S", [ M.var (| "t" |) ] |) ]] in
   (* Var *)
-  do~ M.declare_var "M" [[ [ M.var ~(| "t" |); M.var ~(| "t" |) ] ]] in
-  do~ M.substitute_var "M" [[ array_with_repeat (array_with_repeat (0) (M.var ~(| "t" |))) (M.var ~(| "t" |)) ]] in
-  do~ M.substitute_var "M" [[ M.call_function ~(| "POSEIDON_M", [ M.var ~(| "t" |) ] |) ]] in
+  do~ M.declare_var "M" [[ [ M.var (| "t" |); M.var (| "t" |) ] ]] in
+  do~ M.substitute_var "M" [[ array_with_repeat (array_with_repeat (0) (M.var (| "t" |))) (M.var (| "t" |)) ]] in
+  do~ M.substitute_var "M" [[ M.call_function ~(| "POSEIDON_M", [ M.var (| "t" |) ] |) ]] in
   (* Var *)
-  do~ M.declare_var "P" [[ [ M.var ~(| "t" |); M.var ~(| "t" |) ] ]] in
-  do~ M.substitute_var "P" [[ array_with_repeat (array_with_repeat (0) (M.var ~(| "t" |))) (M.var ~(| "t" |)) ]] in
-  do~ M.substitute_var "P" [[ M.call_function ~(| "POSEIDON_P", [ M.var ~(| "t" |) ] |) ]] in
+  do~ M.declare_var "P" [[ [ M.var (| "t" |); M.var (| "t" |) ] ]] in
+  do~ M.substitute_var "P" [[ array_with_repeat (array_with_repeat (0) (M.var (| "t" |))) (M.var (| "t" |)) ]] in
+  do~ M.substitute_var "P" [[ M.call_function ~(| "POSEIDON_P", [ M.var (| "t" |) ] |) ]] in
   (* Component *)
   do~ M.declare_component "ark" in
   (* Component *)
@@ -208,188 +208,188 @@ Definition PoseidonEx (nInputs nOuts : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_component "mixS" in
   (* Component *)
   do~ M.declare_component "mixLast" in
-  do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var ~(| "t" |); M.var ~(| "C" |); 0 ] |) ]] in
+  do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var (| "t" |); M.var (| "C" |); 0 ] |) ]] in
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-    do~ M.if_ [[ InfixOp.greater ~(| M.var ~(| "j" |), 0 |) ]] (* then *) (
-      do~ M.substitute_var "ark" [[ M.var_access ~(| "inputs", [Access.Array (InfixOp.sub ~(| M.var ~(| "j" |), 1 |))] |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+    do~ M.if_ [[ InfixOp.greater ~(| M.var (| "j" |), 0 |) ]] (* then *) (
+      do~ M.substitute_var "ark" [[ M.var_access (| "inputs", [Access.Array (InfixOp.sub ~(| M.var (| "j" |), 1 |))] |) ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "ark" [[ M.var ~(| "initialState" |) ]] in
+      do~ M.substitute_var "ark" [[ M.var (| "initialState" |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "r" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "r" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "r" |), InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "r" |), InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |) |) ]] (
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
       do~ M.substitute_var "sigmaF" [[ M.call_function ~(| "Sigma", ([] : list F.t) |) ]] in
-      do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "r" |), 0 |) ]] (* then *) (
-        do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "ark", [Access.Array (0); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+      do~ M.if_ [[ InfixOp.eq ~(| M.var (| "r" |), 0 |) ]] (* then *) (
+        do~ M.substitute_var "sigmaF" [[ M.var_access (| "ark", [Access.Array (0); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
         M.pure BlockUnit.Tt
       ) (* else *) (
-        do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| M.var ~(| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+        do~ M.substitute_var "sigmaF" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| M.var (| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
         M.pure BlockUnit.Tt
       ) in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var ~(| "t" |); M.var ~(| "C" |); InfixOp.mul ~(| InfixOp.add ~(| M.var ~(| "r" |), 1 |), M.var ~(| "t" |) |) ] |) ]] in
+    do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var (| "t" |); M.var (| "C" |); InfixOp.mul ~(| InfixOp.add ~(| M.var (| "r" |), 1 |), M.var (| "t" |) |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "ark" [[ M.var_access ~(| "sigmaF", [Access.Array (M.var ~(| "r" |)); Access.Array (M.var ~(| "j" |)); Access.Component "out"] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "ark" [[ M.var_access (| "sigmaF", [Access.Array (M.var (| "r" |)); Access.Array (M.var (| "j" |)); Access.Component "out"] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var ~(| "t" |); M.var ~(| "M" |) ] |) ]] in
+    do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var (| "t" |); M.var (| "M" |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "mix" [[ M.var_access ~(| "ark", [Access.Array (InfixOp.add ~(| M.var ~(| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "mix" [[ M.var_access (| "ark", [Access.Array (InfixOp.add ~(| M.var (| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var ~(| "r" |), 1 |) ]] in
+    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var (| "r" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
     do~ M.substitute_var "sigmaF" [[ M.call_function ~(| "Sigma", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 2 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.substitute_var "sigmaF" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 2 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var ~(| "t" |); M.var ~(| "C" |); InfixOp.mul ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), M.var ~(| "t" |) |) ] |) ]] in
+  do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var (| "t" |); M.var (| "C" |); InfixOp.mul ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), M.var (| "t" |) |) ] |) ]] in
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "ark" [[ M.var_access ~(| "sigmaF", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |)); Access.Array (M.var ~(| "j" |)); Access.Component "out"] |) ]] in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "ark" [[ M.var_access (| "sigmaF", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |)); Access.Array (M.var (| "j" |)); Access.Component "out"] |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var ~(| "t" |); M.var ~(| "P" |) ] |) ]] in
+  do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var (| "t" |); M.var (| "P" |) ] |) ]] in
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-    do~ M.substitute_var "mix" [[ M.var_access ~(| "ark", [Access.Array (InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+    do~ M.substitute_var "mix" [[ M.var_access (| "ark", [Access.Array (InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "r" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "r" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "r" |), M.var ~(| "nRoundsP" |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "r" |), M.var (| "nRoundsP" |) |) ]] (
     do~ M.substitute_var "sigmaP" [[ M.call_function ~(| "Sigma", ([] : list F.t) |) ]] in
-    do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "r" |), 0 |) ]] (* then *) (
-      do~ M.substitute_var "sigmaP" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.if_ [[ InfixOp.eq ~(| M.var (| "r" |), 0 |) ]] (* then *) (
+      do~ M.substitute_var "sigmaP" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "sigmaP" [[ M.var_access ~(| "mixS", [Access.Array (InfixOp.sub ~(| M.var ~(| "r" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
+      do~ M.substitute_var "sigmaP" [[ M.var_access (| "mixS", [Access.Array (InfixOp.sub ~(| M.var (| "r" |), 1 |)); Access.Component "out"; Access.Array (0)] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "mixS" [[ M.call_function ~(| "MixS", [ M.var ~(| "t" |); M.var ~(| "S" |); M.var ~(| "r" |) ] |) ]] in
+    do~ M.substitute_var "mixS" [[ M.call_function ~(| "MixS", [ M.var (| "t" |); M.var (| "S" |); M.var (| "r" |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "j" |), 0 |) ]] (* then *) (
-        do~ M.substitute_var "mixS" [[ InfixOp.add ~(| M.var_access ~(| "sigmaP", [Access.Array (M.var ~(| "r" |)); Access.Component "out"] |), M.var_access ~(| "C", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |), M.var ~(| "t" |) |), M.var ~(| "r" |) |))] |) |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.if_ [[ InfixOp.eq ~(| M.var (| "j" |), 0 |) ]] (* then *) (
+        do~ M.substitute_var "mixS" [[ InfixOp.add ~(| M.var_access (| "sigmaP", [Access.Array (M.var (| "r" |)); Access.Component "out"] |), M.var_access (| "C", [Access.Array (InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |), M.var (| "t" |) |), M.var (| "r" |) |))] |) |) ]] in
         M.pure BlockUnit.Tt
       ) (* else *) (
-        do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "r" |), 0 |) ]] (* then *) (
-          do~ M.substitute_var "mixS" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+        do~ M.if_ [[ InfixOp.eq ~(| M.var (| "r" |), 0 |) ]] (* then *) (
+          do~ M.substitute_var "mixS" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
           M.pure BlockUnit.Tt
         ) (* else *) (
-          do~ M.substitute_var "mixS" [[ M.var_access ~(| "mixS", [Access.Array (InfixOp.sub ~(| M.var ~(| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+          do~ M.substitute_var "mixS" [[ M.var_access (| "mixS", [Access.Array (InfixOp.sub ~(| M.var (| "r" |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
           M.pure BlockUnit.Tt
         ) in
         M.pure BlockUnit.Tt
       ) in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var ~(| "r" |), 1 |) ]] in
+    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var (| "r" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "r" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "r" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "r" |), InfixOp.sub ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "r" |), InfixOp.sub ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |) |) ]] (
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
       do~ M.substitute_var "sigmaF" [[ M.call_function ~(| "Sigma", ([] : list F.t) |) ]] in
-      do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "r" |), 0 |) ]] (* then *) (
-        do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "mixS", [Access.Array (InfixOp.sub ~(| M.var ~(| "nRoundsP" |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+      do~ M.if_ [[ InfixOp.eq ~(| M.var (| "r" |), 0 |) ]] (* then *) (
+        do~ M.substitute_var "sigmaF" [[ M.var_access (| "mixS", [Access.Array (InfixOp.sub ~(| M.var (| "nRoundsP" |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
         M.pure BlockUnit.Tt
       ) (* else *) (
-        do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), M.var ~(| "r" |) |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
+        do~ M.substitute_var "sigmaF" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), M.var (| "r" |) |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
         M.pure BlockUnit.Tt
       ) in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var ~(| "t" |); M.var ~(| "C" |); InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), 1 |), M.var ~(| "t" |) |), M.var ~(| "nRoundsP" |) |), InfixOp.mul ~(| M.var ~(| "r" |), M.var ~(| "t" |) |) |) ] |) ]] in
+    do~ M.substitute_var "ark" [[ M.call_function ~(| "Ark", [ M.var (| "t" |); M.var (| "C" |); InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), 1 |), M.var (| "t" |) |), M.var (| "nRoundsP" |) |), InfixOp.mul ~(| M.var (| "r" |), M.var (| "t" |) |) |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "ark" [[ M.var_access ~(| "sigmaF", [Access.Array (InfixOp.add ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), M.var ~(| "r" |) |)); Access.Array (M.var ~(| "j" |)); Access.Component "out"] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "ark" [[ M.var_access (| "sigmaF", [Access.Array (InfixOp.add ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), M.var (| "r" |) |)); Access.Array (M.var (| "j" |)); Access.Component "out"] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var ~(| "t" |); M.var ~(| "M" |) ] |) ]] in
+    do~ M.substitute_var "mix" [[ M.call_function ~(| "Mix", [ M.var (| "t" |); M.var (| "M" |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "mix" [[ M.var_access ~(| "ark", [Access.Array (InfixOp.add ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var ~(| "nRoundsF" |), 2 |), M.var ~(| "r" |) |), 1 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "mix" [[ M.var_access (| "ark", [Access.Array (InfixOp.add ~(| InfixOp.add ~(| InfixOp.intDiv ~(| M.var (| "nRoundsF" |), 2 |), M.var (| "r" |) |), 1 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var ~(| "r" |), 1 |) ]] in
+    do~ M.substitute_var "r" [[ InfixOp.add ~(| M.var (| "r" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "j" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "j" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
     do~ M.substitute_var "sigmaF" [[ M.call_function ~(| "Sigma", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "sigmaF" [[ M.var_access ~(| "mix", [Access.Array (InfixOp.sub ~(| M.var ~(| "nRoundsF" |), 2 |)); Access.Component "out"; Access.Array (M.var ~(| "j" |))] |) ]] in
-    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.substitute_var "sigmaF" [[ M.var_access (| "mix", [Access.Array (InfixOp.sub ~(| M.var (| "nRoundsF" |), 2 |)); Access.Component "out"; Access.Array (M.var (| "j" |))] |) ]] in
+    do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nOuts" |) |) ]] (
-    do~ M.substitute_var "mixLast" [[ M.call_function ~(| "MixLast", [ M.var ~(| "t" |); M.var ~(| "M" |); M.var ~(| "i" |) ] |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nOuts" |) |) ]] (
+    do~ M.substitute_var "mixLast" [[ M.call_function ~(| "MixLast", [ M.var (| "t" |); M.var (| "M" |); M.var (| "i" |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "j" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "j" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "j" |), M.var ~(| "t" |) |) ]] (
-      do~ M.substitute_var "mixLast" [[ M.var_access ~(| "sigmaF", [Access.Array (InfixOp.sub ~(| M.var ~(| "nRoundsF" |), 1 |)); Access.Array (M.var ~(| "j" |)); Access.Component "out"] |) ]] in
-      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var ~(| "j" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "j" |), M.var (| "t" |) |) ]] (
+      do~ M.substitute_var "mixLast" [[ M.var_access (| "sigmaF", [Access.Array (InfixOp.sub ~(| M.var (| "nRoundsF" |), 1 |)); Access.Array (M.var (| "j" |)); Access.Component "out"] |) ]] in
+      do~ M.substitute_var "j" [[ InfixOp.add ~(| M.var (| "j" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var_access ~(| "mixLast", [Access.Array (M.var ~(| "i" |)); Access.Component "out"] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "out" [[ M.var_access (| "mixLast", [Access.Array (M.var (| "i" |)); Access.Component "out"] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -405,20 +405,20 @@ End PoseidonSignals.
 (* Template body *)
 Definition Poseidon (nInputs : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "inputs" [[ [ M.var ~(| "nInputs" |) ] ]] in
+  do~ M.declare_signal "inputs" [[ [ M.var (| "nInputs" |) ] ]] in
   (* Signal Output *)
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Component *)
   do~ M.declare_component "pEx" in
-  do~ M.substitute_var "pEx" [[ M.call_function ~(| "PoseidonEx", [ M.var ~(| "nInputs" |); 1 ] |) ]] in
+  do~ M.substitute_var "pEx" [[ M.call_function ~(| "PoseidonEx", [ M.var (| "nInputs" |); 1 ] |) ]] in
   do~ M.substitute_var "pEx" [[ 0 ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nInputs" |) |) ]] (
-    do~ M.substitute_var "pEx" [[ M.var_access ~(| "inputs", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nInputs" |) |) ]] (
+    do~ M.substitute_var "pEx" [[ M.var_access (| "inputs", [Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "pEx", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "pEx", [Access.Component "out"; Access.Array (0)] |) ]] in
   M.pure BlockUnit.Tt.

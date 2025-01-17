@@ -24,15 +24,15 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   do~ M.substitute_var "base" [[ [ 5299619240641551281634865583518297030282874472190772894086521144482721001553; 16950150798460657717958625567821834550301663161624707787222815936182638968203 ] ]] in
   (* Component *)
   do~ M.declare_component "escalarMul" in
-  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMul", [ 256; M.var ~(| "base" |) ] |) ]] in
+  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMul", [ 256; M.var (| "base" |) ] |) ]] in
   do~ M.substitute_var "escalarMul" [[ 0 ]] in
   do~ M.substitute_var "escalarMul" [[ 1 ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 256 |) ]] (
-    do~ M.substitute_var "escalarMul" [[ M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 256 |) ]] (
+    do~ M.substitute_var "escalarMul" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMul", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMul", [Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMul", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMul", [Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

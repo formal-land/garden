@@ -12,21 +12,21 @@ End ShRSignals.
 (* Template body *)
 Definition ShR (n r : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "n" |) |) ]] (
-    do~ M.if_ [[ InfixOp.greaterEq ~(| InfixOp.add ~(| M.var ~(| "i" |), M.var ~(| "r" |) |), M.var ~(| "n" |) |) ]] (* then *) (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
+    do~ M.if_ [[ InfixOp.greaterEq ~(| InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |), M.var (| "n" |) |) ]] (* then *) (
       do~ M.substitute_var "out" [[ 0 ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "out" [[ M.var_access ~(| "in", [Access.Array (InfixOp.add ~(| M.var ~(| "i" |), M.var ~(| "r" |) |))] |) ]] in
+      do~ M.substitute_var "out" [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |))] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
