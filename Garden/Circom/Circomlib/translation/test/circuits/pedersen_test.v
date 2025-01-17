@@ -25,15 +25,15 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.substitute_var "n2b" [[ M.var_access ~(| "in", [Access.Array (0)] |) ]] in
-  do~ M.substitute_var "n2b" [[ M.var_access ~(| "in", [Access.Array (1)] |) ]] in
+  do~ M.substitute_var "n2b" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+  do~ M.substitute_var "n2b" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 250 |) ]] (
-    do~ M.substitute_var "pedersen" [[ M.var_access ~(| "n2b", [Access.Array (0); Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "pedersen" [[ M.var_access ~(| "n2b", [Access.Array (1); Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 250 |) ]] (
+    do~ M.substitute_var "pedersen" [[ M.var_access (| "n2b", [Access.Array (0); Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "pedersen" [[ M.var_access (| "n2b", [Access.Array (1); Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "pedersen", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "pedersen", [Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

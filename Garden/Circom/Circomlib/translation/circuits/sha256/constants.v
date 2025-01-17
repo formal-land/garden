@@ -19,9 +19,9 @@ Definition H (x : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access ~(| "c", [Access.Array (M.var ~(| "x" |))] |), M.var ~(| "i" |) |), 1 |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access (| "c", [Access.Array (M.var (| "x" |))] |), M.var (| "i" |) |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -44,9 +44,9 @@ Definition K (x : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access ~(| "c", [Access.Array (M.var ~(| "x" |))] |), M.var ~(| "i" |) |), 1 |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access (| "c", [Access.Array (M.var (| "x" |))] |), M.var (| "i" |) |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.

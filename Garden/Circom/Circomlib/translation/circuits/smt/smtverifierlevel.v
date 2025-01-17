@@ -51,12 +51,12 @@ Definition SMTVerifierLevel : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "switcher" in
   do~ M.substitute_var "switcher" [[ M.call_function ~(| "Switcher", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "switcher" [[ M.var ~(| "child" |) ]] in
-  do~ M.substitute_var "switcher" [[ M.var ~(| "sibling" |) ]] in
-  do~ M.substitute_var "switcher" [[ M.var ~(| "lrbit" |) ]] in
-  do~ M.substitute_var "proofHash" [[ M.var_access ~(| "switcher", [Access.Component "outL"] |) ]] in
-  do~ M.substitute_var "proofHash" [[ M.var_access ~(| "switcher", [Access.Component "outR"] |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var_access ~(| "proofHash", [Access.Component "out"] |), M.var ~(| "st_top" |) |) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var ~(| "old1leaf" |), M.var ~(| "st_iold" |) |) ]] in
-  do~ M.substitute_var "root" [[ InfixOp.add ~(| InfixOp.add ~(| M.var_access ~(| "aux", [Access.Array (0)] |), M.var_access ~(| "aux", [Access.Array (1)] |) |), InfixOp.mul ~(| M.var ~(| "new1leaf" |), M.var ~(| "st_inew" |) |) |) ]] in
+  do~ M.substitute_var "switcher" [[ M.var (| "child" |) ]] in
+  do~ M.substitute_var "switcher" [[ M.var (| "sibling" |) ]] in
+  do~ M.substitute_var "switcher" [[ M.var (| "lrbit" |) ]] in
+  do~ M.substitute_var "proofHash" [[ M.var_access (| "switcher", [Access.Component "outL"] |) ]] in
+  do~ M.substitute_var "proofHash" [[ M.var_access (| "switcher", [Access.Component "outR"] |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var_access (| "proofHash", [Access.Component "out"] |), M.var (| "st_top" |) |) ]] in
+  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var (| "old1leaf" |), M.var (| "st_iold" |) |) ]] in
+  do~ M.substitute_var "root" [[ InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "aux", [Access.Array (0)] |), M.var_access (| "aux", [Access.Array (1)] |) |), InfixOp.mul ~(| M.var (| "new1leaf" |), M.var (| "st_inew" |) |) |) ]] in
   M.pure BlockUnit.Tt.

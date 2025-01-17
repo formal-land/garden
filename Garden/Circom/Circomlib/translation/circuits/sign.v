@@ -22,10 +22,10 @@ Definition Sign : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 254 |) ]] (
-    do~ M.substitute_var "comp" [[ M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
+    do~ M.substitute_var "comp" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "sign" [[ M.var_access ~(| "comp", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "sign" [[ M.var_access (| "comp", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.

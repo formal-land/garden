@@ -18,10 +18,10 @@ Definition IsZero : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Signal Intermediate *)
   do~ M.declare_signal "inv" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "inv" [[ ternary_expression (InfixOp.notEq ~(| M.var ~(| "in" |), 0 |)) (InfixOp.div ~(| 1, M.var ~(| "in" |) |)) (0) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var ~(| "in" |) |), M.var ~(| "inv" |) |), 1 |) ]] in
+  do~ M.substitute_var "inv" [[ ternary_expression (InfixOp.notEq ~(| M.var (| "in" |), 0 |)) (InfixOp.div ~(| 1, M.var (| "in" |) |)) (0) ]] in
+  do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var (| "in" |) |), M.var (| "inv" |) |), 1 |) ]] in
   do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var ~(| "in" |), M.var ~(| "out" |) |) ]]
+    [[ InfixOp.mul ~(| M.var (| "in" |), M.var (| "out" |) |) ]]
     [[ 0 ]]
   in
   M.pure BlockUnit.Tt.
@@ -43,8 +43,8 @@ Definition IsEqual : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "isz" in
   do~ M.substitute_var "isz" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access ~(| "in", [Access.Array (1)] |), M.var_access ~(| "in", [Access.Array (0)] |) |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "isz", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "isz", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -64,9 +64,9 @@ Definition ForceEqualIfEnabled : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "isz" in
   do~ M.substitute_var "isz" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access ~(| "in", [Access.Array (1)] |), M.var_access ~(| "in", [Access.Array (0)] |) |) ]] in
+  do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
   do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var_access ~(| "isz", [Access.Component "out"] |) |), M.var ~(| "enabled" |) |) ]]
+    [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var_access (| "isz", [Access.Component "out"] |) |), M.var (| "enabled" |) |) ]]
     [[ 0 ]]
   in
   M.pure BlockUnit.Tt.
@@ -81,16 +81,16 @@ End LessThanSignals.
 
 (* Template body *)
 Definition LessThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
-  do~ M.assert [[ InfixOp.lesserEq ~(| M.var ~(| "n" |), 252 |) ]] in
+  do~ M.assert [[ InfixOp.lesserEq ~(| M.var (| "n" |), 252 |) ]] in
   (* Signal Input *)
   do~ M.declare_signal "in" [[ [ 2 ] ]] in
   (* Signal Output *)
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Component *)
   do~ M.declare_component "n2b" in
-  do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ InfixOp.add ~(| M.var ~(| "n" |), 1 |) ] |) ]] in
-  do~ M.substitute_var "n2b" [[ InfixOp.sub ~(| InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (0)] |), InfixOp.shiftL ~(| 1, M.var ~(| "n" |) |) |), M.var_access ~(| "in", [Access.Array (1)] |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.sub ~(| 1, M.var_access ~(| "n2b", [Access.Component "out"; Access.Array (M.var ~(| "n" |))] |) |) ]] in
+  do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ InfixOp.add ~(| M.var (| "n" |), 1 |) ] |) ]] in
+  do~ M.substitute_var "n2b" [[ InfixOp.sub ~(| InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), InfixOp.shiftL ~(| 1, M.var (| "n" |) |) |), M.var_access (| "in", [Access.Array (1)] |) |) ]] in
+  do~ M.substitute_var "out" [[ InfixOp.sub ~(| 1, M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "n" |))] |) |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -109,10 +109,10 @@ Definition LessEqThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Component *)
   do~ M.declare_component "lt" in
-  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var ~(| "n" |) ] |) ]] in
-  do~ M.substitute_var "lt" [[ M.var_access ~(| "in", [Access.Array (0)] |) ]] in
-  do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (1)] |), 1 |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "lt", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+  do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+  do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (1)] |), 1 |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -131,10 +131,10 @@ Definition GreaterThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Component *)
   do~ M.declare_component "lt" in
-  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var ~(| "n" |) ] |) ]] in
-  do~ M.substitute_var "lt" [[ M.var_access ~(| "in", [Access.Array (1)] |) ]] in
-  do~ M.substitute_var "lt" [[ M.var_access ~(| "in", [Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "lt", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+  do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
+  do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -153,8 +153,8 @@ Definition GreaterEqThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
   (* Component *)
   do~ M.declare_component "lt" in
-  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var ~(| "n" |) ] |) ]] in
-  do~ M.substitute_var "lt" [[ M.var_access ~(| "in", [Access.Array (1)] |) ]] in
-  do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (0)] |), 1 |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "lt", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+  do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
+  do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.

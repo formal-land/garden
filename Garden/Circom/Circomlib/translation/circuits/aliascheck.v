@@ -18,13 +18,13 @@ Definition AliasCheck : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 254 |) ]] (
-    do~ M.substitute_var "compConstant" [[ M.var_access ~(| "in", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
+    do~ M.substitute_var "compConstant" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   do~ M.equality_constraint
-    [[ M.var_access ~(| "compConstant", [Access.Component "out"] |) ]]
+    [[ M.var_access (| "compConstant", [Access.Component "out"] |) ]]
     [[ 0 ]]
   in
   M.pure BlockUnit.Tt.

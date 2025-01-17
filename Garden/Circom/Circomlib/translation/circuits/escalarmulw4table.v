@@ -3,7 +3,7 @@ Require Import Garden.Garden.
 
 (* Function *)
 Definition pointAdd (x1 y1 x2 y2 : F.t) : M.t F.t :=
-  M.function_body (
+  M.function_body [("x1", x1); ("y1", y1); ("x2", x2); ("y2", y2)] (
     (* Var *)
     do~ M.declare_var "a" [[ ([] : list F.t) ]] in
     do~ M.substitute_var "a" [[ 168700 ]] in
@@ -13,15 +13,15 @@ Definition pointAdd (x1 y1 x2 y2 : F.t) : M.t F.t :=
     (* Var *)
     do~ M.declare_var "res" [[ [ 2 ] ]] in
     do~ M.substitute_var "res" [[ array_with_repeat (0) (2) ]] in
-    do~ M.substitute_var "res" [[ InfixOp.div ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var ~(| "x1" |), M.var ~(| "y2" |) |), InfixOp.mul ~(| M.var ~(| "y1" |), M.var ~(| "x2" |) |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "x1" |) |), M.var ~(| "x2" |) |), M.var ~(| "y1" |) |), M.var ~(| "y2" |) |) |) |) ]] in
-    do~ M.substitute_var "res" [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "y1" |), M.var ~(| "y2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "x1" |) |), M.var ~(| "x2" |) |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "x1" |) |), M.var ~(| "x2" |) |), M.var ~(| "y1" |) |), M.var ~(| "y2" |) |) |) |) ]] in
-    do~ M.return_ [[ M.var ~(| "res" |) ]] in
+    do~ M.substitute_var "res" [[ InfixOp.div ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var (| "x1" |), M.var (| "y2" |) |), InfixOp.mul ~(| M.var (| "y1" |), M.var (| "x2" |) |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "d" |), M.var (| "x1" |) |), M.var (| "x2" |) |), M.var (| "y1" |) |), M.var (| "y2" |) |) |) |) ]] in
+    do~ M.substitute_var "res" [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "y1" |), M.var (| "y2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "a" |), M.var (| "x1" |) |), M.var (| "x2" |) |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "d" |), M.var (| "x1" |) |), M.var (| "x2" |) |), M.var (| "y1" |) |), M.var (| "y2" |) |) |) |) ]] in
+    do~ M.return_ [[ M.var (| "res" |) ]] in
     M.pure BlockUnit.Tt
   ).
 
 (* Function *)
 Definition EscalarMulW4Table (base k : F.t) : M.t F.t :=
-  M.function_body (
+  M.function_body [("base", base); ("k", k)] (
     (* Var *)
     do~ M.declare_var "out" [[ [ 16; 2 ] ]] in
     do~ M.substitute_var "out" [[ array_with_repeat (array_with_repeat (0) (2)) (16) ]] in
@@ -34,23 +34,23 @@ Definition EscalarMulW4Table (base k : F.t) : M.t F.t :=
     (* Var *)
     do~ M.declare_var "dbl" [[ [ 2 ] ]] in
     do~ M.substitute_var "dbl" [[ array_with_repeat (0) (2) ]] in
-    do~ M.substitute_var "dbl" [[ M.var ~(| "base" |) ]] in
+    do~ M.substitute_var "dbl" [[ M.var (| "base" |) ]] in
     do~ M.substitute_var "i" [[ 0 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), InfixOp.mul ~(| M.var ~(| "k" |), 4 |) |) ]] (
-      do~ M.substitute_var "dbl" [[ M.call_function ~(| "pointAdd", [ M.var_access ~(| "dbl", [Access.Array (0)] |); M.var_access ~(| "dbl", [Access.Array (1)] |); M.var_access ~(| "dbl", [Access.Array (0)] |); M.var_access ~(| "dbl", [Access.Array (1)] |) ] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), InfixOp.mul ~(| M.var (| "k" |), 4 |) |) ]] (
+      do~ M.substitute_var "dbl" [[ M.call_function ~(| "pointAdd", [ M.var_access (| "dbl", [Access.Array (0)] |); M.var_access (| "dbl", [Access.Array (1)] |); M.var_access (| "dbl", [Access.Array (0)] |); M.var_access (| "dbl", [Access.Array (1)] |) ] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
     do~ M.substitute_var "out" [[ 0 ]] in
     do~ M.substitute_var "out" [[ 1 ]] in
     do~ M.substitute_var "i" [[ 1 ]] in
-    do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 16 |) ]] (
-      do~ M.substitute_var "p" [[ M.call_function ~(| "pointAdd", [ M.var_access ~(| "out", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Array (0)] |); M.var_access ~(| "out", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Array (1)] |); M.var_access ~(| "dbl", [Access.Array (0)] |); M.var_access ~(| "dbl", [Access.Array (1)] |) ] |) ]] in
-      do~ M.substitute_var "out" [[ M.var_access ~(| "p", [Access.Array (0)] |) ]] in
-      do~ M.substitute_var "out" [[ M.var_access ~(| "p", [Access.Array (1)] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 16 |) ]] (
+      do~ M.substitute_var "p" [[ M.call_function ~(| "pointAdd", [ M.var_access (| "out", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Array (0)] |); M.var_access (| "out", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Array (1)] |); M.var_access (| "dbl", [Access.Array (0)] |); M.var_access (| "dbl", [Access.Array (1)] |) ] |) ]] in
+      do~ M.substitute_var "out" [[ M.var_access (| "p", [Access.Array (0)] |) ]] in
+      do~ M.substitute_var "out" [[ M.var_access (| "p", [Access.Array (1)] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.return_ [[ M.var ~(| "out" |) ]] in
+    do~ M.return_ [[ M.var (| "out" |) ]] in
     M.pure BlockUnit.Tt
   ).

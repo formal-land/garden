@@ -22,14 +22,14 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "escalarMul" [[ [ 16; 2 ] ]] in
   do~ M.substitute_var "escalarMul" [[ array_with_repeat (array_with_repeat (0) (2)) (16) ]] in
-  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMulW4Table", [ M.var ~(| "base" |); 0 ] |) ]] in
+  do~ M.substitute_var "escalarMul" [[ M.call_function ~(| "EscalarMulW4Table", [ M.var (| "base" |); 0 ] |) ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 16 |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var_access ~(| "escalarMul", [Access.Array (M.var ~(| "i" |)); Access.Array (0)] |), M.var ~(| "in" |) |) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var_access ~(| "escalarMul", [Access.Array (M.var ~(| "i" |)); Access.Array (1)] |), M.var ~(| "in" |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 16 |) ]] (
+    do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var_access (| "escalarMul", [Access.Array (M.var (| "i" |)); Access.Array (0)] |), M.var (| "in" |) |) ]] in
+    do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var_access (| "escalarMul", [Access.Array (M.var (| "i" |)); Access.Array (1)] |), M.var (| "in" |) |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.

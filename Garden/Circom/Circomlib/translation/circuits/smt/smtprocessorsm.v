@@ -63,12 +63,12 @@ Definition SMTProcessorSM : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_signal "aux1" [[ ([] : list F.t) ]] in
   (* Signal Intermediate *)
   do~ M.declare_signal "aux2" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "aux1" [[ InfixOp.mul ~(| M.var ~(| "prev_top" |), M.var ~(| "levIns" |) |) ]] in
-  do~ M.substitute_var "aux2" [[ InfixOp.mul ~(| M.var ~(| "aux1" |), M.var_access ~(| "fnc", [Access.Array (0)] |) |) ]] in
-  do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var ~(| "prev_top" |), M.var ~(| "aux1" |) |) ]] in
-  do~ M.substitute_var "st_old0" [[ InfixOp.mul ~(| M.var ~(| "aux2" |), M.var ~(| "is0" |) |) ]] in
-  do~ M.substitute_var "st_new1" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| M.var ~(| "aux2" |), M.var ~(| "st_old0" |) |), M.var ~(| "prev_bot" |) |), M.var ~(| "xor" |) |) ]] in
-  do~ M.substitute_var "st_bot" [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var ~(| "xor" |) |), InfixOp.add ~(| InfixOp.sub ~(| M.var ~(| "aux2" |), M.var ~(| "st_old0" |) |), M.var ~(| "prev_bot" |) |) |) ]] in
-  do~ M.substitute_var "st_upd" [[ InfixOp.sub ~(| M.var ~(| "aux1" |), M.var ~(| "aux2" |) |) ]] in
-  do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var ~(| "prev_new1" |), M.var ~(| "prev_old0" |) |), M.var ~(| "prev_na" |) |), M.var ~(| "prev_upd" |) |) ]] in
+  do~ M.substitute_var "aux1" [[ InfixOp.mul ~(| M.var (| "prev_top" |), M.var (| "levIns" |) |) ]] in
+  do~ M.substitute_var "aux2" [[ InfixOp.mul ~(| M.var (| "aux1" |), M.var_access (| "fnc", [Access.Array (0)] |) |) ]] in
+  do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var (| "prev_top" |), M.var (| "aux1" |) |) ]] in
+  do~ M.substitute_var "st_old0" [[ InfixOp.mul ~(| M.var (| "aux2" |), M.var (| "is0" |) |) ]] in
+  do~ M.substitute_var "st_new1" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |), M.var (| "xor" |) |) ]] in
+  do~ M.substitute_var "st_bot" [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var (| "xor" |) |), InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |) |) ]] in
+  do~ M.substitute_var "st_upd" [[ InfixOp.sub ~(| M.var (| "aux1" |), M.var (| "aux2" |) |) ]] in
+  do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var (| "prev_new1" |), M.var (| "prev_old0" |) |), M.var (| "prev_na" |) |), M.var (| "prev_upd" |) |) ]] in
   M.pure BlockUnit.Tt.

@@ -45,19 +45,19 @@ Definition BabyAdd : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "d" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "d" [[ 168696 ]] in
-  do~ M.substitute_var "beta" [[ InfixOp.mul ~(| M.var ~(| "x1" |), M.var ~(| "y2" |) |) ]] in
-  do~ M.substitute_var "gamma" [[ InfixOp.mul ~(| M.var ~(| "y1" |), M.var ~(| "x2" |) |) ]] in
-  do~ M.substitute_var "delta" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var ~(| "a" |) |), M.var ~(| "x1" |) |), M.var ~(| "y1" |) |), InfixOp.add ~(| M.var ~(| "x2" |), M.var ~(| "y2" |) |) |) ]] in
-  do~ M.substitute_var "tau" [[ InfixOp.mul ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |) ]] in
-  do~ M.substitute_var "xout" [[ InfixOp.div ~(| InfixOp.add ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |) |) ]] in
+  do~ M.substitute_var "beta" [[ InfixOp.mul ~(| M.var (| "x1" |), M.var (| "y2" |) |) ]] in
+  do~ M.substitute_var "gamma" [[ InfixOp.mul ~(| M.var (| "y1" |), M.var (| "x2" |) |) ]] in
+  do~ M.substitute_var "delta" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var (| "a" |) |), M.var (| "x1" |) |), M.var (| "y1" |) |), InfixOp.add ~(| M.var (| "x2" |), M.var (| "y2" |) |) |) ]] in
+  do~ M.substitute_var "tau" [[ InfixOp.mul ~(| M.var (| "beta" |), M.var (| "gamma" |) |) ]] in
+  do~ M.substitute_var "xout" [[ InfixOp.div ~(| InfixOp.add ~(| M.var (| "beta" |), M.var (| "gamma" |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |) |) ]] in
   do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.add ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |), M.var ~(| "xout" |) |) ]]
-    [[ InfixOp.add ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |) ]]
+    [[ InfixOp.mul ~(| InfixOp.add ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |), M.var (| "xout" |) |) ]]
+    [[ InfixOp.add ~(| M.var (| "beta" |), M.var (| "gamma" |) |) ]]
   in
-  do~ M.substitute_var "yout" [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "delta" |), InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "beta" |) |) |), M.var ~(| "gamma" |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |) |) ]] in
+  do~ M.substitute_var "yout" [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.add ~(| M.var (| "delta" |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "beta" |) |) |), M.var (| "gamma" |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |) |) ]] in
   do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |), M.var ~(| "yout" |) |) ]]
-    [[ InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "delta" |), InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "beta" |) |) |), M.var ~(| "gamma" |) |) ]]
+    [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |), M.var (| "yout" |) |) ]]
+    [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "delta" |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "beta" |) |) |), M.var (| "gamma" |) |) ]]
   in
   M.pure BlockUnit.Tt.
 
@@ -84,12 +84,12 @@ Definition BabyDbl : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "adder" in
   do~ M.substitute_var "adder" [[ M.call_function ~(| "BabyAdd", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "x" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "y" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "x" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "y" |) ]] in
-  do~ M.substitute_var "xout" [[ M.var_access ~(| "adder", [Access.Component "xout"] |) ]] in
-  do~ M.substitute_var "yout" [[ M.var_access ~(| "adder", [Access.Component "yout"] |) ]] in
+  do~ M.substitute_var "adder" [[ M.var (| "x" |) ]] in
+  do~ M.substitute_var "adder" [[ M.var (| "y" |) ]] in
+  do~ M.substitute_var "adder" [[ M.var (| "x" |) ]] in
+  do~ M.substitute_var "adder" [[ M.var (| "y" |) ]] in
+  do~ M.substitute_var "xout" [[ M.var_access (| "adder", [Access.Component "xout"] |) ]] in
+  do~ M.substitute_var "yout" [[ M.var_access (| "adder", [Access.Component "yout"] |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -118,11 +118,11 @@ Definition BabyCheck : M.t (BlockUnit.t Empty_set) :=
   (* Var *)
   do~ M.declare_var "d" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "d" [[ 168696 ]] in
-  do~ M.substitute_var "x2" [[ InfixOp.mul ~(| M.var ~(| "x" |), M.var ~(| "x" |) |) ]] in
-  do~ M.substitute_var "y2" [[ InfixOp.mul ~(| M.var ~(| "y" |), M.var ~(| "y" |) |) ]] in
+  do~ M.substitute_var "x2" [[ InfixOp.mul ~(| M.var (| "x" |), M.var (| "x" |) |) ]] in
+  do~ M.substitute_var "y2" [[ InfixOp.mul ~(| M.var (| "y" |), M.var (| "y" |) |) ]] in
   do~ M.equality_constraint
-    [[ InfixOp.add ~(| InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "x2" |) |), M.var ~(| "y2" |) |) ]]
-    [[ InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "x2" |) |), M.var ~(| "y2" |) |) |) ]]
+    [[ InfixOp.add ~(| InfixOp.mul ~(| M.var (| "a" |), M.var (| "x2" |) |), M.var (| "y2" |) |) ]]
+    [[ InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "d" |), M.var (| "x2" |) |), M.var (| "y2" |) |) |) ]]
   in
   M.pure BlockUnit.Tt.
 
@@ -150,19 +150,19 @@ Definition BabyPbk : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "pvkBits" in
   do~ M.substitute_var "pvkBits" [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
-  do~ M.substitute_var "pvkBits" [[ M.var ~(| "in" |) ]] in
+  do~ M.substitute_var "pvkBits" [[ M.var (| "in" |) ]] in
   (* Component *)
   do~ M.declare_component "mulFix" in
-  do~ M.substitute_var "mulFix" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var ~(| "BASE8" |) ] |) ]] in
+  do~ M.substitute_var "mulFix" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var (| "BASE8" |) ] |) ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 253 |) ]] (
-    do~ M.substitute_var "mulFix" [[ M.var_access ~(| "pvkBits", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
+    do~ M.substitute_var "mulFix" [[ M.var_access (| "pvkBits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "Ax" [[ M.var_access ~(| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "Ay" [[ M.var_access ~(| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "Ax" [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "Ay" [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

@@ -196,11 +196,11 @@ def to_coq_expression(node) -> str:
         variable = node["Variable"]
         if len(variable["access"]) == 0:
             return \
-                "M.var ~(| " + \
+                "M.var (| " + \
                 "\"" + variable["name"] + "\"" + \
                 " |)"
         return \
-            "M.var_access ~(| " + \
+            "M.var_access (| " + \
             "\"" + variable["name"] + "\"" + ", " + \
             "[" + "; ".join(to_coq_access(access) for access in variable["access"]) + "]" + \
             " |)"
@@ -495,7 +495,9 @@ def to_coq_definition(node) -> str:
             "Definition " + function["name"] + to_coq_definition_args(function["args"]) + \
             " : M.t F.t :=\n" + \
             indent(
-                "M.function_body (\n" + \
+                "M.function_body [" +
+                "; ".join(f"(\"{arg}\", {arg})" for arg in function["args"]) +
+                "] (\n" + \
                 indent(
                     to_coq_statement(function["body"])
                 ) + "\n" +

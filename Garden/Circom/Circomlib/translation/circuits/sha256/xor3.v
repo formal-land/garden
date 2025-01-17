@@ -15,22 +15,22 @@ End Xor3Signals.
 (* Template body *)
 Definition Xor3 (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "a" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "a" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Input *)
-  do~ M.declare_signal "b" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "b" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "c" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
   (* Signal Intermediate *)
-  do~ M.declare_signal "mid" [[ [ M.var ~(| "n" |) ] ]] in
+  do~ M.declare_signal "mid" [[ [ M.var (| "n" |) ] ]] in
   (* Var *)
   do~ M.declare_var "k" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "k" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "k" |), M.var ~(| "n" |) |) ]] (
-    do~ M.substitute_var "mid" [[ InfixOp.mul ~(| M.var_access ~(| "b", [Access.Array (M.var ~(| "k" |))] |), M.var_access ~(| "c", [Access.Array (M.var ~(| "k" |))] |) |) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var_access ~(| "a", [Access.Array (M.var ~(| "k" |))] |), InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| 2, M.var_access ~(| "b", [Access.Array (M.var ~(| "k" |))] |) |) |), InfixOp.mul ~(| 2, M.var_access ~(| "c", [Access.Array (M.var ~(| "k" |))] |) |) |), InfixOp.mul ~(| 4, M.var_access ~(| "mid", [Access.Array (M.var ~(| "k" |))] |) |) |) |), M.var_access ~(| "b", [Access.Array (M.var ~(| "k" |))] |) |), M.var_access ~(| "c", [Access.Array (M.var ~(| "k" |))] |) |), InfixOp.mul ~(| 2, M.var_access ~(| "mid", [Access.Array (M.var ~(| "k" |))] |) |) |) ]] in
-    do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var ~(| "k" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "k" |), M.var (| "n" |) |) ]] (
+    do~ M.substitute_var "mid" [[ InfixOp.mul ~(| M.var_access (| "b", [Access.Array (M.var (| "k" |))] |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) ]] in
+    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var_access (| "a", [Access.Array (M.var (| "k" |))] |), InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| 2, M.var_access (| "b", [Access.Array (M.var (| "k" |))] |) |) |), InfixOp.mul ~(| 2, M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) |), InfixOp.mul ~(| 4, M.var_access (| "mid", [Access.Array (M.var (| "k" |))] |) |) |) |), M.var_access (| "b", [Access.Array (M.var (| "k" |))] |) |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |), InfixOp.mul ~(| 2, M.var_access (| "mid", [Access.Array (M.var (| "k" |))] |) |) |) ]] in
+    do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var (| "k" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.

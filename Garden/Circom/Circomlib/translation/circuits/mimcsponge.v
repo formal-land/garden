@@ -13,41 +13,41 @@ End MiMCSpongeSignals.
 (* Template body *)
 Definition MiMCSponge (nInputs nRounds nOutputs : F.t) : M.t (BlockUnit.t Empty_set) :=
   (* Signal Input *)
-  do~ M.declare_signal "ins" [[ [ M.var ~(| "nInputs" |) ] ]] in
+  do~ M.declare_signal "ins" [[ [ M.var (| "nInputs" |) ] ]] in
   (* Signal Input *)
   do~ M.declare_signal "k" [[ ([] : list F.t) ]] in
   (* Signal Output *)
-  do~ M.declare_signal "outs" [[ [ M.var ~(| "nOutputs" |) ] ]] in
+  do~ M.declare_signal "outs" [[ [ M.var (| "nOutputs" |) ] ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
   (* Component *)
   do~ M.declare_component "S" in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nInputs" |) |) ]] (
-    do~ M.substitute_var "S" [[ M.call_function ~(| "MiMCFeistel", [ M.var ~(| "nRounds" |) ] |) ]] in
-    do~ M.substitute_var "S" [[ M.var ~(| "k" |) ]] in
-    do~ M.if_ [[ InfixOp.eq ~(| M.var ~(| "i" |), 0 |) ]] (* then *) (
-      do~ M.substitute_var "S" [[ M.var_access ~(| "ins", [Access.Array (0)] |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nInputs" |) |) ]] (
+    do~ M.substitute_var "S" [[ M.call_function ~(| "MiMCFeistel", [ M.var (| "nRounds" |) ] |) ]] in
+    do~ M.substitute_var "S" [[ M.var (| "k" |) ]] in
+    do~ M.if_ [[ InfixOp.eq ~(| M.var (| "i" |), 0 |) ]] (* then *) (
+      do~ M.substitute_var "S" [[ M.var_access (| "ins", [Access.Array (0)] |) ]] in
       do~ M.substitute_var "S" [[ 0 ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "S" [[ InfixOp.add ~(| M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Component "xL_out"] |), M.var_access ~(| "ins", [Access.Array (M.var ~(| "i" |))] |) |) ]] in
-      do~ M.substitute_var "S" [[ M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Component "xR_out"] |) ]] in
+      do~ M.substitute_var "S" [[ InfixOp.add ~(| M.var_access (| "S", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Component "xL_out"] |), M.var_access (| "ins", [Access.Array (M.var (| "i" |))] |) |) ]] in
+      do~ M.substitute_var "S" [[ M.var_access (| "S", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Component "xR_out"] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "outs" [[ M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| M.var ~(| "nInputs" |), 1 |)); Access.Component "xL_out"] |) ]] in
+  do~ M.substitute_var "outs" [[ M.var_access (| "S", [Access.Array (InfixOp.sub ~(| M.var (| "nInputs" |), 1 |)); Access.Component "xL_out"] |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), InfixOp.sub ~(| M.var ~(| "nOutputs" |), 1 |) |) ]] (
-    do~ M.substitute_var "S" [[ M.call_function ~(| "MiMCFeistel", [ M.var ~(| "nRounds" |) ] |) ]] in
-    do~ M.substitute_var "S" [[ M.var ~(| "k" |) ]] in
-    do~ M.substitute_var "S" [[ M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "nInputs" |), M.var ~(| "i" |) |), 1 |)); Access.Component "xL_out"] |) ]] in
-    do~ M.substitute_var "S" [[ M.var_access ~(| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "nInputs" |), M.var ~(| "i" |) |), 1 |)); Access.Component "xR_out"] |) ]] in
-    do~ M.substitute_var "outs" [[ M.var_access ~(| "S", [Access.Array (InfixOp.add ~(| M.var ~(| "nInputs" |), M.var ~(| "i" |) |)); Access.Component "xL_out"] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), InfixOp.sub ~(| M.var (| "nOutputs" |), 1 |) |) ]] (
+    do~ M.substitute_var "S" [[ M.call_function ~(| "MiMCFeistel", [ M.var (| "nRounds" |) ] |) ]] in
+    do~ M.substitute_var "S" [[ M.var (| "k" |) ]] in
+    do~ M.substitute_var "S" [[ M.var_access (| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| M.var (| "nInputs" |), M.var (| "i" |) |), 1 |)); Access.Component "xL_out"] |) ]] in
+    do~ M.substitute_var "S" [[ M.var_access (| "S", [Access.Array (InfixOp.sub ~(| InfixOp.add ~(| M.var (| "nInputs" |), M.var (| "i" |) |), 1 |)); Access.Component "xR_out"] |) ]] in
+    do~ M.substitute_var "outs" [[ M.var_access (| "S", [Access.Array (InfixOp.add ~(| M.var (| "nInputs" |), M.var (| "i" |) |)); Access.Component "xL_out"] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.
@@ -87,43 +87,43 @@ Definition MiMCFeistel (nrounds : F.t) : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_var "t" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "t" [[ 0 ]] in
   (* Signal Intermediate *)
-  do~ M.declare_signal "t2" [[ [ M.var ~(| "nrounds" |) ] ]] in
+  do~ M.declare_signal "t2" [[ [ M.var (| "nrounds" |) ] ]] in
   (* Signal Intermediate *)
-  do~ M.declare_signal "t4" [[ [ M.var ~(| "nrounds" |) ] ]] in
+  do~ M.declare_signal "t4" [[ [ M.var (| "nrounds" |) ] ]] in
   (* Signal Intermediate *)
-  do~ M.declare_signal "xL" [[ [ InfixOp.sub ~(| M.var ~(| "nrounds" |), 1 |) ] ]] in
+  do~ M.declare_signal "xL" [[ [ InfixOp.sub ~(| M.var (| "nrounds" |), 1 |) ] ]] in
   (* Signal Intermediate *)
-  do~ M.declare_signal "xR" [[ [ InfixOp.sub ~(| M.var ~(| "nrounds" |), 1 |) ] ]] in
+  do~ M.declare_signal "xR" [[ [ InfixOp.sub ~(| M.var (| "nrounds" |), 1 |) ] ]] in
   (* Var *)
   do~ M.declare_var "c" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "c" [[ 0 ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nrounds" |) |) ]] (
-    do~ M.if_ [[ InfixOp.boolOr ~(| InfixOp.eq ~(| M.var ~(| "i" |), 0 |), InfixOp.eq ~(| M.var ~(| "i" |), InfixOp.sub ~(| M.var ~(| "nrounds" |), 1 |) |) |) ]] (* then *) (
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nrounds" |) |) ]] (
+    do~ M.if_ [[ InfixOp.boolOr ~(| InfixOp.eq ~(| M.var (| "i" |), 0 |), InfixOp.eq ~(| M.var (| "i" |), InfixOp.sub ~(| M.var (| "nrounds" |), 1 |) |) |) ]] (* then *) (
       do~ M.substitute_var "c" [[ 0 ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "c" [[ M.var_access ~(| "c_partial", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |) ]] in
+      do~ M.substitute_var "c" [[ M.var_access (| "c_partial", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "t" [[ ternary_expression (InfixOp.eq ~(| M.var ~(| "i" |), 0 |)) (InfixOp.add ~(| M.var ~(| "k" |), M.var ~(| "xL_in" |) |)) (InfixOp.add ~(| InfixOp.add ~(| M.var ~(| "k" |), M.var_access ~(| "xL", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |) |), M.var ~(| "c" |) |)) ]] in
-    do~ M.substitute_var "t2" [[ InfixOp.mul ~(| M.var ~(| "t" |), M.var ~(| "t" |) |) ]] in
-    do~ M.substitute_var "t4" [[ InfixOp.mul ~(| M.var_access ~(| "t2", [Access.Array (M.var ~(| "i" |))] |), M.var_access ~(| "t2", [Access.Array (M.var ~(| "i" |))] |) |) ]] in
-    do~ M.if_ [[ InfixOp.lesser ~(| M.var ~(| "i" |), InfixOp.sub ~(| M.var ~(| "nrounds" |), 1 |) |) ]] (* then *) (
+    do~ M.substitute_var "t" [[ ternary_expression (InfixOp.eq ~(| M.var (| "i" |), 0 |)) (InfixOp.add ~(| M.var (| "k" |), M.var (| "xL_in" |) |)) (InfixOp.add ~(| InfixOp.add ~(| M.var (| "k" |), M.var_access (| "xL", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |) |), M.var (| "c" |) |)) ]] in
+    do~ M.substitute_var "t2" [[ InfixOp.mul ~(| M.var (| "t" |), M.var (| "t" |) |) ]] in
+    do~ M.substitute_var "t4" [[ InfixOp.mul ~(| M.var_access (| "t2", [Access.Array (M.var (| "i" |))] |), M.var_access (| "t2", [Access.Array (M.var (| "i" |))] |) |) ]] in
+    do~ M.if_ [[ InfixOp.lesser ~(| M.var (| "i" |), InfixOp.sub ~(| M.var (| "nrounds" |), 1 |) |) ]] (* then *) (
       (* Var *)
       do~ M.declare_var "aux" [[ ([] : list F.t) ]] in
-      do~ M.substitute_var "aux" [[ ternary_expression (InfixOp.eq ~(| M.var ~(| "i" |), 0 |)) (M.var ~(| "xR_in" |)) (M.var_access ~(| "xR", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |)) ]] in
-      do~ M.substitute_var "xL" [[ InfixOp.add ~(| M.var ~(| "aux" |), InfixOp.mul ~(| M.var_access ~(| "t4", [Access.Array (M.var ~(| "i" |))] |), M.var ~(| "t" |) |) |) ]] in
-      do~ M.substitute_var "xR" [[ ternary_expression (InfixOp.eq ~(| M.var ~(| "i" |), 0 |)) (M.var ~(| "xL_in" |)) (M.var_access ~(| "xL", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |)) ]] in
+      do~ M.substitute_var "aux" [[ ternary_expression (InfixOp.eq ~(| M.var (| "i" |), 0 |)) (M.var (| "xR_in" |)) (M.var_access (| "xR", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |)) ]] in
+      do~ M.substitute_var "xL" [[ InfixOp.add ~(| M.var (| "aux" |), InfixOp.mul ~(| M.var_access (| "t4", [Access.Array (M.var (| "i" |))] |), M.var (| "t" |) |) |) ]] in
+      do~ M.substitute_var "xR" [[ ternary_expression (InfixOp.eq ~(| M.var (| "i" |), 0 |)) (M.var (| "xL_in" |)) (M.var_access (| "xL", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |)) ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
-      do~ M.substitute_var "xR_out" [[ InfixOp.add ~(| M.var_access ~(| "xR", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |), InfixOp.mul ~(| M.var_access ~(| "t4", [Access.Array (M.var ~(| "i" |))] |), M.var ~(| "t" |) |) |) ]] in
-      do~ M.substitute_var "xL_out" [[ M.var_access ~(| "xL", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |))] |) ]] in
+      do~ M.substitute_var "xR_out" [[ InfixOp.add ~(| M.var_access (| "xR", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |), InfixOp.mul ~(| M.var_access (| "t4", [Access.Array (M.var (| "i" |))] |), M.var (| "t" |) |) |) ]] in
+      do~ M.substitute_var "xL_out" [[ M.var_access (| "xL", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.

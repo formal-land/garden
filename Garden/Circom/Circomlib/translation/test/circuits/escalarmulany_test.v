@@ -24,18 +24,18 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "escalarMulAny" in
   do~ M.substitute_var "escalarMulAny" [[ M.call_function ~(| "EscalarMulAny", [ 253 ] |) ]] in
-  do~ M.substitute_var "escalarMulAny" [[ M.var_access ~(| "p", [Access.Array (0)] |) ]] in
-  do~ M.substitute_var "escalarMulAny" [[ M.var_access ~(| "p", [Access.Array (1)] |) ]] in
+  do~ M.substitute_var "escalarMulAny" [[ M.var_access (| "p", [Access.Array (0)] |) ]] in
+  do~ M.substitute_var "escalarMulAny" [[ M.var_access (| "p", [Access.Array (1)] |) ]] in
   (* Var *)
   do~ M.declare_var "i" [[ ([] : list F.t) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.substitute_var "n2b" [[ M.var ~(| "e" |) ]] in
+  do~ M.substitute_var "n2b" [[ M.var (| "e" |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 253 |) ]] (
-    do~ M.substitute_var "escalarMulAny" [[ M.var_access ~(| "n2b", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
+    do~ M.substitute_var "escalarMulAny" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMulAny", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "escalarMulAny", [Access.Component "out"; Access.Array (1)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMulAny", [Access.Component "out"; Access.Array (0)] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "escalarMulAny", [Access.Component "out"; Access.Array (1)] |) ]] in
   M.pure BlockUnit.Tt.

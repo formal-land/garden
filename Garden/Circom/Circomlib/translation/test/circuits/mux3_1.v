@@ -51,18 +51,18 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "cst" in
   do~ M.substitute_var "cst" [[ M.call_function ~(| "Constants", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "n2b" [[ M.var ~(| "selector" |) ]] in
+  do~ M.substitute_var "n2b" [[ M.var (| "selector" |) ]] in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 3 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access ~(| "n2b", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 3 |) ]] (
+    do~ M.substitute_var "mux" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 8 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access ~(| "cst", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 8 |) ]] (
+    do~ M.substitute_var "mux" [[ M.var_access (| "cst", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "mux", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "mux", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.

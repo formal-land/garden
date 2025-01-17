@@ -40,31 +40,31 @@ Definition T1 : M.t (BlockUnit.t Empty_set) :=
   do~ M.declare_component "bigsigma1" in
   do~ M.substitute_var "bigsigma1" [[ M.call_function ~(| "BigSigma", [ 6; 11; 25 ] |) ]] in
   do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "bigsigma1" [[ M.var_access ~(| "e", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "e", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "f", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "g", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+    do~ M.substitute_var "bigsigma1" [[ M.var_access (| "e", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ch" [[ M.var_access (| "e", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ch" [[ M.var_access (| "f", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ch" [[ M.var_access (| "g", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   (* Component *)
   do~ M.declare_component "sum" in
   do~ M.substitute_var "sum" [[ M.call_function ~(| "BinSum", [ 32; 5 ] |) ]] in
   do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "h", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "bigsigma1", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "ch", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "k", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "w", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+    do~ M.substitute_var "sum" [[ M.var_access (| "h", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "sum" [[ M.var_access (| "bigsigma1", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "sum" [[ M.var_access (| "ch", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "sum" [[ M.var_access (| "k", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "sum" [[ M.var_access (| "w", [Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ M.var_access ~(| "sum", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
+  do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+    do~ M.substitute_var "out" [[ M.var_access (| "sum", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
     M.pure BlockUnit.Tt
   ) in
   M.pure BlockUnit.Tt.

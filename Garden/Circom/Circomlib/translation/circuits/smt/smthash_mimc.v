@@ -21,10 +21,10 @@ Definition SMTHash1 : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "h" in
   do~ M.substitute_var "h" [[ M.call_function ~(| "MultiMiMC7", [ 2; 91 ] |) ]] in
-  do~ M.substitute_var "h" [[ M.var ~(| "key" |) ]] in
-  do~ M.substitute_var "h" [[ M.var ~(| "value" |) ]] in
+  do~ M.substitute_var "h" [[ M.var (| "key" |) ]] in
+  do~ M.substitute_var "h" [[ M.var (| "value" |) ]] in
   do~ M.substitute_var "h" [[ 1 ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "h", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "h", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
 
 (* Template signals *)
@@ -47,8 +47,8 @@ Definition SMTHash2 : M.t (BlockUnit.t Empty_set) :=
   (* Component *)
   do~ M.declare_component "h" in
   do~ M.substitute_var "h" [[ M.call_function ~(| "MultiMiMC7", [ 2; 91 ] |) ]] in
-  do~ M.substitute_var "h" [[ M.var ~(| "L" |) ]] in
-  do~ M.substitute_var "h" [[ M.var ~(| "R" |) ]] in
+  do~ M.substitute_var "h" [[ M.var (| "L" |) ]] in
+  do~ M.substitute_var "h" [[ M.var (| "R" |) ]] in
   do~ M.substitute_var "h" [[ 0 ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "h", [Access.Component "out"] |) ]] in
+  do~ M.substitute_var "out" [[ M.var_access (| "h", [Access.Component "out"] |) ]] in
   M.pure BlockUnit.Tt.
