@@ -3,14 +3,25 @@ Translate Circom circuits to Coq code.
 """
 import json
 import sys
+from typing import Any, Tuple
 
 def indent(text: str) -> str:
     return "\n".join("  " + line for line in text.split("\n"))
 
+def escape_coq_name(name: str) -> str:
+    reserved_names = [
+        "as", "at", "cofix", "else", "end", "exists", "fix", "forall", "fun",
+        "if", "in", "let", "match", "mod", "Prop", "return", "Set", "then",
+        "Type", "using", "where", "with"
+    ]
+    if name in reserved_names:
+        return name + "_"
+    return name
+
 def list_with_special_empty(items: list[str]) -> str:
     if len(items) == 0:
         return "([] : list F.t)"
-    return "[" + "; ".join(items) + "]"
+    return "[ " + "; ".join(items) + " ]"
 
 """
 pub type TagList = Vec<String>;
@@ -80,10 +91,20 @@ pub enum Access {
 """
 def to_coq_access(node) -> str:
     if "ComponentAccess" in node:
-        return f"Access.Component ({node['ComponentAccess']})"
+        return f"Access.Component \"{node['ComponentAccess']}\""
     if "ArrayAccess" in node:
         return f"Access.Array ({to_coq_expression(node['ArrayAccess'])})"
     return f"Unknown access: {node}"
+
+def lower_case_first_letter(s: str) -> str:
+    return s[0].lower() + s[1:]
+
+def to_coq_big_int(node) -> str:
+    digits = node[1]
+    result = 0
+    for index, digit in enumerate(digits):
+        result += digit * 2 ** (32 * index)
+    return str(result)
 
 """
 pub enum Expression {
@@ -151,20 +172,23 @@ def to_coq_expression(node) -> str:
     if "InfixOp" in node:
         infix_op = node["InfixOp"]
         return \
-            "InfixOp." + infix_op["infix_op"].lower() + " ~(| " + \
+            "InfixOp." + escape_coq_name(lower_case_first_letter(infix_op["infix_op"])) + " ~(| " + \
             to_coq_expression(infix_op["lhe"]) + ", " + \
             to_coq_expression(infix_op["rhe"]) + \
             " |)"
     if "PrefixOp" in node:
         prefix_op = node["PrefixOp"]
         return \
-            "PrefixOp." + prefix_op["prefix_op"].lower() + " ~(| " + \
+            "PrefixOp." + lower_case_first_letter(prefix_op["prefix_op"]) + " ~(| " + \
             to_coq_expression(prefix_op["rhe"]) + \
             " |)"
     if "InlineSwitchOp" in node:
         inline_switch_op = node["InlineSwitchOp"]
         return \
-            "(" + to_coq_expression(inline_switch_op["cond"]) + " ? " + to_coq_expression(inline_switch_op["if_true"]) + " : " + to_coq_expression(inline_switch_op["if_false"]) + ")"
+            "ternary_expression (" + \
+            to_coq_expression(inline_switch_op["cond"]) + ") (" + \
+            to_coq_expression(inline_switch_op["if_true"]) + ") (" + \
+            to_coq_expression(inline_switch_op["if_false"]) + ")"
     if "ParallelOp" in node:
         parallel_op = node["ParallelOp"]
         return "ParallelOp " + to_coq_expression(parallel_op["rhe"])
@@ -182,12 +206,16 @@ def to_coq_expression(node) -> str:
             " |)"
     if "Number" in node:
         number = node["Number"]
-        return str(number[1][0])
+        return to_coq_big_int(number[1])
     if "Call" in node:
         call = node["Call"]
         return \
-            call["id"] + " ~(| " + \
-            ", ".join(to_coq_expression(arg) for arg in call["args"]) + \
+            "M.call_function ~(| " + \
+            "\"" + call["id"] + "\"" + ", " + \
+            list_with_special_empty([
+                to_coq_expression(arg)
+                for arg in call["args"]
+            ]) + \
             " |)"
     if "BusCall" in node:
         bus_call = node["BusCall"]
@@ -200,8 +228,10 @@ def to_coq_expression(node) -> str:
             ", ".join(to_coq_expression(signal) for signal in anonymous_comp["signals"])
     if "ArrayInLine" in node:
         array_in_line = node["ArrayInLine"]
-        return \
-            "ArrayInLine {" + ", ".join(to_coq_expression(value) for value in array_in_line["values"]) + "}"
+        return list_with_special_empty([
+            to_coq_expression(value)
+            for value in array_in_line["values"]
+        ])
     if "Tuple" in node:
         tuple = node["Tuple"]
         return \
@@ -209,10 +239,13 @@ def to_coq_expression(node) -> str:
     if "UniformArray" in node:
         uniform_array = node["UniformArray"]
         return \
-            "UniformArray " + to_coq_expression(uniform_array["value"]) + " " + to_coq_expression(uniform_array["dimension"])
+            "array_with_repeat (" + to_coq_expression(uniform_array["value"]) + ") (" + \
+            to_coq_expression(uniform_array["dimension"]) + ")"
     return f"Unknown expression: {node}"
 
 def flatten_blocks(node) -> list:
+    if node is None:
+        return []
     if "Block" in node:
         block = node["Block"]
         return [
@@ -292,11 +325,11 @@ def to_coq_statement(node) -> str:
     if "IfThenElse" in node:
         if_then_else = node["IfThenElse"]
         return \
-            "if " + to_coq_expression(if_then_else["cond"]) + " then\n" + \
-            indent(to_coq_statement(if_then_else["if_case"])) + "\n" + \
-            "else\n" + \
-            indent(to_coq_statement(if_then_else["else_case"])) + "\n" + \
-            "end"
+            "do~ M.if_ [[ " + to_coq_expression(if_then_else["cond"]) + " ]] (* then *) (\n" + \
+            indent(to_coq_statements(flatten_blocks(if_then_else["if_case"]))) + "\n" + \
+            ") (* else *) (\n" + \
+            indent(to_coq_statements(flatten_blocks(if_then_else["else_case"]))) + "\n" + \
+            ") in"
     if "While" in node:
         while_stmt = node["While"]
         return \
@@ -316,7 +349,7 @@ def to_coq_statement(node) -> str:
         if xtype == "Var":
             declare_function = "M.declare_var"
         elif xtype == "Component":
-            declare_function = "M.declare_component"
+            return "do~ M.declare_component \"" + declaration["name"] + "\" in"
         elif xtype == "AnonymousComponent":
             declare_function = "M.declare_anonymous_component"
         elif "Signal" in xtype:
@@ -360,12 +393,42 @@ def to_coq_statement(node) -> str:
             "LogCall " + ", ".join(to_coq_log_argument(arg) for arg in log_call["args"])
     if "Block" in node:
         stmts = flatten_blocks(node)
-        return \
-            "\n".join(to_coq_statement(stmt) for stmt in stmts) + "\n" + \
-            "M.pure BlockUnit.Tt"
+        return to_coq_statements(stmts)
     if "Assert" in node:
-        return "assert " + to_coq_expression(node["Assert"]["arg"])
+        return "do~ M.assert [[ " + to_coq_expression(node["Assert"]["arg"]) + " ]] in"
     return f"Unknown statement: {node}"
+
+def to_coq_statements(stmts: list) -> str:
+    return \
+        "\n".join([
+            *(to_coq_statement(stmt) for stmt in stmts),
+            "M.pure BlockUnit.Tt",
+        ])
+
+def get_signals_in_template(template) -> list[Tuple[str, int]]:
+    if "Block" in template["body"]:
+        stmts = flatten_blocks(template["body"])
+        return [
+            (
+                init_stmt["Declaration"]["name"],
+                len(init_stmt["Declaration"]["dimensions"]),
+            )
+            for stmt in stmts
+            if "InitializationBlock" in stmt
+            for init_stmt in stmt["InitializationBlock"]["initializations"]
+            if
+               "Declaration" in init_stmt and
+                "Signal" in init_stmt["Declaration"]["xtype"]
+        ]
+
+    return []
+
+def get_signal_type(nb_dimensions: int) -> str:
+    if nb_dimensions == 0:
+        return "F.t"
+    if nb_dimensions == 1:
+        return "list F.t"
+    return "list (" + get_signal_type(nb_dimensions - 1) + ")"
 
 def to_coq_definition_args(args: list[str]) -> str:
     if len(args) == 0:
@@ -402,10 +465,26 @@ pub enum Definition {
 def to_coq_definition(node) -> str:
     if "Template" in node:
         template = node["Template"]
+        signals = get_signals_in_template(template)
         return \
-            "(* Template *)\n" + \
+            "(* Template signals *)\n" + \
+            "Module " + template["name"] + "Signals.\n" + \
+            indent(
+                "Record t : Set := {\n" +
+                indent(
+                    "\n".join(
+                        escape_coq_name(signal[0]) + " : " +
+                        get_signal_type(signal[1]) + ";"
+                        for signal in signals
+                    )
+                ) + "\n" +
+                "}."
+            ) + "\n" + \
+            "End " + template["name"] + "Signals.\n" + \
+            "\n" + \
+            "(* Template body *)\n" + \
             "Definition " + template["name"] + to_coq_definition_args(template["args"]) + \
-            " : M.t BlockUnit.t :=\n" + \
+            " : M.t (BlockUnit.t Empty_set) :=\n" + \
             indent(
                 to_coq_statement(template["body"]) + "."
             )
@@ -445,8 +524,7 @@ pub struct AST {
 }
 """
 def to_coq_ast(node) -> str:
-    header = """
-(* Generated by Garden *)
+    header = """(* Generated by Garden *)
 Require Import Garden.Garden.
 
 """
@@ -458,5 +536,7 @@ Require Import Garden.Garden.
 with open(sys.argv[1], "r") as f:
     json_data = f.read()
 
+coq_translation = to_coq_ast(json.loads(json_data))
+
 # Print the Coq code
-print(to_coq_ast(json.loads(json_data)))
+print(coq_translation)

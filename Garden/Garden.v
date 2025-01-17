@@ -36,16 +36,18 @@ Notation "{ x : A @ P }" := (sigS (A := A) (fun x => P)) : type_scope.
 Notation "{ ' pat : A @ P }" := (sigS (A := A) (fun pat => P)) : type_scope.
 
 Module F.
+  (** This is only an alias to the [Z] type, to represent field elements *)
   Definition t := Z.
 End F.
 
 Module BlockUnit.
   (** The return value of a code block. *)
-  Inductive t : Set :=
+  Inductive t {R : Set} : Set :=
   (** The default value *)
   | Tt
   (** The instruction `return` was called *)
-  | Return (value : F.t).
+  | Return (value : R).
+  Arguments t : clear implicits.
 End BlockUnit.
 
 Module Access.
@@ -59,12 +61,14 @@ Module Primitive.
   Inductive t : Set -> Set :=
   | OpenScope : t unit
   | CloseScope : t unit
-  | DeclareVar (name : string) (value : F.t) : t unit
+  | DeclareVar {A : Set} (name : string) (value : A) : t unit
   | DeclareSignal (name : string) (dimensions : list F.t) : t unit
-  | SubstituteVar (name : string) (value : F.t) : t unit
+  | DeclareComponent (name : string) : t unit
+  | SubstituteVar {A : Set} (name : string) (value : A) : t unit
   | GetVarAccess (name : string) (access : list Access.t) : t F.t
   | GetPrime : t F.t
-  | EqualityConstraint (value1 value2 : F.t) : t unit.
+  | EqualityConstraint (value1 value2 : F.t) : t unit
+  | CallFunction (name : string) (parameters : list F.t) : t F.t.
 End Primitive.
 
 Module M.
@@ -74,12 +78,8 @@ Module M.
   | Primitive {B : Set}
       (primitive : Primitive.t B)
       (k : B -> t A)
-  | Loop {In Out : Set}
-      (init : In)
-      (body : In -> t Out)
-      (** The final value to return if we decide to break of the loop, otherwise what to continue
-          with. *)
-      (break_with : Out -> In + Out)
+  | Loop {Out : Set}
+      (body : t (option Out))
       (k : Out -> t A)
   (** Explicit cut in the monadic expressions, to provide better composition for the proofs. *)
   | Let {B : Set} (e1 : t B) (k : B -> t A)
@@ -88,7 +88,7 @@ Module M.
   | Impossible (message : string).
   Arguments Pure {_}.
   Arguments Primitive {_ _}.
-  Arguments Loop {_ _ _}.
+  Arguments Loop {_ _}.
   Arguments Let {_ _}.
   Arguments Call {_ _}.
   Arguments Impossible {_}.
@@ -103,8 +103,8 @@ Module M.
       e2 output
     | Primitive primitive k =>
       Primitive primitive (fun result => let_ (k result) e2)
-    | Loop input body break_with k =>
-      Loop input body break_with (fun result => let_ (k result) e2)
+    | Loop body k =>
+      Loop body (fun result => let_ (k result) e2)
     | Let e1 k =>
       Let e1 (fun result => let_ (k result) e2)
     | Call e k =>
@@ -112,8 +112,8 @@ Module M.
     | Impossible message => Impossible message
     end.
 
-  Definition do (block1 block2 : t BlockUnit.t) : t BlockUnit.t :=
-    Let block1 (fun (result : BlockUnit.t) =>
+  Definition do {R : Set} (block1 block2 : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
+    Let block1 (fun (result : BlockUnit.t R) =>
     match result with
     | BlockUnit.Tt => block2
     | BlockUnit.Return _ => block1
@@ -125,27 +125,43 @@ Module M.
   (** This axiom is only used as a marker, we eliminate it later. *)
   Parameter run : forall {A : Set}, t A -> A.
 
-  Definition function_body (block : t BlockUnit.t) : t F.t :=
-    Primitive Primitive.OpenScope (fun _ =>
-    Let block (fun (result : BlockUnit.t) =>
-    Primitive Primitive.CloseScope (fun _ =>
+  Definition function_body {R : Set} (block : t (BlockUnit.t R)) : t R :=
+    Let block (fun (result : BlockUnit.t R) =>
     match result with
     | BlockUnit.Tt => Impossible "Expected a return in the function body"
     | BlockUnit.Return value => Pure value
-    end))).
+    end).
 
-  (* TODO: use the dimensions *)
-  Definition declare_var (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+  Fixpoint init_Set_from_dimensions (dimensions : list F.t) : Set :=
+    match dimensions with
+    | [] => F.t
+    | _ :: dimensions => list (init_Set_from_dimensions dimensions)
+    end.
+
+  Fixpoint init_value_dimensions (dimensions : list F.t) : init_Set_from_dimensions dimensions :=
+    match dimensions with
+    | [] => 0
+    | dimension :: dimensions =>
+      List.repeat (init_value_dimensions dimensions) (Z.to_nat dimension)
+    end.
+
+  Definition declare_var {R : Set} (name : string) (dimensions : t (list F.t)) :
+      t (BlockUnit.t R) :=
     let_ dimensions (fun dimensions =>
-    Primitive (Primitive.DeclareVar name 0) (fun _ =>
+    Primitive (Primitive.DeclareVar name (init_value_dimensions dimensions)) (fun _ =>
     Pure BlockUnit.Tt)).
 
-  Definition declare_signal (name : string) (dimensions : t (list F.t)) : t BlockUnit.t :=
+  Definition declare_signal {R : Set} (name : string) (dimensions : t (list F.t)) :
+      t (BlockUnit.t R) :=
     let_ dimensions (fun dimensions =>
     Primitive (Primitive.DeclareSignal name dimensions) (fun _ =>
     Pure BlockUnit.Tt)).
 
-  Definition substitute_var (name : string) (value : t F.t) : t BlockUnit.t :=
+  Definition declare_component {R : Set} (name : string) : t (BlockUnit.t R) :=
+    Primitive (Primitive.DeclareComponent name) (fun _ =>
+    Pure BlockUnit.Tt).
+
+  Definition substitute_var {R A : Set} (name : string) (value : t A) : t (BlockUnit.t R) :=
     let_ value (fun value =>
     Primitive (Primitive.SubstituteVar name value) (fun _ =>
     Pure BlockUnit.Tt)).
@@ -156,20 +172,51 @@ Module M.
   Definition var_access (name : string) (access : list Access.t) : t F.t :=
     Primitive (Primitive.GetVarAccess name access) Pure.
 
-  Parameter while : t F.t -> t BlockUnit.t -> t BlockUnit.t.
+  Definition if_ {R : Set} (condition : t F.t) (then_ else_ : t (BlockUnit.t R)) :
+      t (BlockUnit.t R) :=
+    Let condition (fun condition =>
+    if condition =? 0 then
+      else_
+    else
+      then_).
 
-  Definition return_ (result : t F.t) : t BlockUnit.t :=
+  Definition while {R : Set} (condition : t F.t) (body : t (BlockUnit.t R)) : t (BlockUnit.t R) :=
+    Loop
+      (
+        Let condition (fun condition =>
+        if condition =? 0 then
+          Pure (Some BlockUnit.Tt)
+        else
+          let_ body (fun result =>
+          match result with
+          | BlockUnit.Tt => Pure None
+          | BlockUnit.Return _ => Pure (Some result)
+          end))
+      )
+      Pure.
+
+  Definition return_ {R : Set} (result : t R) : t (BlockUnit.t R) :=
     let_ result (fun result =>
     Pure (BlockUnit.Return result)).
 
   Definition get_prime : t F.t :=
     Primitive Primitive.GetPrime Pure.
 
-  Definition equality_constraint (value1 value2 : t F.t) : t BlockUnit.t :=
+  Definition equality_constraint {R : Set} (value1 value2 : t F.t) : t (BlockUnit.t R) :=
     let_ value1 (fun value1 =>
     let_ value2 (fun value2 =>
     Primitive (Primitive.EqualityConstraint value1 value2) (fun _ =>
     Pure BlockUnit.Tt))).
+
+  Definition call_function (name : string) (parameters : list F.t) : t F.t :=
+    Primitive (Primitive.CallFunction name parameters) Pure.
+
+  Definition assert {R : Set} (condition : t F.t) : t (BlockUnit.t R) :=
+    let_ condition (fun condition =>
+    if condition =? 0 then
+      Impossible "assert failure"
+    else
+      Pure BlockUnit.Tt).
 
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
@@ -236,13 +283,70 @@ Module Notations.
     (at level 100).
 
   Notation "[[ e ]]" :=
+    (* (M.Pure e) *)
     (ltac:(M.monadic e))
     (only parsing).
 End Notations.
 
 Export Notations.
 
+Definition ternary_expression (condition true_value false_value : F.t) : F.t :=
+  if condition =? 0 then
+    false_value
+  else
+    true_value.
+
+Definition array_with_repeat {A : Set} (value : A) (size : F.t) : list A :=
+  List.repeat value (Z.to_nat size).
+
+(*
+pub enum ExpressionPrefixOpcode {
+    Sub,
+    BoolNot,
+    Complement,
+}
+*)
+Module PrefixOp.
+  Definition sub (a : F.t) : M.t F.t :=
+    M.pure (- a).
+
+  Definition boolNot (a : F.t) : M.t F.t :=
+    M.pure (Z.lnot a).
+
+  Parameter complement : F.t -> M.t F.t.
+End PrefixOp.
+
+(*
+pub enum ExpressionInfixOpcode {
+    Mul,
+    Div,
+    Add,
+    Sub,
+    Pow,
+    IntDiv,
+    Mod,
+    ShiftL,
+    ShiftR,
+    LesserEq,
+    GreaterEq,
+    Lesser,
+    Greater,
+    Eq,
+    NotEq,
+    BoolOr,
+    BoolAnd,
+    BitOr,
+    BitAnd,
+    BitXor,
+}
+*)
 Module InfixOp.
+  Definition mul (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((a * b) mod p).
+
+  Parameter div : F.t -> F.t -> M.t F.t.
+
   Definition add (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((a + b) mod p).
@@ -251,22 +355,36 @@ Module InfixOp.
     let* p := M.get_prime in
     M.pure ((a - b) mod p).
 
-  Definition mul (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((a * b) mod p).
-
   Definition pow (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((a ^ b) mod p).
 
-  Definition lesser (a b : F.t) : M.t F.t :=
-    if a <? b then
+  Parameter intDiv : F.t -> F.t -> M.t F.t.
+
+  Parameter mod_ : F.t -> F.t -> M.t F.t.
+
+  Definition shiftL (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftl a b) mod p).
+
+  Definition shiftR (a b : F.t) : M.t F.t :=
+    let* p := M.get_prime in
+    M.pure ((Z.shiftr a b) mod p).
+
+  Definition lesserEq (a b : F.t) : M.t F.t :=
+    if a <=? b then
       M.pure 1
     else
       M.pure 0.
 
-  Definition lessereq (a b : F.t) : M.t F.t :=
-    if a <=? b then
+  Definition greaterEq (a b : F.t) : M.t F.t :=
+    if a >=? b then
+      M.pure 1
+    else
+      M.pure 0.
+
+  Definition lesser (a b : F.t) : M.t F.t :=
+    if a <? b then
       M.pure 1
     else
       M.pure 0.
@@ -277,29 +395,152 @@ Module InfixOp.
     else
       M.pure 0.
 
-  Definition greatereq (a b : F.t) : M.t F.t :=
-    if a >=? b then
+  Definition eq (a b : F.t) : M.t F.t :=
+    if a =? b then
       M.pure 1
     else
       M.pure 0.
 
-  Definition bitand (a b : F.t) : M.t F.t :=
+  Definition notEq (a b : F.t) : M.t F.t :=
+    if a =? b then
+      M.pure 0
+    else
+      M.pure 1.
+
+  Parameter boolOr : F.t -> F.t -> M.t F.t.
+
+  Parameter boolAnd : F.t -> F.t -> M.t F.t.
+
+  Definition bitAnd (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.land a b) mod p).
 
-  Definition bitor (a b : F.t) : M.t F.t :=
+  Definition bitOr (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.lor a b) mod p).
 
-  Definition bitxor (a b : F.t) : M.t F.t :=
+  Definition bitXor (a b : F.t) : M.t F.t :=
     let* p := M.get_prime in
     M.pure ((Z.lxor a b) mod p).
-
-  Definition shiftl (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((Z.shiftl a b) mod p).
-
-  Definition shiftr (a b : F.t) : M.t F.t :=
-    let* p := M.get_prime in
-    M.pure ((Z.shiftr a b) mod p).
 End InfixOp.
+
+(** ** Semantics *)
+
+Module Scope.
+  (** We will use the scope only for symbolic computations, so that we do not need to prove any
+      properties about its operations. *)
+  Definition t : Set :=
+    list (string * {A : Set @ A}).
+
+  Definition empty : t :=
+    [].
+
+  Fixpoint get (scope : t) (name : string) : option {A : Set @ A} :=
+    match scope with
+    | [] => None
+    | (name', value) :: scope' =>
+      if String.eqb name name' then
+        Some value
+      else
+        get scope' name
+    end.
+
+  Fixpoint set {A : Set} (scope : t) (name : string) (value : A) : t :=
+    match scope with
+    | [] => [(name, existS _ value)]
+    | (name', value') :: scope' =>
+      if String.eqb name name' then
+        (name, existS _ value) :: scope'
+      else
+        (name', value') :: set scope' name value
+    end.
+  Arguments set /.
+End Scope.
+
+Module Scopes.
+  (** We have a stack of scopes because there might be shadowing in sub-blocks. *)
+  Definition t : Set :=
+    list Scope.t.
+
+  Definition empty : t :=
+    [Scope.empty].
+End Scopes.
+
+Module Run.
+  Reserved Notation "{{ p , state_in ⏩ e 🔽 output ⏩ state_out }}".
+
+  Inductive t {A : Set} (p : Z) (output : A) (scopes_out : Scopes.t) :
+      Scopes.t -> M.t A -> Prop :=
+  | Pure :
+    (* This should be the only case where the input and output states are the same. *)
+    {{ p, scopes_out ⏩ M.Pure output 🔽 output ⏩ scopes_out }}
+  | PrimitiveGetPrime
+      (k : Z -> M.t A)
+      (scopes_in : Scopes.t) :
+    {{ p, scopes_in ⏩ k p 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩
+      M.Primitive Primitive.GetPrime k 🔽 output
+    ⏩ scopes_out }}
+  | PrimitiveDeclareVar {B : Set}
+      (name : string)
+      (value : B)
+      (k : unit -> M.t A)
+      (scope_in : Scope.t)
+      (scopes_in : Scopes.t) :
+    {{ p, Scope.set scope_in name value :: scopes_in ⏩
+      k tt 🔽 output
+    ⏩ scopes_out }} ->
+    {{ p, scope_in :: scopes_in ⏩
+      M.Primitive (Primitive.DeclareVar name value) k 🔽 output
+    ⏩ scopes_out }}
+  | PrimitiveSubstituteVar {B : Set}
+      (name : string)
+      (value : B)
+      (k : unit -> M.t A)
+      (scope_in : Scope.t)
+      (scopes_in : Scopes.t) :
+    {{ p, Scope.set scope_in name value :: scopes_in ⏩
+      k tt 🔽 output
+    ⏩ scopes_out }} ->
+    {{ p, scope_in :: scopes_in ⏩
+      M.Primitive (Primitive.SubstituteVar name value) k 🔽 output
+    ⏩ scopes_out }}
+  | LoopNext {Out : Set}
+      (body : M.t (option Out))
+      (k : Out -> M.t A)
+      (scopes_in scopes_inter : Scopes.t) :
+    {{ p, scopes_in ⏩ body 🔽 None ⏩ scopes_inter }} ->
+    {{ p, scopes_inter ⏩ M.Loop body k 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+  | LoopStop {Out : Set}
+      (body : M.t (option Out))
+      (k : Out -> M.t A)
+      (output_inter : Out)
+      (scopes_in scopes_inter : Scopes.t) :
+    {{ p, scopes_in ⏩ body 🔽 Some output_inter ⏩ scopes_inter }} ->
+    {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+  | Let {B : Set}
+      (e : M.t B)
+      (k : B -> M.t A)
+      (output_inter : B)
+      (scopes_in scopes_inter : Scopes.t) :
+    {{ p, scopes_in ⏩ e 🔽 output_inter ⏩ scopes_inter }} ->
+    {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }}
+  | LetUnfold {B : Set}
+      (e : M.t B)
+      (k : B -> M.t A)
+      (scopes_in : Scopes.t) :
+    {{ p, scopes_in ⏩ M.let_ e k 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }}
+  | LetUnUnfold {B : Set}
+      (e : M.t B)
+      (k : B -> M.t A)
+      (scopes_in : Scopes.t) :
+    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }} ->
+    {{ p, scopes_in ⏩ M.let_ e k 🔽 output ⏩ scopes_out }}
+
+  where "{{ p , scopes_in ⏩ e 🔽 output ⏩ scopes_out }}" :=
+    (t p output scopes_out scopes_in e).
+End Run.

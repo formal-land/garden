@@ -38,10 +38,12 @@ jobs:
             cd ../..
           endGroup
           startGroup "Translate Circom library"
-            cd third-party/circomlib/test/circuits
-            circom greaterthan.circom
-            cd ../../../..
-            python scripts/coq_of_circom.py third-party/circomlib/circuits/binsum.json > Garden/Circom/Example/binsum.v
+            cd third-party/circomlib
+            # Translate each Circom circuit to JSON
+            find . -name '*.circom' -execdir circom {} \;
+            cd ../..
+            # Translate the JSON to Coq
+            python scripts/coq_of_circom_ci.py
           endGroup
           startGroup "Check that the diff is empty (excluding submodules)"
             git -c color.ui=always diff --exit-code --ignore-submodules=dirty
