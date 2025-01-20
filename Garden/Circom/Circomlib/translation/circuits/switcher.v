@@ -4,30 +4,45 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module SwitcherSignals.
   Record t : Set := {
+    (* Input *)
     sel : F.t;
+    (* Input *)
     L : F.t;
+    (* Input *)
     R : F.t;
+    (* Output *)
     outL : F.t;
+    (* Output *)
     outR : F.t;
+    (* Intermediate *)
     aux : F.t;
   }.
 End SwitcherSignals.
 
 (* Template body *)
 Definition Switcher : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "sel" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "L" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "R" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "outL" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "outR" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "aux" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "aux" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "R" |), M.var (| "L" |) |), M.var (| "sel" |) |) ]] in
-  do~ M.substitute_var "outL" [[ InfixOp.add ~(| M.var (| "aux" |), M.var (| "L" |) |) ]] in
-  do~ M.substitute_var "outR" [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var (| "aux" |) |), M.var (| "R" |) |) ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "sel" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "L" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "R" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "outL" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "outR" [[ ([] : list F.t) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "aux" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "aux" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "R" |), M.var (| "L" |) |), M.var (| "sel" |) |) ]] in
+    do~ M.substitute_var "outL" [[ InfixOp.add ~(| M.var (| "aux" |), M.var (| "L" |) |) ]] in
+    do~ M.substitute_var "outR" [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var (| "aux" |) |), M.var (| "R" |) |) ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition Switcher_not_under_constrained sel L R : Prop :=
+  exists! outL outR,
+  exists aux,
+  let signals := SwitcherSignals.Build_t sel L R outL outR aux in
+  True (* NotUnderConstrained Switcher signals *).

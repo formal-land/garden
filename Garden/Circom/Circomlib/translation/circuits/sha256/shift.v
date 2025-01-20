@@ -4,29 +4,39 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module ShRSignals.
   Record t : Set := {
+    (* Input *)
     in_ : list F.t;
+    (* Output *)
     out : list F.t;
   }.
 End ShRSignals.
 
 (* Template body *)
 Definition ShR (n r : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
-    do~ M.if_ [[ InfixOp.greaterEq ~(| InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |), M.var (| "n" |) |) ]] (* then *) (
-      do~ M.substitute_var "out" [[ 0 ]] in
-      M.pure BlockUnit.Tt
-    ) (* else *) (
-      do~ M.substitute_var "out" [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |))] |) ]] in
+  M.template_body [("n", n); ("r", r)] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
+      do~ M.if_ [[ InfixOp.greaterEq ~(| InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |), M.var (| "n" |) |) ]] (* then *) (
+        do~ M.substitute_var "out" [[ 0 ]] in
+        M.pure BlockUnit.Tt
+      ) (* else *) (
+        do~ M.substitute_var "out" [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |))] |) ]] in
+        M.pure BlockUnit.Tt
+      ) in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition ShR_not_under_constrained (n r : F.t) in_ : Prop :=
+  exists! out,
+  let signals := ShRSignals.Build_t in_ out in
+  True (* NotUnderConstrained ShR n r signals *).

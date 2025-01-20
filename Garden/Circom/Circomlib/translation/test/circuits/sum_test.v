@@ -4,49 +4,60 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module ASignals.
   Record t : Set := {
+    (* Input *)
     a : F.t;
+    (* Input *)
     b : F.t;
+    (* Output *)
     out : F.t;
   }.
 End ASignals.
 
 (* Template body *)
 Definition A : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Component *)
-  do~ M.declare_component "n2ba" in
-  do~ M.substitute_var "n2ba" [[ M.call_function ~(| "Num2Bits", [ 32 ] |) ]] in
-  (* Component *)
-  do~ M.declare_component "n2bb" in
-  do~ M.substitute_var "n2bb" [[ M.call_function ~(| "Num2Bits", [ 32 ] |) ]] in
-  (* Component *)
-  do~ M.declare_component "sum" in
-  do~ M.substitute_var "sum" [[ M.call_function ~(| "BinSum", [ 32; 2 ] |) ]] in
-  (* Component *)
-  do~ M.declare_component "b2n" in
-  do~ M.substitute_var "b2n" [[ M.call_function ~(| "Bits2Num", [ 32 ] |) ]] in
-  do~ M.substitute_var "n2ba" [[ M.var (| "a" |) ]] in
-  do~ M.substitute_var "n2bb" [[ M.var (| "b" |) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
-    do~ M.substitute_var "sum" [[ M.var_access (| "n2ba", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access (| "n2bb", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    (* Component *)
+    do~ M.declare_component "n2ba" in
+    do~ M.substitute_var "n2ba" [[ M.call_function ~(| "Num2Bits", [ 32 ] |) ]] in
+    (* Component *)
+    do~ M.declare_component "n2bb" in
+    do~ M.substitute_var "n2bb" [[ M.call_function ~(| "Num2Bits", [ 32 ] |) ]] in
+    (* Component *)
+    do~ M.declare_component "sum" in
+    do~ M.substitute_var "sum" [[ M.call_function ~(| "BinSum", [ 32; 2 ] |) ]] in
+    (* Component *)
+    do~ M.declare_component "b2n" in
+    do~ M.substitute_var "b2n" [[ M.call_function ~(| "Bits2Num", [ 32 ] |) ]] in
+    do~ M.substitute_var "n2ba" [[ M.var (| "a" |) ]] in
+    do~ M.substitute_var "n2bb" [[ M.var (| "b" |) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+      do~ M.substitute_var "sum" [[ M.var_access (| "n2ba", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "sum" [[ M.var_access (| "n2bb", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+      do~ M.substitute_var "b2n" [[ M.var_access (| "sum", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "out" [[ M.var_access (| "b2n", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
-    do~ M.substitute_var "b2n" [[ M.var_access (| "sum", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
-    M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "out" [[ M.var_access (| "b2n", [Access.Component "out"] |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition A_not_under_constrained a b : Prop :=
+  exists! out,
+  let signals := ASignals.Build_t a b out in
+  True (* NotUnderConstrained A signals *).

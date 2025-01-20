@@ -405,12 +405,13 @@ def to_coq_statements(stmts: list) -> str:
             "M.pure BlockUnit.Tt",
         ])
 
-def get_signals_in_template(template) -> list[Tuple[str, int]]:
+def get_signals_in_template(template) -> list[Tuple[str, str, int]]:
     if "Block" in template["body"]:
         stmts = flatten_blocks(template["body"])
         return [
             (
                 init_stmt["Declaration"]["name"],
+                init_stmt["Declaration"]["xtype"]["Signal"][0],
                 len(init_stmt["Declaration"]["dimensions"]),
             )
             for stmt in stmts
@@ -433,7 +434,15 @@ def get_signal_type(nb_dimensions: int) -> str:
 def to_coq_definition_args(args: list[str]) -> str:
     if len(args) == 0:
         return ""
-    return " (" + " ".join(args) + " : F.t)"
+    return " (" + " ".join(escape_coq_name(arg) for arg in args) + " : F.t)"
+
+def to_coq_quantifiers(quantifier: str, variables: list[str]) -> str:
+    if len(variables) == 0:
+        return ""
+    return \
+        quantifier + " " + \
+        " ".join(escape_coq_name(variable) for variable in variables) + \
+        ",\n"
 
 """
 pub enum Definition {
@@ -473,8 +482,9 @@ def to_coq_definition(node) -> str:
                 "Record t : Set := {\n" +
                 indent(
                     "\n".join(
+                        "(* " + signal[1] + " *)\n" +
                         escape_coq_name(signal[0]) + " : " +
-                        get_signal_type(signal[1]) + ";"
+                        get_signal_type(signal[2]) + ";"
                         for signal in signals
                     )
                 ) + "\n" +
@@ -486,7 +496,40 @@ def to_coq_definition(node) -> str:
             "Definition " + template["name"] + to_coq_definition_args(template["args"]) + \
             " : M.t (BlockUnit.t Empty_set) :=\n" + \
             indent(
-                to_coq_statement(template["body"]) + "."
+                "M.template_body [" +
+                "; ".join(f"(\"{arg}\", {arg})" for arg in template["args"]) +
+                "] (\n" + \
+                indent(
+                    to_coq_statement(template["body"])
+                ) + "\n" +
+                ")."
+            ) + "\n" + \
+            "\n" + \
+            "(* Template not under-constrained *)\n" + \
+            "Definition " + template["name"] + "_not_under_constrained" + \
+            to_coq_definition_args(template["args"]) + \
+            "".join(
+                " " + escape_coq_name(signal[0])
+                for signal in signals
+                if signal[1] == "Input"
+            ) + \
+            " : Prop :=\n" + \
+            indent(
+                to_coq_quantifiers("exists!", [
+                    signal[0]
+                    for signal in signals
+                    if signal[1] == "Output"
+                ]) + \
+                to_coq_quantifiers("exists", [
+                    signal[0]
+                    for signal in signals
+                    if signal[1] == "Intermediate"
+                ]) + \
+                "let signals := " + template["name"] + "Signals.Build_t" + \
+                "".join(f" {escape_coq_name(signal[0])}" for signal in signals) + " in\n" + \
+                "True (* NotUnderConstrained " + template["name"] + \
+                "".join(" " + arg for arg in template["args"]) + \
+                " signals *)."
             )
     if "Function" in node:
         function = node["Function"]

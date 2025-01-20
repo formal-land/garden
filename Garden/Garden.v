@@ -131,23 +131,30 @@ Module M.
     Primitive Primitive.CloseScope (fun _ =>
     Pure result))).
 
-  Fixpoint function_init_args (args : list (string * F.t)) : t unit :=
+  Fixpoint init_args (args : list (string * F.t)) : t unit :=
     match args with
     | [] => Pure tt
     | (name, value) :: args =>
       Primitive (Primitive.DeclareVar name value) (fun _ =>
-      function_init_args args)
+      init_args args)
     end.
 
   Definition function_body {R : Set} (args : list (string * F.t)) (block : t (BlockUnit.t R)) :
       t R :=
     wrap_in_scope (
-      let_ (function_init_args args) (fun _ =>
+      let_ (init_args args) (fun _ =>
       Let block (fun (result : BlockUnit.t R) =>
       match result with
       | BlockUnit.Tt => Impossible "Expected a return in the function body"
       | BlockUnit.Return value => Pure value
       end))
+    ).
+
+  Definition template_body (args : list (string * F.t)) (block : t (BlockUnit.t Empty_set)) :
+      t (BlockUnit.t Empty_set) :=
+    wrap_in_scope (
+      let_ (init_args args) (fun _ =>
+      block)
     ).
 
   Fixpoint init_Set_from_dimensions (dimensions : list F.t) : Set :=
@@ -450,6 +457,40 @@ Module InfixOp.
     M.pure ((Z.lxor a b) mod p).
 End InfixOp.
 
+(*
+(** ** Circuits are what we are compiling the monadic programs to *)
+
+Module Circuit.
+  Inductive t {Signals A : Set} : Set :=
+  | Pure (value : A)
+  | Read (k : Signals -> t)
+  | Write (udpate : Signals -> Signals) (k : t)
+  | Equal (x1 x2 : F.t) (k : t).
+  Arguments t : clear implicits.
+
+  Fixpoint eval_deterministic {Signals A : Set} (circuit : t Signals A) (signals : Signals) :
+      A * Signals :=
+    match circuit with
+    | Pure value => (value, signals)
+    | Read k => eval_deterministic (k signals) signals
+    | Write update k => eval_deterministic k (update signals)
+    | Equal _ _ k => eval_deterministic k signals
+    end.
+
+  Fixpoint eval_non_deterministic {Signals A : Set} (circuit : t Signals A) (signals : Signals) :
+      Prop :=
+    match circuit with
+    | Pure _ => True
+    | Read k => eval_non_deterministic (k signals) signals
+    | Write _ k => eval_non_deterministic k signals
+    | Equal x1 x2 k => x1 = x2 /\ eval_non_deterministic k signals
+    end.
+
+  Definition Agree {Signals A : Set} (circuit : t Signals A) (signals : Signals) : Prop :=
+    eval_non_deterministic circuit (snd (eval_deterministic circuit signals)).
+End Circuit.
+*)
+
 (** ** Semantics *)
 
 Module Scope.
@@ -462,12 +503,12 @@ Module Scope.
     [].
   Arguments empty /.
 
-  Fixpoint get (scope : t) (name : string) : option {A : Set @ A} :=
+  Fixpoint get (scope : t) (name : string) : {A : Set @ A} + string :=
     match scope with
-    | [] => None
+    | [] => inr ("get '" ++ name ++ "' in scope: not found")%string
     | (name', value) :: scope' =>
       if String.eqb name name' then
-        Some value
+        inl value
       else
         get scope' name
     end.
@@ -476,16 +517,16 @@ Module Scope.
     (name, existS _ value) :: scope.
   Arguments declare /.
 
-  Fixpoint set {A : Set} (scope : t) (name : string) (value : A) : option t :=
+  Fixpoint set {A : Set} (scope : t) (name : string) (value : A) : t + string :=
     match scope with
-    | [] => None
+    | [] => inr ("set '" ++ name ++ "' in scope: not found")%string
     | (name', value') :: scope' =>
       if String.eqb name name' then
-        Some ((name, existS _ value) :: scope')
+        inl ((name, existS _ value) :: scope')
       else
         match set scope' name value with
-        | Some scope' => Some ((name', value') :: scope')
-        | None => None
+        | inl scope' => inl ((name', value') :: scope')
+        | inr error => inr error
         end
     end.
 End Scope.
@@ -499,26 +540,26 @@ Module Scopes.
     [].
   Arguments empty /.
 
-  Fixpoint get (scopes : t) (name : string) : option {A : Set @ A} :=
+  Fixpoint get (scopes : t) (name : string) : {A : Set @ A} + string :=
     match scopes with
-    | [] => None
+    | [] => inr ("get '" ++ name ++ "' in scopes: not found")%string
     | scope :: scopes' =>
       match Scope.get scope name with
-      | Some value => Some value
-      | None => get scopes' name
+      | inl value => inl value
+      | inr _ => get scopes' name
       end
     end.
 
-  Fixpoint set {A : Set} (scopes : t) (name : string) (value : A) : option t :=
+  Fixpoint set {A : Set} (scopes : t) (name : string) (value : A) : t + string :=
     match scopes with
-    | [] => None
+    | [] => inr ("set '" ++ name ++ "' in scopes: not found")%string
     | scope :: scopes' =>
       match Scope.set scope name value with
-      | Some scope => Some (scope :: scopes')
-      | None =>
+      | inl scope => inl (scope :: scopes')
+      | inr _ =>
         match set scopes' name value with
-        | Some scopes' => Some (scope :: scopes')
-        | None => None
+        | inl scopes' => inl (scope :: scopes')
+        | inr error => inr error
         end
       end
     end.
@@ -541,132 +582,200 @@ Module GetVarAccessArrays.
 End GetVarAccessArrays.
 
 Module Run.
-  Reserved Notation "{{ p , state_in ⏩ e 🔽 output ⏩ state_out }}".
+  Reserved Notation "{{ p , signals , scopes_in ⏩ e 🔽 output ⏩ scopes_out , P_prover , P_verifier }}".
 
-  Inductive t {A : Set} (p : Z) (output : A) (scopes_out : Scopes.t) :
-      Scopes.t -> M.t A -> Prop :=
+  Inductive t {Signals A : Set}
+      (* constant inputs *)
+      (p : Z) (signals  : Signals)
+      (* outputs *)
+      (scopes_out : Scopes.t) (output : A) :
+      forall
+        (scopes_in : Scopes.t)
+        (e : M.t A)
+        (P_prover P_verifier : Prop),
+        Prop :=
   | Pure :
-    (* This should be the only case where the input and output states are the same. *)
-    {{ p, scopes_out ⏩ M.Pure output 🔽 output ⏩ scopes_out }}
+    {{ p, signals, scopes_out ⏩
+      M.Pure output 🔽 output
+    ⏩ scopes_out, True, True }}
   | PrimitiveOpenScope
       (k : unit -> M.t A)
-      (scopes_in : Scopes.t) :
-    {{ p, Scope.empty :: scopes_in ⏩ k tt 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    {{ p, signals, Scope.empty :: scopes_in ⏩
+      k tt 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scopes_in ⏩
       M.Primitive Primitive.OpenScope k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | PrimitiveCloseScope
       (k : unit -> M.t A)
       (scope_in : Scope.t)
-      (scopes_in : Scopes.t) :
-    {{ p, scopes_in ⏩ k tt 🔽 output ⏩ scopes_out }} ->
-    {{ p, scope_in :: scopes_in ⏩
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    {{ p, signals, scopes_in ⏩
+      k tt 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scope_in :: scopes_in ⏩
       M.Primitive Primitive.CloseScope k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | PrimitiveGetPrime
       (k : Z -> M.t A)
-      (scopes_in : Scopes.t) :
-    {{ p, scopes_in ⏩ k p 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    {{ p, signals, scopes_in ⏩
+      k p 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scopes_in ⏩
       M.Primitive Primitive.GetPrime k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | PrimitiveDeclareVar {B : Set}
       (name : string)
       (value : B)
       (k : unit -> M.t A)
       (scope_in : Scope.t)
-      (scopes_in : Scopes.t) :
-    {{ p, Scope.declare scope_in name value :: scopes_in ⏩
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    {{ p, signals, Scope.declare scope_in name value :: scopes_in ⏩
       k tt 🔽 output
-    ⏩ scopes_out }} ->
-    {{ p, scope_in :: scopes_in ⏩
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scope_in :: scopes_in ⏩
       M.Primitive (Primitive.DeclareVar name value) k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | PrimitiveSubstituteVar {B : Set}
       (name : string)
       (value : B)
       (k : unit -> M.t A)
-      (scopes_in scopes_inter : Scopes.t) :
-    Scopes.set scopes_in name value = Some scopes_inter ->
-    {{ p, scopes_inter ⏩
+      (scopes_in scopes_inter : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    Scopes.set scopes_in name value = inl scopes_inter ->
+    {{ p, signals, scopes_inter ⏩
       k tt 🔽 output
-    ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scopes_in ⏩
       M.Primitive (Primitive.SubstituteVar name value) k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | PrimitiveGetVarAccess {Container Element : Set}
       (name : string)
       (accesses : list Access.t)
       (k : Element -> M.t A)
       (container : Container) (element : Element)
-      (scopes_in : Scopes.t) :
-    Scopes.get scopes_in name = Some (existS Container container) ->
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    Scopes.get scopes_in name = inl (existS Container container) ->
     GetVarAccessArrays.t container accesses element ->
-    {{ p, scopes_in ⏩ k element 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩
+    {{ p, signals, scopes_in ⏩
+      k element 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scopes_in ⏩
       M.Primitive (Primitive.GetVarAccess name accesses) k 🔽 output
-    ⏩ scopes_out }}
+    ⏩ scopes_out, P_prover, P_verifier }}
   | LoopNext {Out : Set}
       (body : M.t (option Out))
       (k : Out -> M.t A)
-      (scopes_in scopes_inter : Scopes.t) :
-    {{ p, scopes_in ⏩ body 🔽 None ⏩ scopes_inter }} ->
-    {{ p, scopes_inter ⏩ M.Loop body k 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+      (scopes_in scopes_inter : Scopes.t)
+      (P_prover_first P_verifier_first : Prop)
+      (P_prover_second P_verifier_second : Prop) :
+    {{ p, signals, scopes_in ⏩
+      body 🔽 None
+    ⏩ scopes_inter, P_prover_first, P_verifier_first }} ->
+    {{ p, signals, scopes_inter ⏩
+      M.Loop body k 🔽 output
+    ⏩ scopes_out, P_prover_second, P_verifier_second }} ->
+    {{ p, signals, scopes_in ⏩
+      M.Loop body k 🔽 output
+    ⏩ scopes_out, P_prover_first /\ P_prover_second, P_verifier_first /\ P_verifier_second }}
   | LoopStop {Out : Set}
       (body : M.t (option Out))
       (k : Out -> M.t A)
       (output_inter : Out)
-      (scopes_in scopes_inter : Scopes.t) :
-    {{ p, scopes_in ⏩ body 🔽 Some output_inter ⏩ scopes_inter }} ->
-    {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+      (scopes_in scopes_inter : Scopes.t)
+      (P_prover_first P_verifier_first : Prop)
+      (P_prover_second P_verifier_second : Prop) :
+    {{ p, signals, scopes_in ⏩
+      body 🔽 Some output_inter
+    ⏩ scopes_inter, P_prover_first, P_verifier_first }} ->
+    {{ p, signals, scopes_inter ⏩
+      k output_inter 🔽 output
+    ⏩ scopes_out, P_prover_second, P_verifier_second }} ->
+    {{ p, signals, scopes_in ⏩
+      M.Loop body k 🔽 output
+    ⏩ scopes_out, P_prover_first /\ P_prover_second, P_verifier_first /\ P_verifier_second }}
   | Let {B : Set}
       (e : M.t B)
       (k : B -> M.t A)
       (output_inter : B)
-      (scopes_in scopes_inter : Scopes.t) :
-    {{ p, scopes_in ⏩ e 🔽 output_inter ⏩ scopes_inter }} ->
-    {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }}
-  | LetUnfold {B : Set}
-      (e : M.t B)
-      (k : B -> M.t A)
-      (scopes_in : Scopes.t) :
-    {{ p, scopes_in ⏩ M.let_ e k 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }}
-  | LetUnUnfold {B : Set}
-      (e : M.t B)
-      (k : B -> M.t A)
-      (scopes_in : Scopes.t) :
-    {{ p, scopes_in ⏩ M.Let e k 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.let_ e k 🔽 output ⏩ scopes_out }}
+      (scopes_in scopes_inter : Scopes.t)
+      (P_prover_first P_verifier_first : Prop)
+      (P_prover_second P_verifier_second : Prop) :
+    {{ p, signals, scopes_in ⏩
+      e 🔽 output_inter
+    ⏩ scopes_inter, P_prover_first, P_verifier_first }} ->
+    {{ p, signals, scopes_inter ⏩
+      k output_inter 🔽 output
+    ⏩ scopes_out, P_prover_second, P_verifier_second }} ->
+    {{ p, signals, scopes_in ⏩
+      M.Let e k 🔽 output
+    ⏩ scopes_out, P_prover_first /\ P_prover_second, P_verifier_first /\ P_verifier_second }}
   | Call {B : Set}
       (e : M.t B)
       (k : B -> M.t A)
       (output_inter : B)
-      (scopes_in : Scopes.t) :
-    {{ p, Scopes.empty ⏩ e 🔽 output_inter ⏩ Scopes.empty }} ->
-    {{ p, scopes_in ⏩ k output_inter 🔽 output ⏩ scopes_out }} ->
-    {{ p, scopes_in ⏩ M.Call e k 🔽 output ⏩ scopes_out }}
+      (scopes_in : Scopes.t)
+      (P_prover P_verifier : Prop) :
+    {{ p, tt, Scopes.empty ⏩
+      e 🔽 output_inter
+    ⏩ Scopes.empty, True, True }} ->
+    {{ p, signals, scopes_in ⏩
+      k output_inter 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    {{ p, signals, scopes_in ⏩
+      M.Call e k 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }}
+  | Equiv
+      (scopes_in : Scopes.t)
+      (e : M.t A)
+      (P_prover P_verifier : Prop)
+      (P_prover' P_verifier' : Prop) :
+    {{ p, signals, scopes_in ⏩
+      e 🔽 output
+    ⏩ scopes_out, P_prover, P_verifier }} ->
+    (P_prover <-> P_prover') ->
+    (P_verifier <-> P_verifier') ->
+    {{ p, signals, scopes_in ⏩
+      e 🔽 output
+    ⏩ scopes_out, P_prover', P_verifier' }}
 
-  where "{{ p , scopes_in ⏩ e 🔽 output ⏩ scopes_out }}" :=
-    (t p output scopes_out scopes_in e).
+  where "{{ p , signals , scopes_in ⏩ e 🔽 output ⏩ scopes_out , P_prover , P_verifier }}" :=
+    (t p signals scopes_out output scopes_in e P_prover P_verifier).
 
-  Lemma Loop {A Out : Set} (p : Z)
+  (** We had to split the [Loop] primitive into both [LoopNext] and [LoopStop] to avoid a
+      "non-strictly positive" error *)
+  Lemma Loop {Signals A Out : Set} (p : Z)
       (body : M.t (option Out))
       (k : Out -> M.t A)
       (output : A)
       (output_inter : option Out)
-      (scopes_in scopes_inter scopes_out : Scopes.t) :
-    {{ p, scopes_in ⏩ body 🔽 output_inter ⏩ scopes_inter }} ->
+      (scopes_in scopes_inter scopes_out : Scopes.t)
+      (signals : Signals)
+      (P_prover_first P_verifier_first : Prop)
+      (P_prover_second P_verifier_second : Prop) :
+    {{ p, signals, scopes_in ⏩
+      body 🔽 output_inter
+    ⏩ scopes_inter, P_prover_first, P_verifier_first }} ->
     match output_inter with
     | None =>
-      {{ p, scopes_inter ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}
+      {{ p, signals, scopes_inter ⏩
+        M.Loop body k 🔽 output
+      ⏩ scopes_out, P_prover_second, P_verifier_second }}
     | Some output_inter =>
-      {{ p, scopes_inter ⏩ k output_inter 🔽 output ⏩ scopes_out }}
+      {{ p, signals, scopes_inter ⏩
+        k output_inter 🔽 output
+      ⏩ scopes_out, P_prover_second, P_verifier_second }}
     end ->
-    {{ p, scopes_in ⏩ M.Loop body k 🔽 output ⏩ scopes_out }}.
+    {{ p, signals, scopes_in ⏩
+      M.Loop body k 🔽 output
+    ⏩ scopes_out, P_prover_first /\ P_prover_second, P_verifier_first /\ P_verifier_second }}.
   Proof.
     intros H_body H_next.
     destruct output_inter as [output_inter|].
@@ -676,16 +785,18 @@ Module Run.
 End Run.
 
 Ltac run_deterministic :=
-  repeat (
-    cbn ||
-    apply Run.PrimitiveOpenScope ||
-    apply Run.PrimitiveCloseScope ||
-    apply Run.PrimitiveDeclareVar ||
-    (eapply Run.PrimitiveSubstituteVar; try reflexivity) ||
-    (eapply Run.PrimitiveGetVarAccess; try now repeat constructor) ||
-    eapply Run.PrimitiveGetPrime ||
-    eapply Run.Loop ||
-    eapply Run.Let ||
-    eapply Run.Call ||
-    apply Run.Pure
-  ).
+  eapply Run.Equiv; [
+    repeat (
+      cbn ||
+      apply Run.PrimitiveOpenScope ||
+      apply Run.PrimitiveCloseScope ||
+      apply Run.PrimitiveDeclareVar ||
+      (eapply Run.PrimitiveSubstituteVar; try reflexivity) ||
+      (eapply Run.PrimitiveGetVarAccess; try now repeat constructor) ||
+      eapply Run.PrimitiveGetPrime ||
+      eapply Run.Loop ||
+      eapply Run.Let ||
+      eapply Run.Call ||
+      apply Run.Pure
+    )
+  | | ]; try tauto.

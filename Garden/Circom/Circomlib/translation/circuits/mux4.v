@@ -4,144 +4,187 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module MultiMux4Signals.
   Record t : Set := {
+    (* Input *)
     c : list (list F.t);
+    (* Input *)
     s : list F.t;
+    (* Output *)
     out : list F.t;
+    (* Intermediate *)
     a3210 : list F.t;
+    (* Intermediate *)
     a321 : list F.t;
+    (* Intermediate *)
     a320 : list F.t;
+    (* Intermediate *)
     a310 : list F.t;
+    (* Intermediate *)
     a32 : list F.t;
+    (* Intermediate *)
     a31 : list F.t;
+    (* Intermediate *)
     a30 : list F.t;
+    (* Intermediate *)
     a3 : list F.t;
+    (* Intermediate *)
     a210 : list F.t;
+    (* Intermediate *)
     a21 : list F.t;
+    (* Intermediate *)
     a20 : list F.t;
+    (* Intermediate *)
     a10 : list F.t;
+    (* Intermediate *)
     a2 : list F.t;
+    (* Intermediate *)
     a1 : list F.t;
+    (* Intermediate *)
     a0 : list F.t;
+    (* Intermediate *)
     a : list F.t;
+    (* Intermediate *)
     s10 : F.t;
+    (* Intermediate *)
     s20 : F.t;
+    (* Intermediate *)
     s21 : F.t;
+    (* Intermediate *)
     s210 : F.t;
   }.
 End MultiMux4Signals.
 
 (* Template body *)
 Definition MultiMux4 (n : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ M.var (| "n" |); 16 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "s" [[ [ 4 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a3210" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a321" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a320" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a310" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a32" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a31" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a30" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a3" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a210" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a21" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a20" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a10" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a2" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a1" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a0" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "a" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "s10" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "s10" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (1)] |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "s20" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "s20" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (2)] |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "s21" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "s21" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (2)] |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "s210" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "s210" [[ InfixOp.mul ~(| M.var (| "s21" |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
-    do~ M.substitute_var "a3210" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (15)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (14)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (13)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (11)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (7)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s210" |) |) ]] in
-    do~ M.substitute_var "a321" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (14)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s21" |) |) ]] in
-    do~ M.substitute_var "a320" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (13)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s20" |) |) ]] in
-    do~ M.substitute_var "a310" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (11)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s10" |) |) ]] in
-    do~ M.substitute_var "a32" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (2)] |) |) ]] in
-    do~ M.substitute_var "a31" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
-    do~ M.substitute_var "a30" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
-    do~ M.substitute_var "a3" [[ InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |) ]] in
-    do~ M.substitute_var "a210" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (7)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s210" |) |) ]] in
-    do~ M.substitute_var "a21" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s21" |) |) ]] in
-    do~ M.substitute_var "a20" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s20" |) |) ]] in
-    do~ M.substitute_var "a10" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s10" |) |) ]] in
-    do~ M.substitute_var "a2" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (2)] |) |) ]] in
-    do~ M.substitute_var "a1" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
-    do~ M.substitute_var "a0" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
-    do~ M.substitute_var "a" [[ M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "a3210", [Access.Array (M.var (| "i" |))] |), M.var_access (| "a321", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a320", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a310", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a32", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a31", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a30", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a3", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "s", [Access.Array (3)] |) |), InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "a210", [Access.Array (M.var (| "i" |))] |), M.var_access (| "a21", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a20", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a10", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a2", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a1", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a0", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a", [Access.Array (M.var (| "i" |))] |) |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+  M.template_body [("n", n)] (
+    (* Signal Input *)
+    do~ M.declare_signal "c" [[ [ M.var (| "n" |); 16 ] ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "s" [[ [ 4 ] ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a3210" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a321" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a320" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a310" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a32" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a31" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a30" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a3" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a210" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a21" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a20" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a10" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a2" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a1" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a0" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "a" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "s10" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "s10" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (1)] |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "s20" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "s20" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (2)] |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "s21" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "s21" [[ InfixOp.mul ~(| M.var_access (| "s", [Access.Array (2)] |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "s210" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "s210" [[ InfixOp.mul ~(| M.var (| "s21" |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
+      do~ M.substitute_var "a3210" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (15)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (14)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (13)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (11)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (7)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s210" |) |) ]] in
+      do~ M.substitute_var "a321" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (14)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s21" |) |) ]] in
+      do~ M.substitute_var "a320" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (13)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s20" |) |) ]] in
+      do~ M.substitute_var "a310" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (11)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s10" |) |) ]] in
+      do~ M.substitute_var "a32" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (12)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (2)] |) |) ]] in
+      do~ M.substitute_var "a31" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (10)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
+      do~ M.substitute_var "a30" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (9)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
+      do~ M.substitute_var "a3" [[ InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (8)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |) ]] in
+      do~ M.substitute_var "a210" [[ InfixOp.mul ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (7)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s210" |) |) ]] in
+      do~ M.substitute_var "a21" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (6)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s21" |) |) ]] in
+      do~ M.substitute_var "a20" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (5)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s20" |) |) ]] in
+      do~ M.substitute_var "a10" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (3)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s10" |) |) ]] in
+      do~ M.substitute_var "a2" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (4)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (2)] |) |) ]] in
+      do~ M.substitute_var "a1" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (2)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (1)] |) |) ]] in
+      do~ M.substitute_var "a0" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var_access (| "s", [Access.Array (0)] |) |) ]] in
+      do~ M.substitute_var "a" [[ M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) ]] in
+      do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "a3210", [Access.Array (M.var (| "i" |))] |), M.var_access (| "a321", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a320", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a310", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a32", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a31", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a30", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a3", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "s", [Access.Array (3)] |) |), InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "a210", [Access.Array (M.var (| "i" |))] |), M.var_access (| "a21", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a20", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a10", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a2", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a1", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a0", [Access.Array (M.var (| "i" |))] |) |), M.var_access (| "a", [Access.Array (M.var (| "i" |))] |) |) |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition MultiMux4_not_under_constrained (n : F.t) c s : Prop :=
+  exists! out,
+  exists a3210 a321 a320 a310 a32 a31 a30 a3 a210 a21 a20 a10 a2 a1 a0 a s10 s20 s21 s210,
+  let signals := MultiMux4Signals.Build_t c s out a3210 a321 a320 a310 a32 a31 a30 a3 a210 a21 a20 a10 a2 a1 a0 a s10 s20 s21 s210 in
+  True (* NotUnderConstrained MultiMux4 n signals *).
 
 (* Template signals *)
 Module Mux4Signals.
   Record t : Set := {
+    (* Input *)
     c : list F.t;
+    (* Input *)
     s : list F.t;
+    (* Output *)
     out : F.t;
   }.
 End Mux4Signals.
 
 (* Template body *)
 Definition Mux4 : M.t (BlockUnit.t Empty_set) :=
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ 16 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "s" [[ [ 4 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-  (* Component *)
-  do~ M.declare_component "mux" in
-  do~ M.substitute_var "mux" [[ M.call_function ~(| "MultiMux4", [ 1 ] |) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 16 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access (| "c", [Access.Array (M.var (| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+  M.template_body [] (
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "c" [[ [ 16 ] ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "s" [[ [ 4 ] ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    (* Component *)
+    do~ M.declare_component "mux" in
+    do~ M.substitute_var "mux" [[ M.call_function ~(| "MultiMux4", [ 1 ] |) ]] in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 16 |) ]] (
+      do~ M.substitute_var "mux" [[ M.var_access (| "c", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 4 |) ]] (
+      do~ M.substitute_var "mux" [[ M.var_access (| "s", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "out" [[ M.var_access (| "mux", [Access.Component "out"; Access.Array (0)] |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 4 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access (| "s", [Access.Array (M.var (| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
-    M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "out" [[ M.var_access (| "mux", [Access.Component "out"; Access.Array (0)] |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition Mux4_not_under_constrained c s : Prop :=
+  exists! out,
+  let signals := Mux4Signals.Build_t c s out in
+  True (* NotUnderConstrained Mux4 signals *).

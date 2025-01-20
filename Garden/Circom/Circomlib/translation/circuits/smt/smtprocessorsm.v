@@ -4,71 +4,98 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module SMTProcessorSMSignals.
   Record t : Set := {
+    (* Input *)
     xor : F.t;
+    (* Input *)
     is0 : F.t;
+    (* Input *)
     levIns : F.t;
+    (* Input *)
     fnc : list F.t;
+    (* Input *)
     prev_top : F.t;
+    (* Input *)
     prev_old0 : F.t;
+    (* Input *)
     prev_bot : F.t;
+    (* Input *)
     prev_new1 : F.t;
+    (* Input *)
     prev_na : F.t;
+    (* Input *)
     prev_upd : F.t;
+    (* Output *)
     st_top : F.t;
+    (* Output *)
     st_old0 : F.t;
+    (* Output *)
     st_bot : F.t;
+    (* Output *)
     st_new1 : F.t;
+    (* Output *)
     st_na : F.t;
+    (* Output *)
     st_upd : F.t;
+    (* Intermediate *)
     aux1 : F.t;
+    (* Intermediate *)
     aux2 : F.t;
   }.
 End SMTProcessorSMSignals.
 
 (* Template body *)
 Definition SMTProcessorSM : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "xor" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "is0" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "levIns" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "fnc" [[ [ 2 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_top" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_old0" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_bot" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_new1" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_na" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "prev_upd" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_top" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_old0" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_bot" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_new1" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_na" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "st_upd" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "aux1" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "aux2" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "aux1" [[ InfixOp.mul ~(| M.var (| "prev_top" |), M.var (| "levIns" |) |) ]] in
-  do~ M.substitute_var "aux2" [[ InfixOp.mul ~(| M.var (| "aux1" |), M.var_access (| "fnc", [Access.Array (0)] |) |) ]] in
-  do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var (| "prev_top" |), M.var (| "aux1" |) |) ]] in
-  do~ M.substitute_var "st_old0" [[ InfixOp.mul ~(| M.var (| "aux2" |), M.var (| "is0" |) |) ]] in
-  do~ M.substitute_var "st_new1" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |), M.var (| "xor" |) |) ]] in
-  do~ M.substitute_var "st_bot" [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var (| "xor" |) |), InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |) |) ]] in
-  do~ M.substitute_var "st_upd" [[ InfixOp.sub ~(| M.var (| "aux1" |), M.var (| "aux2" |) |) ]] in
-  do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var (| "prev_new1" |), M.var (| "prev_old0" |) |), M.var (| "prev_na" |) |), M.var (| "prev_upd" |) |) ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "xor" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "is0" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "levIns" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "fnc" [[ [ 2 ] ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_top" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_old0" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_bot" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_new1" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_na" [[ ([] : list F.t) ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "prev_upd" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_top" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_old0" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_bot" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_new1" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_na" [[ ([] : list F.t) ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "st_upd" [[ ([] : list F.t) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "aux1" [[ ([] : list F.t) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "aux2" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "aux1" [[ InfixOp.mul ~(| M.var (| "prev_top" |), M.var (| "levIns" |) |) ]] in
+    do~ M.substitute_var "aux2" [[ InfixOp.mul ~(| M.var (| "aux1" |), M.var_access (| "fnc", [Access.Array (0)] |) |) ]] in
+    do~ M.substitute_var "st_top" [[ InfixOp.sub ~(| M.var (| "prev_top" |), M.var (| "aux1" |) |) ]] in
+    do~ M.substitute_var "st_old0" [[ InfixOp.mul ~(| M.var (| "aux2" |), M.var (| "is0" |) |) ]] in
+    do~ M.substitute_var "st_new1" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |), M.var (| "xor" |) |) ]] in
+    do~ M.substitute_var "st_bot" [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var (| "xor" |) |), InfixOp.add ~(| InfixOp.sub ~(| M.var (| "aux2" |), M.var (| "st_old0" |) |), M.var (| "prev_bot" |) |) |) ]] in
+    do~ M.substitute_var "st_upd" [[ InfixOp.sub ~(| M.var (| "aux1" |), M.var (| "aux2" |) |) ]] in
+    do~ M.substitute_var "st_na" [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.add ~(| M.var (| "prev_new1" |), M.var (| "prev_old0" |) |), M.var (| "prev_na" |) |), M.var (| "prev_upd" |) |) ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition SMTProcessorSM_not_under_constrained xor is0 levIns fnc prev_top prev_old0 prev_bot prev_new1 prev_na prev_upd : Prop :=
+  exists! st_top st_old0 st_bot st_new1 st_na st_upd,
+  exists aux1 aux2,
+  let signals := SMTProcessorSMSignals.Build_t xor is0 levIns fnc prev_top prev_old0 prev_bot prev_new1 prev_na prev_upd st_top st_old0 st_bot st_new1 st_na st_upd aux1 aux2 in
+  True (* NotUnderConstrained SMTProcessorSM signals *).

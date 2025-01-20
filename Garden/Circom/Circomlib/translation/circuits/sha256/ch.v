@@ -4,29 +4,41 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module Ch_tSignals.
   Record t : Set := {
+    (* Input *)
     a : list F.t;
+    (* Input *)
     b : list F.t;
+    (* Input *)
     c : list F.t;
+    (* Output *)
     out : list F.t;
   }.
 End Ch_tSignals.
 
 (* Template body *)
 Definition Ch_t (n : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "a" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "b" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ M.var (| "n" |) ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
-  (* Var *)
-  do~ M.declare_var "k" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "k" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var (| "k" |), M.var (| "n" |) |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| M.var_access (| "a", [Access.Array (M.var (| "k" |))] |), InfixOp.sub ~(| M.var_access (| "b", [Access.Array (M.var (| "k" |))] |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) ]] in
-    do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var (| "k" |), 1 |) ]] in
+  M.template_body [("n", n)] (
+    (* Signal Input *)
+    do~ M.declare_signal "a" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "b" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "c" [[ [ M.var (| "n" |) ] ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
+    (* Var *)
+    do~ M.declare_var "k" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "k" [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "k" |), M.var (| "n" |) |) ]] (
+      do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| M.var_access (| "a", [Access.Array (M.var (| "k" |))] |), InfixOp.sub ~(| M.var_access (| "b", [Access.Array (M.var (| "k" |))] |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) |), M.var_access (| "c", [Access.Array (M.var (| "k" |))] |) |) ]] in
+      do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var (| "k" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition Ch_t_not_under_constrained (n : F.t) a b c : Prop :=
+  exists! out,
+  let signals := Ch_tSignals.Build_t a b c out in
+  True (* NotUnderConstrained Ch_t n signals *).
