@@ -26,13 +26,21 @@ Module Steps.
 End Steps.
 
 Module Variable_.
-  Parameter t : Set.
+  Inductive t : Set :=
+  | Add : t -> t -> t
+  | Mul : t -> t -> t
+  | Sub : t -> t -> t
+  | One : t
+  | Zero : t.
 
-  Parameter add : t -> t -> t.
-  Parameter mul : t -> t -> t.
-  Parameter sub : t -> t -> t.
-  Parameter one : t.
-  Parameter zero : t.
+  Fixpoint eval (x : t) : Z :=
+    match x with
+    | Add x1 x2 => eval x1 + eval x2
+    | Mul x1 x2 => eval x1 * eval x2
+    | Sub x1 x2 => eval x1 - eval x2
+    | One => 1
+    | Zero => 0
+    end.
 End Variable_.
 
 Module Constraint.
@@ -104,21 +112,26 @@ Definition quotient_c (self : Variable_.t) (x : nat) : Variable_.t :=
 
 Definition mode_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   match step with
-  | Steps.Round _ => Variable_.one
-  | _ => Variable_.zero
+  | Steps.Round _ => Variable_.One
+  | _ => Variable_.Zero
   end.
+
+Lemma run_mode_round : forall step,
+  Variable_.eval (mode_round Variable_.Zero step) = 0%Z.
+Proof.
+Admitted.
 
 Definition is_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   mode_round self step.
 
 Definition is_boolean (x : Variable_.t) : Variable_.t :=
-  Variable_.mul x (Variable_.sub x Variable_.one).
+  Variable_.Mul x (Variable_.Sub x Variable_.One).
 
 Module Keccak.
   Fixpoint var_two_pow (n : nat) : Variable_.t :=
     match n with
-    | 0 => Variable_.one
-    | S n' => Variable_.mul (Variable_.add Variable_.one Variable_.one) (var_two_pow n')
+    | 0 => Variable_.One
+    | S n' => Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n')
     end.
 
   Definition Self := Variable_.t.
@@ -152,16 +165,16 @@ Module Keccak.
   *)
 
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
-    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
+    nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
 
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
-    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * x).
+    nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * x).
 
   Definition grid_80 (quarters : list Variable_.t) (i x q : nat) : Variable_.t :=
-    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
+    nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
 
   Definition grid_400 (quarters : list Variable_.t) (i y x q : nat) : Variable_.t :=
-    nth_or_default Variable_.zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
+    nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
 
   Axiom from_quarters_TODO : Variable_.t.
 
@@ -189,20 +202,20 @@ Module Keccak.
     match y with
     | Some y' =>
       if length quarters =? 100 then
-          Variable_.add (grid_100 quarters y' x 0) (Variable_.add
-            (Variable_.mul (var_two_pow 16) (grid_100 quarters y' x 1))
-            (Variable_.add
-            (Variable_.mul (var_two_pow 32) (grid_100 quarters y' x 2))
-            (Variable_.mul (var_two_pow 48) (grid_100 quarters y' x 3))))
+          Variable_.Add (grid_100 quarters y' x 0) (Variable_.Add
+            (Variable_.Mul (var_two_pow 16) (grid_100 quarters y' x 1))
+            (Variable_.Add
+            (Variable_.Mul (var_two_pow 32) (grid_100 quarters y' x 2))
+            (Variable_.Mul (var_two_pow 48) (grid_100 quarters y' x 3))))
       else
         from_quarters_TODO
     | None =>
       if length quarters =? 20 then
-          Variable_.add (grid_20 quarters x 0) (Variable_.add
-            (Variable_.mul (var_two_pow 16) (grid_20 quarters x 1))
-            (Variable_.add
-            (Variable_.mul (var_two_pow 32) (grid_20 quarters x 2))
-            (Variable_.mul (var_two_pow 48) (grid_20 quarters x 3))))
+          Variable_.Add (grid_20 quarters x 0) (Variable_.Add
+            (Variable_.Mul (var_two_pow 16) (grid_20 quarters x 1))
+            (Variable_.Add
+            (Variable_.Mul (var_two_pow 32) (grid_20 quarters x 2))
+            (Variable_.Mul (var_two_pow 48) (grid_20 quarters x 3))))
         else
           from_quarters_TODO
     end.
@@ -286,13 +299,13 @@ Module Keccak.
       match i with
       | Some i_z =>
           let i_nat := Z.to_nat i_z in
-          let shifts_i := nth_or_default Variable_.zero shifts i_nat in
-          let shifts_100_i := nth_or_default Variable_.zero shifts (100 + i_nat) in
-          let shifts_200_i := nth_or_default Variable_.zero shifts (200 + i_nat) in
-          let shifts_300_i := nth_or_default Variable_.zero shifts (300 + i_nat) in
-          Variable_.add shifts_i (Variable_.add (Variable_.mul (var_two_pow 1) shifts_100_i)
-                                                (Variable_.add (Variable_.mul (var_two_pow 2) shifts_200_i)
-                                                              (Variable_.mul (var_two_pow 3) shifts_300_i)))
+          let shifts_i := nth_or_default Variable_.Zero shifts i_nat in
+          let shifts_100_i := nth_or_default Variable_.Zero shifts (100 + i_nat) in
+          let shifts_200_i := nth_or_default Variable_.Zero shifts (200 + i_nat) in
+          let shifts_300_i := nth_or_default Variable_.Zero shifts (300 + i_nat) in
+          Variable_.Add shifts_i (Variable_.Add (Variable_.Mul (var_two_pow 1) shifts_100_i)
+                                                (Variable_.Add (Variable_.Mul (var_two_pow 2) shifts_200_i)
+                                                              (Variable_.Mul (var_two_pow 3) shifts_300_i)))
       | None =>
           match y, x, q with
           | Some y_z, Some x_z, Some q_z =>
@@ -303,10 +316,10 @@ Module Keccak.
               let shifts_1 := grid_400 shifts 1 y_nat x_nat q_nat in
               let shifts_2 := grid_400 shifts 2 y_nat x_nat q_nat in
               let shifts_3 := grid_400 shifts 3 y_nat x_nat q_nat in
-              Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
-                                                    (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
-                                                                  (Variable_.mul (var_two_pow 3) shifts_3)))
-          | _, _, _ => Variable_.zero
+              Variable_.Add shifts_0 (Variable_.Add (Variable_.Mul (var_two_pow 1) shifts_1)
+                                                    (Variable_.Add (Variable_.Mul (var_two_pow 2) shifts_2)
+                                                                  (Variable_.Mul (var_two_pow 3) shifts_3)))
+          | _, _, _ => Variable_.Zero
           end
       end
     else if List.length shifts =? 80 then
@@ -318,12 +331,12 @@ Module Keccak.
           let shifts_1 := grid_80 shifts 1 x_nat q_nat in
           let shifts_2 := grid_80 shifts 2 x_nat q_nat in
           let shifts_3 := grid_80 shifts 3 x_nat q_nat in
-          Variable_.add shifts_0 (Variable_.add (Variable_.mul (var_two_pow 1) shifts_1)
-                                                (Variable_.add (Variable_.mul (var_two_pow 2) shifts_2)
-                                                              (Variable_.mul (var_two_pow 3) shifts_3)))
-      | _, _ => Variable_.zero
+          Variable_.Add shifts_0 (Variable_.Add (Variable_.Mul (var_two_pow 1) shifts_1)
+                                                (Variable_.Add (Variable_.Mul (var_two_pow 2) shifts_2)
+                                                              (Variable_.Mul (var_two_pow 3) shifts_3)))
+      | _, _ => Variable_.Zero
       end
-    else Variable_.zero.
+    else Variable_.Zero.
 
   (*
   fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
@@ -380,9 +393,9 @@ Module Keccak.
   *)
 
   Definition constrain_theta (self : Variable_.t) (step : Steps.t) : list (list (list Variable_.t)) :=
-    let state_c := List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
-    let state_d := List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
-    let state_e := List.repeat (List.repeat (List.repeat Variable_.zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
+    let state_c := List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+    let state_d := List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
+    let state_e := List.repeat (List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
 
     let indices := seq 0 (Z.to_nat DIM) in
    let self :=
@@ -393,10 +406,10 @@ Module Keccak.
         let rot_c := from_quarters (vec_dense_rot_c self) None x in
 
         let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
-                    (Variable_.sub (Variable_.mul word_c (var_two_pow 1))
-                      (Variable_.add (Variable_.mul (quotient_c self x) (var_two_pow 64)) rem_c)) in
+                    (Variable_.Sub (Variable_.Mul word_c (var_two_pow 1))
+                      (Variable_.Add (Variable_.Mul (quotient_c self x) (var_two_pow 64)) rem_c)) in
         let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
-                    (Variable_.sub rot_c (Variable_.add (quotient_c self x) rem_c)) in
+                    (Variable_.Sub rot_c (Variable_.Add (quotient_c self x) rem_c)) in
         let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
                     (is_boolean (quotient_c self x)) in
 
@@ -405,27 +418,50 @@ Module Keccak.
         (fun self (q : nat) =>
           let q := Z.of_nat q in
           let state_c_q :=
-            Variable_.add (state_a 0 (Z.of_nat x) q)
-            (Variable_.add (state_a 1 (Z.of_nat x) q)
-            (Variable_.add (state_a 2 (Z.of_nat x) q)
-            (Variable_.add (state_a 3 (Z.of_nat x) q)
+            Variable_.Add (state_a 0 (Z.of_nat x) q)
+            (Variable_.Add (state_a 1 (Z.of_nat x) q)
+            (Variable_.Add (state_a 2 (Z.of_nat x) q)
+            (Variable_.Add (state_a 3 (Z.of_nat x) q)
             (state_a 4 (Z.of_nat x) q)))) in
       
           let self := constrain self (Constraint.ThetaShiftsC (Z.of_nat x) q) (is_round self step)
-                        (Variable_.sub state_c_q
+                        (Variable_.Sub state_c_q
                         (from_shifts (vec_shifts_c self) None None (Some (Z.of_nat x)) (Some q))) in
       
           let state_d_q :=
-            Variable_.add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
+            Variable_.Add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
             (expand_rot_c self ((Z.of_nat x + 1) mod DIM) q) in
       
           let state_e_q :=
             List.map
-              (fun y => Variable_.add (state_a y (Z.of_nat x) q) state_d_q)
+              (fun y => Variable_.Add (state_a y (Z.of_nat x) q) state_d_q)
               (List.map Z.of_nat (seq 0 (Z.to_nat DIM))) in
       
           self
         ) quarters self
     ) indices self in
 state_e.
+
+Lemma var_two_pow_base_case : var_two_pow 0 = Variable_.One.
+Proof.
+  simpl. reflexivity.
+Qed.
+
+Lemma var_two_pow_inductive_case : forall n : nat,
+ var_two_pow (S n) = Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n).
+Proof.
+  intros. simpl. reflexivity.
+Qed.
+
+Lemma var_two_pow_recursive_definition : forall n,
+  match n with
+  | 0 => var_two_pow n = Variable_.One
+  | S n' => var_two_pow n = Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n')
+  end.
+Proof. 
+  induction n; 
+  simpl; 
+  reflexivity. 
+Qed.
+
 End Keccak.
