@@ -1,7 +1,5 @@
 Require Import Coq.Logic.Eqdep.
-Require Import Coq.ZArith.ZArith.
-
-Local Open Scope Z.
+Require Import Garden.Garden.
 
 (*
 pub const DIM: usize = 5;
@@ -159,9 +157,16 @@ Module Keccak.
   Proof.
     induction n as [| n' IHn].
     { reflexivity. }
-    { simpl. }
-    
-  Admitted.
+    { with_strategy opaque [Z.mul Z.pow Z.of_nat] cbn.
+      rewrite IHn.
+      replace (2 ^ Z.of_nat (S n')) with (2 * 2 ^ Z.of_nat n'). 2: {
+        replace (Z.of_nat (S n')) with (Z.of_nat n' + 1)%Z by lia.
+        rewrite Z.pow_add_r by lia.
+        lia.
+      }
+      reflexivity.
+    }
+  Qed.
 
   Definition Self := Variable_.t.
 
