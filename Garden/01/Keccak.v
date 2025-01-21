@@ -116,13 +116,34 @@ Definition mode_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   | _ => Variable_.Zero
   end.
 
-Lemma run_mode_round : forall step,
-  Variable_.eval (mode_round Variable_.Zero step) = 0%Z.
+Lemma mode_round_correct :
+  forall (self : Variable_.t) (step : Steps.t),
+    Variable_.eval (mode_round self step) =
+    match step with
+    | Steps.Round _ => Z.of_nat 1
+    | Steps.Sponge _ => Z.of_nat 0
+    end.
 Proof.
-Admitted.
+  intros self step.
+  destruct step as [n | s];
+  simpl; reflexivity.
+Qed.
 
 Definition is_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   mode_round self step.
+
+Lemma is_round_correct :
+  forall (self : Variable_.t) (step : Steps.t),
+    Variable_.eval (is_round self step) =
+    match step with
+    | Steps.Round _ => Z.of_nat 1
+    | Steps.Sponge _ => Z.of_nat 0
+    end.
+Proof.
+  intros self step.
+  unfold is_round.
+  apply mode_round_correct.
+Qed.
 
 Definition is_boolean (x : Variable_.t) : Variable_.t :=
   Variable_.Mul x (Variable_.Sub x Variable_.One).
