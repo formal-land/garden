@@ -1,5 +1,7 @@
+Require Import Coq.Logic.Eqdep.
 Require Import Coq.ZArith.ZArith.
-Require Import Coq.Lists.List.
+
+Local Open Scope Z.
 
 (*
 pub const DIM: usize = 5;
@@ -151,9 +153,23 @@ Definition is_boolean (x : Variable_.t) : Variable_.t :=
 Module Keccak.
   Fixpoint var_two_pow (n : nat) : Variable_.t :=
     match n with
-    | 0 => Variable_.One
+    | 0%nat => Variable_.One
     | S n' => Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n')
     end.
+
+  Lemma var_two_pow_correct :
+    forall (n : nat),
+      Variable_.eval (var_two_pow n) = 2 ^ Z.of_nat n.
+  Proof.
+    induction n as [| n' IHn].
+    { reflexivity. }
+    {
+      simpl.
+      rewrite IHn.
+      destruct (2 ^ Z.of_nat n').
+      admit.
+    }
+  Admitted.
 
   Definition Self := Variable_.t.
 
@@ -161,6 +177,16 @@ Module Keccak.
 
   Definition nth_or_default {A : Set} (default : A) (l : list A) (n : nat) : A :=
     List.nth n l default.
+
+  Lemma nth_or_default_correct :
+    forall {A : Set} (default : A) (l : list A) (n : nat),
+      Z.of_nat n < Z.of_nat (List.length l) ->
+      List.nth n l default = nth_or_default default l n.
+  Proof.
+    intros A default l n H.
+    unfold nth_or_default.
+    reflexivity.
+  Qed.
 
   (*
     #[macro_export]
@@ -188,14 +214,54 @@ Module Keccak.
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
 
+  Lemma grid_100_is_valid :
+    forall (quarters : list Variable_.t) (y x q : nat),
+      Z.of_nat (List.length quarters) = 100 ->
+      grid_100 quarters y x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
+  Proof.
+    intros quarters y x q H.
+    unfold grid_100.
+    reflexivity.
+  Qed.
+
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * x).
+
+  Lemma grid_20_is_valid :
+    forall (quarters : list Variable_.t) (x q : nat),
+      Z.of_nat (List.length quarters) = 20 ->
+      grid_20 quarters x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * x).
+  Proof.
+    intros quarters x q H.
+    unfold grid_20.
+    reflexivity.
+  Qed.
 
   Definition grid_80 (quarters : list Variable_.t) (i x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
 
+  Lemma grid_80_is_valid :
+    forall (quarters : list Variable_.t) (i x q : nat),
+      Z.of_nat (List.length quarters) = 80 ->
+      grid_80 quarters i x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
+  Proof.
+    intros quarters i x q H.
+    unfold grid_80.
+    reflexivity.
+  Qed.
+
   Definition grid_400 (quarters : list Variable_.t) (i y x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
+
+  Lemma grid_400_is_valid :
+    forall (quarters : list Variable_.t) (i y x q : nat),
+      Z.of_nat (List.length quarters) = 400 ->
+      grid_400 quarters i y x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
+  Proof.
+    intros quarters i y x q H.
+    unfold grid_400.
+    reflexivity.
+  Qed.
 
   Axiom from_quarters_TODO : Variable_.t.
 
@@ -222,7 +288,7 @@ Module Keccak.
   Definition from_quarters (quarters : list Variable_.t) (y : option nat) (x : nat) : Variable_.t :=
     match y with
     | Some y' =>
-      if length quarters =? 100 then
+    if Z.of_nat (List.length quarters) =? 100 then
           Variable_.Add (grid_100 quarters y' x 0) (Variable_.Add
             (Variable_.Mul (var_two_pow 16) (grid_100 quarters y' x 1))
             (Variable_.Add
@@ -231,7 +297,7 @@ Module Keccak.
       else
         from_quarters_TODO
     | None =>
-      if length quarters =? 20 then
+      if Z.of_nat (List.length quarters) =? 20 then
           Variable_.Add (grid_20 quarters x 0) (Variable_.Add
             (Variable_.Mul (var_two_pow 16) (grid_20 quarters x 1))
             (Variable_.Add
@@ -253,19 +319,19 @@ Module Keccak.
 
   Definition vec_dense_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
-            (seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
+            (List.seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
 
   Definition vec_remainder_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
-            (seq 0 (Z.to_nat DIM)).
+            (List.seq 0 (Z.to_nat DIM)).
 
   Definition vec_dense_rot_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
-            (seq 0 (Z.to_nat DIM)).
+            (List.seq 0 (Z.to_nat DIM)).
 
   Definition vec_shifts_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
-            (seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
+            (List.seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
 
   Definition shifts_c (self : Variable_.t) (i x q : Z) : Variable_.t :=
     let idx := grid_index THETA_SHIFTS_C_LEN i 0 x q in
@@ -316,7 +382,7 @@ Module Keccak.
   *)
 
   Definition from_shifts (shifts : list Variable_.t) (i y x q : option Z) : Variable_.t :=
-    if List.length shifts =? 400 then
+    if Z.of_nat (List.length shifts) =? 400 then
       match i with
       | Some i_z =>
           let i_nat := Z.to_nat i_z in
@@ -343,7 +409,7 @@ Module Keccak.
           | _, _, _ => Variable_.Zero
           end
       end
-    else if List.length shifts =? 80 then
+    else if Z.of_nat (List.length shifts) =? 80 then
       match x, q with
       | Some x_z, Some q_z =>
           let x_nat := Z.to_nat x_z in
@@ -418,9 +484,9 @@ Module Keccak.
     let state_d := List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM) in
     let state_e := List.repeat (List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
 
-    let indices := seq 0 (Z.to_nat DIM) in
+    let indices := List.seq 0 (Z.to_nat DIM) in
    let self :=
-  fold_left
+  List.fold_left
     (fun self (x : nat) =>
         let word_c := from_quarters (vec_dense_c self) None x in
         let rem_c := from_quarters (vec_remainder_c self) None x in
@@ -434,8 +500,8 @@ Module Keccak.
         let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
                     (is_boolean (quotient_c self x)) in
 
-        let quarters := seq 0 (Z.to_nat QUARTERS) in
-        fold_left
+        let quarters := List.seq 0 (Z.to_nat QUARTERS) in
+        List.fold_left
         (fun self (q : nat) =>
           let q := Z.of_nat q in
           let state_c_q :=
@@ -456,33 +522,11 @@ Module Keccak.
           let state_e_q :=
             List.map
               (fun y => Variable_.Add (state_a y (Z.of_nat x) q) state_d_q)
-              (List.map Z.of_nat (seq 0 (Z.to_nat DIM))) in
+              (List.map Z.of_nat (List.seq 0 (Z.to_nat DIM))) in
       
           self
         ) quarters self
     ) indices self in
 state_e.
-
-Lemma var_two_pow_base_case : var_two_pow 0 = Variable_.One.
-Proof.
-  simpl. reflexivity.
-Qed.
-
-Lemma var_two_pow_inductive_case : forall n : nat,
- var_two_pow (S n) = Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n).
-Proof.
-  intros. simpl. reflexivity.
-Qed.
-
-Lemma var_two_pow_recursive_definition : forall n,
-  match n with
-  | 0 => var_two_pow n = Variable_.One
-  | S n' => var_two_pow n = Variable_.Mul (Variable_.Add Variable_.One Variable_.One) (var_two_pow n')
-  end.
-Proof. 
-  induction n; 
-  simpl; 
-  reflexivity. 
-Qed.
 
 End Keccak.
