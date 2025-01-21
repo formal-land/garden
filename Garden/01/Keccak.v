@@ -307,6 +307,28 @@ Module Keccak.
           from_quarters_TODO
     end.
 
+  Lemma from_quarters_correct :
+    forall (quarters : list Variable_.t) (y : option nat) (x : nat),
+      Z.of_nat (List.length quarters) = 100 ->
+      match y with
+      | Some y' =>
+        from_quarters quarters y x = Variable_.Add (grid_100 quarters y' x 0) (Variable_.Add
+          (Variable_.Mul (var_two_pow 16) (grid_100 quarters y' x 1))
+          (Variable_.Add
+          (Variable_.Mul (var_two_pow 32) (grid_100 quarters y' x 2))
+          (Variable_.Mul (var_two_pow 48) (grid_100 quarters y' x 3))))
+      | None => True
+      end.
+  Proof.
+    intros quarters y x H.
+    unfold from_quarters.
+    destruct y as [y' |].
+    { simpl.
+      rewrite H.
+      reflexivity. }
+    { reflexivity. }
+  Qed.
+    
   Definition grid_index (length i y x q : Z) : Z :=
     match length with
     | 5%Z => x
