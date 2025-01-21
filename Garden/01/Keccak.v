@@ -118,15 +118,13 @@ Definition mode_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   | _ => Variable_.Zero
   end.
 
-Lemma mode_round_correct :
-  forall (self : Variable_.t) (step : Steps.t),
+Lemma mode_round_correct (self : Variable_.t) (step : Steps.t) :
     Variable_.eval (mode_round self step) =
     match step with
     | Steps.Round _ => Z.of_nat 1
     | Steps.Sponge _ => Z.of_nat 0
     end.
 Proof.
-  intros self step.
   destruct step as [n | s];
   simpl; reflexivity.
 Qed.
@@ -134,15 +132,13 @@ Qed.
 Definition is_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
   mode_round self step.
 
-Lemma is_round_correct :
-  forall (self : Variable_.t) (step : Steps.t),
+Lemma is_round_correct (self : Variable_.t) (step : Steps.t) :
     Variable_.eval (is_round self step) =
     match step with
     | Steps.Round _ => Z.of_nat 1
     | Steps.Sponge _ => Z.of_nat 0
     end.
 Proof.
-  intros self step.
   unfold is_round.
   apply mode_round_correct.
 Qed.
@@ -163,12 +159,8 @@ Module Keccak.
   Proof.
     induction n as [| n' IHn].
     { reflexivity. }
-    {
-      simpl.
-      rewrite IHn.
-      destruct (2 ^ Z.of_nat n').
-      admit.
-    }
+    { simpl. }
+    
   Admitted.
 
   Definition Self := Variable_.t.
@@ -178,12 +170,10 @@ Module Keccak.
   Definition nth_or_default {A : Set} (default : A) (l : list A) (n : nat) : A :=
     List.nth n l default.
 
-  Lemma nth_or_default_correct :
-    forall {A : Set} (default : A) (l : list A) (n : nat),
+  Lemma nth_or_default_correct {A : Set} (default : A) (l : list A) (n : nat) :
       Z.of_nat n < Z.of_nat (List.length l) ->
       List.nth n l default = nth_or_default default l n.
   Proof.
-    intros A default l n H.
     unfold nth_or_default.
     reflexivity.
   Qed.
@@ -219,8 +209,6 @@ Module Keccak.
       Z.of_nat (List.length quarters) = 100 ->
       grid_100 quarters y x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
   Proof.
-    intros quarters y x q H.
-    unfold grid_100.
     reflexivity.
   Qed.
 
@@ -232,8 +220,6 @@ Module Keccak.
       Z.of_nat (List.length quarters) = 20 ->
       grid_20 quarters x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * x).
   Proof.
-    intros quarters x q H.
-    unfold grid_20.
     reflexivity.
   Qed.
 
@@ -245,8 +231,6 @@ Module Keccak.
       Z.of_nat (List.length quarters) = 80 ->
       grid_80 quarters i x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
   Proof.
-    intros quarters i x q H.
-    unfold grid_80.
     reflexivity.
   Qed.
 
@@ -258,8 +242,6 @@ Module Keccak.
       Z.of_nat (List.length quarters) = 400 ->
       grid_400 quarters i y x q = nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
   Proof.
-    intros quarters i y x q H.
-    unfold grid_400.
     reflexivity.
   Qed.
 
@@ -307,8 +289,8 @@ Module Keccak.
           from_quarters_TODO
     end.
 
-  Lemma from_quarters_correct :
-    forall (quarters : list Variable_.t) (y : option nat) (x : nat),
+  Lemma from_quarters_correct:
+  forall (quarters : list Variable_.t) (y : option nat) (x : nat),
       Z.of_nat (List.length quarters) = 100 ->
       match y with
       | Some y' =>
@@ -317,16 +299,15 @@ Module Keccak.
           (Variable_.Add
           (Variable_.Mul (var_two_pow 32) (grid_100 quarters y' x 2))
           (Variable_.Mul (var_two_pow 48) (grid_100 quarters y' x 3))))
-      | None => True
+      | None => True (* TODO *)
       end.
   Proof.
-    intros quarters y x H.
-    unfold from_quarters.
-    destruct y as [y' |].
-    { simpl.
-      rewrite H.
-      reflexivity. }
-    { reflexivity. }
+      intros quarters y x H.
+      unfold from_quarters.
+      destruct y as [y' |].
+      rewrite H. 
+      reflexivity. 
+      trivial.
   Qed.
     
   Definition grid_index (length i y x q : Z) : Z :=
@@ -338,34 +319,90 @@ Module Keccak.
     | 400%Z => q + QUARTERS * (x + DIM * (y + DIM * i))
     | _ => 0
     end.
+  
+  Lemma grid_index_correct (length i y x q : Z) :
+      (length = 5 \/ length = 20 \/ length = 80 \/ length = 100 \/ length = 400) ->
+      grid_index length i y x q = match length with
+      | 5 => x
+      | 20 => q + QUARTERS * x
+      | 80 => q + QUARTERS * (x + DIM * i)
+      | 100 => q + QUARTERS * (x + DIM * y)
+      | 400 => q + QUARTERS * (x + DIM * (y + DIM * i))
+      | _ => 0
+      end.
+  Proof.
+    reflexivity.
+  Qed.
 
   Definition vec_dense_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaDenseC (Z.of_nat idx)))
             (List.seq 0 (Z.to_nat THETA_DENSE_C_LEN)).
 
+  Lemma vec_dense_c_correct (self : Variable_.t) :
+    List.length (vec_dense_c self) = Z.to_nat THETA_DENSE_C_LEN.
+  Proof.
+    reflexivity.
+  Qed.
+
   Definition vec_remainder_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaRemainderC (Z.of_nat idx)))
             (List.seq 0 (Z.to_nat DIM)).
+
+  Lemma vec_remainder_c_correct (self : Variable_.t) :
+    List.length (vec_remainder_c self) = Z.to_nat DIM.
+  Proof.
+    reflexivity.
+  Qed.
 
   Definition vec_dense_rot_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaDenseRotC (Z.of_nat idx)))
             (List.seq 0 (Z.to_nat DIM)).
 
+  Lemma vec_dense_rot_c_correct (self : Variable_.t) :
+    List.length (vec_dense_rot_c self) = Z.to_nat DIM.
+  Proof.
+    reflexivity.
+  Qed.
+
   Definition vec_shifts_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
             (List.seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
+          
+  Lemma vec_shifts_c_correct (self : Variable_.t) :
+    List.length (vec_shifts_c self) = Z.to_nat THETA_SHIFTS_C_LEN.
+  Proof.
+    reflexivity.
+  Qed.
 
   Definition shifts_c (self : Variable_.t) (i x q : Z) : Variable_.t :=
     let idx := grid_index THETA_SHIFTS_C_LEN i 0 x q in
     variable (ColumnAlias.Input idx).
   
+  Lemma shifts_c_correct (self : Variable_.t) (i x q : Z) :
+    shifts_c self i x q = variable (ColumnAlias.Input (grid_index THETA_SHIFTS_C_LEN i 0 x q)).
+  Proof.
+    reflexivity.
+  Qed.
+
   Definition expand_rot_c (self : Variable_.t) (x q : Z) : Variable_.t :=
     let idx := grid_index THETA_EXPAND_ROT_C_LEN 0 0 x q in
     variable (ColumnAlias.Input idx).
 
+  Lemma expand_rot_c_correct (self : Variable_.t) (x q : Z) :
+    expand_rot_c self x q = variable (ColumnAlias.Input (grid_index THETA_EXPAND_ROT_C_LEN 0 0 x q)).
+  Proof.
+    reflexivity.
+  Qed.
+
   Definition state_a (y x q : Z) : Variable_.t :=
     let idx := grid_index THETA_STATE_A_LEN 0 y x q in
     variable (ColumnAlias.Input idx).
+  
+  Lemma state_a_correct (y x q : Z) :
+    state_a y x q = variable (ColumnAlias.Input (grid_index THETA_STATE_A_LEN 0 y x q)).
+  Proof.
+    reflexivity.
+  Qed.
   
   (*
   fn from_shifts(
