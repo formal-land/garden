@@ -209,6 +209,19 @@ Module Keccak.
   Definition grid_100 (quarters : list Variable_.t) (y x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
 
+  Definition simulation_grid_100 (quarters : list Z) (y x q : nat) : Z :=
+    nth_or_default 0%Z quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * y)).
+  
+  Definition run_grid_100 (quarters : list Variable_.t) (y x q : nat) :
+    Variable_.eval (grid_100 quarters y x q) =
+    simulation_grid_100 (List.map Variable_.eval quarters) y x q.
+  Proof.
+    unfold grid_100, simulation_grid_100, nth_or_default.
+    replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+    repeat rewrite (List.map_nth Variable_.eval).
+    reflexivity.
+  Qed.
+
   Lemma grid_100_is_valid :
     forall (quarters : list Variable_.t) (y x q : nat),
       Z.of_nat (List.length quarters) = 100 ->
@@ -219,6 +232,19 @@ Module Keccak.
 
   Definition grid_20 (quarters : list Variable_.t) (x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * x).
+
+  Definition simulation_grid_20 (quarters : list Z) (x q : nat) : Z :=
+    nth_or_default 0%Z quarters (q + (Z.to_nat QUARTERS) * x).
+
+  Definition run_grid_20 (quarters : list Variable_.t) (x q : nat) :
+    Variable_.eval (grid_20 quarters x q) =
+    simulation_grid_20 (List.map Variable_.eval quarters) x q.
+  Proof.
+    unfold grid_20, simulation_grid_20, nth_or_default.
+    replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+    repeat rewrite (List.map_nth Variable_.eval).
+    reflexivity.
+  Qed.
 
   Lemma grid_20_is_valid :
     forall (quarters : list Variable_.t) (x q : nat),
