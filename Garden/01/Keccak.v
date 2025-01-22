@@ -231,6 +231,19 @@ Module Keccak.
   Definition grid_80 (quarters : list Variable_.t) (i x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
 
+  Definition simulation_grid_80 (quarters : list Z) (i x q : nat) : Z :=
+    nth_or_default 0%Z quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * i)).
+
+  Lemma run_grid_80 (quarters : list Variable_.t) (i x q : nat) :
+    Variable_.eval (grid_80 quarters i x q) =
+    simulation_grid_80 (List.map Variable_.eval quarters) i x q.
+  Proof.
+    unfold grid_80, simulation_grid_80, nth_or_default.
+    replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+    repeat rewrite (List.map_nth Variable_.eval).
+    reflexivity.
+  Qed.
+
   Lemma grid_80_is_valid :
     forall (quarters : list Variable_.t) (i x q : nat),
       Z.of_nat (List.length quarters) = 80 ->
@@ -241,6 +254,19 @@ Module Keccak.
 
   Definition grid_400 (quarters : list Variable_.t) (i y x q : nat) : Variable_.t :=
     nth_or_default Variable_.Zero quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
+
+  Definition simulation_grid_400 (quarters : list Z) (i y x q : nat) : Z :=
+    nth_or_default 0%Z quarters (q + (Z.to_nat QUARTERS) * (x + (Z.to_nat DIM) * (y + (Z.to_nat DIM) * i))).
+
+  Definition run_grid_400 (quarters : list Variable_.t) (i y x q : nat) :
+    Variable_.eval (grid_400 quarters i y x q) =
+    simulation_grid_400 (List.map Variable_.eval quarters) i y x q.
+  Proof.
+    unfold grid_400, simulation_grid_400, nth_or_default.
+    replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+    repeat rewrite (List.map_nth Variable_.eval).
+    reflexivity.
+  Qed.
 
   Lemma grid_400_is_valid :
     forall (quarters : list Variable_.t) (i y x q : nat),
@@ -574,7 +600,7 @@ Module Keccak.
       { trivial. }
     }
   Admitted.
-  
+
   (*
   fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
         // Define vectors storing expressions which are not in the witness layout for efficiency
