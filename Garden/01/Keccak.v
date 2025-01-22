@@ -176,8 +176,8 @@ Module Keccak.
     List.nth n l default.
 
   Lemma nth_or_default_correct {A : Set} (default : A) (l : list A) (n : nat) :
-      Z.of_nat n < Z.of_nat (List.length l) ->
-      List.nth n l default = nth_or_default default l n.
+    Z.of_nat n < Z.of_nat (List.length l) ->
+    List.nth n l default = nth_or_default default l n.
   Proof.
     unfold nth_or_default.
     reflexivity.
@@ -489,6 +489,92 @@ Module Keccak.
       end
     else Variable_.Zero.
 
+  Definition simulation_from_shifts (shifts : list Z) (i y x q : option Z) : Z :=
+    if Z.of_nat (List.length shifts) =? 400 then
+      match i with
+      | Some i_z =>
+          let i_nat := Z.to_nat i_z in
+          let shifts_i := nth_or_default 0%Z shifts i_nat in
+          let shifts_100_i := nth_or_default 0%Z shifts (100 + i_nat) in
+          let shifts_200_i := nth_or_default 0%Z shifts (200 + i_nat) in
+          let shifts_300_i := nth_or_default 0%Z shifts (300 + i_nat) in
+          shifts_i + 2 ^ 1 * shifts_100_i + 2 ^ 2 * shifts_200_i + 2 ^ 3 * shifts_300_i
+      | None =>
+          match y, x, q with
+          | Some y_z, Some x_z, Some q_z =>
+              let y_nat := Z.to_nat y_z in
+              let x_nat := Z.to_nat x_z in
+              let q_nat := Z.to_nat q_z in
+              let shifts_0 := nth_or_default 0%Z shifts (q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
+              let shifts_1 := nth_or_default 0%Z shifts (1 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
+              let shifts_2 := nth_or_default 0%Z shifts (2 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
+              let shifts_3 := nth_or_default 0%Z shifts (3 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
+              shifts_0 + 2 ^ 1 * shifts_1 + 2 ^ 2 * shifts_2 + 2 ^ 3 * shifts_3
+          | _, _, _ => 0
+          end
+      end
+    else if Z.of_nat (List.length shifts) =? 80 then
+      match x, q with
+      | Some x_z, Some q_z =>
+          let x_nat := Z.to_nat x_z in
+          let q_nat := Z.to_nat q_z in
+          let shifts_0 := nth_or_default 0%Z shifts (q_nat + (Z.to_nat QUARTERS) * x_nat) in
+          let shifts_1 := nth_or_default 0%Z shifts (1 + q_nat + (Z.to_nat QUARTERS) * x_nat) in
+          let shifts_2 := nth_or_default 0%Z shifts (2 + q_nat + (Z.to_nat QUARTERS) * x_nat) in
+          let shifts_3 := nth_or_default 0%Z shifts (3 + q_nat + (Z.to_nat QUARTERS) * x_nat) in
+          shifts_0 + 2 ^ 1 * shifts_1 + 2 ^ 2 * shifts_2 + 2 ^ 3 * shifts_3
+      | _, _ => 0
+      end
+    else 0.
+  
+  Lemma run_from_shifts (shifts : list Variable_.t) (i y x q : option Z) :
+    Variable_.eval (from_shifts shifts i y x q) = 
+    simulation_from_shifts (List.map Variable_.eval shifts) i y x q.
+  Proof.
+    unfold from_shifts, simulation_from_shifts.
+    rewrite List.length_map.
+    destruct (_ =? 400).
+    { destruct i.
+      { unfold nth_or_default.
+        replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+        repeat rewrite (List.map_nth Variable_.eval).
+        repeat set (List.nth _ _ _).
+        with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
+        rewrite !var_two_pow_correct.
+        lia.
+      }
+      {
+        destruct y. destruct x. destruct q.
+        { unfold nth_or_default.
+          replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+          repeat rewrite (List.map_nth Variable_.eval).
+          repeat set (List.nth _ _ _).
+          with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
+          rewrite !var_two_pow_correct.
+          admit.
+        }
+        { trivial. }
+        { trivial. }
+        { trivial. }
+      }
+    }
+    { destruct (Z.of_nat (Datatypes.length shifts) =? 80).
+      { destruct x, q.
+        { unfold nth_or_default.
+          replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+          repeat rewrite (List.map_nth Variable_.eval).
+          repeat set (List.nth _ _ _).
+          with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
+          rewrite !var_two_pow_correct.
+          admit. }
+          { trivial. }
+          { trivial. }
+          { trivial. }
+      }
+      { trivial. }
+    }
+  Admitted.
+  
   (*
   fn constrain_theta(&mut self, step: Steps) -> Vec<Vec<Vec<Self::Variable>>> {
         // Define vectors storing expressions which are not in the witness layout for efficiency
