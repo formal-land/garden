@@ -557,10 +557,10 @@ Module Keccak.
               let y_nat := Z.to_nat y_z in
               let x_nat := Z.to_nat x_z in
               let q_nat := Z.to_nat q_z in
-              let shifts_0 := nth_or_default 0%Z shifts (q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
-              let shifts_1 := nth_or_default 0%Z shifts (1 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
-              let shifts_2 := nth_or_default 0%Z shifts (2 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
-              let shifts_3 := nth_or_default 0%Z shifts (3 + q_nat + (Z.to_nat QUARTERS) * (x_nat + (Z.to_nat DIM) * y_nat)) in
+              let shifts_0 := simulation_grid_400 shifts 0 y_nat x_nat q_nat in
+              let shifts_1 := simulation_grid_400 shifts 1 y_nat x_nat q_nat in
+              let shifts_2 := simulation_grid_400 shifts 2 y_nat x_nat q_nat in
+              let shifts_3 := simulation_grid_400 shifts 3 y_nat x_nat q_nat in
               shifts_0 + 2 ^ 1 * shifts_1 + 2 ^ 2 * shifts_2 + 2 ^ 3 * shifts_3
           | _, _, _ => 0
           end
@@ -596,25 +596,11 @@ Module Keccak.
         lia.
       }
       {
-        destruct y. destruct x. destruct q.
-        { unfold nth_or_default.
-          replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
-          repeat rewrite (List.map_nth Variable_.eval).
-          repeat set (List.nth _ _ _).
-          with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
-          rewrite !var_two_pow_correct.
-          rewrite !run_grid_400.
-          unfold simulation_grid_400.
-          unfold nth_or_default.
-          replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
-          repeat rewrite (List.map_nth Variable_.eval).
-          repeat set (List.nth _ _ _).
-          with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
-          repeat f_equal.
-          { admit. }
-          all: lia.
-        }
-        all: trivial.
+        destruct y, x, q; trivial.
+        rewrite <- !run_grid_400.
+        with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
+        rewrite !var_two_pow_correct.
+        lia.
       }
     }
     { destruct (Z.of_nat (Datatypes.length shifts) =? 80) eqn:Heq80.
