@@ -585,7 +585,7 @@ Module Keccak.
   Proof.
     unfold from_shifts, simulation_from_shifts.
     rewrite List.length_map.
-    destruct (_ =? 400).
+    destruct (Z.of_nat (Datatypes.length shifts) =? 400) eqn:Heq400.
     { destruct i.
       { unfold nth_or_default.
         replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
@@ -603,14 +603,21 @@ Module Keccak.
           repeat set (List.nth _ _ _).
           with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
           rewrite !var_two_pow_correct.
-          admit.
+          rewrite !run_grid_400.
+          unfold simulation_grid_400.
+          unfold nth_or_default.
+          replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
+          repeat rewrite (List.map_nth Variable_.eval).
+          repeat set (List.nth _ _ _).
+          with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
+          repeat f_equal.
+          { admit. }
+          all: lia.
         }
-        { trivial. }
-        { trivial. }
-        { trivial. }
+        all: trivial.
       }
     }
-    { destruct (Z.of_nat (Datatypes.length shifts) =? 80).
+    { destruct (Z.of_nat (Datatypes.length shifts) =? 80) eqn:Heq80.
       { destruct x, q.
         { unfold nth_or_default.
           replace 0 with (Variable_.eval Variable_.Zero) by reflexivity.
@@ -618,12 +625,12 @@ Module Keccak.
           repeat set (List.nth _ _ _).
           with_strategy opaque [Z.add Z.mul var_two_pow] cbn.
           rewrite !var_two_pow_correct.
-          admit. }
-          { trivial. }
-          { trivial. }
-          { trivial. }
+          rewrite !grid_80_is_valid.
+          { admit. }
+          all: trivial.
+          all: lia.  }
       }
-      { trivial. }
+      trivial.
     }
   Admitted.
 
