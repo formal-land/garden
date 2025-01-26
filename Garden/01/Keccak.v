@@ -1,4 +1,3 @@
-Require Import Coq.Logic.Eqdep.
 Require Import Garden.Garden.
 
 (*
@@ -119,8 +118,8 @@ Definition mode_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
 Lemma mode_round_correct (self : Variable_.t) (step : Steps.t) :
     Variable_.eval (mode_round self step) =
     match step with
-    | Steps.Round _ => Z.of_nat 1
-    | Steps.Sponge _ => Z.of_nat 0
+    | Steps.Round _ => 1
+    | Steps.Sponge _ => 0
     end.
 Proof.
   destruct step as [n | s];
@@ -133,8 +132,8 @@ Definition is_round (self : Variable_.t) (step : Steps.t) : Variable_.t :=
 Lemma is_round_correct (self : Variable_.t) (step : Steps.t) :
     Variable_.eval (is_round self step) =
     match step with
-    | Steps.Round _ => Z.of_nat 1
-    | Steps.Sponge _ => Z.of_nat 0
+    | Steps.Round _ => 1
+    | Steps.Sponge _ => 0
     end.
 Proof.
   unfold is_round.
@@ -346,27 +345,26 @@ Module Keccak.
           from_quarters_TODO
     end.
 
-  Lemma from_quarters_correct:
-  forall (quarters : list Variable_.t) (y : option nat) (x : nat),
-      Z.of_nat (List.length quarters) = 100 ->
-      match y with
-      | Some y' =>
-        from_quarters quarters y x = Variable_.Add (grid_100 quarters y' x 0) (Variable_.Add
-          (Variable_.Mul (var_two_pow 16) (grid_100 quarters y' x 1))
-          (Variable_.Add
-          (Variable_.Mul (var_two_pow 32) (grid_100 quarters y' x 2))
-          (Variable_.Mul (var_two_pow 48) (grid_100 quarters y' x 3))))
-      | None => True (* TODO *)
-      end.
+  Lemma from_quarters_correct (quarters : list Variable_.t) (y : option nat) (x : nat) :
+    Z.of_nat (List.length quarters) = 100 ->
+    match y with
+    | Some y' =>
+      from_quarters quarters y x = Variable_.Add (grid_100 quarters y' x 0) (Variable_.Add
+        (Variable_.Mul (var_two_pow 16) (grid_100 quarters y' x 1))
+        (Variable_.Add
+        (Variable_.Mul (var_two_pow 32) (grid_100 quarters y' x 2))
+        (Variable_.Mul (var_two_pow 48) (grid_100 quarters y' x 3))))
+    | None => True (* TODO *)
+    end.
   Proof.
-      intros quarters y x H.
-      unfold from_quarters.
-      destruct y as [y' |].
-      rewrite H. 
-      reflexivity. 
-      trivial.
+    intros H.
+    unfold from_quarters.
+    destruct y as [y' |].
+    rewrite H. 
+    reflexivity. 
+    trivial.
   Qed.
-    
+
   Definition grid_index (length i y x q : Z) : Z :=
     match length with
     | 5%Z => x
@@ -376,7 +374,7 @@ Module Keccak.
     | 400%Z => q + QUARTERS * (x + DIM * (y + DIM * i))
     | _ => 0
     end.
-  
+
   Lemma grid_index_correct (length i y x q : Z) :
       (length = 5 \/ length = 20 \/ length = 80 \/ length = 100 \/ length = 400) ->
       grid_index length i y x q = match length with
@@ -424,7 +422,7 @@ Module Keccak.
   Definition vec_shifts_c (self : Variable_.t) : list Variable_.t :=
     List.map (fun idx => variable (ColumnAlias.ThetaShiftsC (Z.of_nat idx)))
             (List.seq 0 (Z.to_nat THETA_SHIFTS_C_LEN)).
-          
+
   Lemma vec_shifts_c_correct (self : Variable_.t) :
     List.length (vec_shifts_c self) = Z.to_nat THETA_SHIFTS_C_LEN.
   Proof.
@@ -434,7 +432,7 @@ Module Keccak.
   Definition shifts_c (self : Variable_.t) (i x q : Z) : Variable_.t :=
     let idx := grid_index THETA_SHIFTS_C_LEN i 0 x q in
     variable (ColumnAlias.Input idx).
-  
+
   Lemma shifts_c_correct (self : Variable_.t) (i x q : Z) :
     shifts_c self i x q = variable (ColumnAlias.Input (grid_index THETA_SHIFTS_C_LEN i 0 x q)).
   Proof.
@@ -454,13 +452,13 @@ Module Keccak.
   Definition state_a (y x q : Z) : Variable_.t :=
     let idx := grid_index THETA_STATE_A_LEN 0 y x q in
     variable (ColumnAlias.Input idx).
-  
+
   Lemma state_a_correct (y x q : Z) :
     state_a y x q = variable (ColumnAlias.Input (grid_index THETA_STATE_A_LEN 0 y x q)).
   Proof.
     reflexivity.
   Qed.
-  
+
   (*
   fn from_shifts(
         shifts: &[Self::Variable],
@@ -578,7 +576,7 @@ Module Keccak.
       | _, _ => 0
       end
     else 0.
-  
+
   Lemma run_from_shifts (shifts : list Variable_.t) (i y x q : option Z) :
     Variable_.eval (from_shifts shifts i y x q) = 
     simulation_from_shifts (List.map Variable_.eval shifts) i y x q.
@@ -683,48 +681,47 @@ Module Keccak.
     let state_e := List.repeat (List.repeat (List.repeat Variable_.Zero (Z.to_nat QUARTERS)) (Z.to_nat DIM)) (Z.to_nat DIM) in
 
     let indices := List.seq 0 (Z.to_nat DIM) in
-   let self :=
-  List.fold_left
-    (fun self (x : nat) =>
-        let word_c := from_quarters (vec_dense_c self) None x in
-        let rem_c := from_quarters (vec_remainder_c self) None x in
-        let rot_c := from_quarters (vec_dense_rot_c self) None x in
+    let self :=
+      List.fold_left
+        (fun self (x : nat) =>
+          let word_c := from_quarters (vec_dense_c self) None x in
+          let rem_c := from_quarters (vec_remainder_c self) None x in
+          let rot_c := from_quarters (vec_dense_rot_c self) None x in
 
-        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
-                    (Variable_.Sub (Variable_.Mul word_c (var_two_pow 1))
-                      (Variable_.Add (Variable_.Mul (quotient_c self x) (var_two_pow 64)) rem_c)) in
-        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
-                    (Variable_.Sub rot_c (Variable_.Add (quotient_c self x) rem_c)) in
-        let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
-                    (is_boolean (quotient_c self x)) in
+          let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                      (Variable_.Sub (Variable_.Mul word_c (var_two_pow 1))
+                        (Variable_.Add (Variable_.Mul (quotient_c self x) (var_two_pow 64)) rem_c)) in
+          let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                      (Variable_.Sub rot_c (Variable_.Add (quotient_c self x) rem_c)) in
+          let self := constrain self (Constraint.ThetaWordC (Z.of_nat x)) (is_round self step)
+                      (is_boolean (quotient_c self x)) in
 
-        let quarters := List.seq 0 (Z.to_nat QUARTERS) in
-        List.fold_left
-        (fun self (q : nat) =>
-          let q := Z.of_nat q in
-          let state_c_q :=
-            Variable_.Add (state_a 0 (Z.of_nat x) q)
-            (Variable_.Add (state_a 1 (Z.of_nat x) q)
-            (Variable_.Add (state_a 2 (Z.of_nat x) q)
-            (Variable_.Add (state_a 3 (Z.of_nat x) q)
-            (state_a 4 (Z.of_nat x) q)))) in
-      
-          let self := constrain self (Constraint.ThetaShiftsC (Z.of_nat x) q) (is_round self step)
-                        (Variable_.Sub state_c_q
-                        (from_shifts (vec_shifts_c self) None None (Some (Z.of_nat x)) (Some q))) in
-      
-          let state_d_q :=
-            Variable_.Add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
-            (expand_rot_c self ((Z.of_nat x + 1) mod DIM) q) in
-      
-          let state_e_q :=
-            List.map
-              (fun y => Variable_.Add (state_a y (Z.of_nat x) q) state_d_q)
-              (List.map Z.of_nat (List.seq 0 (Z.to_nat DIM))) in
-      
-          self
-        ) quarters self
-    ) indices self in
-state_e.
+          let quarters := List.seq 0 (Z.to_nat QUARTERS) in
+          List.fold_left
+          (fun self (q : nat) =>
+            let q := Z.of_nat q in
+            let state_c_q :=
+              Variable_.Add (state_a 0 (Z.of_nat x) q)
+              (Variable_.Add (state_a 1 (Z.of_nat x) q)
+              (Variable_.Add (state_a 2 (Z.of_nat x) q)
+              (Variable_.Add (state_a 3 (Z.of_nat x) q)
+              (state_a 4 (Z.of_nat x) q)))) in
 
+            let self := constrain self (Constraint.ThetaShiftsC (Z.of_nat x) q) (is_round self step)
+                          (Variable_.Sub state_c_q
+                          (from_shifts (vec_shifts_c self) None None (Some (Z.of_nat x)) (Some q))) in
+
+            let state_d_q :=
+              Variable_.Add (shifts_c self 0 ((Z.of_nat x + DIM - 1) mod DIM) q)
+              (expand_rot_c self ((Z.of_nat x + 1) mod DIM) q) in
+
+            let state_e_q :=
+              List.map
+                (fun y => Variable_.Add (state_a y (Z.of_nat x) q) state_d_q)
+                (List.map Z.of_nat (List.seq 0 (Z.to_nat DIM))) in
+
+            self
+          ) quarters self
+      ) indices self in
+    state_e.
 End Keccak.
