@@ -11,102 +11,109 @@ Module Sha256_2Signals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End Sha256_2Signals.
 
 (* Template body *)
 Definition Sha256_2 : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     (* Var *)
     do~ M.declare_var "k" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "k" [[ 0 ]] in
+    do~ M.substitute_var "k" [] [[ 0 ]] in
     (* Component *)
     do~ M.declare_component "bits2num" in
-    do~ M.substitute_var "bits2num" [[ M.call_function ~(| "Bits2Num", [ 216 ] |) ]] in
+    do~ M.substitute_var "bits2num" [] [[ M.call_function ~(| "Bits2Num", [ 216 ] |) ]] in
     (* Component *)
     do~ M.declare_component "num2bits" in
-    do~ M.substitute_var "num2bits" [[ M.call_function ~(| "Num2Bits", [ 216 ] |) ]] in
-    do~ M.substitute_var "num2bits" [[ M.call_function ~(| "Num2Bits", [ 216 ] |) ]] in
-    do~ M.substitute_var "num2bits" [[ M.var (| "a" |) ]] in
-    do~ M.substitute_var "num2bits" [[ M.var (| "b" |) ]] in
+    do~ M.substitute_var "num2bits" [Access.Array (0)] [[ M.call_function ~(| "Num2Bits", [ 216 ] |) ]] in
+    do~ M.substitute_var "num2bits" [Access.Array (1)] [[ M.call_function ~(| "Num2Bits", [ 216 ] |) ]] in
+    do~ M.substitute_var "num2bits" [Access.Array (0); Access.Component "in"] [[ M.var (| "a" |) ]] in
+    do~ M.substitute_var "num2bits" [Access.Array (1); Access.Component "in"] [[ M.var (| "b" |) ]] in
     (* Component *)
     do~ M.declare_component "sha256compression" in
-    do~ M.substitute_var "sha256compression" [[ M.call_function ~(| "Sha256compression", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "sha256compression" [] [[ M.call_function ~(| "Sha256compression", ([] : list F.t) |) ]] in
     (* Component *)
     do~ M.declare_component "ha0" in
-    do~ M.substitute_var "ha0" [[ M.call_function ~(| "H", [ 0 ] |) ]] in
+    do~ M.substitute_var "ha0" [] [[ M.call_function ~(| "H", [ 0 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hb0" in
-    do~ M.substitute_var "hb0" [[ M.call_function ~(| "H", [ 1 ] |) ]] in
+    do~ M.substitute_var "hb0" [] [[ M.call_function ~(| "H", [ 1 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hc0" in
-    do~ M.substitute_var "hc0" [[ M.call_function ~(| "H", [ 2 ] |) ]] in
+    do~ M.substitute_var "hc0" [] [[ M.call_function ~(| "H", [ 2 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hd0" in
-    do~ M.substitute_var "hd0" [[ M.call_function ~(| "H", [ 3 ] |) ]] in
+    do~ M.substitute_var "hd0" [] [[ M.call_function ~(| "H", [ 3 ] |) ]] in
     (* Component *)
     do~ M.declare_component "he0" in
-    do~ M.substitute_var "he0" [[ M.call_function ~(| "H", [ 4 ] |) ]] in
+    do~ M.substitute_var "he0" [] [[ M.call_function ~(| "H", [ 4 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hf0" in
-    do~ M.substitute_var "hf0" [[ M.call_function ~(| "H", [ 5 ] |) ]] in
+    do~ M.substitute_var "hf0" [] [[ M.call_function ~(| "H", [ 5 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hg0" in
-    do~ M.substitute_var "hg0" [[ M.call_function ~(| "H", [ 6 ] |) ]] in
+    do~ M.substitute_var "hg0" [] [[ M.call_function ~(| "H", [ 6 ] |) ]] in
     (* Component *)
     do~ M.declare_component "hh0" in
-    do~ M.substitute_var "hh0" [[ M.call_function ~(| "H", [ 7 ] |) ]] in
-    do~ M.substitute_var "k" [[ 0 ]] in
+    do~ M.substitute_var "hh0" [] [[ M.call_function ~(| "H", [ 7 ] |) ]] in
+    do~ M.substitute_var "k" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "k" |), 32 |) ]] (
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "ha0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hb0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hc0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hd0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "he0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hf0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hg0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "hh0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
-      do~ M.substitute_var "k" [[ InfixOp.add ~(| M.var (| "k" |), 1 |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 0, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "ha0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 1, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hb0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 2, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hc0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 3, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hd0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 4, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "he0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 5, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hf0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 6, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hg0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "hin"; Access.Array (InfixOp.add ~(| InfixOp.mul ~(| 7, 32 |), M.var (| "k" |) |))] [[ M.var_access (| "hh0", [Access.Component "out"; Access.Array (M.var (| "k" |))] |) ]] in
+      do~ M.substitute_var "k" [] [[ InfixOp.add ~(| M.var (| "k" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 216 |) ]] (
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "num2bits", [Access.Array (0); Access.Component "out"; Access.Array (InfixOp.sub ~(| 215, M.var (| "i" |) |))] |) ]] in
-      do~ M.substitute_var "sha256compression" [[ M.var_access (| "num2bits", [Access.Array (1); Access.Component "out"; Access.Array (InfixOp.sub ~(| 215, M.var (| "i" |) |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "num2bits", [Access.Array (0); Access.Component "out"; Access.Array (InfixOp.sub ~(| 215, M.var (| "i" |) |))] |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (InfixOp.add ~(| M.var (| "i" |), 216 |))] [[ M.var_access (| "num2bits", [Access.Array (1); Access.Component "out"; Access.Array (InfixOp.sub ~(| 215, M.var (| "i" |) |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "sha256compression" [[ 1 ]] in
-    do~ M.substitute_var "i" [[ 433 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (432)] [[ 1 ]] in
+    do~ M.substitute_var "i" [] [[ 433 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 503 |) ]] (
-      do~ M.substitute_var "sha256compression" [[ 0 ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (M.var (| "i" |))] [[ 0 ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "sha256compression" [[ 1 ]] in
-    do~ M.substitute_var "sha256compression" [[ 1 ]] in
-    do~ M.substitute_var "sha256compression" [[ 0 ]] in
-    do~ M.substitute_var "sha256compression" [[ 1 ]] in
-    do~ M.substitute_var "sha256compression" [[ 1 ]] in
-    do~ M.substitute_var "sha256compression" [[ 0 ]] in
-    do~ M.substitute_var "sha256compression" [[ 0 ]] in
-    do~ M.substitute_var "sha256compression" [[ 0 ]] in
-    do~ M.substitute_var "sha256compression" [[ 0 ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (503)] [[ 1 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (504)] [[ 1 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (505)] [[ 0 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (506)] [[ 1 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (507)] [[ 1 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (508)] [[ 0 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (509)] [[ 0 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (510)] [[ 0 ]] in
+    do~ M.substitute_var "sha256compression" [Access.Component "inp"; Access.Array (511)] [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 216 |) ]] (
-      do~ M.substitute_var "bits2num" [[ M.var_access (| "sha256compression", [Access.Component "out"; Access.Array (InfixOp.sub ~(| 255, M.var (| "i" |) |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "bits2num" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "sha256compression", [Access.Component "out"; Access.Array (InfixOp.sub ~(| 255, M.var (| "i" |) |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var_access (| "bits2num", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "bits2num", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

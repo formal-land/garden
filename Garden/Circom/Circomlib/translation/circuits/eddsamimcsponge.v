@@ -19,125 +19,136 @@ Module EdDSAMiMCSpongeVerifierSignals.
     (* Input *)
     M : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | enabled : P _ enabled "enabled"
+    | Ax : P _ Ax "Ax"
+    | Ay : P _ Ay "Ay"
+    | S : P _ S "S"
+    | R8x : P _ R8x "R8x"
+    | R8y : P _ R8y "R8y"
+    | M : P _ M "M".
+  End IsNamed.
 End EdDSAMiMCSpongeVerifierSignals.
 
 (* Template body *)
 Definition EdDSAMiMCSpongeVerifier : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "enabled" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "enabled" in
     (* Signal Input *)
-    do~ M.declare_signal "Ax" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "Ax" in
     (* Signal Input *)
-    do~ M.declare_signal "Ay" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "Ay" in
     (* Signal Input *)
-    do~ M.declare_signal "S" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "S" in
     (* Signal Input *)
-    do~ M.declare_signal "R8x" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "R8x" in
     (* Signal Input *)
-    do~ M.declare_signal "R8y" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "R8y" in
     (* Signal Input *)
-    do~ M.declare_signal "M" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "M" in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     (* Component *)
     do~ M.declare_component "snum2bits" in
-    do~ M.substitute_var "snum2bits" [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
-    do~ M.substitute_var "snum2bits" [[ M.var (| "S" |) ]] in
+    do~ M.substitute_var "snum2bits" [] [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
+    do~ M.substitute_var "snum2bits" [Access.Component "in"] [[ M.var (| "S" |) ]] in
     (* Component *)
     do~ M.declare_component "compConstant" in
-    do~ M.substitute_var "compConstant" [[ M.call_function ~(| "CompConstant", [ 2736030358979909402780800718157159386076813972158567259200215660948447373040 ] |) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "compConstant" [] [[ M.call_function ~(| "CompConstant", [ 2736030358979909402780800718157159386076813972158567259200215660948447373040 ] |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
-      do~ M.substitute_var "compConstant" [[ M.var_access (| "snum2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "compConstant" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "snum2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "compConstant" [[ 0 ]] in
+    do~ M.substitute_var "compConstant" [Access.Component "in"; Access.Array (253)] [[ 0 ]] in
     do~ M.equality_constraint
       [[ M.var_access (| "compConstant", [Access.Component "out"] |) ]]
       [[ 0 ]]
     in
     (* Component *)
     do~ M.declare_component "hash" in
-    do~ M.substitute_var "hash" [[ M.call_function ~(| "MiMCSponge", [ 5; 220; 1 ] |) ]] in
-    do~ M.substitute_var "hash" [[ M.var (| "R8x" |) ]] in
-    do~ M.substitute_var "hash" [[ M.var (| "R8y" |) ]] in
-    do~ M.substitute_var "hash" [[ M.var (| "Ax" |) ]] in
-    do~ M.substitute_var "hash" [[ M.var (| "Ay" |) ]] in
-    do~ M.substitute_var "hash" [[ M.var (| "M" |) ]] in
-    do~ M.substitute_var "hash" [[ 0 ]] in
+    do~ M.substitute_var "hash" [] [[ M.call_function ~(| "MiMCSponge", [ 5; 220; 1 ] |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "ins"; Access.Array (0)] [[ M.var (| "R8x" |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "ins"; Access.Array (1)] [[ M.var (| "R8y" |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "ins"; Access.Array (2)] [[ M.var (| "Ax" |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "ins"; Access.Array (3)] [[ M.var (| "Ay" |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "ins"; Access.Array (4)] [[ M.var (| "M" |) ]] in
+    do~ M.substitute_var "hash" [Access.Component "k"] [[ 0 ]] in
     (* Component *)
     do~ M.declare_component "h2bits" in
-    do~ M.substitute_var "h2bits" [[ M.call_function ~(| "Num2Bits_strict", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "h2bits" [[ M.var_access (| "hash", [Access.Component "outs"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "h2bits" [] [[ M.call_function ~(| "Num2Bits_strict", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "h2bits" [Access.Component "in"] [[ M.var_access (| "hash", [Access.Component "outs"; Access.Array (0)] |) ]] in
     (* Component *)
     do~ M.declare_component "dbl1" in
-    do~ M.substitute_var "dbl1" [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "dbl1" [[ M.var (| "Ax" |) ]] in
-    do~ M.substitute_var "dbl1" [[ M.var (| "Ay" |) ]] in
+    do~ M.substitute_var "dbl1" [] [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "dbl1" [Access.Component "x"] [[ M.var (| "Ax" |) ]] in
+    do~ M.substitute_var "dbl1" [Access.Component "y"] [[ M.var (| "Ay" |) ]] in
     (* Component *)
     do~ M.declare_component "dbl2" in
-    do~ M.substitute_var "dbl2" [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "dbl2" [[ M.var_access (| "dbl1", [Access.Component "xout"] |) ]] in
-    do~ M.substitute_var "dbl2" [[ M.var_access (| "dbl1", [Access.Component "yout"] |) ]] in
+    do~ M.substitute_var "dbl2" [] [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "dbl2" [Access.Component "x"] [[ M.var_access (| "dbl1", [Access.Component "xout"] |) ]] in
+    do~ M.substitute_var "dbl2" [Access.Component "y"] [[ M.var_access (| "dbl1", [Access.Component "yout"] |) ]] in
     (* Component *)
     do~ M.declare_component "dbl3" in
-    do~ M.substitute_var "dbl3" [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "dbl3" [[ M.var_access (| "dbl2", [Access.Component "xout"] |) ]] in
-    do~ M.substitute_var "dbl3" [[ M.var_access (| "dbl2", [Access.Component "yout"] |) ]] in
+    do~ M.substitute_var "dbl3" [] [[ M.call_function ~(| "BabyDbl", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "dbl3" [Access.Component "x"] [[ M.var_access (| "dbl2", [Access.Component "xout"] |) ]] in
+    do~ M.substitute_var "dbl3" [Access.Component "y"] [[ M.var_access (| "dbl2", [Access.Component "yout"] |) ]] in
     (* Component *)
     do~ M.declare_component "isZero" in
-    do~ M.substitute_var "isZero" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "isZero" [[ M.var_access (| "dbl3", [Access.Component "x"] |) ]] in
+    do~ M.substitute_var "isZero" [] [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "isZero" [Access.Component "in"] [[ M.var_access (| "dbl3", [Access.Component "x"] |) ]] in
     do~ M.equality_constraint
       [[ M.var_access (| "isZero", [Access.Component "out"] |) ]]
       [[ 0 ]]
     in
     (* Component *)
     do~ M.declare_component "mulAny" in
-    do~ M.substitute_var "mulAny" [[ M.call_function ~(| "EscalarMulAny", [ 254 ] |) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "mulAny" [] [[ M.call_function ~(| "EscalarMulAny", [ 254 ] |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
-      do~ M.substitute_var "mulAny" [[ M.var_access (| "h2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "mulAny" [Access.Component "e"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "h2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "mulAny" [[ M.var_access (| "dbl3", [Access.Component "xout"] |) ]] in
-    do~ M.substitute_var "mulAny" [[ M.var_access (| "dbl3", [Access.Component "yout"] |) ]] in
+    do~ M.substitute_var "mulAny" [Access.Component "p"; Access.Array (0)] [[ M.var_access (| "dbl3", [Access.Component "xout"] |) ]] in
+    do~ M.substitute_var "mulAny" [Access.Component "p"; Access.Array (1)] [[ M.var_access (| "dbl3", [Access.Component "yout"] |) ]] in
     (* Component *)
     do~ M.declare_component "addRight" in
-    do~ M.substitute_var "addRight" [[ M.call_function ~(| "BabyAdd", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "addRight" [[ M.var (| "R8x" |) ]] in
-    do~ M.substitute_var "addRight" [[ M.var (| "R8y" |) ]] in
-    do~ M.substitute_var "addRight" [[ M.var_access (| "mulAny", [Access.Component "out"; Access.Array (0)] |) ]] in
-    do~ M.substitute_var "addRight" [[ M.var_access (| "mulAny", [Access.Component "out"; Access.Array (1)] |) ]] in
+    do~ M.substitute_var "addRight" [] [[ M.call_function ~(| "BabyAdd", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "addRight" [Access.Component "x1"] [[ M.var (| "R8x" |) ]] in
+    do~ M.substitute_var "addRight" [Access.Component "y1"] [[ M.var (| "R8y" |) ]] in
+    do~ M.substitute_var "addRight" [Access.Component "x2"] [[ M.var_access (| "mulAny", [Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "addRight" [Access.Component "y2"] [[ M.var_access (| "mulAny", [Access.Component "out"; Access.Array (1)] |) ]] in
     (* Var *)
     do~ M.declare_var "BASE8" [[ [ 2 ] ]] in
-    do~ M.substitute_var "BASE8" [[ array_with_repeat (0) (2) ]] in
-    do~ M.substitute_var "BASE8" [[ [ 5299619240641551281634865583518297030282874472190772894086521144482721001553; 16950150798460657717958625567821834550301663161624707787222815936182638968203 ] ]] in
+    do~ M.substitute_var "BASE8" [] [[ array_with_repeat (0) (2) ]] in
+    do~ M.substitute_var "BASE8" [] [[ [ 5299619240641551281634865583518297030282874472190772894086521144482721001553; 16950150798460657717958625567821834550301663161624707787222815936182638968203 ] ]] in
     (* Component *)
     do~ M.declare_component "mulFix" in
-    do~ M.substitute_var "mulFix" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var (| "BASE8" |) ] |) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "mulFix" [] [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var (| "BASE8" |) ] |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
-      do~ M.substitute_var "mulFix" [[ M.var_access (| "snum2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "mulFix" [Access.Component "e"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "snum2bits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
     (* Component *)
     do~ M.declare_component "eqCheckX" in
-    do~ M.substitute_var "eqCheckX" [[ M.call_function ~(| "ForceEqualIfEnabled", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "eqCheckX" [[ M.var (| "enabled" |) ]] in
-    do~ M.substitute_var "eqCheckX" [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
-    do~ M.substitute_var "eqCheckX" [[ M.var_access (| "addRight", [Access.Component "xout"] |) ]] in
+    do~ M.substitute_var "eqCheckX" [] [[ M.call_function ~(| "ForceEqualIfEnabled", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "eqCheckX" [Access.Component "enabled"] [[ M.var (| "enabled" |) ]] in
+    do~ M.substitute_var "eqCheckX" [Access.Component "in"; Access.Array (0)] [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "eqCheckX" [Access.Component "in"; Access.Array (1)] [[ M.var_access (| "addRight", [Access.Component "xout"] |) ]] in
     (* Component *)
     do~ M.declare_component "eqCheckY" in
-    do~ M.substitute_var "eqCheckY" [[ M.call_function ~(| "ForceEqualIfEnabled", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "eqCheckY" [[ M.var (| "enabled" |) ]] in
-    do~ M.substitute_var "eqCheckY" [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
-    do~ M.substitute_var "eqCheckY" [[ M.var_access (| "addRight", [Access.Component "yout"] |) ]] in
+    do~ M.substitute_var "eqCheckY" [] [[ M.call_function ~(| "ForceEqualIfEnabled", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "eqCheckY" [Access.Component "enabled"] [[ M.var (| "enabled" |) ]] in
+    do~ M.substitute_var "eqCheckY" [Access.Component "in"; Access.Array (0)] [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
+    do~ M.substitute_var "eqCheckY" [Access.Component "in"; Access.Array (1)] [[ M.var_access (| "addRight", [Access.Component "yout"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

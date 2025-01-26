@@ -9,28 +9,34 @@ Module SignSignals.
     (* Output *)
     sign : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | sign : P _ sign "sign".
+  End IsNamed.
 End SignSignals.
 
 (* Template body *)
 Definition Sign : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 254 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "sign" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "sign" in
     (* Component *)
     do~ M.declare_component "comp" in
-    do~ M.substitute_var "comp" [[ M.call_function ~(| "CompConstant", [ 10944121435919637611123202872628637544274182200208017171849102093287904247808 ] |) ]] in
+    do~ M.substitute_var "comp" [] [[ M.call_function ~(| "CompConstant", [ 10944121435919637611123202872628637544274182200208017171849102093287904247808 ] |) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
-      do~ M.substitute_var "comp" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "comp" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "sign" [[ M.var_access (| "comp", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "sign" [] [[ M.var_access (| "comp", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

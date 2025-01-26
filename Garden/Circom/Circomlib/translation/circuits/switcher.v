@@ -17,26 +17,36 @@ Module SwitcherSignals.
     (* Intermediate *)
     aux : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | sel : P _ sel "sel"
+    | L : P _ L "L"
+    | R : P _ R "R"
+    | outL : P _ outL "outL"
+    | outR : P _ outR "outR"
+    | aux : P _ aux "aux".
+  End IsNamed.
 End SwitcherSignals.
 
 (* Template body *)
 Definition Switcher : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "sel" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "sel" in
     (* Signal Input *)
-    do~ M.declare_signal "L" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "L" in
     (* Signal Input *)
-    do~ M.declare_signal "R" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "R" in
     (* Signal Output *)
-    do~ M.declare_signal "outL" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "outL" in
     (* Signal Output *)
-    do~ M.declare_signal "outR" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "outR" in
     (* Signal Intermediate *)
-    do~ M.declare_signal "aux" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "aux" [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "R" |), M.var (| "L" |) |), M.var (| "sel" |) |) ]] in
-    do~ M.substitute_var "outL" [[ InfixOp.add ~(| M.var (| "aux" |), M.var (| "L" |) |) ]] in
-    do~ M.substitute_var "outR" [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var (| "aux" |) |), M.var (| "R" |) |) ]] in
+    do~ M.declare_signal "aux" in
+    do~ M.substitute_var "aux" [] [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var (| "R" |), M.var (| "L" |) |), M.var (| "sel" |) |) ]] in
+    do~ M.substitute_var "outL" [] [[ InfixOp.add ~(| M.var (| "aux" |), M.var (| "L" |) |) ]] in
+    do~ M.substitute_var "outR" [] [[ InfixOp.add ~(| PrefixOp.sub ~(| M.var (| "aux" |) |), M.var (| "R" |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 

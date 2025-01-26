@@ -11,18 +11,25 @@ Module XORSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End XORSignals.
 
 (* Template body *)
 Definition XOR : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "a" |), M.var (| "b" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "a" |) |), M.var (| "b" |) |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "a" |), M.var (| "b" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "a" |) |), M.var (| "b" |) |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -42,18 +49,25 @@ Module ANDSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End ANDSignals.
 
 (* Template body *)
 Definition AND : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -73,18 +87,25 @@ Module ORSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End ORSignals.
 
 (* Template body *)
 Definition OR : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "a" |), M.var (| "b" |) |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "a" |), M.var (| "b" |) |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -102,16 +123,22 @@ Module NOTSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End NOTSignals.
 
 (* Template body *)
 Definition NOT : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.add ~(| 1, M.var (| "in" |) |), InfixOp.mul ~(| 2, M.var (| "in" |) |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| InfixOp.add ~(| 1, M.var (| "in" |) |), InfixOp.mul ~(| 2, M.var (| "in" |) |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -131,18 +158,25 @@ Module NANDSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End NANDSignals.
 
 (* Template body *)
 Definition NAND : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -162,18 +196,25 @@ Module NORSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End NORSignals.
 
 (* Template body *)
 Definition NOR : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |), 1 |), M.var (| "a" |) |), M.var (| "b" |) |) ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.add ~(| InfixOp.mul ~(| M.var (| "a" |), M.var (| "b" |) |), 1 |), M.var (| "a" |) |), M.var (| "b" |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -191,15 +232,21 @@ Module MultiANDSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End MultiANDSignals.
 
 (* Template body *)
 Definition MultiAND (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "and1" in
     (* Component *)
@@ -207,43 +254,43 @@ Definition MultiAND (n : F.t) : M.t (BlockUnit.t Empty_set) :=
     (* Component *)
     do~ M.declare_component "ands" in
     do~ M.if_ [[ InfixOp.eq ~(| M.var (| "n" |), 1 |) ]] (* then *) (
-      do~ M.substitute_var "out" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+      do~ M.substitute_var "out" [] [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
       M.pure BlockUnit.Tt
     ) (* else *) (
       do~ M.if_ [[ InfixOp.eq ~(| M.var (| "n" |), 2 |) ]] (* then *) (
-        do~ M.substitute_var "and1" [[ M.call_function ~(| "AND", ([] : list F.t) |) ]] in
-        do~ M.substitute_var "and1" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
-        do~ M.substitute_var "and1" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
-        do~ M.substitute_var "out" [[ M.var_access (| "and1", [Access.Component "out"] |) ]] in
+        do~ M.substitute_var "and1" [] [[ M.call_function ~(| "AND", ([] : list F.t) |) ]] in
+        do~ M.substitute_var "and1" [Access.Component "a"] [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+        do~ M.substitute_var "and1" [Access.Component "b"] [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
+        do~ M.substitute_var "out" [] [[ M.var_access (| "and1", [Access.Component "out"] |) ]] in
         M.pure BlockUnit.Tt
       ) (* else *) (
-        do~ M.substitute_var "and2" [[ M.call_function ~(| "AND", ([] : list F.t) |) ]] in
+        do~ M.substitute_var "and2" [] [[ M.call_function ~(| "AND", ([] : list F.t) |) ]] in
         (* Var *)
         do~ M.declare_var "n1" [[ ([] : list F.t) ]] in
-        do~ M.substitute_var "n1" [[ InfixOp.intDiv ~(| M.var (| "n" |), 2 |) ]] in
+        do~ M.substitute_var "n1" [] [[ InfixOp.intDiv ~(| M.var (| "n" |), 2 |) ]] in
         (* Var *)
         do~ M.declare_var "n2" [[ ([] : list F.t) ]] in
-        do~ M.substitute_var "n2" [[ InfixOp.sub ~(| M.var (| "n" |), InfixOp.intDiv ~(| M.var (| "n" |), 2 |) |) ]] in
-        do~ M.substitute_var "ands" [[ M.call_function ~(| "MultiAND", [ M.var (| "n1" |) ] |) ]] in
-        do~ M.substitute_var "ands" [[ M.call_function ~(| "MultiAND", [ M.var (| "n2" |) ] |) ]] in
+        do~ M.substitute_var "n2" [] [[ InfixOp.sub ~(| M.var (| "n" |), InfixOp.intDiv ~(| M.var (| "n" |), 2 |) |) ]] in
+        do~ M.substitute_var "ands" [Access.Array (0)] [[ M.call_function ~(| "MultiAND", [ M.var (| "n1" |) ] |) ]] in
+        do~ M.substitute_var "ands" [Access.Array (1)] [[ M.call_function ~(| "MultiAND", [ M.var (| "n2" |) ] |) ]] in
         (* Var *)
         do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-        do~ M.substitute_var "i" [[ 0 ]] in
-        do~ M.substitute_var "i" [[ 0 ]] in
+        do~ M.substitute_var "i" [] [[ 0 ]] in
+        do~ M.substitute_var "i" [] [[ 0 ]] in
         do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n1" |) |) ]] (
-          do~ M.substitute_var "ands" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
-          do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+          do~ M.substitute_var "ands" [Access.Array (0); Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+          do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
           M.pure BlockUnit.Tt
         ) in
-        do~ M.substitute_var "i" [[ 0 ]] in
+        do~ M.substitute_var "i" [] [[ 0 ]] in
         do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n2" |) |) ]] (
-          do~ M.substitute_var "ands" [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| M.var (| "n1" |), M.var (| "i" |) |))] |) ]] in
-          do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+          do~ M.substitute_var "ands" [Access.Array (1); Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (InfixOp.add ~(| M.var (| "n1" |), M.var (| "i" |) |))] |) ]] in
+          do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
           M.pure BlockUnit.Tt
         ) in
-        do~ M.substitute_var "and2" [[ M.var_access (| "ands", [Access.Array (0); Access.Component "out"] |) ]] in
-        do~ M.substitute_var "and2" [[ M.var_access (| "ands", [Access.Array (1); Access.Component "out"] |) ]] in
-        do~ M.substitute_var "out" [[ M.var_access (| "and2", [Access.Component "out"] |) ]] in
+        do~ M.substitute_var "and2" [Access.Component "a"] [[ M.var_access (| "ands", [Access.Array (0); Access.Component "out"] |) ]] in
+        do~ M.substitute_var "and2" [Access.Component "b"] [[ M.var_access (| "ands", [Access.Array (1); Access.Component "out"] |) ]] in
+        do~ M.substitute_var "out" [] [[ M.var_access (| "and2", [Access.Component "out"] |) ]] in
         M.pure BlockUnit.Tt
       ) in
       M.pure BlockUnit.Tt

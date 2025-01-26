@@ -9,39 +9,45 @@ Module MainSignals.
     (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End MainSignals.
 
 (* Template body *)
 Definition Main : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ [ 2 ] ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "pedersen" in
-    do~ M.substitute_var "pedersen" [[ M.call_function ~(| "Pedersen", [ 256 ] |) ]] in
+    do~ M.substitute_var "pedersen" [] [[ M.call_function ~(| "Pedersen", [ 256 ] |) ]] in
     (* Component *)
     do~ M.declare_component "n2b" in
-    do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
+    do~ M.substitute_var "n2b" [] [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
-    do~ M.substitute_var "n2b" [[ M.var (| "in" |) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.substitute_var "n2b" [Access.Component "in"] [[ M.var (| "in" |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
-      do~ M.substitute_var "pedersen" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "pedersen" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ 253 ]] in
+    do~ M.substitute_var "i" [] [[ 253 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 256 |) ]] (
-      do~ M.substitute_var "pedersen" [[ 0 ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "pedersen" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ 0 ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (0)] |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (1)] |) ]] in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ M.var_access (| "pedersen", [Access.Component "out"; Access.Array (1)] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

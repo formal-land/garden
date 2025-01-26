@@ -11,19 +11,26 @@ Module IsZeroSignals.
     (* Intermediate *)
     inv : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out"
+    | inv : P _ inv "inv".
+  End IsNamed.
 End IsZeroSignals.
 
 (* Template body *)
 Definition IsZero : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Signal Intermediate *)
-    do~ M.declare_signal "inv" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "inv" [[ ternary_expression (InfixOp.notEq ~(| M.var (| "in" |), 0 |)) (InfixOp.div ~(| 1, M.var (| "in" |) |)) (0) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var (| "in" |) |), M.var (| "inv" |) |), 1 |) ]] in
+    do~ M.declare_signal "inv" in
+    do~ M.substitute_var "inv" [] [[ ternary_expression (InfixOp.notEq ~(| M.var (| "in" |), 0 |)) (InfixOp.div ~(| 1, M.var (| "in" |) |)) (0) ]] in
+    do~ M.substitute_var "out" [] [[ InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var (| "in" |) |), M.var (| "inv" |) |), 1 |) ]] in
     do~ M.equality_constraint
       [[ InfixOp.mul ~(| M.var (| "in" |), M.var (| "out" |) |) ]]
       [[ 0 ]]
@@ -46,20 +53,26 @@ Module IsEqualSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End IsEqualSignals.
 
 (* Template body *)
 Definition IsEqual : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "isz" in
-    do~ M.substitute_var "isz" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "isz", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "isz" [] [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "isz" [Access.Component "in"] [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "isz", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -77,19 +90,25 @@ Module ForceEqualIfEnabledSignals.
     (* Input *)
     in_ : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | enabled : P _ enabled "enabled"
+    | in_ : P _ in_ "in".
+  End IsNamed.
 End ForceEqualIfEnabledSignals.
 
 (* Template body *)
 Definition ForceEqualIfEnabled : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "enabled" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "enabled" in
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Component *)
     do~ M.declare_component "isz" in
-    do~ M.substitute_var "isz" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "isz" [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
+    do~ M.substitute_var "isz" [] [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "isz" [Access.Component "in"] [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
     do~ M.equality_constraint
       [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var_access (| "isz", [Access.Component "out"] |) |), M.var (| "enabled" |) |) ]]
       [[ 0 ]]
@@ -110,6 +129,12 @@ Module LessThanSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End LessThanSignals.
 
 (* Template body *)
@@ -117,14 +142,14 @@ Definition LessThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     do~ M.assert [[ InfixOp.lesserEq ~(| M.var (| "n" |), 252 |) ]] in
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "n2b" in
-    do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ InfixOp.add ~(| M.var (| "n" |), 1 |) ] |) ]] in
-    do~ M.substitute_var "n2b" [[ InfixOp.sub ~(| InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), InfixOp.shiftL ~(| 1, M.var (| "n" |) |) |), M.var_access (| "in", [Access.Array (1)] |) |) ]] in
-    do~ M.substitute_var "out" [[ InfixOp.sub ~(| 1, M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "n" |))] |) |) ]] in
+    do~ M.substitute_var "n2b" [] [[ M.call_function ~(| "Num2Bits", [ InfixOp.add ~(| M.var (| "n" |), 1 |) ] |) ]] in
+    do~ M.substitute_var "n2b" [Access.Component "in"] [[ InfixOp.sub ~(| InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), InfixOp.shiftL ~(| 1, M.var (| "n" |) |) |), M.var_access (| "in", [Access.Array (1)] |) |) ]] in
+    do~ M.substitute_var "out" [] [[ InfixOp.sub ~(| 1, M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "n" |))] |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -142,21 +167,27 @@ Module LessEqThanSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End LessEqThanSignals.
 
 (* Template body *)
 Definition LessEqThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "lt" in
-    do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
-    do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
-    do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (1)] |), 1 |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "lt" [] [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (0)] [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (1)] [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (1)] |), 1 |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -174,21 +205,27 @@ Module GreaterThanSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End GreaterThanSignals.
 
 (* Template body *)
 Definition GreaterThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "lt" in
-    do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
-    do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
-    do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "lt" [] [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (0)] [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (1)] [[ M.var_access (| "in", [Access.Array (0)] |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -206,21 +243,27 @@ Module GreaterEqThanSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End GreaterEqThanSignals.
 
 (* Template body *)
 Definition GreaterEqThan (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 2 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "lt" in
-    do~ M.substitute_var "lt" [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
-    do~ M.substitute_var "lt" [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
-    do~ M.substitute_var "lt" [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "lt" [] [[ M.call_function ~(| "LessThan", [ M.var (| "n" |) ] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (0)] [[ M.var_access (| "in", [Access.Array (1)] |) ]] in
+    do~ M.substitute_var "lt" [Access.Component "in"; Access.Array (1)] [[ InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "lt", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

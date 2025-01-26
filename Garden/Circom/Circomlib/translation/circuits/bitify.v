@@ -9,33 +9,39 @@ Module Num2BitsSignals.
     (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Num2BitsSignals.
 
 (* Template body *)
 Definition Num2Bits (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
+    do~ M.declare_signal "out" in
     (* Var *)
     do~ M.declare_var "lc1" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "lc1" [[ 0 ]] in
+    do~ M.substitute_var "lc1" [] [[ 0 ]] in
     (* Var *)
     do~ M.declare_var "e2" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "e2" [[ 1 ]] in
+    do~ M.substitute_var "e2" [] [[ 1 ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
-      do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var (| "in" |), M.var (| "i" |) |), 1 |) ]] in
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var (| "in" |), M.var (| "i" |) |), 1 |) ]] in
       do~ M.equality_constraint
         [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), InfixOp.sub ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), 1 |) |) ]]
         [[ 0 ]]
       in
-      do~ M.substitute_var "lc1" [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), M.var (| "e2" |) |) |) ]] in
-      do~ M.substitute_var "e2" [[ InfixOp.add ~(| M.var (| "e2" |), M.var (| "e2" |) |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "lc1" [] [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), M.var (| "e2" |) |) |) ]] in
+      do~ M.substitute_var "e2" [] [[ InfixOp.add ~(| M.var (| "e2" |), M.var (| "e2" |) |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
     do~ M.equality_constraint
@@ -59,29 +65,35 @@ Module Num2Bits_strictSignals.
     (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Num2Bits_strictSignals.
 
 (* Template body *)
 Definition Num2Bits_strict : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ [ 254 ] ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "aliasCheck" in
-    do~ M.substitute_var "aliasCheck" [[ M.call_function ~(| "AliasCheck", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "aliasCheck" [] [[ M.call_function ~(| "AliasCheck", ([] : list F.t) |) ]] in
     (* Component *)
     do~ M.declare_component "n2b" in
-    do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ 254 ] |) ]] in
-    do~ M.substitute_var "n2b" [[ M.var (| "in" |) ]] in
+    do~ M.substitute_var "n2b" [] [[ M.call_function ~(| "Num2Bits", [ 254 ] |) ]] in
+    do~ M.substitute_var "n2b" [Access.Component "in"] [[ M.var (| "in" |) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
-      do~ M.substitute_var "out" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "aliasCheck" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "aliasCheck" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
     M.pure BlockUnit.Tt
@@ -101,31 +113,37 @@ Module Bits2NumSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Bits2NumSignals.
 
 (* Template body *)
 Definition Bits2Num (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ M.var (| "n" |) ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Var *)
     do~ M.declare_var "lc1" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "lc1" [[ 0 ]] in
+    do~ M.substitute_var "lc1" [] [[ 0 ]] in
     (* Var *)
     do~ M.declare_var "e2" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "e2" [[ 1 ]] in
+    do~ M.substitute_var "e2" [] [[ 1 ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
-      do~ M.substitute_var "lc1" [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "in", [Access.Array (M.var (| "i" |))] |), M.var (| "e2" |) |) |) ]] in
-      do~ M.substitute_var "e2" [[ InfixOp.add ~(| M.var (| "e2" |), M.var (| "e2" |) |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "lc1" [] [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "in", [Access.Array (M.var (| "i" |))] |), M.var (| "e2" |) |) |) ]] in
+      do~ M.substitute_var "e2" [] [[ InfixOp.add ~(| M.var (| "e2" |), M.var (| "e2" |) |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var (| "lc1" |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var (| "lc1" |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -143,31 +161,37 @@ Module Bits2Num_strictSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Bits2Num_strictSignals.
 
 (* Template body *)
 Definition Bits2Num_strict : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 254 ] ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "aliasCheck" in
-    do~ M.substitute_var "aliasCheck" [[ M.call_function ~(| "AliasCheck", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "aliasCheck" [] [[ M.call_function ~(| "AliasCheck", ([] : list F.t) |) ]] in
     (* Component *)
     do~ M.declare_component "b2n" in
-    do~ M.substitute_var "b2n" [[ M.call_function ~(| "Bits2Num", [ 254 ] |) ]] in
+    do~ M.substitute_var "b2n" [] [[ M.call_function ~(| "Bits2Num", [ 254 ] |) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
-      do~ M.substitute_var "b2n" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "aliasCheck" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "b2n" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "aliasCheck" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var_access (| "b2n", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "b2n", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -185,38 +209,44 @@ Module Num2BitsNegSignals.
     (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Num2BitsNegSignals.
 
 (* Template body *)
 Definition Num2BitsNeg (n : F.t) : M.t (BlockUnit.t Empty_set) :=
   M.template_body [("n", n)] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "in" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ [ M.var (| "n" |) ] ]] in
+    do~ M.declare_signal "out" in
     (* Var *)
     do~ M.declare_var "lc1" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "lc1" [[ 0 ]] in
+    do~ M.substitute_var "lc1" [] [[ 0 ]] in
     (* Component *)
     do~ M.declare_component "isZero" in
-    do~ M.substitute_var "isZero" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "isZero" [] [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
     (* Var *)
     do~ M.declare_var "neg" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "neg" [[ ternary_expression (InfixOp.eq ~(| M.var (| "n" |), 0 |)) (0) (InfixOp.sub ~(| InfixOp.pow ~(| 2, M.var (| "n" |) |), M.var (| "in" |) |)) ]] in
+    do~ M.substitute_var "neg" [] [[ ternary_expression (InfixOp.eq ~(| M.var (| "n" |), 0 |)) (0) (InfixOp.sub ~(| InfixOp.pow ~(| 2, M.var (| "n" |) |), M.var (| "in" |) |)) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
-      do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var (| "neg" |), M.var (| "i" |) |), 1 |) ]] in
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var (| "neg" |), M.var (| "i" |) |), 1 |) ]] in
       do~ M.equality_constraint
         [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), InfixOp.sub ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), 1 |) |) ]]
         [[ 0 ]]
       in
-      do~ M.substitute_var "lc1" [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), InfixOp.pow ~(| 2, M.var (| "i" |) |) |) |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "lc1" [] [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "out", [Access.Array (M.var (| "i" |))] |), InfixOp.pow ~(| 2, M.var (| "i" |) |) |) |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "isZero" [[ M.var (| "in" |) ]] in
+    do~ M.substitute_var "isZero" [Access.Component "in"] [[ M.var (| "in" |) ]] in
     do~ M.equality_constraint
       [[ InfixOp.add ~(| M.var (| "lc1" |), InfixOp.mul ~(| M.var_access (| "isZero", [Access.Component "out"] |), InfixOp.pow ~(| 2, M.var (| "n" |) |) |) |) ]]
       [[ InfixOp.sub ~(| InfixOp.pow ~(| 2, M.var (| "n" |) |), M.var (| "in" |) |) ]]

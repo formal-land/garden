@@ -7,22 +7,27 @@ Module AliasCheckSignals.
     (* Input *)
     in_ : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in".
+  End IsNamed.
 End AliasCheckSignals.
 
 (* Template body *)
 Definition AliasCheck : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "in" [[ [ 254 ] ]] in
+    do~ M.declare_signal "in" in
     (* Component *)
     do~ M.declare_component "compConstant" in
-    do~ M.substitute_var "compConstant" [[ M.call_function ~(| "CompConstant", [ PrefixOp.sub ~(| 1 |) ] |) ]] in
+    do~ M.substitute_var "compConstant" [] [[ M.call_function ~(| "CompConstant", [ PrefixOp.sub ~(| 1 |) ] |) ]] in
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 254 |) ]] (
-      do~ M.substitute_var "compConstant" [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "compConstant" [Access.Component "in"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
     do~ M.equality_constraint

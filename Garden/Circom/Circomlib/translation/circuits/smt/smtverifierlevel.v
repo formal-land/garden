@@ -29,49 +29,65 @@ Module SMTVerifierLevelSignals.
     (* Intermediate *)
     aux : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | st_top : P _ st_top "st_top"
+    | st_i0 : P _ st_i0 "st_i0"
+    | st_iold : P _ st_iold "st_iold"
+    | st_inew : P _ st_inew "st_inew"
+    | st_na : P _ st_na "st_na"
+    | root : P _ root "root"
+    | sibling : P _ sibling "sibling"
+    | old1leaf : P _ old1leaf "old1leaf"
+    | new1leaf : P _ new1leaf "new1leaf"
+    | lrbit : P _ lrbit "lrbit"
+    | child : P _ child "child"
+    | aux : P _ aux "aux".
+  End IsNamed.
 End SMTVerifierLevelSignals.
 
 (* Template body *)
 Definition SMTVerifierLevel : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "st_top" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "st_top" in
     (* Signal Input *)
-    do~ M.declare_signal "st_i0" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "st_i0" in
     (* Signal Input *)
-    do~ M.declare_signal "st_iold" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "st_iold" in
     (* Signal Input *)
-    do~ M.declare_signal "st_inew" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "st_inew" in
     (* Signal Input *)
-    do~ M.declare_signal "st_na" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "st_na" in
     (* Signal Output *)
-    do~ M.declare_signal "root" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "root" in
     (* Signal Input *)
-    do~ M.declare_signal "sibling" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "sibling" in
     (* Signal Input *)
-    do~ M.declare_signal "old1leaf" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "old1leaf" in
     (* Signal Input *)
-    do~ M.declare_signal "new1leaf" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "new1leaf" in
     (* Signal Input *)
-    do~ M.declare_signal "lrbit" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "lrbit" in
     (* Signal Input *)
-    do~ M.declare_signal "child" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "child" in
     (* Signal Intermediate *)
-    do~ M.declare_signal "aux" [[ [ 2 ] ]] in
+    do~ M.declare_signal "aux" in
     (* Component *)
     do~ M.declare_component "proofHash" in
-    do~ M.substitute_var "proofHash" [[ M.call_function ~(| "SMTHash2", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "proofHash" [] [[ M.call_function ~(| "SMTHash2", ([] : list F.t) |) ]] in
     (* Component *)
     do~ M.declare_component "switcher" in
-    do~ M.substitute_var "switcher" [[ M.call_function ~(| "Switcher", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "switcher" [[ M.var (| "child" |) ]] in
-    do~ M.substitute_var "switcher" [[ M.var (| "sibling" |) ]] in
-    do~ M.substitute_var "switcher" [[ M.var (| "lrbit" |) ]] in
-    do~ M.substitute_var "proofHash" [[ M.var_access (| "switcher", [Access.Component "outL"] |) ]] in
-    do~ M.substitute_var "proofHash" [[ M.var_access (| "switcher", [Access.Component "outR"] |) ]] in
-    do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var_access (| "proofHash", [Access.Component "out"] |), M.var (| "st_top" |) |) ]] in
-    do~ M.substitute_var "aux" [[ InfixOp.mul ~(| M.var (| "old1leaf" |), M.var (| "st_iold" |) |) ]] in
-    do~ M.substitute_var "root" [[ InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "aux", [Access.Array (0)] |), M.var_access (| "aux", [Access.Array (1)] |) |), InfixOp.mul ~(| M.var (| "new1leaf" |), M.var (| "st_inew" |) |) |) ]] in
+    do~ M.substitute_var "switcher" [] [[ M.call_function ~(| "Switcher", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "switcher" [Access.Component "L"] [[ M.var (| "child" |) ]] in
+    do~ M.substitute_var "switcher" [Access.Component "R"] [[ M.var (| "sibling" |) ]] in
+    do~ M.substitute_var "switcher" [Access.Component "sel"] [[ M.var (| "lrbit" |) ]] in
+    do~ M.substitute_var "proofHash" [Access.Component "L"] [[ M.var_access (| "switcher", [Access.Component "outL"] |) ]] in
+    do~ M.substitute_var "proofHash" [Access.Component "R"] [[ M.var_access (| "switcher", [Access.Component "outR"] |) ]] in
+    do~ M.substitute_var "aux" [Access.Array (0)] [[ InfixOp.mul ~(| M.var_access (| "proofHash", [Access.Component "out"] |), M.var (| "st_top" |) |) ]] in
+    do~ M.substitute_var "aux" [Access.Array (1)] [[ InfixOp.mul ~(| M.var (| "old1leaf" |), M.var (| "st_iold" |) |) ]] in
+    do~ M.substitute_var "root" [] [[ InfixOp.add ~(| InfixOp.add ~(| M.var_access (| "aux", [Access.Array (0)] |), M.var_access (| "aux", [Access.Array (1)] |) |), InfixOp.mul ~(| M.var (| "new1leaf" |), M.var (| "st_inew" |) |) |) ]] in
     M.pure BlockUnit.Tt
   ).
 

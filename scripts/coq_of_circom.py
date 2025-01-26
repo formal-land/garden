@@ -6,7 +6,10 @@ import sys
 from typing import Any, Tuple
 
 def indent(text: str) -> str:
-    return "\n".join("  " + line for line in text.split("\n"))
+    return "\n".join(
+        "  " + line if line.strip() != "" else ""
+        for line in text.split("\n")
+    )
 
 def escape_coq_name(name: str) -> str:
     reserved_names = [
@@ -353,7 +356,7 @@ def to_coq_statement(node) -> str:
         elif xtype == "AnonymousComponent":
             declare_function = "M.declare_anonymous_component"
         elif "Signal" in xtype:
-            declare_function = "M.declare_signal"
+            return "do~ M.declare_signal \"" + declaration["name"] + "\" in"
         elif xtype == "Bus":
             declare_function = "M.declare_bus"
         else:
@@ -368,6 +371,7 @@ def to_coq_statement(node) -> str:
         substitution = node["Substitution"]
         return \
             "do~ M.substitute_var \"" + substitution["var"] + "\" " + \
+            "[" + "; ".join(to_coq_access(access) for access in substitution["access"]) + "] " + \
             "[[ " + to_coq_expression(substitution["rhe"]) + " ]] in"
     if "MultSubstitution" in node:
         mult_substitution = node["MultSubstitution"]
@@ -488,7 +492,18 @@ def to_coq_definition(node) -> str:
                         for signal in signals
                     )
                 ) + "\n" +
-                "}."
+                "}." + "\n" +
+                "\n" +
+                "Module IsNamed.\n" + \
+                indent(
+                    "Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=\n" + \
+                    "\n".join(
+                        "| " + escape_coq_name(signal[0]) + " : P _ " +
+                        escape_coq_name(signal[0]) + " \"" + signal[0] + "\""
+                        for signal in signals
+                    ) + "."
+                ) + "\n" +
+                "End IsNamed."
             ) + "\n" + \
             "End " + template["name"] + "Signals.\n" + \
             "\n" + \

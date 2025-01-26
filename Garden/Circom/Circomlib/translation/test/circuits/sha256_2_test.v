@@ -11,23 +11,30 @@ Module MainSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | a : P _ a "a"
+    | b : P _ b "b"
+    | out : P _ out "out".
+  End IsNamed.
 End MainSignals.
 
 (* Template body *)
 Definition Main : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Signal Input *)
-    do~ M.declare_signal "a" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "a" in
     (* Signal Input *)
-    do~ M.declare_signal "b" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "b" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "sha256_2" in
-    do~ M.substitute_var "sha256_2" [[ M.call_function ~(| "Sha256_2", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "sha256_2" [[ M.var (| "a" |) ]] in
-    do~ M.substitute_var "sha256_2" [[ M.var (| "b" |) ]] in
-    do~ M.substitute_var "out" [[ M.var_access (| "sha256_2", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "sha256_2" [] [[ M.call_function ~(| "Sha256_2", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "sha256_2" [Access.Component "a"] [[ M.var (| "a" |) ]] in
+    do~ M.substitute_var "sha256_2" [Access.Component "b"] [[ M.var (| "b" |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "sha256_2", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 

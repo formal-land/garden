@@ -7,6 +7,11 @@ Module ConstantsSignals.
     (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | out : P _ out "out".
+  End IsNamed.
 End ConstantsSignals.
 
 (* Template body *)
@@ -14,25 +19,25 @@ Definition Constants : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ [ 16 ] ]] in
-    do~ M.substitute_var "out" [[ 123 ]] in
-    do~ M.substitute_var "out" [[ 456 ]] in
-    do~ M.substitute_var "out" [[ 789 ]] in
-    do~ M.substitute_var "out" [[ 12 ]] in
-    do~ M.substitute_var "out" [[ 111 ]] in
-    do~ M.substitute_var "out" [[ 222 ]] in
-    do~ M.substitute_var "out" [[ 333 ]] in
-    do~ M.substitute_var "out" [[ 4546 ]] in
-    do~ M.substitute_var "out" [[ 134523 ]] in
-    do~ M.substitute_var "out" [[ 44356 ]] in
-    do~ M.substitute_var "out" [[ 15623 ]] in
-    do~ M.substitute_var "out" [[ 4566 ]] in
-    do~ M.substitute_var "out" [[ 1223 ]] in
-    do~ M.substitute_var "out" [[ 4546 ]] in
-    do~ M.substitute_var "out" [[ 4256 ]] in
-    do~ M.substitute_var "out" [[ 4456 ]] in
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ 123 ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ 456 ]] in
+    do~ M.substitute_var "out" [Access.Array (2)] [[ 789 ]] in
+    do~ M.substitute_var "out" [Access.Array (3)] [[ 12 ]] in
+    do~ M.substitute_var "out" [Access.Array (4)] [[ 111 ]] in
+    do~ M.substitute_var "out" [Access.Array (5)] [[ 222 ]] in
+    do~ M.substitute_var "out" [Access.Array (6)] [[ 333 ]] in
+    do~ M.substitute_var "out" [Access.Array (7)] [[ 4546 ]] in
+    do~ M.substitute_var "out" [Access.Array (8)] [[ 134523 ]] in
+    do~ M.substitute_var "out" [Access.Array (9)] [[ 44356 ]] in
+    do~ M.substitute_var "out" [Access.Array (10)] [[ 15623 ]] in
+    do~ M.substitute_var "out" [Access.Array (11)] [[ 4566 ]] in
+    do~ M.substitute_var "out" [Access.Array (12)] [[ 1223 ]] in
+    do~ M.substitute_var "out" [Access.Array (13)] [[ 4546 ]] in
+    do~ M.substitute_var "out" [Access.Array (14)] [[ 4256 ]] in
+    do~ M.substitute_var "out" [Access.Array (15)] [[ 4456 ]] in
     M.pure BlockUnit.Tt
   ).
 
@@ -50,6 +55,12 @@ Module MainSignals.
     (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | selector : P _ selector "selector"
+    | out : P _ out "out".
+  End IsNamed.
 End MainSignals.
 
 (* Template body *)
@@ -57,34 +68,34 @@ Definition Main : M.t (BlockUnit.t Empty_set) :=
   M.template_body [] (
     (* Var *)
     do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     (* Signal Input *)
-    do~ M.declare_signal "selector" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "selector" in
     (* Signal Output *)
-    do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
+    do~ M.declare_signal "out" in
     (* Component *)
     do~ M.declare_component "mux" in
-    do~ M.substitute_var "mux" [[ M.call_function ~(| "Mux4", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "mux" [] [[ M.call_function ~(| "Mux4", ([] : list F.t) |) ]] in
     (* Component *)
     do~ M.declare_component "n2b" in
-    do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ 4 ] |) ]] in
+    do~ M.substitute_var "n2b" [] [[ M.call_function ~(| "Num2Bits", [ 4 ] |) ]] in
     (* Component *)
     do~ M.declare_component "cst" in
-    do~ M.substitute_var "cst" [[ M.call_function ~(| "Constants", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "n2b" [[ M.var (| "selector" |) ]] in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "cst" [] [[ M.call_function ~(| "Constants", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "n2b" [Access.Component "in"] [[ M.var (| "selector" |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 4 |) ]] (
-      do~ M.substitute_var "mux" [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "mux" [Access.Component "s"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "i" [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
     do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 16 |) ]] (
-      do~ M.substitute_var "mux" [[ M.var_access (| "cst", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
-      do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      do~ M.substitute_var "mux" [Access.Component "c"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "cst", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
       M.pure BlockUnit.Tt
     ) in
-    do~ M.substitute_var "out" [[ M.var_access (| "mux", [Access.Component "out"] |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "mux", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
   ).
 
