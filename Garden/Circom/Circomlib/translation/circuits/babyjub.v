@@ -4,165 +4,256 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module BabyAddSignals.
   Record t : Set := {
+    (* Input *)
     x1 : F.t;
+    (* Input *)
     y1 : F.t;
+    (* Input *)
     x2 : F.t;
+    (* Input *)
     y2 : F.t;
+    (* Output *)
     xout : F.t;
+    (* Output *)
     yout : F.t;
+    (* Intermediate *)
     beta : F.t;
+    (* Intermediate *)
     gamma : F.t;
+    (* Intermediate *)
     delta : F.t;
+    (* Intermediate *)
     tau : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | x1 : P _ x1 "x1"
+    | y1 : P _ y1 "y1"
+    | x2 : P _ x2 "x2"
+    | y2 : P _ y2 "y2"
+    | xout : P _ xout "xout"
+    | yout : P _ yout "yout"
+    | beta : P _ beta "beta"
+    | gamma : P _ gamma "gamma"
+    | delta : P _ delta "delta"
+    | tau : P _ tau "tau".
+  End IsNamed.
 End BabyAddSignals.
 
 (* Template body *)
 Definition BabyAdd : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "x1" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "y1" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "x2" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "y2" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "xout" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "yout" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "beta" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "gamma" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "delta" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "tau" [[ ([] : list F.t) ]] in
-  (* Var *)
-  do~ M.declare_var "a" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "a" [[ 168700 ]] in
-  (* Var *)
-  do~ M.declare_var "d" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "d" [[ 168696 ]] in
-  do~ M.substitute_var "beta" [[ InfixOp.mul ~(| M.var ~(| "x1" |), M.var ~(| "y2" |) |) ]] in
-  do~ M.substitute_var "gamma" [[ InfixOp.mul ~(| M.var ~(| "y1" |), M.var ~(| "x2" |) |) ]] in
-  do~ M.substitute_var "delta" [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var ~(| "a" |) |), M.var ~(| "x1" |) |), M.var ~(| "y1" |) |), InfixOp.add ~(| M.var ~(| "x2" |), M.var ~(| "y2" |) |) |) ]] in
-  do~ M.substitute_var "tau" [[ InfixOp.mul ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |) ]] in
-  do~ M.substitute_var "xout" [[ InfixOp.div ~(| InfixOp.add ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.add ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |), M.var ~(| "xout" |) |) ]]
-    [[ InfixOp.add ~(| M.var ~(| "beta" |), M.var ~(| "gamma" |) |) ]]
-  in
-  do~ M.substitute_var "yout" [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "delta" |), InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "beta" |) |) |), M.var ~(| "gamma" |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "tau" |) |) |), M.var ~(| "yout" |) |) ]]
-    [[ InfixOp.sub ~(| InfixOp.add ~(| M.var ~(| "delta" |), InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "beta" |) |) |), M.var ~(| "gamma" |) |) ]]
-  in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "x1" in
+    (* Signal Input *)
+    do~ M.declare_signal "y1" in
+    (* Signal Input *)
+    do~ M.declare_signal "x2" in
+    (* Signal Input *)
+    do~ M.declare_signal "y2" in
+    (* Signal Output *)
+    do~ M.declare_signal "xout" in
+    (* Signal Output *)
+    do~ M.declare_signal "yout" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "beta" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "gamma" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "delta" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "tau" in
+    (* Var *)
+    do~ M.declare_var "a" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "a" [] [[ 168700 ]] in
+    (* Var *)
+    do~ M.declare_var "d" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "d" [] [[ 168696 ]] in
+    do~ M.substitute_var "beta" [] [[ InfixOp.mul ~(| M.var (| "x1" |), M.var (| "y2" |) |) ]] in
+    do~ M.substitute_var "gamma" [] [[ InfixOp.mul ~(| M.var (| "y1" |), M.var (| "x2" |) |) ]] in
+    do~ M.substitute_var "delta" [] [[ InfixOp.mul ~(| InfixOp.add ~(| InfixOp.mul ~(| PrefixOp.sub ~(| M.var (| "a" |) |), M.var (| "x1" |) |), M.var (| "y1" |) |), InfixOp.add ~(| M.var (| "x2" |), M.var (| "y2" |) |) |) ]] in
+    do~ M.substitute_var "tau" [] [[ InfixOp.mul ~(| M.var (| "beta" |), M.var (| "gamma" |) |) ]] in
+    do~ M.substitute_var "xout" [] [[ InfixOp.div ~(| InfixOp.add ~(| M.var (| "beta" |), M.var (| "gamma" |) |), InfixOp.add ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| InfixOp.add ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |), M.var (| "xout" |) |) ]]
+      [[ InfixOp.add ~(| M.var (| "beta" |), M.var (| "gamma" |) |) ]]
+    in
+    do~ M.substitute_var "yout" [] [[ InfixOp.div ~(| InfixOp.sub ~(| InfixOp.add ~(| M.var (| "delta" |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "beta" |) |) |), M.var (| "gamma" |) |), InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, InfixOp.mul ~(| M.var (| "d" |), M.var (| "tau" |) |) |), M.var (| "yout" |) |) ]]
+      [[ InfixOp.sub ~(| InfixOp.add ~(| M.var (| "delta" |), InfixOp.mul ~(| M.var (| "a" |), M.var (| "beta" |) |) |), M.var (| "gamma" |) |) ]]
+    in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition BabyAdd_not_under_constrained x1 y1 x2 y2 : Prop :=
+  exists! xout yout,
+  exists beta gamma delta tau,
+  let signals := BabyAddSignals.Build_t x1 y1 x2 y2 xout yout beta gamma delta tau in
+  True (* NotUnderConstrained BabyAdd signals *).
 
 (* Template signals *)
 Module BabyDblSignals.
   Record t : Set := {
+    (* Input *)
     x : F.t;
+    (* Input *)
     y : F.t;
+    (* Output *)
     xout : F.t;
+    (* Output *)
     yout : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | x : P _ x "x"
+    | y : P _ y "y"
+    | xout : P _ xout "xout"
+    | yout : P _ yout "yout".
+  End IsNamed.
 End BabyDblSignals.
 
 (* Template body *)
 Definition BabyDbl : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "x" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "y" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "xout" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "yout" [[ ([] : list F.t) ]] in
-  (* Component *)
-  do~ M.declare_component "adder" in
-  do~ M.substitute_var "adder" [[ M.call_function ~(| "BabyAdd", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "x" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "y" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "x" |) ]] in
-  do~ M.substitute_var "adder" [[ M.var ~(| "y" |) ]] in
-  do~ M.substitute_var "xout" [[ M.var_access ~(| "adder", [Access.Component "xout"] |) ]] in
-  do~ M.substitute_var "yout" [[ M.var_access ~(| "adder", [Access.Component "yout"] |) ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "x" in
+    (* Signal Input *)
+    do~ M.declare_signal "y" in
+    (* Signal Output *)
+    do~ M.declare_signal "xout" in
+    (* Signal Output *)
+    do~ M.declare_signal "yout" in
+    (* Component *)
+    do~ M.declare_component "adder" in
+    do~ M.substitute_var "adder" [] [[ M.call_function ~(| "BabyAdd", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "adder" [Access.Component "x1"] [[ M.var (| "x" |) ]] in
+    do~ M.substitute_var "adder" [Access.Component "y1"] [[ M.var (| "y" |) ]] in
+    do~ M.substitute_var "adder" [Access.Component "x2"] [[ M.var (| "x" |) ]] in
+    do~ M.substitute_var "adder" [Access.Component "y2"] [[ M.var (| "y" |) ]] in
+    do~ M.substitute_var "xout" [] [[ M.var_access (| "adder", [Access.Component "xout"] |) ]] in
+    do~ M.substitute_var "yout" [] [[ M.var_access (| "adder", [Access.Component "yout"] |) ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition BabyDbl_not_under_constrained x y : Prop :=
+  exists! xout yout,
+  let signals := BabyDblSignals.Build_t x y xout yout in
+  True (* NotUnderConstrained BabyDbl signals *).
 
 (* Template signals *)
 Module BabyCheckSignals.
   Record t : Set := {
+    (* Input *)
     x : F.t;
+    (* Input *)
     y : F.t;
+    (* Intermediate *)
     x2 : F.t;
+    (* Intermediate *)
     y2 : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | x : P _ x "x"
+    | y : P _ y "y"
+    | x2 : P _ x2 "x2"
+    | y2 : P _ y2 "y2".
+  End IsNamed.
 End BabyCheckSignals.
 
 (* Template body *)
 Definition BabyCheck : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "x" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "y" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "x2" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "y2" [[ ([] : list F.t) ]] in
-  (* Var *)
-  do~ M.declare_var "a" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "a" [[ 168700 ]] in
-  (* Var *)
-  do~ M.declare_var "d" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "d" [[ 168696 ]] in
-  do~ M.substitute_var "x2" [[ InfixOp.mul ~(| M.var ~(| "x" |), M.var ~(| "x" |) |) ]] in
-  do~ M.substitute_var "y2" [[ InfixOp.mul ~(| M.var ~(| "y" |), M.var ~(| "y" |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.add ~(| InfixOp.mul ~(| M.var ~(| "a" |), M.var ~(| "x2" |) |), M.var ~(| "y2" |) |) ]]
-    [[ InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "d" |), M.var ~(| "x2" |) |), M.var ~(| "y2" |) |) |) ]]
-  in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "x" in
+    (* Signal Input *)
+    do~ M.declare_signal "y" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "x2" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "y2" in
+    (* Var *)
+    do~ M.declare_var "a" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "a" [] [[ 168700 ]] in
+    (* Var *)
+    do~ M.declare_var "d" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "d" [] [[ 168696 ]] in
+    do~ M.substitute_var "x2" [] [[ InfixOp.mul ~(| M.var (| "x" |), M.var (| "x" |) |) ]] in
+    do~ M.substitute_var "y2" [] [[ InfixOp.mul ~(| M.var (| "y" |), M.var (| "y" |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.add ~(| InfixOp.mul ~(| M.var (| "a" |), M.var (| "x2" |) |), M.var (| "y2" |) |) ]]
+      [[ InfixOp.add ~(| 1, InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "d" |), M.var (| "x2" |) |), M.var (| "y2" |) |) |) ]]
+    in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition BabyCheck_not_under_constrained x y : Prop :=
+  exists x2 y2,
+  let signals := BabyCheckSignals.Build_t x y x2 y2 in
+  True (* NotUnderConstrained BabyCheck signals *).
 
 (* Template signals *)
 Module BabyPbkSignals.
   Record t : Set := {
+    (* Input *)
     in_ : F.t;
+    (* Output *)
     Ax : F.t;
+    (* Output *)
     Ay : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | Ax : P _ Ax "Ax"
+    | Ay : P _ Ay "Ay".
+  End IsNamed.
 End BabyPbkSignals.
 
 (* Template body *)
 Definition BabyPbk : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "Ax" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "Ay" [[ ([] : list F.t) ]] in
-  (* Var *)
-  do~ M.declare_var "BASE8" [[ [ 2 ] ]] in
-  do~ M.substitute_var "BASE8" [[ array_with_repeat (0) (2) ]] in
-  do~ M.substitute_var "BASE8" [[ [ 5299619240641551281634865583518297030282874472190772894086521144482721001553; 16950150798460657717958625567821834550301663161624707787222815936182638968203 ] ]] in
-  (* Component *)
-  do~ M.declare_component "pvkBits" in
-  do~ M.substitute_var "pvkBits" [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
-  do~ M.substitute_var "pvkBits" [[ M.var ~(| "in" |) ]] in
-  (* Component *)
-  do~ M.declare_component "mulFix" in
-  do~ M.substitute_var "mulFix" [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var ~(| "BASE8" |) ] |) ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 253 |) ]] (
-    do~ M.substitute_var "mulFix" [[ M.var_access ~(| "pvkBits", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" in
+    (* Signal Output *)
+    do~ M.declare_signal "Ax" in
+    (* Signal Output *)
+    do~ M.declare_signal "Ay" in
+    (* Var *)
+    do~ M.declare_var "BASE8" [[ [ 2 ] ]] in
+    do~ M.substitute_var "BASE8" [] [[ array_with_repeat (0) (2) ]] in
+    do~ M.substitute_var "BASE8" [] [[ [ 5299619240641551281634865583518297030282874472190772894086521144482721001553; 16950150798460657717958625567821834550301663161624707787222815936182638968203 ] ]] in
+    (* Component *)
+    do~ M.declare_component "pvkBits" in
+    do~ M.substitute_var "pvkBits" [] [[ M.call_function ~(| "Num2Bits", [ 253 ] |) ]] in
+    do~ M.substitute_var "pvkBits" [Access.Component "in"] [[ M.var (| "in" |) ]] in
+    (* Component *)
+    do~ M.declare_component "mulFix" in
+    do~ M.substitute_var "mulFix" [] [[ M.call_function ~(| "EscalarMulFix", [ 253; M.var (| "BASE8" |) ] |) ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 253 |) ]] (
+      do~ M.substitute_var "mulFix" [Access.Component "e"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "pvkBits", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "Ax" [] [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "Ay" [] [[ M.var_access (| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "Ax" [[ M.var_access ~(| "mulFix", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "Ay" [[ M.var_access ~(| "mulFix", [Access.Component "out"; Access.Array (1)] |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition BabyPbk_not_under_constrained in_ : Prop :=
+  exists! Ax Ay,
+  let signals := BabyPbkSignals.Build_t in_ Ax Ay in
+  True (* NotUnderConstrained BabyPbk signals *).

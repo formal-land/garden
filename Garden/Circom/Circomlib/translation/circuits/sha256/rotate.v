@@ -4,23 +4,39 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module RotRSignals.
   Record t : Set := {
+    (* Input *)
     in_ : list F.t;
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End RotRSignals.
 
 (* Template body *)
 Definition RotR (n r : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ M.var ~(| "n" |) ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "n" |) ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "n" |) |) ]] (
-    do~ M.substitute_var "out" [[ M.var_access ~(| "in", [Access.Array (InfixOp.mod_ ~(| InfixOp.add ~(| M.var ~(| "i" |), M.var ~(| "r" |) |), M.var ~(| "n" |) |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [("n", n); ("r", r)] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ M.var_access (| "in", [Access.Array (InfixOp.mod_ ~(| InfixOp.add ~(| M.var (| "i" |), M.var (| "r" |) |), M.var (| "n" |) |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition RotR_not_under_constrained (n r : F.t) in_ : Prop :=
+  exists! out,
+  let signals := RotRSignals.Build_t in_ out in
+  True (* NotUnderConstrained RotR n r signals *).

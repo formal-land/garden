@@ -4,54 +4,84 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module ConstantsSignals.
   Record t : Set := {
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | out : P _ out "out".
+  End IsNamed.
 End ConstantsSignals.
 
 (* Template body *)
 Definition Constants : M.t (BlockUnit.t Empty_set) :=
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 2 ] ]] in
-  do~ M.substitute_var "out" [[ 37 ]] in
-  do~ M.substitute_var "out" [[ 47 ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ 37 ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ 47 ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition Constants_not_under_constrained : Prop :=
+  exists! out,
+  let signals := ConstantsSignals.Build_t out in
+  True (* NotUnderConstrained Constants signals *).
 
 (* Template signals *)
 Module MainSignals.
   Record t : Set := {
+    (* Input *)
     selector : F.t;
+    (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | selector : P _ selector "selector"
+    | out : P _ out "out".
+  End IsNamed.
 End MainSignals.
 
 (* Template body *)
 Definition Main : M.t (BlockUnit.t Empty_set) :=
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "selector" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-  (* Component *)
-  do~ M.declare_component "mux" in
-  do~ M.substitute_var "mux" [[ M.call_function ~(| "Mux1", ([] : list F.t) |) ]] in
-  (* Component *)
-  do~ M.declare_component "n2b" in
-  do~ M.substitute_var "n2b" [[ M.call_function ~(| "Num2Bits", [ 1 ] |) ]] in
-  (* Component *)
-  do~ M.declare_component "cst" in
-  do~ M.substitute_var "cst" [[ M.call_function ~(| "Constants", ([] : list F.t) |) ]] in
-  do~ M.substitute_var "n2b" [[ M.var ~(| "selector" |) ]] in
-  do~ M.substitute_var "mux" [[ M.var_access ~(| "n2b", [Access.Component "out"; Access.Array (0)] |) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 2 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access ~(| "cst", [Access.Component "out"; Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [] (
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "selector" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Component *)
+    do~ M.declare_component "mux" in
+    do~ M.substitute_var "mux" [] [[ M.call_function ~(| "Mux1", ([] : list F.t) |) ]] in
+    (* Component *)
+    do~ M.declare_component "n2b" in
+    do~ M.substitute_var "n2b" [] [[ M.call_function ~(| "Num2Bits", [ 1 ] |) ]] in
+    (* Component *)
+    do~ M.declare_component "cst" in
+    do~ M.substitute_var "cst" [] [[ M.call_function ~(| "Constants", ([] : list F.t) |) ]] in
+    do~ M.substitute_var "n2b" [Access.Component "in"] [[ M.var (| "selector" |) ]] in
+    do~ M.substitute_var "mux" [Access.Component "s"] [[ M.var_access (| "n2b", [Access.Component "out"; Access.Array (0)] |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 2 |) ]] (
+      do~ M.substitute_var "mux" [Access.Component "c"; Access.Array (M.var (| "i" |))] [[ M.var_access (| "cst", [Access.Component "out"; Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "mux", [Access.Component "out"] |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "mux", [Access.Component "out"] |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition Main_not_under_constrained selector : Prop :=
+  exists! out,
+  let signals := MainSignals.Build_t selector out in
+  True (* NotUnderConstrained Main signals *).

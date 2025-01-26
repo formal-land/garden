@@ -6,7 +6,10 @@ import sys
 from typing import Any, Tuple
 
 def indent(text: str) -> str:
-    return "\n".join("  " + line for line in text.split("\n"))
+    return "\n".join(
+        "  " + line if line.strip() != "" else ""
+        for line in text.split("\n")
+    )
 
 def escape_coq_name(name: str) -> str:
     reserved_names = [
@@ -196,11 +199,11 @@ def to_coq_expression(node) -> str:
         variable = node["Variable"]
         if len(variable["access"]) == 0:
             return \
-                "M.var ~(| " + \
+                "M.var (| " + \
                 "\"" + variable["name"] + "\"" + \
                 " |)"
         return \
-            "M.var_access ~(| " + \
+            "M.var_access (| " + \
             "\"" + variable["name"] + "\"" + ", " + \
             "[" + "; ".join(to_coq_access(access) for access in variable["access"]) + "]" + \
             " |)"
@@ -353,7 +356,7 @@ def to_coq_statement(node) -> str:
         elif xtype == "AnonymousComponent":
             declare_function = "M.declare_anonymous_component"
         elif "Signal" in xtype:
-            declare_function = "M.declare_signal"
+            return "do~ M.declare_signal \"" + declaration["name"] + "\" in"
         elif xtype == "Bus":
             declare_function = "M.declare_bus"
         else:
@@ -368,6 +371,7 @@ def to_coq_statement(node) -> str:
         substitution = node["Substitution"]
         return \
             "do~ M.substitute_var \"" + substitution["var"] + "\" " + \
+            "[" + "; ".join(to_coq_access(access) for access in substitution["access"]) + "] " + \
             "[[ " + to_coq_expression(substitution["rhe"]) + " ]] in"
     if "MultSubstitution" in node:
         mult_substitution = node["MultSubstitution"]
@@ -405,12 +409,13 @@ def to_coq_statements(stmts: list) -> str:
             "M.pure BlockUnit.Tt",
         ])
 
-def get_signals_in_template(template) -> list[Tuple[str, int]]:
+def get_signals_in_template(template) -> list[Tuple[str, str, int]]:
     if "Block" in template["body"]:
         stmts = flatten_blocks(template["body"])
         return [
             (
                 init_stmt["Declaration"]["name"],
+                init_stmt["Declaration"]["xtype"]["Signal"][0],
                 len(init_stmt["Declaration"]["dimensions"]),
             )
             for stmt in stmts
@@ -433,7 +438,15 @@ def get_signal_type(nb_dimensions: int) -> str:
 def to_coq_definition_args(args: list[str]) -> str:
     if len(args) == 0:
         return ""
-    return " (" + " ".join(args) + " : F.t)"
+    return " (" + " ".join(escape_coq_name(arg) for arg in args) + " : F.t)"
+
+def to_coq_quantifiers(quantifier: str, variables: list[str]) -> str:
+    if len(variables) == 0:
+        return ""
+    return \
+        quantifier + " " + \
+        " ".join(escape_coq_name(variable) for variable in variables) + \
+        ",\n"
 
 """
 pub enum Definition {
@@ -473,12 +486,24 @@ def to_coq_definition(node) -> str:
                 "Record t : Set := {\n" +
                 indent(
                     "\n".join(
+                        "(* " + signal[1] + " *)\n" +
                         escape_coq_name(signal[0]) + " : " +
-                        get_signal_type(signal[1]) + ";"
+                        get_signal_type(signal[2]) + ";"
                         for signal in signals
                     )
                 ) + "\n" +
-                "}."
+                "}." + "\n" +
+                "\n" +
+                "Module IsNamed.\n" + \
+                indent(
+                    "Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=\n" + \
+                    "\n".join(
+                        "| " + escape_coq_name(signal[0]) + " : P _ " +
+                        escape_coq_name(signal[0]) + " \"" + signal[0] + "\""
+                        for signal in signals
+                    ) + "."
+                ) + "\n" +
+                "End IsNamed."
             ) + "\n" + \
             "End " + template["name"] + "Signals.\n" + \
             "\n" + \
@@ -486,7 +511,40 @@ def to_coq_definition(node) -> str:
             "Definition " + template["name"] + to_coq_definition_args(template["args"]) + \
             " : M.t (BlockUnit.t Empty_set) :=\n" + \
             indent(
-                to_coq_statement(template["body"]) + "."
+                "M.template_body [" +
+                "; ".join(f"(\"{arg}\", {arg})" for arg in template["args"]) +
+                "] (\n" + \
+                indent(
+                    to_coq_statement(template["body"])
+                ) + "\n" +
+                ")."
+            ) + "\n" + \
+            "\n" + \
+            "(* Template not under-constrained *)\n" + \
+            "Definition " + template["name"] + "_not_under_constrained" + \
+            to_coq_definition_args(template["args"]) + \
+            "".join(
+                " " + escape_coq_name(signal[0])
+                for signal in signals
+                if signal[1] == "Input"
+            ) + \
+            " : Prop :=\n" + \
+            indent(
+                to_coq_quantifiers("exists!", [
+                    signal[0]
+                    for signal in signals
+                    if signal[1] == "Output"
+                ]) + \
+                to_coq_quantifiers("exists", [
+                    signal[0]
+                    for signal in signals
+                    if signal[1] == "Intermediate"
+                ]) + \
+                "let signals := " + template["name"] + "Signals.Build_t" + \
+                "".join(f" {escape_coq_name(signal[0])}" for signal in signals) + " in\n" + \
+                "True (* NotUnderConstrained " + template["name"] + \
+                "".join(" " + arg for arg in template["args"]) + \
+                " signals *)."
             )
     if "Function" in node:
         function = node["Function"]
@@ -495,7 +553,9 @@ def to_coq_definition(node) -> str:
             "Definition " + function["name"] + to_coq_definition_args(function["args"]) + \
             " : M.t F.t :=\n" + \
             indent(
-                "M.function_body (\n" + \
+                "M.function_body [" +
+                "; ".join(f"(\"{arg}\", {arg})" for arg in function["args"]) +
+                "] (\n" + \
                 indent(
                     to_coq_statement(function["body"])
                 ) + "\n" +

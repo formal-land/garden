@@ -4,67 +4,93 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module T1Signals.
   Record t : Set := {
+    (* Input *)
     h : list F.t;
+    (* Input *)
     e : list F.t;
+    (* Input *)
     f : list F.t;
+    (* Input *)
     g : list F.t;
+    (* Input *)
     k : list F.t;
+    (* Input *)
     w : list F.t;
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | h : P _ h "h"
+    | e : P _ e "e"
+    | f : P _ f "f"
+    | g : P _ g "g"
+    | k : P _ k "k"
+    | w : P _ w "w"
+    | out : P _ out "out".
+  End IsNamed.
 End T1Signals.
 
 (* Template body *)
 Definition T1 : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "h" [[ [ 32 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "e" [[ [ 32 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "f" [[ [ 32 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "g" [[ [ 32 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "k" [[ [ 32 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "w" [[ [ 32 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 32 ] ]] in
-  (* Var *)
-  do~ M.declare_var "ki" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "ki" [[ 0 ]] in
-  (* Component *)
-  do~ M.declare_component "ch" in
-  do~ M.substitute_var "ch" [[ M.call_function ~(| "Ch_t", [ 32 ] |) ]] in
-  (* Component *)
-  do~ M.declare_component "bigsigma1" in
-  do~ M.substitute_var "bigsigma1" [[ M.call_function ~(| "BigSigma", [ 6; 11; 25 ] |) ]] in
-  do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "bigsigma1" [[ M.var_access ~(| "e", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "e", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "f", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ch" [[ M.var_access ~(| "g", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "h" in
+    (* Signal Input *)
+    do~ M.declare_signal "e" in
+    (* Signal Input *)
+    do~ M.declare_signal "f" in
+    (* Signal Input *)
+    do~ M.declare_signal "g" in
+    (* Signal Input *)
+    do~ M.declare_signal "k" in
+    (* Signal Input *)
+    do~ M.declare_signal "w" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "ki" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "ki" [] [[ 0 ]] in
+    (* Component *)
+    do~ M.declare_component "ch" in
+    do~ M.substitute_var "ch" [] [[ M.call_function ~(| "Ch_t", [ 32 ] |) ]] in
+    (* Component *)
+    do~ M.declare_component "bigsigma1" in
+    do~ M.substitute_var "bigsigma1" [] [[ M.call_function ~(| "BigSigma", [ 6; 11; 25 ] |) ]] in
+    do~ M.substitute_var "ki" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+      do~ M.substitute_var "bigsigma1" [Access.Component "in"; Access.Array (M.var (| "ki" |))] [[ M.var_access (| "e", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ch" [Access.Component "a"; Access.Array (M.var (| "ki" |))] [[ M.var_access (| "e", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ch" [Access.Component "b"; Access.Array (M.var (| "ki" |))] [[ M.var_access (| "f", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ch" [Access.Component "c"; Access.Array (M.var (| "ki" |))] [[ M.var_access (| "g", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ki" [] [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    (* Component *)
+    do~ M.declare_component "sum" in
+    do~ M.substitute_var "sum" [] [[ M.call_function ~(| "BinSum", [ 32; 5 ] |) ]] in
+    do~ M.substitute_var "ki" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+      do~ M.substitute_var "sum" [Access.Component "in"; Access.Array (0); Access.Array (M.var (| "ki" |))] [[ M.var_access (| "h", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "sum" [Access.Component "in"; Access.Array (1); Access.Array (M.var (| "ki" |))] [[ M.var_access (| "bigsigma1", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "sum" [Access.Component "in"; Access.Array (2); Access.Array (M.var (| "ki" |))] [[ M.var_access (| "ch", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "sum" [Access.Component "in"; Access.Array (3); Access.Array (M.var (| "ki" |))] [[ M.var_access (| "k", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "sum" [Access.Component "in"; Access.Array (4); Access.Array (M.var (| "ki" |))] [[ M.var_access (| "w", [Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ki" [] [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "ki" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "ki" |), 32 |) ]] (
+      do~ M.substitute_var "out" [Access.Array (M.var (| "ki" |))] [[ M.var_access (| "sum", [Access.Component "out"; Access.Array (M.var (| "ki" |))] |) ]] in
+      do~ M.substitute_var "ki" [] [[ InfixOp.add ~(| M.var (| "ki" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  (* Component *)
-  do~ M.declare_component "sum" in
-  do~ M.substitute_var "sum" [[ M.call_function ~(| "BinSum", [ 32; 5 ] |) ]] in
-  do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "h", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "bigsigma1", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "ch", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "k", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "sum" [[ M.var_access ~(| "w", [Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
-    M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "ki" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "ki" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ M.var_access ~(| "sum", [Access.Component "out"; Access.Array (M.var ~(| "ki" |))] |) ]] in
-    do~ M.substitute_var "ki" [[ InfixOp.add ~(| M.var ~(| "ki" |), 1 |) ]] in
-    M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition T1_not_under_constrained h e f g k w : Prop :=
+  exists! out,
+  let signals := T1Signals.Build_t h e f g k w out in
+  True (* NotUnderConstrained T1 signals *).

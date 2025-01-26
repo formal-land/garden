@@ -4,49 +4,77 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module HSignals.
   Record t : Set := {
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | out : P _ out "out".
+  End IsNamed.
 End HSignals.
 
 (* Template body *)
 Definition H (x : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 32 ] ]] in
-  (* Var *)
-  do~ M.declare_var "c" [[ [ 8 ] ]] in
-  do~ M.substitute_var "c" [[ array_with_repeat (0) (8) ]] in
-  do~ M.substitute_var "c" [[ [ 1779033703; 3144134277; 1013904242; 2773480762; 1359893119; 2600822924; 528734635; 1541459225 ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access ~(| "c", [Access.Array (M.var ~(| "x" |))] |), M.var ~(| "i" |) |), 1 |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [("x", x)] (
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "c" [[ [ 8 ] ]] in
+    do~ M.substitute_var "c" [] [[ array_with_repeat (0) (8) ]] in
+    do~ M.substitute_var "c" [] [[ [ 1779033703; 3144134277; 1013904242; 2773480762; 1359893119; 2600822924; 528734635; 1541459225 ] ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access (| "c", [Access.Array (M.var (| "x" |))] |), M.var (| "i" |) |), 1 |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition H_not_under_constrained (x : F.t) : Prop :=
+  exists! out,
+  let signals := HSignals.Build_t out in
+  True (* NotUnderConstrained H x signals *).
 
 (* Template signals *)
 Module KSignals.
   Record t : Set := {
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | out : P _ out "out".
+  End IsNamed.
 End KSignals.
 
 (* Template body *)
 Definition K (x : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 32 ] ]] in
-  (* Var *)
-  do~ M.declare_var "c" [[ [ 64 ] ]] in
-  do~ M.substitute_var "c" [[ array_with_repeat (0) (64) ]] in
-  do~ M.substitute_var "c" [[ [ 1116352408; 1899447441; 3049323471; 3921009573; 961987163; 1508970993; 2453635748; 2870763221; 3624381080; 310598401; 607225278; 1426881987; 1925078388; 2162078206; 2614888103; 3248222580; 3835390401; 4022224774; 264347078; 604807628; 770255983; 1249150122; 1555081692; 1996064986; 2554220882; 2821834349; 2952996808; 3210313671; 3336571891; 3584528711; 113926993; 338241895; 666307205; 773529912; 1294757372; 1396182291; 1695183700; 1986661051; 2177026350; 2456956037; 2730485921; 2820302411; 3259730800; 3345764771; 3516065817; 3600352804; 4094571909; 275423344; 430227734; 506948616; 659060556; 883997877; 958139571; 1322822218; 1537002063; 1747873779; 1955562222; 2024104815; 2227730452; 2361852424; 2428436474; 2756734187; 3204031479; 3329325298 ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 32 |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access ~(| "c", [Access.Array (M.var ~(| "x" |))] |), M.var ~(| "i" |) |), 1 |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [("x", x)] (
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "c" [[ [ 64 ] ]] in
+    do~ M.substitute_var "c" [] [[ array_with_repeat (0) (64) ]] in
+    do~ M.substitute_var "c" [] [[ [ 1116352408; 1899447441; 3049323471; 3921009573; 961987163; 1508970993; 2453635748; 2870763221; 3624381080; 310598401; 607225278; 1426881987; 1925078388; 2162078206; 2614888103; 3248222580; 3835390401; 4022224774; 264347078; 604807628; 770255983; 1249150122; 1555081692; 1996064986; 2554220882; 2821834349; 2952996808; 3210313671; 3336571891; 3584528711; 113926993; 338241895; 666307205; 773529912; 1294757372; 1396182291; 1695183700; 1986661051; 2177026350; 2456956037; 2730485921; 2820302411; 3259730800; 3345764771; 3516065817; 3600352804; 4094571909; 275423344; 430227734; 506948616; 659060556; 883997877; 958139571; 1322822218; 1537002063; 1747873779; 1955562222; 2024104815; 2227730452; 2361852424; 2428436474; 2756734187; 3204031479; 3329325298 ] ]] in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 32 |) ]] (
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ InfixOp.bitAnd ~(| InfixOp.shiftR ~(| M.var_access (| "c", [Access.Array (M.var (| "x" |))] |), M.var (| "i" |) |), 1 |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition K_not_under_constrained (x : F.t) : Prop :=
+  exists! out,
+  let signals := KSignals.Build_t out in
+  True (* NotUnderConstrained K x signals *).

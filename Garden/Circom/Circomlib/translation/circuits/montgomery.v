@@ -4,134 +4,208 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module Edwards2MontgomerySignals.
   Record t : Set := {
+    (* Input *)
     in_ : list F.t;
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Edwards2MontgomerySignals.
 
 (* Template body *)
 Definition Edwards2Montgomery : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ 2 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 2 ] ]] in
-  do~ M.substitute_var "out" [[ InfixOp.div ~(| InfixOp.add ~(| 1, M.var_access ~(| "in", [Access.Array (1)] |) |), InfixOp.sub ~(| 1, M.var_access ~(| "in", [Access.Array (1)] |) |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.div ~(| M.var_access ~(| "out", [Access.Array (0)] |), M.var_access ~(| "in", [Access.Array (0)] |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (0)] |), InfixOp.sub ~(| 1, M.var_access ~(| "in", [Access.Array (1)] |) |) |) ]]
-    [[ InfixOp.add ~(| 1, M.var_access ~(| "in", [Access.Array (1)] |) |) ]]
-  in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (1)] |), M.var_access ~(| "in", [Access.Array (0)] |) |) ]]
-    [[ M.var_access ~(| "out", [Access.Array (0)] |) ]]
-  in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ InfixOp.div ~(| InfixOp.add ~(| 1, M.var_access (| "in", [Access.Array (1)] |) |), InfixOp.sub ~(| 1, M.var_access (| "in", [Access.Array (1)] |) |) |) ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ InfixOp.div ~(| M.var_access (| "out", [Access.Array (0)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (0)] |), InfixOp.sub ~(| 1, M.var_access (| "in", [Access.Array (1)] |) |) |) ]]
+      [[ InfixOp.add ~(| 1, M.var_access (| "in", [Access.Array (1)] |) |) ]]
+    in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (1)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]]
+      [[ M.var_access (| "out", [Access.Array (0)] |) ]]
+    in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition Edwards2Montgomery_not_under_constrained in_ : Prop :=
+  exists! out,
+  let signals := Edwards2MontgomerySignals.Build_t in_ out in
+  True (* NotUnderConstrained Edwards2Montgomery signals *).
 
 (* Template signals *)
 Module Montgomery2EdwardsSignals.
   Record t : Set := {
+    (* Input *)
     in_ : list F.t;
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out".
+  End IsNamed.
 End Montgomery2EdwardsSignals.
 
 (* Template body *)
 Definition Montgomery2Edwards : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ 2 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 2 ] ]] in
-  do~ M.substitute_var "out" [[ InfixOp.div ~(| M.var_access ~(| "in", [Access.Array (0)] |), M.var_access ~(| "in", [Access.Array (1)] |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.div ~(| InfixOp.sub ~(| M.var_access ~(| "in", [Access.Array (0)] |), 1 |), InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (0)] |), 1 |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (0)] |), M.var_access ~(| "in", [Access.Array (1)] |) |) ]]
-    [[ M.var_access ~(| "in", [Access.Array (0)] |) ]]
-  in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var_access ~(| "out", [Access.Array (1)] |), InfixOp.add ~(| M.var_access ~(| "in", [Access.Array (0)] |), 1 |) |) ]]
-    [[ InfixOp.sub ~(| M.var_access ~(| "in", [Access.Array (0)] |), 1 |) ]]
-  in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ InfixOp.div ~(| M.var_access (| "in", [Access.Array (0)] |), M.var_access (| "in", [Access.Array (1)] |) |) ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ InfixOp.div ~(| InfixOp.sub ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |), InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (0)] |), M.var_access (| "in", [Access.Array (1)] |) |) ]]
+      [[ M.var_access (| "in", [Access.Array (0)] |) ]]
+    in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var_access (| "out", [Access.Array (1)] |), InfixOp.add ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) |) ]]
+      [[ InfixOp.sub ~(| M.var_access (| "in", [Access.Array (0)] |), 1 |) ]]
+    in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition Montgomery2Edwards_not_under_constrained in_ : Prop :=
+  exists! out,
+  let signals := Montgomery2EdwardsSignals.Build_t in_ out in
+  True (* NotUnderConstrained Montgomery2Edwards signals *).
 
 (* Template signals *)
 Module MontgomeryAddSignals.
   Record t : Set := {
+    (* Input *)
     in1 : list F.t;
+    (* Input *)
     in2 : list F.t;
+    (* Output *)
     out : list F.t;
+    (* Intermediate *)
     lamda : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in1 : P _ in1 "in1"
+    | in2 : P _ in2 "in2"
+    | out : P _ out "out"
+    | lamda : P _ lamda "lamda".
+  End IsNamed.
 End MontgomeryAddSignals.
 
 (* Template body *)
 Definition MontgomeryAdd : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in1" [[ [ 2 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "in2" [[ [ 2 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 2 ] ]] in
-  (* Var *)
-  do~ M.declare_var "a" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "a" [[ 168700 ]] in
-  (* Var *)
-  do~ M.declare_var "d" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "d" [[ 168696 ]] in
-  (* Var *)
-  do~ M.declare_var "A" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "A" [[ InfixOp.div ~(| InfixOp.mul ~(| 2, InfixOp.add ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |), InfixOp.sub ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |) ]] in
-  (* Var *)
-  do~ M.declare_var "B" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "B" [[ InfixOp.div ~(| 4, InfixOp.sub ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "lamda" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "lamda" [[ InfixOp.div ~(| InfixOp.sub ~(| M.var_access ~(| "in2", [Access.Array (1)] |), M.var_access ~(| "in1", [Access.Array (1)] |) |), InfixOp.sub ~(| M.var_access ~(| "in2", [Access.Array (0)] |), M.var_access ~(| "in1", [Access.Array (0)] |) |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var ~(| "lamda" |), InfixOp.sub ~(| M.var_access ~(| "in2", [Access.Array (0)] |), M.var_access ~(| "in1", [Access.Array (0)] |) |) |) ]]
-    [[ InfixOp.sub ~(| M.var_access ~(| "in2", [Access.Array (1)] |), M.var_access ~(| "in1", [Access.Array (1)] |) |) ]]
-  in
-  do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "B" |), M.var ~(| "lamda" |) |), M.var ~(| "lamda" |) |), M.var ~(| "A" |) |), M.var_access ~(| "in1", [Access.Array (0)] |) |), M.var_access ~(| "in2", [Access.Array (0)] |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "lamda" |), InfixOp.sub ~(| M.var_access ~(| "in1", [Access.Array (0)] |), M.var_access ~(| "out", [Access.Array (0)] |) |) |), M.var_access ~(| "in1", [Access.Array (1)] |) |) ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "in1" in
+    (* Signal Input *)
+    do~ M.declare_signal "in2" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "a" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "a" [] [[ 168700 ]] in
+    (* Var *)
+    do~ M.declare_var "d" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "d" [] [[ 168696 ]] in
+    (* Var *)
+    do~ M.declare_var "A" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "A" [] [[ InfixOp.div ~(| InfixOp.mul ~(| 2, InfixOp.add ~(| M.var (| "a" |), M.var (| "d" |) |) |), InfixOp.sub ~(| M.var (| "a" |), M.var (| "d" |) |) |) ]] in
+    (* Var *)
+    do~ M.declare_var "B" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "B" [] [[ InfixOp.div ~(| 4, InfixOp.sub ~(| M.var (| "a" |), M.var (| "d" |) |) |) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "lamda" in
+    do~ M.substitute_var "lamda" [] [[ InfixOp.div ~(| InfixOp.sub ~(| M.var_access (| "in2", [Access.Array (1)] |), M.var_access (| "in1", [Access.Array (1)] |) |), InfixOp.sub ~(| M.var_access (| "in2", [Access.Array (0)] |), M.var_access (| "in1", [Access.Array (0)] |) |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var (| "lamda" |), InfixOp.sub ~(| M.var_access (| "in2", [Access.Array (0)] |), M.var_access (| "in1", [Access.Array (0)] |) |) |) ]]
+      [[ InfixOp.sub ~(| M.var_access (| "in2", [Access.Array (1)] |), M.var_access (| "in1", [Access.Array (1)] |) |) ]]
+    in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "B" |), M.var (| "lamda" |) |), M.var (| "lamda" |) |), M.var (| "A" |) |), M.var_access (| "in1", [Access.Array (0)] |) |), M.var_access (| "in2", [Access.Array (0)] |) |) ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "lamda" |), InfixOp.sub ~(| M.var_access (| "in1", [Access.Array (0)] |), M.var_access (| "out", [Access.Array (0)] |) |) |), M.var_access (| "in1", [Access.Array (1)] |) |) ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition MontgomeryAdd_not_under_constrained in1 in2 : Prop :=
+  exists! out,
+  exists lamda,
+  let signals := MontgomeryAddSignals.Build_t in1 in2 out lamda in
+  True (* NotUnderConstrained MontgomeryAdd signals *).
 
 (* Template signals *)
 Module MontgomeryDoubleSignals.
   Record t : Set := {
+    (* Input *)
     in_ : list F.t;
+    (* Output *)
     out : list F.t;
+    (* Intermediate *)
     lamda : F.t;
+    (* Intermediate *)
     x1_2 : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | in_ : P _ in_ "in"
+    | out : P _ out "out"
+    | lamda : P _ lamda "lamda"
+    | x1_2 : P _ x1_2 "x1_2".
+  End IsNamed.
 End MontgomeryDoubleSignals.
 
 (* Template body *)
 Definition MontgomeryDouble : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "in" [[ [ 2 ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ 2 ] ]] in
-  (* Var *)
-  do~ M.declare_var "a" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "a" [[ 168700 ]] in
-  (* Var *)
-  do~ M.declare_var "d" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "d" [[ 168696 ]] in
-  (* Var *)
-  do~ M.declare_var "A" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "A" [[ InfixOp.div ~(| InfixOp.mul ~(| 2, InfixOp.add ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |), InfixOp.sub ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |) ]] in
-  (* Var *)
-  do~ M.declare_var "B" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "B" [[ InfixOp.div ~(| 4, InfixOp.sub ~(| M.var ~(| "a" |), M.var ~(| "d" |) |) |) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "lamda" [[ ([] : list F.t) ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "x1_2" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "x1_2" [[ InfixOp.mul ~(| M.var_access ~(| "in", [Access.Array (0)] |), M.var_access ~(| "in", [Access.Array (0)] |) |) ]] in
-  do~ M.substitute_var "lamda" [[ InfixOp.div ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| 3, M.var ~(| "x1_2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var ~(| "A" |) |), M.var_access ~(| "in", [Access.Array (0)] |) |) |), 1 |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var ~(| "B" |) |), M.var_access ~(| "in", [Access.Array (1)] |) |) |) ]] in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| M.var ~(| "lamda" |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var ~(| "B" |) |), M.var_access ~(| "in", [Access.Array (1)] |) |) |) ]]
-    [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| 3, M.var ~(| "x1_2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var ~(| "A" |) |), M.var_access ~(| "in", [Access.Array (0)] |) |) |), 1 |) ]]
-  in
-  do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var ~(| "B" |), M.var ~(| "lamda" |) |), M.var ~(| "lamda" |) |), M.var ~(| "A" |) |), InfixOp.mul ~(| 2, M.var_access ~(| "in", [Access.Array (0)] |) |) |) ]] in
-  do~ M.substitute_var "out" [[ InfixOp.sub ~(| InfixOp.mul ~(| M.var ~(| "lamda" |), InfixOp.sub ~(| M.var_access ~(| "in", [Access.Array (0)] |), M.var_access ~(| "out", [Access.Array (0)] |) |) |), M.var_access ~(| "in", [Access.Array (1)] |) |) ]] in
-  M.pure BlockUnit.Tt.
+  M.template_body [] (
+    (* Signal Input *)
+    do~ M.declare_signal "in" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "a" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "a" [] [[ 168700 ]] in
+    (* Var *)
+    do~ M.declare_var "d" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "d" [] [[ 168696 ]] in
+    (* Var *)
+    do~ M.declare_var "A" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "A" [] [[ InfixOp.div ~(| InfixOp.mul ~(| 2, InfixOp.add ~(| M.var (| "a" |), M.var (| "d" |) |) |), InfixOp.sub ~(| M.var (| "a" |), M.var (| "d" |) |) |) ]] in
+    (* Var *)
+    do~ M.declare_var "B" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "B" [] [[ InfixOp.div ~(| 4, InfixOp.sub ~(| M.var (| "a" |), M.var (| "d" |) |) |) ]] in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "lamda" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "x1_2" in
+    do~ M.substitute_var "x1_2" [] [[ InfixOp.mul ~(| M.var_access (| "in", [Access.Array (0)] |), M.var_access (| "in", [Access.Array (0)] |) |) ]] in
+    do~ M.substitute_var "lamda" [] [[ InfixOp.div ~(| InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| 3, M.var (| "x1_2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "A" |) |), M.var_access (| "in", [Access.Array (0)] |) |) |), 1 |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "B" |) |), M.var_access (| "in", [Access.Array (1)] |) |) |) ]] in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| M.var (| "lamda" |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "B" |) |), M.var_access (| "in", [Access.Array (1)] |) |) |) ]]
+      [[ InfixOp.add ~(| InfixOp.add ~(| InfixOp.mul ~(| 3, M.var (| "x1_2" |) |), InfixOp.mul ~(| InfixOp.mul ~(| 2, M.var (| "A" |) |), M.var_access (| "in", [Access.Array (0)] |) |) |), 1 |) ]]
+    in
+    do~ M.substitute_var "out" [Access.Array (0)] [[ InfixOp.sub ~(| InfixOp.sub ~(| InfixOp.mul ~(| InfixOp.mul ~(| M.var (| "B" |), M.var (| "lamda" |) |), M.var (| "lamda" |) |), M.var (| "A" |) |), InfixOp.mul ~(| 2, M.var_access (| "in", [Access.Array (0)] |) |) |) ]] in
+    do~ M.substitute_var "out" [Access.Array (1)] [[ InfixOp.sub ~(| InfixOp.mul ~(| M.var (| "lamda" |), InfixOp.sub ~(| M.var_access (| "in", [Access.Array (0)] |), M.var_access (| "out", [Access.Array (0)] |) |) |), M.var_access (| "in", [Access.Array (1)] |) |) ]] in
+    M.pure BlockUnit.Tt
+  ).
+
+(* Template not under-constrained *)
+Definition MontgomeryDouble_not_under_constrained in_ : Prop :=
+  exists! out,
+  exists lamda x1_2,
+  let signals := MontgomeryDoubleSignals.Build_t in_ out lamda x1_2 in
+  True (* NotUnderConstrained MontgomeryDouble signals *).

@@ -4,59 +4,95 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module MultiMux1Signals.
   Record t : Set := {
+    (* Input *)
     c : list (list F.t);
+    (* Input *)
     s : F.t;
+    (* Output *)
     out : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | c : P _ c "c"
+    | s : P _ s "s"
+    | out : P _ out "out".
+  End IsNamed.
 End MultiMux1Signals.
 
 (* Template body *)
 Definition MultiMux1 (n : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ M.var ~(| "n" |); 2 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "s" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ [ M.var ~(| "n" |) ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "n" |) |) ]] (
-    do~ M.substitute_var "out" [[ InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| M.var_access ~(| "c", [Access.Array (M.var ~(| "i" |)); Access.Array (1)] |), M.var_access ~(| "c", [Access.Array (M.var ~(| "i" |)); Access.Array (0)] |) |), M.var ~(| "s" |) |), M.var_access ~(| "c", [Access.Array (M.var ~(| "i" |)); Access.Array (0)] |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [("n", n)] (
+    (* Signal Input *)
+    do~ M.declare_signal "c" in
+    (* Signal Input *)
+    do~ M.declare_signal "s" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "n" |) |) ]] (
+      do~ M.substitute_var "out" [Access.Array (M.var (| "i" |))] [[ InfixOp.add ~(| InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (1)] |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |), M.var (| "s" |) |), M.var_access (| "c", [Access.Array (M.var (| "i" |)); Access.Array (0)] |) |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
     M.pure BlockUnit.Tt
-  ) in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition MultiMux1_not_under_constrained (n : F.t) c s : Prop :=
+  exists! out,
+  let signals := MultiMux1Signals.Build_t c s out in
+  True (* NotUnderConstrained MultiMux1 n signals *).
 
 (* Template signals *)
 Module Mux1Signals.
   Record t : Set := {
+    (* Input *)
     c : list F.t;
+    (* Input *)
     s : F.t;
+    (* Output *)
     out : F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | c : P _ c "c"
+    | s : P _ s "s"
+    | out : P _ out "out".
+  End IsNamed.
 End Mux1Signals.
 
 (* Template body *)
 Definition Mux1 : M.t (BlockUnit.t Empty_set) :=
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "c" [[ [ 2 ] ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "s" [[ ([] : list F.t) ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "out" [[ ([] : list F.t) ]] in
-  (* Component *)
-  do~ M.declare_component "mux" in
-  do~ M.substitute_var "mux" [[ M.call_function ~(| "MultiMux1", [ 1 ] |) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), 2 |) ]] (
-    do~ M.substitute_var "mux" [[ M.var_access ~(| "c", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [] (
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    (* Signal Input *)
+    do~ M.declare_signal "c" in
+    (* Signal Input *)
+    do~ M.declare_signal "s" in
+    (* Signal Output *)
+    do~ M.declare_signal "out" in
+    (* Component *)
+    do~ M.declare_component "mux" in
+    do~ M.substitute_var "mux" [] [[ M.call_function ~(| "MultiMux1", [ 1 ] |) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), 2 |) ]] (
+      do~ M.substitute_var "mux" [Access.Component "c"; Access.Array (0); Access.Array (M.var (| "i" |))] [[ M.var_access (| "c", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "mux" [Access.Component "s"] [[ M.var (| "s" |) ]] in
+    do~ M.substitute_var "out" [] [[ M.var_access (| "mux", [Access.Component "out"; Access.Array (0)] |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "mux" [[ M.var ~(| "s" |) ]] in
-  do~ M.substitute_var "out" [[ M.var_access ~(| "mux", [Access.Component "out"; Access.Array (0)] |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition Mux1_not_under_constrained c s : Prop :=
+  exists! out,
+  let signals := Mux1Signals.Build_t c s out in
+  True (* NotUnderConstrained Mux1 signals *).

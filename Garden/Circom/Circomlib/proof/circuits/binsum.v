@@ -3,30 +3,10 @@ Require Circom.Circomlib.translation.circuits.binsum.
 
 Import Run.
 
-Lemma run_nbits (p : Z) :
-  {{ p , Scopes.empty ⏩ binsum.nbits 6 🔽 23 ⏩ Scopes.empty }}.
+Lemma run_nbits :
+  {{ SignalsNaming.unit, 97 , tt, Scopes.empty ⏩
+    binsum.nbits 6 🔽 3
+  ⏩ Scopes.empty, True, True }}.
 Proof.
-  unfold binsum.nbits.
-  unfold M.function_body; cbn.
-  eapply Run.Let. {
-    eapply Run.Let. {
-      apply Run.PrimitiveDeclareVar.
-      apply Run.Pure.
-    }
-    eapply Run.Let. {
-      apply Run.PrimitiveSubstituteVar.
-      apply Run.Pure.
-    }
-    eapply Run.Let. {
-      apply Run.PrimitiveDeclareVar.
-      apply Run.Pure.
-    }
-    eapply Run.Let. {
-      apply Run.PrimitiveSubstituteVar.
-      apply Run.Pure.
-    }
-    cbn.
-    eapply Run.Let. {
-      eapply Run.LoopNext. {
-        eapply Run.Let. {
-Admitted.
+  run_deterministic.
+Qed.

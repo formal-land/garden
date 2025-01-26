@@ -4,47 +4,68 @@ Require Import Garden.Garden.
 (* Template signals *)
 Module SMTLevInsSignals.
   Record t : Set := {
+    (* Input *)
     enabled : F.t;
+    (* Input *)
     siblings : list F.t;
+    (* Output *)
     levIns : list F.t;
+    (* Intermediate *)
     done : list F.t;
   }.
+
+  Module IsNamed.
+    Inductive P : forall (A : Set), (t -> A) -> string -> Prop :=
+    | enabled : P _ enabled "enabled"
+    | siblings : P _ siblings "siblings"
+    | levIns : P _ levIns "levIns"
+    | done : P _ done "done".
+  End IsNamed.
 End SMTLevInsSignals.
 
 (* Template body *)
 Definition SMTLevIns (nLevels : F.t) : M.t (BlockUnit.t Empty_set) :=
-  (* Signal Input *)
-  do~ M.declare_signal "enabled" [[ ([] : list F.t) ]] in
-  (* Signal Input *)
-  do~ M.declare_signal "siblings" [[ [ M.var ~(| "nLevels" |) ] ]] in
-  (* Signal Output *)
-  do~ M.declare_signal "levIns" [[ [ M.var ~(| "nLevels" |) ] ]] in
-  (* Signal Intermediate *)
-  do~ M.declare_signal "done" [[ [ InfixOp.sub ~(| M.var ~(| "nLevels" |), 1 |) ] ]] in
-  (* Var *)
-  do~ M.declare_var "i" [[ ([] : list F.t) ]] in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  (* Component *)
-  do~ M.declare_component "isZero" in
-  do~ M.substitute_var "i" [[ 0 ]] in
-  do~ M.while [[ InfixOp.lesser ~(| M.var ~(| "i" |), M.var ~(| "nLevels" |) |) ]] (
-    do~ M.substitute_var "isZero" [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
-    do~ M.substitute_var "isZero" [[ M.var_access ~(| "siblings", [Access.Array (M.var ~(| "i" |))] |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.add ~(| M.var ~(| "i" |), 1 |) ]] in
+  M.template_body [("nLevels", nLevels)] (
+    (* Signal Input *)
+    do~ M.declare_signal "enabled" in
+    (* Signal Input *)
+    do~ M.declare_signal "siblings" in
+    (* Signal Output *)
+    do~ M.declare_signal "levIns" in
+    (* Signal Intermediate *)
+    do~ M.declare_signal "done" in
+    (* Var *)
+    do~ M.declare_var "i" [[ ([] : list F.t) ]] in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    (* Component *)
+    do~ M.declare_component "isZero" in
+    do~ M.substitute_var "i" [] [[ 0 ]] in
+    do~ M.while [[ InfixOp.lesser ~(| M.var (| "i" |), M.var (| "nLevels" |) |) ]] (
+      do~ M.substitute_var "isZero" [Access.Array (M.var (| "i" |))] [[ M.call_function ~(| "IsZero", ([] : list F.t) |) ]] in
+      do~ M.substitute_var "isZero" [Access.Array (M.var (| "i" |)); Access.Component "in"] [[ M.var_access (| "siblings", [Access.Array (M.var (| "i" |))] |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.add ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.equality_constraint
+      [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access (| "isZero", [Access.Array (InfixOp.sub ~(| M.var (| "nLevels" |), 1 |)); Access.Component "out"] |), 1 |), M.var (| "enabled" |) |) ]]
+      [[ 0 ]]
+    in
+    do~ M.substitute_var "levIns" [Access.Array (InfixOp.sub ~(| M.var (| "nLevels" |), 1 |))] [[ InfixOp.sub ~(| 1, M.var_access (| "isZero", [Access.Array (InfixOp.sub ~(| M.var (| "nLevels" |), 2 |)); Access.Component "out"] |) |) ]] in
+    do~ M.substitute_var "done" [Access.Array (InfixOp.sub ~(| M.var (| "nLevels" |), 2 |))] [[ M.var_access (| "levIns", [Access.Array (InfixOp.sub ~(| M.var (| "nLevels" |), 1 |))] |) ]] in
+    do~ M.substitute_var "i" [] [[ InfixOp.sub ~(| M.var (| "nLevels" |), 2 |) ]] in
+    do~ M.while [[ InfixOp.greater ~(| M.var (| "i" |), 0 |) ]] (
+      do~ M.substitute_var "levIns" [Access.Array (M.var (| "i" |))] [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var_access (| "done", [Access.Array (M.var (| "i" |))] |) |), InfixOp.sub ~(| 1, M.var_access (| "isZero", [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |)); Access.Component "out"] |) |) |) ]] in
+      do~ M.substitute_var "done" [Access.Array (InfixOp.sub ~(| M.var (| "i" |), 1 |))] [[ InfixOp.add ~(| M.var_access (| "levIns", [Access.Array (M.var (| "i" |))] |), M.var_access (| "done", [Access.Array (M.var (| "i" |))] |) |) ]] in
+      do~ M.substitute_var "i" [] [[ InfixOp.sub ~(| M.var (| "i" |), 1 |) ]] in
+      M.pure BlockUnit.Tt
+    ) in
+    do~ M.substitute_var "levIns" [Access.Array (0)] [[ InfixOp.sub ~(| 1, M.var_access (| "done", [Access.Array (0)] |) |) ]] in
     M.pure BlockUnit.Tt
-  ) in
-  do~ M.equality_constraint
-    [[ InfixOp.mul ~(| InfixOp.sub ~(| M.var_access ~(| "isZero", [Access.Array (InfixOp.sub ~(| M.var ~(| "nLevels" |), 1 |)); Access.Component "out"] |), 1 |), M.var ~(| "enabled" |) |) ]]
-    [[ 0 ]]
-  in
-  do~ M.substitute_var "levIns" [[ InfixOp.sub ~(| 1, M.var_access ~(| "isZero", [Access.Array (InfixOp.sub ~(| M.var ~(| "nLevels" |), 2 |)); Access.Component "out"] |) |) ]] in
-  do~ M.substitute_var "done" [[ M.var_access ~(| "levIns", [Access.Array (InfixOp.sub ~(| M.var ~(| "nLevels" |), 1 |))] |) ]] in
-  do~ M.substitute_var "i" [[ InfixOp.sub ~(| M.var ~(| "nLevels" |), 2 |) ]] in
-  do~ M.while [[ InfixOp.greater ~(| M.var ~(| "i" |), 0 |) ]] (
-    do~ M.substitute_var "levIns" [[ InfixOp.mul ~(| InfixOp.sub ~(| 1, M.var_access ~(| "done", [Access.Array (M.var ~(| "i" |))] |) |), InfixOp.sub ~(| 1, M.var_access ~(| "isZero", [Access.Array (InfixOp.sub ~(| M.var ~(| "i" |), 1 |)); Access.Component "out"] |) |) |) ]] in
-    do~ M.substitute_var "done" [[ InfixOp.add ~(| M.var_access ~(| "levIns", [Access.Array (M.var ~(| "i" |))] |), M.var_access ~(| "done", [Access.Array (M.var ~(| "i" |))] |) |) ]] in
-    do~ M.substitute_var "i" [[ InfixOp.sub ~(| M.var ~(| "i" |), 1 |) ]] in
-    M.pure BlockUnit.Tt
-  ) in
-  do~ M.substitute_var "levIns" [[ InfixOp.sub ~(| 1, M.var_access ~(| "done", [Access.Array (0)] |) |) ]] in
-  M.pure BlockUnit.Tt.
+  ).
+
+(* Template not under-constrained *)
+Definition SMTLevIns_not_under_constrained (nLevels : F.t) enabled siblings : Prop :=
+  exists! levIns,
+  exists done,
+  let signals := SMTLevInsSignals.Build_t enabled siblings levIns done in
+  True (* NotUnderConstrained SMTLevIns nLevels signals *).
