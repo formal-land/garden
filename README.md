@@ -1,6 +1,6 @@
 # Garden
 
-> A friendly framework to formally verify zero-knowledge systems
+> A friendly framework to formally verify zero-knowledge systems 🍀
 
 <p align="center">
   <img src="garden.svg" alt="logo" width="256" />
