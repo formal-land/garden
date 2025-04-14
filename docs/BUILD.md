@@ -99,3 +99,4 @@ You should use version 2.2.3.
 opam pin add vscoq-language-server.2.2.3 https://github.com/rocq-prover/vscoq/releases/download/v2.2.3/vscoq-language-server-2.2.3.tar.gz
 ```
 
+Install the language LSP server and `ocamlformat` as needed.
