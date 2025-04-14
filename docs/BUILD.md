@@ -91,3 +91,11 @@ cd Garden
 make
 cd ..
 ```
+
+## If Using VSCoq
+
+You should use version 2.2.3.
+```sh
+opam pin add vscoq-language-server.2.2.3 https://github.com/rocq-prover/vscoq/releases/download/v2.2.3/vscoq-language-server-2.2.3.tar.gz
+```
+
