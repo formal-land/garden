@@ -250,6 +250,20 @@ Definition cube (x : Z) : M.t Z :=
   )).
 Opaque cube.
 
+Ltac show_equality_modulo :=
+  repeat (
+    (
+      (
+        apply Zplus_eqm ||
+        apply Zmult_eqm ||
+        apply Zopp_eqm
+      );
+      unfold eqm
+    ) ||
+    rewrite Zmod_eqm ||
+    reflexivity
+  ).
+
 Lemma cube_correct (p : Z) (x : Z) :
   IsPrime p ->
   {{ M.eval p (cube x) 🔽 (x * x * x) mod p, True }}.
@@ -261,8 +275,7 @@ Proof.
     eapply Run.Replace. {
       apply Run.Pure.
     }
-    (* This property should be handled automatically by some field reasoning tactic. *)
-    admit.
+    show_equality_modulo.
   }
   tauto.
-Admitted.
+Qed.
