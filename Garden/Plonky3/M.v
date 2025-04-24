@@ -124,6 +124,9 @@ Module M.
   Definition equal (x y : Z) : t unit :=
     Equal x y.
 
+  Definition call {A : Set} (e : t A) : t A :=
+    Call e.
+
   Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
     match e, k with
     | Pure x, k => k x
@@ -163,6 +166,9 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
+  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
+    {{ e 🔽 value, P }} ->
+    {{ M.Call e 🔽 value, P }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     {{ k value 🔽 output, P2 }} ->
@@ -185,6 +191,7 @@ Definition zero_or_one (x : Z) : M.t unit :=
     M.mul (| x, x |)
   )) in
   M.equal x square_x.
+Opaque zero_or_one.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
 Parameter IsPrime : Z -> Prop.
@@ -194,7 +201,8 @@ Lemma zero_or_one_correct (p : Z) (x : Z) :
   {{ M.eval p (zero_or_one x) 🔽 tt, x = 0 \/ x = 1 }}.
 Proof.
   intros.
-  unfold zero_or_one; cbn.
+  with_strategy transparent [zero_or_one] unfold zero_or_one.
+  cbn.
   eapply Run.Equiv. {
     apply Run.Equal.
   }
@@ -207,15 +215,17 @@ Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
   match l with
   | [] => M.Pure tt
   | x :: l' =>
-    let* _ := zero_or_one x in
+    let* _ := M.call (zero_or_one x) in
     all_zero_or_one l'
   end.
+Opaque all_zero_or_one.
 
 Lemma all_zero_or_one_correct (p : Z) (l : list Z) :
   IsPrime p ->
   {{ M.eval p (all_zero_or_one l) 🔽 tt, List.Forall (fun x => x = 0 \/ x = 1) l }}.
 Proof.
   intros.
+  with_strategy transparent [all_zero_or_one] unfold all_zero_or_one.
   induction l; cbn.
   { eapply Run.Equiv. {
       apply Run.Pure.
@@ -224,6 +234,7 @@ Proof.
   }
   { eapply Run.Equiv. {
       eapply Run.Let. {
+        apply Run.Call.
         now apply zero_or_one_correct.
       }
       apply IHl.
@@ -237,13 +248,15 @@ Definition cube (x : Z) : M.t Z :=
   ltac:(M.expr (
     M.mul (|M.mul (| x, x |), x |)
   )).
+Opaque cube.
 
 Lemma cube_correct (p : Z) (x : Z) :
   IsPrime p ->
   {{ M.eval p (cube x) 🔽 (x * x * x) mod p, True }}.
 Proof.
   intros.
-  unfold cube; cbn.
+  with_strategy transparent [cube] unfold cube.
+  cbn.
   eapply Run.Equiv. {
     eapply Run.Replace. {
       apply Run.Pure.
