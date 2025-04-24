@@ -21,31 +21,26 @@ Global Open Scope bool_scope.
 Export List.ListNotations.
 
 Module UnOp.
-  Inductive t (F : Set) : Set -> Set -> Set :=
-  | Opp : t F F F
+  Inductive t : Set -> Set -> Set :=
+  | Opp : t Z Z
   .
-  Arguments Opp {_}.
 
-  Definition eval (p : Z) {A B : Set} (op : t Z A B) : A -> B :=
-    match op in t _ A B return A -> B with
+  Definition eval (p : Z) {A B : Set} (op : t A B) : A -> B :=
+    match op in t A B return A -> B with
     | Opp => fun x => (-x) mod p
     end.
 End UnOp.
 
 Module BinOp.
-  Inductive t (F : Set) : Set -> Set -> Set -> Set :=
-  | Add : t F F F F
-  | Sub : t F F F F
-  | Mul : t F F F F
-  | Div : t F F F F
+  Inductive t : Set -> Set -> Set -> Set :=
+  | Add : t Z Z Z
+  | Sub : t Z Z Z
+  | Mul : t Z Z Z
+  | Div : t Z Z Z
   .
-  Arguments Add {_}.
-  Arguments Sub {_}.
-  Arguments Mul {_}.
-  Arguments Div {_}.
 
-  Definition eval (p : Z) {A B C : Set} (op : t Z A B C) : A -> B -> C :=
-    match op in t _ A B C return A -> B -> C with
+  Definition eval (p : Z) {A B C : Set} (op : t A B C) : A -> B -> C :=
+    match op in t A B C return A -> B -> C with
     | Add => fun x y => (x + y) mod p
     | Sub => fun x y => (x - y) mod p
     | Mul => fun x y => (x * y) mod p
@@ -55,21 +50,19 @@ End BinOp.
 
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
-  Inductive t (F : Set) : Set -> Set :=
-  | Pure {A : Set} (value : A) : t F A
-  | UnOp {A B : Set} (op : UnOp.t F A B) (x : A) : t F B
-  | BinOp {A B C : Set} (op : BinOp.t F A B C) (x1 : A) (x2 : B) : t F C
-  | Equal (x1 x2 : F) : t F unit
-  | Let {A B : Set} (e : t F A) (k : A -> t F B) : t F B
+  Inductive t : Set -> Set :=
+  | Pure {A : Set} (value : A) : t A
+  | UnOp {A B : Set} (op : UnOp.t A B) (x : A) : t B
+  | BinOp {A B C : Set} (op : BinOp.t A B C) (x1 : A) (x2 : B) : t C
+  | Equal (x1 x2 : Z) : t unit
+  (** This constructor does nothing, but helps to delimit what is inside the current the current
+      function and what is being called, to better compose reasoning. *)
+  | Call {A : Set} (e : t A) : t A
+  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
-  Arguments Pure {_ _}.
-  Arguments UnOp {_ _ _}.
-  Arguments BinOp {_ _ _ _}.
-  Arguments Equal {_}.
-  Arguments Let {_ _ _}.
 
   (** This is a marker that we remove with the following tactic. *)
-  Axiom run : forall {F A : Set}, t F A -> A.
+  Axiom run : forall {A : Set}, t A -> A.
 
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
@@ -108,28 +101,45 @@ Module M.
       end
     | _ =>
       lazymatch type of e with
-      | t _ _ => exact e
+      | t _ => exact e
       | _ => exact (Pure e)
       end
     end.
 
-  Definition opp {F : Set} (x : F) : t F F :=
+  Definition opp (x : Z) : t Z :=
     UnOp UnOp.Opp x.
 
-  Definition add {F : Set} (x y : F) : t F F :=
+  Definition add (x y : Z) : t Z :=
     BinOp BinOp.Add x y.
 
-  Definition sub {F : Set} (x y : F) : t F F :=
+  Definition sub (x y : Z) : t Z :=
     BinOp BinOp.Sub x y.
 
-  Definition mul {F : Set} (x y : F) : t F F :=
+  Definition mul (x y : Z) : t Z :=
     BinOp BinOp.Mul x y.
 
-  Definition div {F : Set} (x y : F) : t F F :=
+  Definition div (x y : Z) : t Z :=
     BinOp BinOp.Div x y.
 
-  Definition equal {F : Set} (x y : F) : t F unit :=
+  Definition equal (x y : Z) : t unit :=
     Equal x y.
+
+  Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
+    match e, k with
+    | Pure x, k => k x
+    | e, k => Let e k
+    end.
+
+  (** Evaluate only the primitive operations and keep everything else. *)
+  Fixpoint eval (p : Z) {A : Set} (e : t A) : t A :=
+    match e in t A return t A with
+    | Pure x => Pure x
+    | UnOp op x => Pure (UnOp.eval p op x)
+    | BinOp op x y => Pure (BinOp.eval p op x y)
+    | Equal x y => Equal x y
+    | Call e => Call (eval p e)
+    | Let e k => collapsing_let (eval p e) (fun x => eval p (k x))
+    end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
@@ -146,35 +156,31 @@ Notation "e (||)" :=
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
-  Reserved Notation "{{ p , e 🔽 output , P }}".
+  Reserved Notation "{{ e 🔽 output , P }}".
 
-  Inductive t (p : Z) : forall {A : Set}, M.t Z A -> A -> Prop -> Prop :=
+  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
-    {{ p, M.Pure value 🔽 value, True }}
-  | UnOp {A B : Set} (op : UnOp.t Z A B) (x : A) :
-    {{ p, M.UnOp op x 🔽 UnOp.eval p op x, True }}
-  | BinOp {A B C : Set} (op : BinOp.t Z A B C) (x1 : A) (x2 : B) :
-    {{ p, M.BinOp op x1 x2 🔽 BinOp.eval p op x1 x2, True }}
+    {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
-    {{ p, M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | Let {A B : Set} (e : M.t Z A) (k : A -> M.t Z B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ p, e 🔽 value, P1 }} ->
-    {{ p, k value 🔽 output, P2 }} ->
-    {{ p, M.Let e k 🔽 output, P1 /\ P2 }}
-  | Equiv {A : Set} (e : M.t Z A) (value : A) (P1 P2 : Prop) :
-    {{ p, e 🔽 value, P1 }} ->
+    {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    {{ k value 🔽 output, P2 }} ->
+    {{ M.Let e k 🔽 output, P1 /\ P2 }}
+  | Equiv {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
     (P1 <-> P2) ->
-    {{ p, e 🔽 value, P2 }}
-  | Replace {A : Set} (e : M.t Z A) (value1 value2 : A) (P : Prop) :
-    {{ p, e 🔽 value1, P }} ->
+    {{ e 🔽 value, P2 }}
+  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+    {{ e 🔽 value1, P }} ->
     value1 = value2 ->
-    {{ p, e 🔽 value2, P }}
-  where "{{ p , e 🔽 output , P }}" := (t p e output P).
+    {{ e 🔽 value2, P }}
+  where "{{ e 🔽 output , P }}" := (t e output P).
 End Run.
 Export Run.
 
 (** Here we see the use of the monadic notations defined above. *)
-Definition zero_or_one {F : Set} (x : F) : M.t F unit :=
+Definition zero_or_one (x : Z) : M.t unit :=
   let* square_x := ltac:(M.expr (
     M.mul (| x, x |)
   )) in
@@ -185,23 +191,19 @@ Parameter IsPrime : Z -> Prop.
 
 Lemma zero_or_one_correct (p : Z) (x : Z) :
   IsPrime p ->
-  {{ p, zero_or_one x 🔽 tt, x = 0 \/ x = 1 }}.
+  {{ M.eval p (zero_or_one x) 🔽 tt, x = 0 \/ x = 1 }}.
 Proof.
   intros.
-  unfold zero_or_one.
+  unfold zero_or_one; cbn.
   eapply Run.Equiv. {
-    eapply Run.Let. {
-      apply Run.BinOp.
-    }
     apply Run.Equal.
   }
-  cbn.
   (* This property should be handled automatically by some field reasoning tactic. *)
   admit.
 Admitted.
 
 (** A function with an arbitrary number of constraints. *)
-Fixpoint all_zero_or_one {F : Set} (l : list F) : M.t F unit :=
+Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
   match l with
   | [] => M.Pure tt
   | x :: l' =>
@@ -211,7 +213,7 @@ Fixpoint all_zero_or_one {F : Set} (l : list F) : M.t F unit :=
 
 Lemma all_zero_or_one_correct (p : Z) (l : list Z) :
   IsPrime p ->
-  {{ p, all_zero_or_one l 🔽 tt, List.Forall (fun x => x = 0 \/ x = 1) l }}.
+  {{ M.eval p (all_zero_or_one l) 🔽 tt, List.Forall (fun x => x = 0 \/ x = 1) l }}.
 Proof.
   intros.
   induction l; cbn.
@@ -231,25 +233,21 @@ Proof.
 Qed.
 
 (** One more example to show the use of the monadic notations without naming intermediate results. *)
-Definition cube {F : Set} (x : F) : M.t F F :=
+Definition cube (x : Z) : M.t Z :=
   ltac:(M.expr (
     M.mul (|M.mul (| x, x |), x |)
   )).
 
 Lemma cube_correct (p : Z) (x : Z) :
   IsPrime p ->
-  {{ p, cube x 🔽 (x * x * x) mod p, True }}.
+  {{ M.eval p (cube x) 🔽 (x * x * x) mod p, True }}.
 Proof.
   intros.
-  unfold cube.
+  unfold cube; cbn.
   eapply Run.Equiv. {
     eapply Run.Replace. {
-      eapply Run.Let. {
-        apply Run.BinOp.
-      }
-      apply Run.BinOp.
+      apply Run.Pure.
     }
-    cbn.
     (* This property should be handled automatically by some field reasoning tactic. *)
     admit.
   }
