@@ -26,8 +26,9 @@ With [Garden](https://github.com/formal-land/garden), we are building a friendly
 
 ## Support
 
-We are first targeting the two following circuit formats:
+We are first targeting the following circuit formats:
 
+- [Plonky3](https://github.com/Plonky3/Plonky3)
 - [Circom](https://github.com/iden3/circom)
 - Mina-like Rust circuits like in [keccak/interpreter.rs](https://github.com/o1-labs/proof-systems/blob/master/o1vm/src/interpreters/keccak/interpreter.rs)
 
