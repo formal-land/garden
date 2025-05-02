@@ -5,8 +5,6 @@ Require Export AirStructure.
 Open Scope Z_scope.
 
 
-
-
 Module Blake3AIR (F : PrimeField).
 
   Module AIRInstance := AirStructure.AIR(F).
@@ -71,34 +69,36 @@ Module Blake3AIR (F : PrimeField).
     end.
 
   (* Implementation of add3 as per the Rust signature *)
-  Definition add3 (builder : AirBuilder) (a : list Var) (b : list Var) (c : list Expr) (d : Expr) : AirBuilder :=
-    match a, b, c with
-    | [a0; a1], [b0; b1], [c0; c1] =>
+  Definition add3 (builder : AirBuilder) (a : list Var) (b : list Var) (c : list Expr) (d : list Expr) : AirBuilder :=
+    match a, b, c, d with
+    | [a0; a1], [b0; b1], [c0; c1], [d0; d1] =>
       (* Similar to add2, but with three addends *)
       let two_16 := Const (F.of_Z (2^16)) in
-      let two_32 := Mul two_16 two_16 in
+      let two_32 := Const (F.of_Z (2^32)) in
+      let double_two_16 := Const (F.of_Z (2^17)) in
+      let double_two_32 := Const (F.of_Z (2^33)) in
       
-      (* Calculate acc_16 = a[0] - b[0] - c[0] - d (assuming d affects only low limb) *)
-      let acc_16 := Sub (FromVariable a0) (Add (Add (FromVariable b0) c0) d) in
+      (* Calculate acc_16 = a[0] - b[0] - c[0] - d[0] (assuming d affects only low limb) *)
+      let acc_16 := Sub (FromVariable a0) (Add (Add (FromVariable b0) c0) d0) in
       
-      (* Calculate acc_32 = a[1] - b[1] - c[1] (no carry handling yet) *)
-      let acc_32 := Sub (FromVariable a1) (Add (FromVariable b1) c1) in
+      (* Calculate acc_32 = a[1] - b[1] - c[1] - d[1] *)
+      let acc_32 := Sub (FromVariable a1) (Add (Add (FromVariable b1) c1) d1) in
       
       (* Calculate acc = acc_16 + acc_32 * 2^16 *)
       let shifted_acc_32 := Mul acc_32 two_16 in
       let acc := Add acc_16 shifted_acc_32 in
       
-      (* Assert acc * (acc + 2^32) = 0 *)
-      let constraint1 := Mul acc (Add acc two_32) in
+      (* Assert acc * (acc + 2^32) * (acc + 2 * 2^32) = 0 *)
+      let constraint1 := Mul (Mul acc (Add acc two_32)) (Add acc double_two_32) in
       
-      (* Assert acc_16 * (acc_16 + 2^16) = 0 *)
-      let constraint2 := Mul acc_16 (Add acc_16 two_16) in
+      (* Assert acc_16 * (acc_16 + 2^16) * (acc_16 + 2 * 2^16) = 0 *)
+      let constraint2 := Mul (Mul acc_16 (Add acc_16 two_16)) (Add acc_16 double_two_16) in
       
       (* Add both constraints to the builder *)
       let builder := assert_eq builder constraint1 (Const F.zero) in
       let builder := assert_eq builder constraint2 (Const F.zero) in
       
       builder
-    | _, _, _ => builder (* Invalid input *)
+    | _, _, _, _ => builder (* Invalid input *)
     end.
 End Blake3AIR.
