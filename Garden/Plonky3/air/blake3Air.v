@@ -1,4 +1,4 @@
-Require Export ZArith.
+Require Export Coq.ZArith.ZArith.
 Require Export List.
 Import ListNotations.
 Require Export AirStructure.
@@ -101,4 +101,14 @@ Module Blake3AIR (F : PrimeField).
       builder
     | _, _, _, _ => builder (* Invalid input *)
     end.
+
+  Definition xor_32_shift (builder : AirBuilder) (a b c : list Var) (shift : nat) : AirBuilder :=
+    match a, length b, length c with
+    | [a0; a1], 32%nat, 32%nat =>
+        let builder := fold_left (fun builder' var => assert_bool builder' (FromVariable var)) c builder in
+
+      builder
+    | _, _, _ => builder (* Invalid input - should have exactly 2 limbs each *)
+    end.
+
 End Blake3AIR.
