@@ -11,7 +11,7 @@ Module AIR (F : PrimeField).
     | NextVar : nat -> Var.  
   
   Inductive Expr :=
-    | Const : F.F -> Expr
+    | Const : Z -> Expr
     | FromVariable : Var -> Expr
     | Add : Expr -> Expr -> Expr
     | Mul : Expr -> Expr -> Expr

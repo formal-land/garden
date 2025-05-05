@@ -16,16 +16,16 @@ Module Blake3AIR (F : PrimeField).
   Definition U32_LIMBS := 2.
 
   (* IV constants for Blake3 *)
-  Definition IV : list (list F.F) :=
+  Definition IV : list (list Z) :=
     [
-      [F.of_Z 0xE667; F.of_Z 0x6A09];
-      [F.of_Z 0xAE85; F.of_Z 0xBB67];
-      [F.of_Z 0xF372; F.of_Z 0x3C6E];
-      [F.of_Z 0xF53A; F.of_Z 0xA54F];
-      [F.of_Z 0x527F; F.of_Z 0x510E];
-      [F.of_Z 0x688C; F.of_Z 0x9B05];
-      [F.of_Z 0xD9AB; F.of_Z 0x1F83];
-      [F.of_Z 0xCD19; F.of_Z 0x5BE0]
+      [0xE667; 0x6A09];
+      [0xAE85; 0xBB67];
+      [0xF372; 0x3C6E];
+      [0xF53A; 0xA54F];
+      [0x527F; 0x510E];
+      [0x688C; 0x9B05];
+      [0xD9AB; 0x1F83];
+      [0xCD19; 0x5BE0]
     ].
 
   
@@ -35,8 +35,8 @@ Module Blake3AIR (F : PrimeField).
     match a, b, c with
     | [a0; a1], [b0; b1], [c0; c1] =>
       (* By assumption p > 2^17 so 1 << 16 will be less than p *)
-      let two_16 := Const (F.of_Z (2^16)) in
-      let two_32 := Const (F.of_Z (2^32)) in
+      let two_16 := Const (2^16) in
+      let two_32 := Const (2^32) in
 
       (* conversion from variable to expression *)
       let a0 := FromVariable a0 in
@@ -73,10 +73,10 @@ Module Blake3AIR (F : PrimeField).
     match a, b, c, d with
     | [a0; a1], [b0; b1], [c0; c1], [d0; d1] =>
       (* Similar to add2, but with three addends *)
-      let two_16 := Const (F.of_Z (2^16)) in
-      let two_32 := Const (F.of_Z (2^32)) in
-      let double_two_16 := Const (F.of_Z (2^17)) in
-      let double_two_32 := Const (F.of_Z (2^33)) in
+      let two_16 := Const (2^16) in
+      let two_32 := Const (2^32) in
+      let double_two_16 := Const (2^17) in
+      let double_two_32 := Const (2^33) in
       
       (* Calculate acc_16 = a[0] - b[0] - c[0] - d[0] (assuming d affects only low limb) *)
       let acc_16 := Sub (FromVariable a0) (Add (Add (FromVariable b0) c0) d0) in

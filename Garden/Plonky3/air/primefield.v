@@ -6,25 +6,36 @@ Open Scope Z_scope.
 
 
 Module Type PrimeField.
-  Parameter F : Type.
+  (* unused abstraction: Parameter F : Type. *)
   Parameter p : Z.  (* The prime characteristic *)
 
+  (* 
+    later we need an assertion here that all operations are
+    within the prime field with characteristic p,
+    so all elements are in the range [0, p-1].
+  *)
+
   (* field operations *)
-  Parameter zero : F.
-  Parameter one : F.
-  Parameter add : F -> F -> F.
-  Parameter sub : F -> F -> F.
-  Parameter neg : F -> F.
-  Parameter mul : F -> F -> F.
-  Parameter inv : F -> F.
-  Parameter div : F -> F -> F.
+  Parameter zero : Z.
+  Parameter one : Z.
+  Parameter add : Z -> Z -> Z.
+  Parameter sub : Z -> Z -> Z.
+  Parameter neg : Z -> Z.
+  Parameter mul : Z -> Z -> Z.
+  Parameter inv : Z -> Z.
+  Parameter div : Z -> Z -> Z.
 
   (* integer conversions *)
+  (*
+  These two are used as placeholders now 
+  because we temporarily use Z as the field type instead of F as abstraction.
+  =======
   Parameter of_Z : Z -> F.
   Parameter to_Z : F -> Z.
-  Parameter of_nat : nat -> F.
-  Parameter to_nat : F -> nat.
-  Parameter of_bool : bool -> F.
+  *)
+  Parameter of_nat : nat -> Z.
+  Parameter to_nat : Z -> nat.
+  Parameter of_bool : bool -> Z.
 
   (* Field properties *)
   Parameter p_prime : IsPrime p.
@@ -45,79 +56,68 @@ Module Type PrimeField.
   (* Distributivity *)
   Axiom distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   
-  (* Field element equality *)
-  Axiom to_Z_range : forall a, 0 <= to_Z a < p.
-  Axiom of_Z_to_Z : forall a, of_Z (to_Z a) = a.
-  Axiom to_Z_of_Z : forall n, 0 <= n < p -> to_Z (of_Z n) = n.
-  
   (* Boolean to field conversion *)
   Axiom of_bool_true : of_bool true = one.
   Axiom of_bool_false : of_bool false = zero.    
+
 End PrimeField.
 
-(* An implementation: Mersenne prime p = 2^31 - 1 *)
+(* An implementation: Mersenne prime p = 2^31 - 1.
+  The computations here are done primitively, especially the implementation of inverse.
+  Later we could replace the implementations with mathcomp.
+ *)
 Module Mersenne31 <: PrimeField.
-  Definition p := 2^31 - 1.
+  Definition p : Z := 2147483647.  (* 2^31 - 1 *)
+
+  (* Modulo utility for all prime fields. *)
+  Definition mod_p (x : Z) : Z := Z.modulo x p.
+
+  (* Proof that the field is in the range [0, p-1] *)
+  (* This is a placeholder, we will need to prove this later. *)
+  (* We can use Z.modulo to ensure the result is in the range. *)
+  (* The proof obligation is that all operations are within the prime field. *)
   
-  (* We'll represent field elements as Z values in the range [0, p-1] *)
-  Definition F := {x : Z | 0 <= x < p}.
-
-
+  (* Proof obligation: for all x, 0 <= x < p *)
   Lemma mod_p_in_range : forall x, 0 <= Z.modulo x p < p.
   Proof.
   Admitted.
   
-  (* Field operations *)
-  Definition zero : F := exist _ 0 (mod_p_in_range 0). 
-  Definition one : F := exist _ 1 (mod_p_in_range 1). 
-
-  Definition mod_p (x : Z) : Z := Z.modulo x p.
+  (* Field operations, for now use pure integer zero and one,
+  as we are dealing with prime fields. *)
+  Definition zero : Z := 0.
+  Definition one : Z := 1.
   
-  Definition add (a b : F) : F := 
-    match a, b with
-    | exist _ va _, exist _ vb _ => 
-      exist _ (mod_p (va + vb)) (mod_p_in_range (va + vb))
-    end.
+  Definition add (a b : Z) : Z := 
+    mod_p (a + b).
   
-  Definition mul (a b : F) : F :=
-    match a, b with
-    | exist _ va _, exist _ vb _ => 
-      exist _ (mod_p (va * vb)) (mod_p_in_range (va * vb))
-    end.
+  Definition mul (a b : Z) : Z :=
+    mod_p (a * b).
     
-  Definition neg (a : F) : F :=
-    match a with
-    | exist _ va _ =>
-      if Z.eqb va 0 then zero
-      else exist _ (mod_p (-va)) (mod_p_in_range (-va))
-    end.
+  Definition neg (a : Z) : Z :=
+    mod_p (p - a).
     
-  Definition sub (a b : F) : F :=
-    match a, b with
-    | exist _ va _, exist _ vb _ => 
-      exist _ (mod_p (va - vb)) (mod_p_in_range (va - vb))
-    end.
+  Definition sub (a b : Z) : Z :=
+    mod_p (a + p - b).
     
-  Definition inv (a : F) : F :=
-    match a with
-    | exist _ va _ =>
-      if Z.eqb va 0 then zero
-      (* Just a placeholder, we can compute later with either mathcomp or a ^ (p-2). *)
-      else exist _ 1 (mod_p_in_range 1) 
-    end.
+  Definition inv (a : Z) : Z := mod_p (a ^ (p - 2)).
+  
+  (* Division is defined as multiplication by the inverse *)
+  (* This is a placeholder, we will need to prove this later. *)
+  (* The proof obligation is that all operations are within the prime field. *)
     
-  Definition div (a b : F) : F := mul a (inv b).
+    
+  Definition div (a b : Z) : Z := mul a (inv b).
   
   (* Conversion functions *)
-  Definition of_Z (z : Z) : F := exist _ (mod_p z) (mod_p_in_range z).  (* Proof obligation *)
+  (* Definition of_Z (z : Z) : F := exist _ (mod_p z) (mod_p_in_range z).  (* Proof obligation *)
   Definition to_Z (a : F) : Z := 
     match a with
     | exist _ va _ => va
-    end.
+    end. *)
   
-  Definition of_nat (n : nat) : F := of_Z (Z.of_nat n).
-  Definition to_nat (a : F) : nat := Z.to_nat (to_Z a).
-  Definition of_bool (b : bool) : F := if b then one else zero.
+  Definition of_nat (n : nat) : Z := Z.of_nat n.
+  Definition to_nat (a : Z) : nat := Z.to_nat a.
+  Definition of_bool (b : bool) : Z := if b then one else zero.
 
   Axiom p_prime : IsPrime p.
   Axiom add_comm : forall a b, add a b = add b a.
@@ -133,11 +133,6 @@ Module Mersenne31 <: PrimeField.
   Axiom mul_inv : forall a, a <> zero -> mul a (inv a) = one.
   Axiom distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
 
-
-  (* Field element equality *)
-  Axiom to_Z_range : forall a, 0 <= to_Z a < p.
-  Axiom of_Z_to_Z : forall a, of_Z (to_Z a) = a.
-  Axiom to_Z_of_Z : forall n, 0 <= n < p -> to_Z (of_Z n) = n.
   
   (* Boolean to field conversion *)
   Axiom of_bool_true : of_bool true = one.
