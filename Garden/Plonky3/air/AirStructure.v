@@ -54,6 +54,17 @@ Module AIR (F : PrimeField).
   
   Class AirConstraints := {
     base_air :: BaseAir;
-    eval : AirBuilder -> AirBuilder;  (* Evaluate AIR constraints *)
+    eval_air_builder : AirBuilder -> AirBuilder;  (* Evaluate AIR constraints *)
   }.
+
+  Class Circuits := {
+    air_constraints : AirConstraints;
+    (* the AIR module should only be instantiated with a prime field, 
+       so field characteristic is implicitly specified upon creation. 
+       Such integer parameter should be specified by accessing F.p.
+       *)
+    eval : Z -> Prop;
+  }.
+
+  
 End AIR.
