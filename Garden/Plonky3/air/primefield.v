@@ -17,8 +17,8 @@ Module Type PrimeField.
   Parameter sub : Z -> Z -> Z.
 
   (* inv and div only works for non-zeroes. *)
-  Parameter inv : Z -> Z.
-  Parameter div : Z -> Z -> Z.
+  Parameter inv : Z -> Prop -> Z.
+  Parameter div : Z -> Z -> Prop -> Z.
   
   (* integer & bool conversions *)
   Parameter of_nat : nat -> Z.
@@ -46,8 +46,8 @@ Module Type PrimeField.
   Axiom mul_zero : forall a, mul a zero = zero.
   Axiom add_neg : forall a, add a (neg a) = zero.
   Axiom sub_def : forall a b, sub a b = add a (neg b).
-  Axiom div_def : forall a b, div a b = mul a (inv b).
-  Axiom mul_inv : forall a, a <> zero -> mul a (inv a) = one.
+  Axiom div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
+  Axiom mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
   Axiom distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   Axiom of_bool_true : of_bool true = one.
   Axiom of_bool_false : of_bool false = zero.
@@ -71,8 +71,8 @@ Module MakePrimeField (P : PrimeParameter) <: PrimeField.
   Definition mul (a b : Z) : Z := mod_p (a * b).
   Definition neg (a : Z) : Z := mod_p (p - a).
   Definition sub (a b : Z) : Z := mod_p (a + p - b).
-  Definition inv (a : Z) : Z := mod_p (a ^ (p - 2)).
-  Definition div (a b : Z) : Z := mul a (inv b).
+  Definition inv (a : Z) (c : Prop) : Z := mod_p (a ^ (p - 2)).
+  Definition div (a b : Z) (c : Prop) : Z := mul a (inv b c).
   
   (* Integer conversions *)
   Definition of_nat (n : nat) : Z := Z.of_nat n.
@@ -121,10 +121,10 @@ Module MakePrimeField (P : PrimeParameter) <: PrimeField.
   Lemma sub_def : forall a b, sub a b = add a (neg b).
   Proof. Admitted.
   
-  Lemma div_def : forall a b, div a b = mul a (inv b).
+  Lemma div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
   Proof. Admitted.
   
-  Lemma mul_inv : forall a, a <> zero -> mul a (inv a) = one.
+  Lemma mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
   Proof. Admitted.
   
   Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
