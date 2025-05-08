@@ -1,4 +1,4 @@
-# Garden (experimental)
+# Garden
 
 > A friendly framework to formally verify zero-knowledge systems 🍀
 
