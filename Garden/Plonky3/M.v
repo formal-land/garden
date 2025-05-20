@@ -22,12 +22,14 @@ Export List.ListNotations.
 
 Module UnOp.
   Inductive t : Set -> Set -> Set :=
-  | Opp : t Z Z
+  | Opp    : t Z Z
+  | Double : t Z Z
   .
 
   Definition eval (p : Z) {A B : Set} (op : t A B) : A -> B :=
     match op in t A B return A -> B with
     | Opp => fun x => (-x) mod p
+    | Double => fun x => (x * 2) mod p
     end.
 End UnOp.
 
