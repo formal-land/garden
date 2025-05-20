@@ -12,15 +12,14 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
       local.flags,
   ];
   *)
-  let* initial_row_3 := [[ M.Pure ({| 
+  let initial_row_3 : Array.t (Array.t Z 32) 4 := {| 
     Array.value := [
       local.(Blake3Cols.counter_low);
       local.(Blake3Cols.counter_hi);
       local.(Blake3Cols.block_len);
       local.(Blake3Cols.flags)
       ] 
-    |} : Array.t (Array.t Z 32) 4) ]] in
-  
+    |} in
   (*
         local
           .inputs
@@ -32,31 +31,27 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
   *)
   (* Check that all bits in inputs are boolean *)
   let* _ := 
-    for_in_zero_to_n 16 (fun i =>
-      let* input_array := [[ Array.get (| local.(Blake3Cols.inputs), i |) ]] in
+    for_in local.(Blake3Cols.inputs).(Array.value) (fun input_array =>
       [[ assert_bools (| input_array |) ]]
     ) in
     
   (* Check that all bits in chaining_values[0] are boolean *)
   let* chaining_values_0 := [[ Array.get (| local.(Blake3Cols.chaining_values), 0 |) ]] in
-  let* _ := 
-    for_in_zero_to_n 4 (fun i =>
-      let* cv_array := [[ Array.get (| chaining_values_0, i |) ]] in
+  let* _ :=
+    for_in chaining_values_0.(Array.value) (fun cv_array =>
       [[ assert_bools (| cv_array |) ]]
-    ) in
+  ) in
     
   (* Check that all bits in chaining_values[1] are boolean *)
   let* chaining_values_1 := [[ Array.get (| local.(Blake3Cols.chaining_values), 1 |) ]] in
-  let* _ := 
-    for_in_zero_to_n 4 (fun i =>
-      let* cv_array := [[ Array.get (| chaining_values_1, i |) ]] in
+  let* _ :=
+    for_in chaining_values_1.(Array.value) (fun cv_array =>
       [[ assert_bools (| cv_array |) ]]
-    ) in
+  ) in
     
   (* Check that all bits in initial_row_3 are boolean *)
   let* _ := 
-    for_in_zero_to_n 4 (fun i =>
-      let* row_array := [[ Array.get (| initial_row_3, i |) ]] in
+    for_in initial_row_3.(Array.value) (fun row_array =>
       [[ assert_bools (| row_array |) ]]
     ) in
     
