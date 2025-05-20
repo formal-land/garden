@@ -3,6 +3,13 @@ Require Import Garden.Plonky3.Util.
 Require Import Garden.Plonky3.blake3.columns.
 Require Import Garden.Plonky3.blake3.constants.
 
+(* Verify a round of the Blake3 algorithm *)
+Definition verify_round 
+  (state_input : Blake3State.t Z) 
+  (round_data : FullRound.t Z) 
+  (m_vector : Array.t (Array.t Z 2) 16) : M.t unit :=
+  (* Placeholder for actual implementation *)
+  M.Pure tt.
 
 Definition eval (local : Blake3Cols.t Z) : M.t unit :=
   (*
@@ -148,6 +155,95 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
     Blake3State.row2 := local.(Blake3Cols.initial_row2);
     Blake3State.row3 := initial_row_3
   |} in
+
+  (* Now we can move to verifying that each of the seven rounds have been computed correctly. *)
+
+  (*
+  // Round 1:
+  self.verify_round(builder, &initial_state, &local.full_rounds[0], &m_values);
+  *)
+  let* full_round_0 := [[ Array.get (| local.(Blake3Cols.full_rounds), 0 |) ]] in
+  let* _ := [[ verify_round (| initial_state, full_round_0, m_values |) ]] in
+  (* 
+  // Permute the vector of m_values.
+  permute(&mut m_values);  
+  *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 2:
+    self.verify_round(
+        builder,
+        &local.full_rounds[0].state_output,
+        &local.full_rounds[1],
+        &m_values,
+    );  
+  *)
+  let* full_round_1 := [[ Array.get (| local.(Blake3Cols.full_rounds), 1 |) ]] in
+  let* _ := [[ verify_round (| full_round_0.(FullRound.state_output), full_round_1, m_values |) ]] in
+  (* permute(&mut m_values); *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 3:
+    self.verify_round(
+        builder,
+        &local.full_rounds[1].state_output,
+        &local.full_rounds[2],
+        &m_values,
+    );
+  *)
+  let* full_round_2 := [[ Array.get (| local.(Blake3Cols.full_rounds), 2 |) ]] in
+  let* _ := [[ verify_round (| full_round_1.(FullRound.state_output), full_round_2, m_values |) ]] in
+  (* permute(&mut m_values); *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 4:
+    self.verify_round(
+        builder,
+        &local.full_rounds[2].state_output,
+        &local.full_rounds[3],
+        &m_values,
+    );
+  *)
+  let* full_round_3 := [[ Array.get (| local.(Blake3Cols.full_rounds), 3 |) ]] in
+  let* _ := [[ verify_round (| full_round_2.(FullRound.state_output), full_round_3, m_values |) ]] in
+  (* permute(&mut m_values); *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 5:
+    self.verify_round(
+        builder,
+        &local.full_rounds[3].state_output,
+        &local.full_rounds[4],
+        &m_values,
+    );
+  *)
+  let* full_round_4 := [[ Array.get (| local.(Blake3Cols.full_rounds), 4 |) ]] in
+  let* _ := [[ verify_round (| full_round_3.(FullRound.state_output), full_round_4, m_values |) ]] in
+  (* permute(&mut m_values); *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 6:
+    self.verify_round(
+        builder,
+        &local.full_rounds[4].state_output,
+        &local.full_rounds[5],
+        &m_values,
+    );
+  *)
+  let* full_round_5 := [[ Array.get (| local.(Blake3Cols.full_rounds), 5 |) ]] in
+  let* _ := [[ verify_round (| full_round_4.(FullRound.state_output), full_round_5, m_values |) ]] in
+  (* permute(&mut m_values); *)
+  let* m_values := [[ permute (| m_values |) ]] in
+  (*
+    // Round 7:
+    self.verify_round(
+        builder,
+        &local.full_rounds[5].state_output,
+        &local.full_rounds[6],
+        &m_values,
+    );
+  *)
+  let* full_round_6 := [[ Array.get (| local.(Blake3Cols.full_rounds), 6 |) ]] in
+  let* _ := [[ verify_round (| full_round_5.(FullRound.state_output), full_round_6, m_values |) ]] in
   
   M.Pure tt.
-
