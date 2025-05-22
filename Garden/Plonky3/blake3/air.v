@@ -3,12 +3,241 @@ Require Import Garden.Plonky3.Util.
 Require Import Garden.Plonky3.blake3.columns.
 Require Import Garden.Plonky3.blake3.constants.
 
+Definition quarter_round_function (trace : QuarterRound.t Z Z) : M.t unit := M.Pure tt.
+
+(*
+    const fn full_round_to_column_quarter_round<'a, T: Copy, U>(
+        &self,
+        input: &'a Blake3State<T>,
+        round_data: &'a FullRound<T>,
+        m_vector: &'a [[U; 2]; 16],
+        index: usize,
+    ) -> QuarterRound<'a, T, U> {
+        QuarterRound {
+            a: &input.row0[index],
+            b: &input.row1[index],
+            c: &input.row2[index],
+            d: &input.row3[index],
+
+            m_two_i: &m_vector[2 * index],
+
+            a_prime: &round_data.state_prime.row0[index],
+            b_prime: &round_data.state_prime.row1[index],
+            c_prime: &round_data.state_prime.row2[index],
+            d_prime: &round_data.state_prime.row3[index],
+
+            m_two_i_plus_one: &m_vector[2 * index + 1],
+
+            a_output: &round_data.state_middle.row0[index],
+            b_output: &round_data.state_middle.row1[index],
+            c_output: &round_data.state_middle.row2[index],
+            d_output: &round_data.state_middle.row3[index],
+        }
+    }
+*)
+Definition full_round_to_column_quarter_round 
+  (input : Blake3State.t Z)
+  (round_data : FullRound.t Z)
+  (m_vector : Array.t (Array.t Z 2) 16)
+  (index : Z) : M.t (QuarterRound.t Z Z) :=
+  
+  (* Get the input state elements *)
+  let* a := [[ Array.get (| input.(Blake3State.row0), index |) ]] in
+  let* b := [[ Array.get (| input.(Blake3State.row1), index |) ]] in
+  let* c := [[ Array.get (| input.(Blake3State.row2), index |) ]] in
+  let* d := [[ Array.get (| input.(Blake3State.row3), index |) ]] in
+  
+  (* Get m_two_i = m_vector[2 * index] *)
+  let* m_two_i := [[ Array.get (| m_vector, 2 * index |) ]] in
+  
+  (* Get the state_prime elements *)
+  let* a_prime := [[ Array.get (| round_data.(FullRound.state_prime).(Blake3State.row0), index |) ]] in
+  let* b_prime := [[ Array.get (| round_data.(FullRound.state_prime).(Blake3State.row1), index |) ]] in
+  let* c_prime := [[ Array.get (| round_data.(FullRound.state_prime).(Blake3State.row2), index |) ]] in
+  let* d_prime := [[ Array.get (| round_data.(FullRound.state_prime).(Blake3State.row3), index |) ]] in
+  
+  (* Get m_two_i_plus_one = m_vector[2 * index + 1] *)
+  let* m_two_i_plus_one := [[ Array.get (| m_vector, 2 * index + 1 |) ]] in
+  
+  (* Get the state_middle elements (which are the outputs) *)
+  let* a_output := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row0), index |) ]] in
+  let* b_output := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row1), index |) ]] in
+  let* c_output := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row2), index |) ]] in
+  let* d_output := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row3), index |) ]] in
+  
+  (* Create and return the QuarterRound structure *)
+  M.Pure {|
+    QuarterRound.a := a;
+    QuarterRound.b := b;
+    QuarterRound.c := c;
+    QuarterRound.d := d;
+    QuarterRound.m_two_i := m_two_i;
+    QuarterRound.a_prime := a_prime;
+    QuarterRound.b_prime := b_prime;
+    QuarterRound.c_prime := c_prime;
+    QuarterRound.d_prime := d_prime;
+    QuarterRound.m_two_i_plus_one := m_two_i_plus_one;
+    QuarterRound.a_output := a_output;
+    QuarterRound.b_output := b_output;
+    QuarterRound.c_output := c_output;
+    QuarterRound.d_output := d_output;
+  |}.
+
+(*
+    const fn full_round_to_diagonal_quarter_round<'a, T: Copy, U>(
+        &self,
+        round_data: &'a FullRound<T>,
+        m_vector: &'a [[U; 2]; 16],
+        index: usize,
+    ) -> QuarterRound<'a, T, U> {
+        QuarterRound {
+            a: &round_data.state_middle.row0[index],
+            b: &round_data.state_middle.row1[(index + 1) % 4],
+            c: &round_data.state_middle.row2[(index + 2) % 4],
+            d: &round_data.state_middle.row3[(index + 3) % 4],
+
+            m_two_i: &m_vector[2 * index + 8],
+
+            a_prime: &round_data.state_middle_prime.row0[index],
+            b_prime: &round_data.state_middle_prime.row1[(index + 1) % 4],
+            c_prime: &round_data.state_middle_prime.row2[(index + 2) % 4],
+            d_prime: &round_data.state_middle_prime.row3[(index + 3) % 4],
+
+            m_two_i_plus_one: &m_vector[2 * index + 9],
+
+            a_output: &round_data.state_output.row0[index],
+            b_output: &round_data.state_output.row1[(index + 1) % 4],
+            c_output: &round_data.state_output.row2[(index + 2) % 4],
+            d_output: &round_data.state_output.row3[(index + 3) % 4],
+        }
+    }
+*)
+Definition full_round_to_diagonal_quarter_round 
+  (round_data : FullRound.t Z)
+  (m_vector : Array.t (Array.t Z 2) 16)
+  (index : Z) : M.t (QuarterRound.t Z Z) :=
+  
+  (* Get the state_middle elements *)
+  let* a := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row0), index |) ]] in
+  let* b := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row1), (index + 1) mod 4 |) ]] in
+  let* c := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row2), (index + 2) mod 4 |) ]] in
+  let* d := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row3), (index + 3) mod 4 |) ]] in
+  
+  (* Get m_two_i = m_vector[2 * index + 8] *)
+  let* m_two_i := [[ Array.get (| m_vector, 2 * index + 8 |) ]] in
+  
+  (* Get the state_middle_prime elements *)
+  let* a_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row0), index |) ]] in
+  let* b_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row1), (index + 1) mod 4 |) ]] in
+  let* c_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row2), (index + 2) mod 4 |) ]] in
+  let* d_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row3), (index + 3) mod 4 |) ]] in
+  
+  (* Get m_two_i_plus_one = m_vector[2 * index + 9] *)
+  let* m_two_i_plus_one := [[ Array.get (| m_vector, 2 * index + 9 |) ]] in
+  
+  (* Get the state_output elements *)
+  let* a_output := [[ Array.get (| round_data.(FullRound.state_output).(Blake3State.row0), index |) ]] in
+  
+  (* Get the state_middle elements *)
+  let* a := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row0), index |) ]] in
+  let* b := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row1), (index + 1) mod 4 |) ]] in
+  let* c := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row2), (index + 2) mod 4 |) ]] in
+  let* d := [[ Array.get (| round_data.(FullRound.state_middle).(Blake3State.row3), (index + 3) mod 4 |) ]] in
+  
+  (* Get m_two_i = m_vector[2 * index + 8] *)
+  let* m_two_i := [[ Array.get (| m_vector, 2 * index + 8 |) ]] in
+  
+  (* Get the state_middle_prime elements *)
+  let* a_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row0), index |) ]] in
+  let* b_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row1), (index + 1) mod 4 |) ]] in
+  let* c_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row2), (index + 2) mod 4 |) ]] in
+  let* d_prime := [[ Array.get (| round_data.(FullRound.state_middle_prime).(Blake3State.row3), (index + 3) mod 4 |) ]] in
+  
+  (* Get m_two_i_plus_one = m_vector[2 * index + 9] *)
+  let* m_two_i_plus_one := [[ Array.get (| m_vector, 2 * index + 9 |) ]] in
+  
+  (* Get the state_output elements *)
+  let* a_output := [[ Array.get (| round_data.(FullRound.state_output).(Blake3State.row0), index |) ]] in
+  let* b_output := [[ Array.get (| round_data.(FullRound.state_output).(Blake3State.row1), (index + 1) mod 4 |) ]] in
+  let* c_output := [[ Array.get (| round_data.(FullRound.state_output).(Blake3State.row2), (index + 2) mod 4 |) ]] in
+  let* d_output := [[ Array.get (| round_data.(FullRound.state_output).(Blake3State.row3), (index + 3) mod 4 |) ]] in
+  
+  (* Create and return the QuarterRound structure *)
+  M.Pure {|
+    QuarterRound.a := a;
+    QuarterRound.b := b;
+    QuarterRound.c := c;
+    QuarterRound.d := d;
+    QuarterRound.m_two_i := m_two_i;
+    QuarterRound.a_prime := a_prime;
+    QuarterRound.b_prime := b_prime;
+    QuarterRound.c_prime := c_prime;
+    QuarterRound.d_prime := d_prime;
+    QuarterRound.m_two_i_plus_one := m_two_i_plus_one;
+    QuarterRound.a_output := a_output;
+    QuarterRound.b_output := b_output;
+    QuarterRound.c_output := c_output;
+    QuarterRound.d_output := d_output;
+  |}.
+
 (* Verify a round of the Blake3 algorithm *)
 Definition verify_round 
-  (state_input : Blake3State.t Z) 
-  (round_data : FullRound.t Z) 
-  (m_vector : Array.t (Array.t Z 2) 16) : M.t unit :=
-  (* Placeholder for actual implementation *)
+    (state_input : Blake3State.t Z) 
+    (round_data : FullRound.t Z) 
+    (m_vector : Array.t (Array.t Z 2) 16) : M.t unit :=
+  (*
+  let trace_column_0 =
+      self.full_round_to_column_quarter_round(input, round_data, m_vector, 0);
+  self.quarter_round_function(builder, &trace_column_0);  
+  *)
+  let* trace_column_0 := [[ full_round_to_column_quarter_round (| state_input, round_data, m_vector, 0 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_column_0 |) ]] in
+  (*
+  let trace_column_1 =
+      self.full_round_to_column_quarter_round(input, round_data, m_vector, 1);
+  self.quarter_round_function(builder, &trace_column_1);  
+  *)
+  let* trace_column_1 := [[ full_round_to_column_quarter_round (| state_input, round_data, m_vector, 1 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_column_1 |) ]] in
+  (*
+  let trace_column_2 =
+      self.full_round_to_column_quarter_round(input, round_data, m_vector, 2);
+  self.quarter_round_function(builder, &trace_column_2);  
+  *)
+  let* trace_column_2 := [[ full_round_to_column_quarter_round (| state_input, round_data, m_vector, 2 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_column_2 |) ]] in
+  (*
+  let trace_column_3 =
+      self.full_round_to_column_quarter_round(input, round_data, m_vector, 3);
+  self.quarter_round_function(builder, &trace_column_3);  
+  *)
+  let* trace_column_3 := [[ full_round_to_column_quarter_round (| state_input, round_data, m_vector, 3 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_column_3 |) ]] in
+  (*
+  let trace_diagonal_0 = self.full_round_to_diagonal_quarter_round(round_data, m_vector, 0);
+  self.quarter_round_function(builder, &trace_diagonal_0);  
+  *)
+  let* trace_diagonal_0 := [[ full_round_to_diagonal_quarter_round (| round_data, m_vector, 0 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_diagonal_0 |) ]] in
+  (*
+  let trace_diagonal_1 = self.full_round_to_diagonal_quarter_round(round_data, m_vector, 1);
+  self.quarter_round_function(builder, &trace_diagonal_1);
+  *)
+  let* trace_diagonal_1 := [[ full_round_to_diagonal_quarter_round (| round_data, m_vector, 1 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_diagonal_1 |) ]] in
+  (*
+  let trace_diagonal_2 = self.full_round_to_diagonal_quarter_round(round_data, m_vector, 2);
+  self.quarter_round_function(builder, &trace_diagonal_2);  
+  *)
+  let* trace_diagonal_2 := [[ full_round_to_diagonal_quarter_round (| round_data, m_vector, 2 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_diagonal_2 |) ]] in
+  (*
+  let trace_diagonal_3 = self.full_round_to_diagonal_quarter_round(round_data, m_vector, 3);
+  self.quarter_round_function(builder, &trace_diagonal_3);  
+  *)
+  let* trace_diagonal_3 := [[ full_round_to_diagonal_quarter_round (| round_data, m_vector, 3 |) ]] in
+  let* _ := [[ quarter_round_function (| trace_diagonal_3 |) ]] in
+  (* end *)
   M.Pure tt.
 
 Definition eval (local : Blake3Cols.t Z) : M.t unit :=
