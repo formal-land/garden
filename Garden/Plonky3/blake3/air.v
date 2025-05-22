@@ -246,4 +246,164 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
   let* full_round_6 := [[ Array.get (| local.(Blake3Cols.full_rounds), 6 |) ]] in
   let* _ := [[ verify_round (| full_round_5.(FullRound.state_output), full_round_6, m_values |) ]] in
   
+  (*
+  local
+    .final_round_helpers
+    .iter()
+    .zip(local.full_rounds[6].state_output.row2)
+    .for_each(|(bits, word)| {
+        let low_16 = pack_bits_le(bits[..BITS_PER_LIMB].iter().copied());
+        let hi_16 = pack_bits_le(bits[BITS_PER_LIMB..].iter().copied());
+        builder.assert_eq(low_16, word[0]);
+        builder.assert_eq(hi_16, word[1]);
+    });
+  *)
+  let* _ := 
+    for_in_zero_to_n 4 (fun i =>
+      (* Get the bits array and the corresponding word *)
+      let* bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
+      let* word := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row2), i |) ]] in 
+      
+      (* Extract the first BITS_PER_LIMB bits and the remaining bits *)
+      let bits_low_list := List.firstn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
+      let bits_high_list := List.skipn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
+      
+      let* low_16 := [[ pack_bits_le (| bits_low_list |) ]] in
+      let* hi_16 := [[ pack_bits_le (| bits_high_list |) ]] in
+      
+      let* word_low := [[ Array.get (| word, 0 |) ]] in
+      let* word_high := [[ Array.get (| word, 1 |) ]] in
+      
+      let* _ := [[ M.equal (| low_16, word_low |) ]] in
+      let* _ := [[ M.equal (| hi_16, word_high |) ]] in
+      
+      M.Pure tt
+    ) in 
+  (*
+  local
+    .final_round_helpers
+    .iter()
+    .chain(local.outputs[0].iter())
+    .for_each(|bits| bits.iter().for_each(|&bit| builder.assert_bool(bit)));
+  *)
+  (* final_round_helpers *)
+  let* _ := 
+    for_in local.(Blake3Cols.final_round_helpers).(Array.value) (fun helper_array =>
+      [[ assert_bools (| helper_array |) ]]
+    ) in
+  (* outputs[0] *)
+  let* outputs_0 := [[ Array.get (| local.(Blake3Cols.outputs), 0 |) ]] in
+  let* _ := 
+    for_in outputs_0.(Array.value) (fun output_array =>
+      [[ assert_bools (| output_array |) ]]
+    ) in
+  
+  (*
+    // Finally we check the xor by xor'ing the output with final_round_helpers, packing the bits
+    // and comparing with the words in local.full_rounds[6].state_output.row0.
+
+    for (out_bits, left_words, right_bits) in izip!(
+        local.outputs[0],
+        local.full_rounds[6].state_output.row0,
+        local.final_round_helpers
+    ) {
+        xor_32_shift(builder, &left_words, &out_bits, &right_bits, 0)
+    }
+  *)
+  let* _ := 
+    for_in_zero_to_n 4 (fun i => 
+      let* out_bits := [[ Array.get (| outputs_0, i |) ]] in
+      let* left_words := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row0), i |) ]] in
+      let* right_bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
+      [[ xor_32_shift (| left_words, out_bits, right_bits, 0 |) ]]
+    )
+   in
+  (*
+  for (out_bits, left_bits, right_bits) in izip!(
+      local.outputs[1], // [[T; 32]; 4],
+      local.full_rounds[6].state_output.row1, // [[T; 32]; 4],
+      local.full_rounds[6].state_output.row3   // [[T; 32]; 4],
+  ) {
+      // then out_bits, left_bits, right_bits are all [T; 32]
+      for (out_bit, left_bit, right_bit) in izip!(out_bits, left_bits, right_bits) {
+          builder.assert_eq(out_bit, left_bit.into().xor(&right_bit.into()));
+      }
+  }
+  *)
+  let* outputs_1 := [[ Array.get (| local.(Blake3Cols.outputs), 1 |) ]] in
+  let* _ :=
+    for_in_zero_to_n 4 (fun i => 
+      let* out_bits := [[ Array.get (| outputs_1, i |) ]] in
+      let* left_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row1), i |) ]] in
+      let* right_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row3), i |) ]] in
+      let* _ := 
+        for_in_zero_to_n 32 (fun j =>
+          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
+          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
+          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
+          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          [[ M.equal (| out_bit, left_xor_right |) ]]
+        )
+      in
+      M.Pure tt
+    ) in
+  (*
+    for (out_bits, left_bits, right_bits) in izip!(
+        local.outputs[2],
+        local.chaining_values[0],
+        local.final_round_helpers
+    ) {
+        for (out_bit, left_bit, right_bit) in izip!(out_bits, left_bits, right_bits) {
+            builder.assert_eq(out_bit, left_bit.into().xor(&right_bit.into()));
+        }
+    }  
+  *)
+  let* outputs_2 := [[ Array.get (| local.(Blake3Cols.outputs), 2 |) ]] in
+  let* chaining_values_0 := [[ Array.get (| local.(Blake3Cols.chaining_values), 0 |) ]] in
+  let* _ :=
+    for_in_zero_to_n 4 (fun i => 
+      let* out_bits := [[ Array.get (| outputs_2, i |) ]] in
+      let* left_bits := [[ Array.get (| chaining_values_0, i |) ]] in
+      let* right_bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
+      let* _ := 
+        for_in_zero_to_n 32 (fun j =>
+          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
+          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
+          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
+          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          [[ M.equal (| out_bit, left_xor_right |) ]]
+        )
+      in
+      M.Pure tt
+    ) in
+  (*
+    for (out_bits, left_bits, right_bits) in izip!(
+        local.outputs[3],
+        local.chaining_values[1],
+        local.full_rounds[6].state_output.row3
+    ) {
+        for (out_bit, left_bit, right_bit) in izip!(out_bits, left_bits, right_bits) {
+            builder.assert_eq(out_bit, left_bit.into().xor(&right_bit.into()));
+        }
+    }  
+  *)
+  let* outputs_3 := [[ Array.get (| local.(Blake3Cols.outputs), 3 |) ]] in
+  let* chaining_values_1 := [[ Array.get (| local.(Blake3Cols.chaining_values), 1 |) ]] in
+  let* _ :=
+    for_in_zero_to_n 4 (fun i => 
+      let* out_bits := [[ Array.get (| outputs_3, i |) ]] in
+      let* left_bits := [[ Array.get (| chaining_values_1, i |) ]] in
+      let* right_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row3), i |) ]] in
+      let* _ := 
+        for_in_zero_to_n 32 (fun j =>
+          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
+          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
+          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
+          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          [[ M.equal (| out_bit, left_xor_right |) ]]
+        )
+      in
+      M.Pure tt
+    ) in
+  (* Check the export bit *)
   M.Pure tt.
