@@ -390,4 +390,5 @@ Fixpoint fold {Acc Element : Set} (acc : Acc) (l : list Element) (f : Acc -> Ele
     fold acc' l' f
   end.
 
+Parameter xor  : Z -> Z -> M.t Z.
 Parameter xor3 : Z -> Z -> Z -> M.t Z.
