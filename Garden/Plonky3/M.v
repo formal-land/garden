@@ -57,11 +57,11 @@ Module M.
   | UnOp {A B : Set} (op : UnOp.t A B) (x : A) : t B
   | BinOp {A B C : Set} (op : BinOp.t A B C) (x1 : A) (x2 : B) : t C
   | Equal (x1 x2 : Z) : t unit
-  | Unwrap {A : Set} (value : option A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
+  | Impossible {A : Set} (message : string) : t A
   .
 
   (** This is a marker that we remove with the following tactic. *)
@@ -146,9 +146,9 @@ Module M.
     | UnOp op x => Pure (UnOp.eval p op x)
     | BinOp op x y => Pure (BinOp.eval p op x y)
     | Equal x y => Equal x y
-    | Unwrap value => Unwrap value
     | Call e => Call (eval p e)
     | Let e k => collapsing_let (eval p e) (fun x => eval p (k x))
+    | Impossible message => Impossible message
     end.
 End M.
 
@@ -179,8 +179,6 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | Unwrap {A : Set} (value : A) :
-    {{ M.Unwrap (Some value) 🔽 value, True }}
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -313,7 +311,10 @@ Module Array.
   End Valid.
 
   Definition get {A : Set} {N : Z} (x : t A N) (index : Z) : M.t A :=
-    M.Unwrap (List.nth_error x.(value) (Z.to_nat index)).
+    match List.nth_error x.(value) (Z.to_nat index) with
+    | Some value => M.Pure value
+    | None => M.Impossible "Index out of bounds"
+    end.
 
   Definition slice_from {A : Set} {N : Z} (x : t A N) (start : Z) : t A (N - start) :=
     {| Array.value := List.skipn (Z.to_nat start) x.(value) |}.
@@ -329,7 +330,89 @@ Module Array.
       end in
     let* xs := aux (Z.to_nat N) in
     M.Pure {| Array.value := List.rev xs |}.
+
+  Definition from_fn_pure {A : Set} {N : Z} (f : Z -> A) : t A N :=
+    {| Array.value := List.map (fun n => f (Z.of_nat n)) (List.seq 0 (Z.to_nat N)) |}.
 End Array.
+
+Module Pair.
+  Record t {A B : Set} : Set := {
+    x : A;
+    xs : B;
+  }.
+  Arguments t : clear implicits.
+End Pair.
+
+Module WithDefault.
+  Class C (A : Set) : Set := {
+    default : A;
+  }.
+End WithDefault.
+
+Module ExplicitArray.
+  Fixpoint t_aux (A : Set) (length : nat) : Set :=
+    match length with
+    | O => unit
+    | S length' => Pair.t A (t_aux A length')
+    end.
+
+  Definition t (A : Set) (length : Z) : Set :=
+    t_aux A (Z.to_nat length).
+
+  Fixpoint get_aux {A : Set} `{WithDefault.C A} {length : nat}
+      (array : t_aux A length) (index : nat) :
+      A :=
+    match length, array, index with
+    | O, _, _ => WithDefault.default
+    | S length', {| Pair.x := x |}, O => x
+    | S length', {| Pair.xs := xs |}, S index' => get_aux xs index'
+    end.
+
+  Definition get {A : Set} `{WithDefault.C A} {length : Z}
+      (array : t A length) (index : Z) :
+      A :=
+    get_aux array (Z.to_nat index).
+
+  Fixpoint from_fn_aux {A : Set} {length : nat} (f : nat -> A) (index : nat) : t_aux A length :=
+    match length return t_aux A length with
+    | O => tt
+    | S length' =>
+      let x := f index in
+      let xs := from_fn_aux f (S index) in
+      {| Pair.x := x; Pair.xs := xs |}
+    end.
+
+  Definition from_fn {A : Set} {length : Z} (f : Z -> A) : t A length :=
+    from_fn_aux (fun n => f (Z.of_nat n)) O.
+
+  Fixpoint default_aux {A : Set} `{WithDefault.C A} (length : nat) :
+      t_aux A length :=
+    match length return t_aux A length with
+    | O => tt
+    | S length' => {| Pair.x := WithDefault.default; Pair.xs := default_aux length' |}
+    end.
+
+  Definition default {A : Set} `{WithDefault.C A} {length : Z} : t A length :=
+    default_aux (Z.to_nat length).
+
+  Fixpoint to_array_aux {A : Set} {length : nat} (array : t_aux A length) : list A :=
+    match length, array with
+    | O, _ => []
+    | S length', {| Pair.x := x; Pair.xs := xs |} => x :: to_array_aux xs
+    end.
+
+  Definition to_array {A : Set} {length : Z} (array : t A length) : Array.t A length :=
+    {| Array.value := to_array_aux array |}.
+End ExplicitArray.
+
+Global Instance Impl_WithDefault_for_Z : WithDefault.C Z := {
+  default := 0;
+}.
+
+Global Instance Impl_WithDefault_for_ExplicitArray (A : Set) `{WithDefault.C A} (length : Z) :
+    WithDefault.C (ExplicitArray.t A length) := {
+  default := ExplicitArray.default;
+}.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
@@ -393,3 +476,6 @@ Definition double (x : Z) : M.t Z :=
 
 Parameter xor  : Z -> Z -> M.t Z.
 Parameter xor3 : Z -> Z -> Z -> M.t Z.
+
+Definition double (x : Z) : M.t Z :=
+  [[ M.mul (| 2, x |) ]].
