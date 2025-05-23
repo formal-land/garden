@@ -3,7 +3,106 @@ Require Import Garden.Plonky3.Util.
 Require Import Garden.Plonky3.blake3.columns.
 Require Import Garden.Plonky3.blake3.constants.
 
-Definition quarter_round_function (trace : QuarterRound.t Z Z) : M.t unit := M.Pure tt.
+Definition quarter_round_function (trace : QuarterRound.t Z Z) : M.t unit := 
+  (*
+  let b_0_16 = pack_bits_le(trace.b[..BITS_PER_LIMB].iter().copied());
+  let b_16_32 = pack_bits_le(trace.b[BITS_PER_LIMB..].iter().copied());  
+  *)
+  (* Pack the first BITS_PER_LIMB bits of trace.b *)
+  let b_bits_low := List.firstn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.b).(Array.value) in
+  let* b_0_16 := [[ pack_bits_le (| b_bits_low |) ]] in
+  
+  (* Pack the remaining bits of trace.b *)
+  let b_bits_high := List.skipn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.b).(Array.value) in
+  let* b_16_32 := [[ pack_bits_le (| b_bits_high |) ]] in
+
+  (*
+  add3(
+      builder,
+      trace.a_prime,
+      trace.a,
+      &[b_0_16, b_16_32],
+      trace.m_two_i,
+  );  
+  *)
+  let trace_a_prime := trace.(QuarterRound.a_prime) in
+  let trace_a := trace.(QuarterRound.a) in
+  let trace_m_two_i := trace.(QuarterRound.m_two_i) in
+  let b_packed : Array.t Z 2 := {| Array.value := [b_0_16; b_16_32] |} in
+
+  let* _ := [[ add3 (|trace_a_prime , trace_a, b_packed, trace_m_two_i |) ]] in
+
+  (*
+    xor_32_shift(builder, trace.a_prime, trace.d, trace.d_prime, 16);  
+  *)
+  let trace_d := trace.(QuarterRound.d) in
+  let trace_d_prime := trace.(QuarterRound.d_prime) in
+  let* _ := [[ xor_32_shift (| trace_a_prime, trace_d, trace_d_prime, 16 |) ]] in
+
+  (*
+    let b_prime_0_16 = pack_bits_le(trace.b_prime[..BITS_PER_LIMB].iter().copied());
+    let b_prime_16_32 = pack_bits_le(trace.b_prime[BITS_PER_LIMB..].iter().copied());  
+  *)
+
+  let b_prime_bits_low := List.firstn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.b_prime).(Array.value) in
+  let* b_prime_0_16 := [[ pack_bits_le (| b_prime_bits_low |) ]] in
+  
+  let b_prime_bits_high := List.skipn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.b_prime).(Array.value) in
+  let* b_prime_16_32 := [[ pack_bits_le (| b_prime_bits_high |) ]] in  
+
+  (*
+    add3(
+        builder,
+        trace.a_output,
+        trace.a_prime,
+        &[b_prime_0_16, b_prime_16_32],
+        trace.m_two_i_plus_one,
+    );  
+  *)
+  let b_prime_packed : Array.t Z 2 := {| Array.value := [b_prime_0_16; b_prime_16_32] |} in
+  let trace_a_output := trace.(QuarterRound.a_output) in
+  let trace_a_prime := trace.(QuarterRound.a_prime) in
+  let trace_m_two_i_plus_one := trace.(QuarterRound.m_two_i_plus_one) in
+
+  let* _ := [[ add3 (|trace_a_output , trace_a_prime, b_prime_packed, trace_m_two_i_plus_one |) ]] in
+
+  (*
+  xor_32_shift(builder, trace.a_output, trace.d_prime, trace.d_output, 8);
+  *)
+  let trace_d_prime := trace.(QuarterRound.d_prime) in
+  let trace_d_output := trace.(QuarterRound.d_output) in
+  let* _ := [[ xor_32_shift (| trace_a_output, trace_d_prime, trace_d_output, 8 |) ]] in
+
+  (*
+    let d_output_0_16 = pack_bits_le(trace.d_output[..BITS_PER_LIMB].iter().copied());
+    let d_output_16_32 = pack_bits_le(trace.d_output[BITS_PER_LIMB..].iter().copied());  
+  *)
+  let d_output_bits_low := List.firstn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.d_output).(Array.value) in
+  let* d_output_0_16 := [[ pack_bits_le (| d_output_bits_low |) ]] in
+  let d_output_bits_high := List.skipn (Z.to_nat BITS_PER_LIMB) trace.(QuarterRound.d_output).(Array.value) in
+  let* d_output_16_32 := [[ pack_bits_le (| d_output_bits_high |) ]] in
+  let d_packed : Array.t Z 2 := {| Array.value := [d_output_0_16; d_output_16_32] |} in
+
+  (*
+    add2(
+        builder,
+        trace.c_output,
+        trace.c_prime,
+        &[d_output_0_16, d_output_16_32],
+        );  
+  *)
+  let trace_c_output := trace.(QuarterRound.c_output) in
+  let trace_c_prime := trace.(QuarterRound.c_prime) in
+  let* _ := [[ add2 (|trace_c_output , trace_c_prime, d_packed |) ]] in
+
+  (*
+  xor_32_shift(builder, trace.c_output, trace.b_prime, trace.b_output, 7);
+  *)
+  let trace_b_prime := trace.(QuarterRound.b_prime) in
+  let trace_b_output := trace.(QuarterRound.b_output) in
+  let* _ := [[ xor_32_shift (| trace_c_output, trace_b_prime, trace_b_output, 7 |) ]] in
+  (* end *)
+  M.Pure tt.
 
 (*
     const fn full_round_to_column_quarter_round<'a, T: Copy, U>(
@@ -634,5 +733,4 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
       in
       M.Pure tt
     ) in
-  (* Check the export bit *)
   M.Pure tt.
