@@ -23,7 +23,6 @@ Export List.ListNotations.
 Module UnOp.
   Inductive t : Set -> Set -> Set :=
   | Opp    : t Z Z
-  | Double : t Z Z
   .
 
   Definition eval (p : Z) {A B : Set} (op : t A B) : A -> B :=
@@ -390,5 +389,8 @@ Fixpoint fold {Acc Element : Set} (acc : Acc) (l : list Element) (f : Acc -> Ele
     fold acc' l' f
   end.
 
+Definition double (x : Z) : M.t Z :=
+  [[ M.mul (| 2, x |) ]].
+  
 Parameter xor  : Z -> Z -> M.t Z.
 Parameter xor3 : Z -> Z -> Z -> M.t Z.
