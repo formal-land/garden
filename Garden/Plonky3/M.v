@@ -28,7 +28,6 @@ Module UnOp.
   Definition eval (p : Z) {A B : Set} (op : t A B) : A -> B :=
     match op in t A B return A -> B with
     | Opp => fun x => (-x) mod p
-    | Double => fun x => (x * 2) mod p
     end.
 End UnOp.
 
@@ -391,6 +390,6 @@ Fixpoint fold {Acc Element : Set} (acc : Acc) (l : list Element) (f : Acc -> Ele
 
 Definition double (x : Z) : M.t Z :=
   [[ M.mul (| 2, x |) ]].
-  
+
 Parameter xor  : Z -> Z -> M.t Z.
 Parameter xor3 : Z -> Z -> Z -> M.t Z.
