@@ -237,10 +237,9 @@ Definition add3
   ]] in
   
   (* Assert both constraints equal zero *)
-  let* _ := [[ assert_zero (| constraint1 |) ]] in
-  let* _ := [[ assert_zero (| constraint2 |) ]] in
-  
-  M.Pure tt.
+  let constraints : Array.t Z 2 := {| Array.value := [ constraint1; constraint2 ] |} in
+
+  [[ assert_zeros (| constraints |) ]]. 
 
 
 
