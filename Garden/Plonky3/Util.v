@@ -300,4 +300,65 @@ Definition add2
     (b : Array.t Z 2) 
     (c : Array.t Z 2) 
     : M.t unit := 
-  M.Pure tt. (* Placeholder. *)
+  (*
+    let two_16 =
+      <AB::Expr as PrimeCharacteristicRing>::PrimeSubfield::from_canonical_checked(1 << 16)
+          .unwrap();
+    let two_32 = two_16.square();
+  *)
+  let two_16 := Z.pow 2 16 in  (* 2^16 *)
+  let two_32 := Z.pow 2 32 in  (* 2^32 *)
+  (* Might need some changes here as I believe we should use something specific to prime fields*)
+
+  (*
+    let acc_16 = a[0] - b[0] - c[0].clone();
+    let acc_32 = a[1] - b[1] - c[1].clone();
+  *)
+  let* acc_16 := [[
+    M.sub (|
+      M.sub (| Array.get (| a, 0 |), Array.get (| b, 0 |) |),
+      Array.get (| c, 0 |)
+    |)
+  ]] in
+  let* acc_32 := [[
+    M.sub (|
+      M.sub (| Array.get (| a, 1 |), Array.get (| b, 1 |) |),
+      Array.get (| c, 1 |)
+    |)
+  ]] in
+  (* let acc = acc_16.clone() + acc_32.mul_2exp_u64(16); *)
+  let* acc := [[
+    M.add (|
+      acc_16,
+      M.mul (| acc_32, two_16 |)
+    |)
+  ]] in
+
+  (*
+  builder.assert_zeros([
+    acc.clone() * (acc + AB::Expr::from_prime_subfield(two_32)),
+    acc_16.clone() * (acc_16 + AB::Expr::from_prime_subfield(two_16)),
+  ]);
+  *)
+  let* constraint1 := 
+    [[
+      M.mul (|
+        acc,
+        M.add (| acc, two_32 |)
+      |)
+    ]]
+  in
+  let* constraint2 :=
+    [[
+      M.mul (|
+        acc_16,
+        M.add (| acc_16, two_16 |)
+      |)
+    ]]
+  in
+  
+  let constraints : Array.t Z 2 := {| Array.value := [ constraint1; constraint2 ] |} in
+
+  [[ assert_zeros (| constraints |) ]]. 
+
+  
