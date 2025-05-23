@@ -69,7 +69,56 @@ Definition xor_32_shift
     (c : Array.t Z 32)     (* Second input array with 32 bits *)
     (shift : Z)            (* Shift amount *)
     : M.t unit := 
-  M.Pure tt. (* Placeholder. *)
+  (* 
+  // First we range check all elements of c.
+  builder.assert_bools( *c); 
+  *)
+  let* _ := [[ assert_bools (| c |) ]] in
+
+  (*
+    // Next we compute (b ^ (c << shift)) and pack the result into two 16-bit integers.
+    let xor_shift_c_0_16 = b[..16]
+        .iter()
+        .enumerate()
+        .map(|(i, elem)| ( *elem).into().xor(&c[(32 + i - shift) % 32].into()));  
+  *)
+  let* xor_shift_c_0_16 := [[
+    Array.from_fn (N := 16) (| fun i => 
+      let* elem := [[ Array.get (| b, i |) ]] in
+      let* c_elem := [[ Array.get (| c, (32 + i - shift) mod 32 |) ]] in
+      [[ M.xor (| elem, c_elem |) ]]
+    |)
+
+  ]] in
+  (* let sum_0_16: AB::Expr = pack_bits_le(xor_shift_c_0_16); *)
+  let* sum_0_16 := [[ pack_bits_le (| xor_shift_c_0_16.(Array.value) |) ]] in
+
+  (*
+    let xor_shift_c_16_32 = b[16..]
+        .iter()
+        .enumerate()
+        .map(|(i, elem)| ( *elem).into().xor(&c[(32 + (i + 16) - shift) % 32].into()));  
+  *)
+  let* xor_shift_c_16_32 := [[
+    Array.from_fn (N := 16) (| fun i => 
+      let* elem := [[ Array.get (| b, i + 16 |) ]] in
+      let* c_elem := [[ Array.get (| c, (32 + (i + 16) - shift) mod 32 |) ]] in
+      [[ M.xor (| elem, c_elem |) ]]
+    |)
+  ]] in
+  (* let sum_16_32: AB::Expr = pack_bits_le(xor_shift_c_16_32); *)
+  let* sum_16_32 := [[ pack_bits_le (| xor_shift_c_16_32.(Array.value) |) ]] in
+
+  (* As both b and c have been range checked to be boolean, all the (b ^ (c << shift))
+    are also boolean and so this final check additionally has the effect of range checking a[0], a[1]. *)
+  (* builder.assert_zeros([a[0] - sum_0_16, a[1] - sum_16_32]); *)
+  let* a0 := [[ Array.get (| a, 0 |) ]] in
+  let* a1 := [[ Array.get (| a, 1 |) ]] in
+  let differences : Array.t Z 2 := {| Array.value := [
+    M.sub (| a0, sum_0_16 |);
+    M.sub (| a1, sum_16_32 |)
+  ] |} in
+  [[ assert_zeros (| differences |) ]].
 
 (*
 #[inline]
@@ -192,3 +241,63 @@ Definition add3
   let* _ := [[ assert_zero (| constraint2 |) ]] in
   
   M.Pure tt.
+
+
+
+(*
+#[inline]
+pub fn add2<AB: AirBuilder>(
+    builder: &mut AB,
+    a: &[AB::Var; 2],
+    b: &[AB::Var; 2],
+    c: &[AB::Expr; 2],
+) {
+    // Define:
+    //  acc    = a - b - c (mod P)
+    //  acc_16 = a[0] - b[0] - c[0] (mod P)
+    //
+    // We perform 2 checks:
+    //
+    // (1) acc*(acc + 2^32) = 0.
+    // (2) acc_16*(acc_16 + 2^16) = 0.
+    //
+    // We give a short proof for why this lets us conclude that a = b + c mod 2^32:
+    //
+    // As all 16 bit limbs have been range checked, we know that a, b, c lie in [0, 2^32) and hence
+    // a = b + c mod 2^32 if and only if, over the integers, a - b - c = 0 or -2^32.
+    //
+    // Equation (1) verifies that either a - b - c = 0 mod P or a - b - c = -2^32 mod P.
+    //
+    // Field overflow cannot occur when computing acc_16 as our characteristic is larger than 2^17.
+    // Hence, equation (2) verifies that, over the integers, a[0] - b[0] - c[0] = 0 or -2^16.
+    // Either way we can immediately conclude that a - b - c = 0 mod 2^16.
+    //
+    // Now we can use the chinese remainder theorem to combine these results to conclude that
+    // either a - b - c = 0 mod 2^16 P or a - b - c = -2^32 mod 2^16 P.
+    //
+    // No overflow can occur mod 2^16 P as 2^16 P > 2^33 and a, b, c < 2^32. Hence we conclude that
+    // over the integers a - b - c = 0 or a - b - c = -2^32 which is equivalent to a = b + c mod 2^32.
+
+    // By assumption P > 2^17 so 1 << 16 will be less than P. We use the checked version just to be safe.
+    // The compiler should optimize it away.
+    let two_16 =
+        <AB::Expr as PrimeCharacteristicRing>::PrimeSubfield::from_canonical_checked(1 << 16)
+            .unwrap();
+    let two_32 = two_16.square();
+
+    let acc_16 = a[0] - b[0] - c[0].clone();
+    let acc_32 = a[1] - b[1] - c[1].clone();
+    let acc = acc_16.clone() + acc_32.mul_2exp_u64(16);
+
+    builder.assert_zeros([
+        acc.clone() * (acc + AB::Expr::from_prime_subfield(two_32)),
+        acc_16.clone() * (acc_16 + AB::Expr::from_prime_subfield(two_16)),
+    ]);
+}
+*)
+Definition add2
+    (a : Array.t Z 2)  
+    (b : Array.t Z 2) 
+    (c : Array.t Z 2) 
+    : M.t unit := 
+  M.Pure tt. (* Placeholder. *)
