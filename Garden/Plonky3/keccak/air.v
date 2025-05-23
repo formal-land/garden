@@ -1,10 +1,11 @@
-Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MLessEffects.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 Require Import Garden.Plonky3.keccak.round_flags.
 
 (* fn eval(&self, builder: &mut AB) *)
 Definition eval
+    {p} `{Prime p}
     (is_first_row is_first_step is_not_final_step is_transition : bool)
     (local next : KeccakCols.t) :
     M.t unit :=
@@ -24,9 +25,9 @@ Definition eval
   let final_step = local.step_flags[NUM_ROUNDS - 1];
   let not_final_step = AB::Expr::ONE - final_step;
   *)
-  let* first_step := [[ Array.get (| local.(KeccakCols.step_flags), 0 |) ]] in
-  let* final_step := [[ Array.get (| local.(KeccakCols.step_flags), NUM_ROUNDS - 1 |) ]] in
-  let* not_final_step := [[ M.sub (| 1, final_step |) ]] in
+  let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
+  let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+  let not_final_step := BinOp.sub 1 final_step in
 
   (*
   for y in 0..5 {
@@ -40,18 +41,16 @@ Definition eval
   }
   *)
   let* _ :=
-    for_in_zero_to_n 5 (fun y =>
-    for_in_zero_to_n 5 (fun x =>
-      when is_first_step [[
-        assert_zeros (N := U64_LIMBS) (|
-          Array.from_fn (| fun limb => [[
-            M.sub (|
-              Array.get (| Array.get (| Array.get (| local.(KeccakCols.preimage), y |), x |), limb |),
-              Array.get (| Array.get (| Array.get (| local.(KeccakCols.a), y |), x |), limb |)
-            |)
-          ]] |)
-        |)
-      ]]
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+      when is_first_step (
+        M.zeros (N := U64_LIMBS) {|
+          Array.get limb :=
+            BinOp.sub
+              (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
+              (Array.get (Array.get (Array.get local.(KeccakCols.a) y) x) limb)
+        |}
+      )
     )) in
 
   (*
@@ -67,31 +66,29 @@ Definition eval
   }
   *)
   let* _ :=
-    for_in_zero_to_n 5 (fun y =>
-    for_in_zero_to_n 5 (fun x =>
-      when (is_not_final_step && is_transition) [[
-        assert_zeros (N := U64_LIMBS) (|
-          Array.from_fn (| fun limb => [[
-            M.sub (|
-              Array.get (| Array.get (| Array.get (| local.(KeccakCols.preimage), y |), x |), limb |),
-              Array.get (| Array.get (| Array.get (| next.(KeccakCols.preimage), y |), x |), limb |)
-            |)
-          ]] |)
-        |)
-      ]]
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+      when (is_not_final_step && is_transition) (
+        M.zeros (N := U64_LIMBS) {|
+          Array.get limb :=
+            BinOp.sub
+              (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
+              (Array.get (Array.get (Array.get next.(KeccakCols.preimage) y) x) limb)
+        |}
+      )
     )) in
 
   (* builder.assert_bool(local.export); *)
-  let* _ := [[ assert_bool (| local.(KeccakCols.export) |) ]] in
+  let* _ := assert_bool local.(KeccakCols.export) in
 
   (*
   builder
     .when(not_final_step.clone())
     .assert_zero(local.export);
   *)
-  let* _ := when is_not_final_step [[
-    assert_zero (| local.(KeccakCols.export) |)
-  ]] in
+  let* _ := when is_not_final_step (
+    assert_zero local.(KeccakCols.export)
+  ) in
 
   (*
   for x in 0..5 {
@@ -106,28 +103,20 @@ Definition eval
   }
   *)
   let* _ :=
-    for_in_zero_to_n 5 (fun x =>
-      let* _ := [[ assert_bools (| Array.get (| local.(KeccakCols.c), x |) |) ]] in
-      let* _ := [[
-        assert_zeros (|
-          Array.from_fn (N := 64) (| fun z =>
-            let* xor := [[
-              xor3 (|
-                Array.get (| Array.get (| local.(KeccakCols.c), x |), z |),
-                Array.get (| Array.get (| local.(KeccakCols.c), (x + 4) mod 5 |), z |),
-                Array.get (| Array.get (| local.(KeccakCols.c), (x + 1) mod 5 |), (z + 63) mod 64 |)
-              |)
-            ]] in
-            [[
-              M.sub (|
-                Array.get (| Array.get (| local.(KeccakCols.c_prime), x |), z |),
-                xor
-              |)
-            ]]
-          |)
-        |)
-      ]] in
-      M.Pure tt
+    M.for_in_zero_to_n 5 (fun x =>
+      let* _ := assert_bools (local.(KeccakCols.c).(Array.get) x) in
+      M.zeros (N := 64) {|
+        Array.get z :=
+          let xor :=
+            xor3
+              ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
+              ((local.(KeccakCols.c).(Array.get) ((x + 4) mod 5)).(Array.get) z)
+              ((local.(KeccakCols.c).(Array.get) ((x + 1) mod 5)).(Array.get) ((z + 63) mod 64))
+          in
+          BinOp.sub
+            ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z)
+            xor
+      |}
     ) in
 
   (*
@@ -156,50 +145,30 @@ Definition eval
   }
   *)
   let* _ :=
-    for_in_zero_to_n 5 (fun y =>
-    for_in_zero_to_n 5 (fun x =>
-      let get_bit (z : Z) : M.t Z := [[
-        xor3 (|
-          Array.get (| Array.get (| Array.get (| local.(KeccakCols.a_prime), y |), x |), z |),
-          Array.get (| Array.get (| local.(KeccakCols.c), x |), z |),
-          Array.get (| Array.get (| local.(KeccakCols.c_prime), x |), z |)
-        |)
-      ]] in
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+      let get_bit (z : Z) : Z :=
+        xor3
+          (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z)
+          ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
+          ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z)
+      in
 
-      let* _ := [[
-        assert_bools (| Array.get (| Array.get (| local.(KeccakCols.a_prime), y |), x |) |)
-      ]] in
+      let* _ := assert_bools ((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x) in
 
-      [[
-        assert_zeros (N := U64_LIMBS) (|
-          Array.from_fn (| fun limb =>
-            let* computed_limb :=
-              let l : list Z :=
-                List.rev (List.map
-                  (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
-                  (List.seq 0 (Z.to_nat BITS_PER_LIMB))
-                ) in
-              [[
-                fold (|
-                  0,
-                  l,
-                  fun acc z => [[
-                    M.add (|
-                      M.mul (| 2, acc |),
-                      get_bit (| z |)
-                    |)
-                  ]]
-                |)
-              ]] in
-            [[
-              M.sub (|
-                computed_limb,
-                Array.get (| Array.get (| Array.get (| local.(KeccakCols.a), y |), x |), limb |)
-              |)
-            ]]
-          |)
-        |)
-      ]]
+      M.zeros (N := U64_LIMBS) {|
+        Array.get limb :=
+          let computed_limb : Z :=
+            let l : list Z :=
+              List.rev (List.map
+                (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
+                (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+              ) in
+            List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
+          BinOp.sub
+            computed_limb
+            (((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb)
+      |}
     )) in
 
   (*
@@ -213,40 +182,166 @@ Definition eval
   }
   *)
   let* _ :=
-    for_in_zero_to_n 5 (fun x =>
+    M.for_in_zero_to_n 5 (fun x =>
       let four : Z := 4 in
-      [[
-        assert_zeros (N := 64) (|
-          Array.from_fn (| fun z =>
-            let* sum := [[
-              fold (|
-                0,
-                List.map Z.of_nat (List.seq 0 5),
-                fun acc y => [[
-                  M.add (|
-                    acc,
-                    Array.get (| Array.get (| Array.get (| local.(KeccakCols.a_prime), y |), x |), z |)
-                  |)
-                ]]
-              |)
-            ]] in
-            let* diff := [[
-              M.sub (|
-                sum,
-                Array.get (| Array.get (| local.(KeccakCols.c_prime), x |), z |)
-              |)
-            ]] in
-            [[
-              M.mul (|
-                M.mul (| diff, M.sub (| diff, 2 |) |),
-                M.sub (| diff, four |)
-              |)
-            ]]
-          |)
-        |)
-      ]]
-    ) in
+      M.zeros (N := 64) {|
+        Array.get z :=
+          let sum : Z :=
+            List.fold_left (fun acc y =>
+              BinOp.add acc
+                (Array.get (Array.get (Array.get local.(KeccakCols.a_prime) y) x) z)
+            )
+            (List.map Z.of_nat (List.seq 0 5)) 0 in
+          let diff := BinOp.sub sum (Array.get (Array.get local.(KeccakCols.c_prime) x) z) in
+          BinOp.mul diff (BinOp.mul (BinOp.sub diff 2) (BinOp.sub diff four))
+        |}
+      ) in
 
-  (* TODO: complete the rest of the function *)
+  (*
+  for y in 0..5 {
+      for x in 0..5 {
+          let get_bit = |z| {
+              let andn = local
+                  .b((x + 1) % 5, y, z)
+                  .into()
+                  .andn(&local.b((x + 2) % 5, y, z).into());
+              andn.xor(&local.b(x, y, z).into())
+          };
+          builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
+              let computed_limb = (limb * BITS_PER_LIMB..(limb + 1) * BITS_PER_LIMB)
+                  .rev()
+                  .fold(AB::Expr::ZERO, |acc, z| acc.double() + get_bit(z));
+              computed_limb - local.a_prime_prime[y][x][limb]
+          }));
+      }
+  }
+  *)
+  let* _ :=
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+      let get_bit (z : Z) : Z :=
+        let andn :=
+          andn
+            (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
+            (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
+          xor
+            andn
+            (Impl_KeccakCols.b local x y z) in
+      M.zeros (N := U64_LIMBS) {|
+        Array.get limb :=
+          let computed_limb : Z :=
+            let l : list Z :=
+              List.rev (List.map
+                (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
+                (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+              ) in
+            List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
+          BinOp.sub
+            computed_limb
+            (((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb)
+        |}
+      )) in
 
-  M.Pure tt.
+  (*
+  builder.assert_bools(local.a_prime_prime_0_0_bits);
+  builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
+      let computed_a_prime_prime_0_0_limb = (limb * BITS_PER_LIMB
+          ..(limb + 1) * BITS_PER_LIMB)
+          .rev()
+          .fold(AB::Expr::ZERO, |acc, z| {
+              acc.double() + local.a_prime_prime_0_0_bits[z]
+          });
+      computed_a_prime_prime_0_0_limb - local.a_prime_prime[0][0][limb]
+  }));
+  *)
+  let* _ := assert_bools local.(KeccakCols.a_prime_prime_0_0_bits) in
+  let* _ :=
+    M.zeros (N := U64_LIMBS) {|
+      Array.get limb :=
+        let computed_a_prime_prime_0_0_limb : Z :=
+          let l : list Z :=
+            List.rev (List.map
+              (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
+              (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+            ) in
+          List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) z)) l 0 in
+        BinOp.sub
+          computed_a_prime_prime_0_0_limb
+          (((local.(KeccakCols.a_prime_prime).(Array.get) 0).(Array.get) 0).(Array.get) limb)
+    |} in
+
+  (*
+  let get_xored_bit = |i| {
+      let mut rc_bit_i = AB::Expr::ZERO;
+      for r in 0..NUM_ROUNDS {
+          let this_round = local.step_flags[r];
+          let this_round_constant = AB::Expr::from_bool(rc_value_bit(r, i) != 0);
+          rc_bit_i += this_round * this_round_constant;
+      }
+
+      rc_bit_i.xor(&local.a_prime_prime_0_0_bits[i].into())
+  };
+  *)
+  let get_xored_bit (i : Z) : Z :=
+    let rc_bit_i : Z :=
+      List.fold_left (fun acc r =>
+        let this_round := Array.get local.(KeccakCols.step_flags) r in
+        let this_round_constant :=
+          Z.b2z (rc_value_bit r i) in
+        BinOp.add acc
+          (BinOp.mul this_round this_round_constant)
+      )
+      (List.map Z.of_nat (List.seq 0 (Z.to_nat NUM_ROUNDS))) 0 in
+    xor rc_bit_i (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) i) in
+
+  (*
+  builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
+      let computed_a_prime_prime_prime_0_0_limb = (limb * BITS_PER_LIMB
+          ..(limb + 1) * BITS_PER_LIMB)
+          .rev()
+          .fold(AB::Expr::ZERO, |acc, z| acc.double() + get_xored_bit(z));
+      computed_a_prime_prime_prime_0_0_limb - local.a_prime_prime_prime_0_0_limbs[limb]
+  }));
+  *)
+  let* _ :=
+    M.zeros (N := U64_LIMBS) {|
+      Array.get limb :=
+        let computed_a_prime_prime_prime_0_0_limb : Z :=
+          let l : list Z :=
+            List.rev (List.map
+              (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
+              (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+            ) in
+          List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_xored_bit z)) l 0 in
+        BinOp.sub
+          computed_a_prime_prime_prime_0_0_limb
+          (Array.get local.(KeccakCols.a_prime_prime_prime_0_0_limbs) limb)
+    |} in
+
+  (*
+  for x in 0..5 {
+      for y in 0..5 {
+          builder
+              .when_transition()
+              .when(not_final_step.clone())
+              .assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
+                  local.a_prime_prime_prime(y, x, limb) - next.a[y][x][limb]
+              }));
+      }
+  }
+  *)
+  let* _ :=
+    M.for_in_zero_to_n 5 (fun x =>
+    M.for_in_zero_to_n 5 (fun y =>
+      when is_transition (
+      when is_not_final_step (
+        M.zeros (N := U64_LIMBS) {|
+          Array.get limb :=
+            BinOp.sub
+              (Impl_KeccakCols.a_prime_prime_prime local y x limb)
+              (Array.get (Array.get (Array.get next.(KeccakCols.a) y) x) limb)
+        |}
+      ))
+    )) in
+
+  M.pure tt.
