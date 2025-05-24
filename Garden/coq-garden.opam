@@ -18,6 +18,8 @@ depends: [
   "coq-coqutil" {>= "0.0.5"}
   "coq-hammer"
   "coq-mathcomp-algebra"
+  "coq-mathcomp-ssreflect"
+  "coq-mathcomp-field"
 ]
 build: [
   [make]
