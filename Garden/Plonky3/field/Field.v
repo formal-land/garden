@@ -228,28 +228,88 @@ Section FieldOperations.
     andn x x.
   
   (* Exponentiation operations *)
-  Definition exp_u64 (x : F) (power : Z) : F.
-  Proof. admit. Admitted.
+  (* Helper functions to extract bits of a number *)
+  Fixpoint bits_of_positive (p : positive) (acc : list bool) : list bool :=
+    match p with
+    | xH => true :: acc
+    | xO p' => bits_of_positive p' (false :: acc)
+    | xI p' => bits_of_positive p' (true :: acc)
+    end.
+
+  Definition bits_of_z (n : Z) (acc : list bool) : list bool :=
+    match n with
+    | Z0 => acc
+    | Zpos p => bits_of_positive p acc
+    | Zneg _ => acc (* negative powers not supported *)
+    end.
   
-  Definition exp_const_u64 (x : F) (power : Z) : F.
-  Proof. admit. Admitted.
+  (* Square and multiply exponentiation *)
+  Definition exp_u64 (x : F) (power : Z) : F :=
+    if Z.ltb power 0 then zero (* negative powers not supported in ring context *)
+    else
+      let bits := bits_of_z power [] in
+      let fix exp_helper (base : F) (bits_list : list bool) (acc : F) : F :=
+        match bits_list with
+        | [] => acc
+        | b :: rest =>
+          let new_acc := if b then mul acc base else acc in
+          exp_helper (square base) rest new_acc
+        end
+      in
+      exp_helper x bits one.
   
-  Definition exp_power_of_2 (x : F) (power_log : nat) : F.
-  Proof. admit. Admitted.
+  (* Optimized exponentiation for small constant powers *)
+  Definition exp_const_u64 (x : F) (power : Z) : F :=
+    match power with
+    | 0%Z => one
+    | 1%Z => x
+    | 2%Z => square x
+    | 3%Z => cube x
+    | 4%Z => square (square x)
+    | 5%Z => mul (square (square x)) x
+    | 6%Z => cube (square x)
+    | 7%Z => 
+        let x2 := square x in
+        let x3 := mul x2 x in
+        let x4 := square x2 in
+        mul x3 x4
+    | _ => exp_u64 x power (* fall back to general algorithm *)
+    end.
   
-  Definition mul_2exp_u64 (x : F) (exp : Z) : F.
-  Proof. admit. Admitted.
+  (* Exponentiation by powers of 2: x^(2^power_log) *)
+  Definition exp_power_of_2 (x : F) (power_log : nat) : F :=
+    let fix iterate_square (base : F) (n : nat) : F :=
+      match n with
+      | O => base
+      | S n' => iterate_square (square base) n'
+      end
+    in
+    iterate_square x power_log.
   
-  (* Powers iterator *)
-  Definition powers (x : F) : nat -> F.
-  Proof. admit. Admitted.
+  (* Multiply by 2^exp: x * 2^exp *)
+  Definition mul_2exp_u64 (x : F) (exp : Z) : F :=
+    mul x (exp_u64 two exp).
   
-  Definition shifted_powers (x start : F) : nat -> F.
-  Proof. admit. Admitted.
+  (* Powers iterator: returns x^n for given n *)
+  Definition powers (x : F) : nat -> F :=
+    fun n => exp_u64 x (Z.of_nat n).
+  
+  (* Shifted powers iterator: returns start * x^n for given n *)
+  Definition shifted_powers (x start : F) : nat -> F :=
+    fun n => mul start (exp_u64 x (Z.of_nat n)).
   
   (* Vector operations *)
-  Definition dot_product {n : nat} (u v : list F) : F.
-  Proof. admit. Admitted.
+  (* Dot product of two vectors: sum of element-wise products *)
+  Definition dot_product {n : nat} (u v : list F) : F :=
+    let fix dot_helper (u_list v_list : list F) (acc : F) : F :=
+      match u_list, v_list with
+      | [], _ => acc
+      | _, [] => acc
+      | x :: u_rest, y :: v_rest => 
+          dot_helper u_rest v_rest (add acc (mul x y))
+      end
+    in
+    dot_helper u v zero.
   
   Definition sum_array {n : nat} (input : list F) : F.
   Proof. admit. Admitted.
@@ -281,7 +341,20 @@ Section FieldLemmas.
   (* Boolean check properties *)
   Theorem bool_check_complete : forall x,
     (x = zero \/ x = one) -> bool_check x = zero.
-  Proof. admit. Admitted.
+  Proof. 
+    intros x [H_zero | H_one].
+    - (* Case: x = zero *)
+      unfold bool_check, andn.
+      rewrite H_zero.
+      apply mul_zero_r.
+    - (* Case: x = one *)
+      unfold bool_check, andn.
+      rewrite H_one.
+      rewrite mul_one.
+      rewrite sub_as_add.
+      rewrite add_neg.
+      reflexivity.
+  Qed.
   
   (* Soundness requires integral domain property *)
   Hypothesis no_zero_divisors : forall x y, x * y = zero -> x = zero \/ y = zero.
@@ -296,19 +369,39 @@ Section FieldLemmas.
   
   (* Elementary operation properties *)
   Lemma double_correct : forall x, double x = two * x.
-  Proof. admit. Admitted.
+  Proof. 
+    unfold double.
+    intros x.
+    rewrite two_def.
+    rewrite mul_comm.
+    rewrite distrib.
+    rewrite mul_one.
+    reflexivity.
+  Qed.
   
   Lemma square_correct : forall x, square x = x * x.
-  Proof. admit. Admitted.
+  Proof. 
+    unfold square.
+    intros x.
+    reflexivity.
+  Qed.
   
   Lemma cube_correct : forall x, cube x = x * x * x.
-  Proof. admit. Admitted.
+  Proof.
+    unfold cube.
+    intros x.
+    rewrite square_correct.
+    reflexivity.
+  Qed.
   
   (* XOR properties *)
   Lemma xor_bool : forall x y, 
     (x = zero \/ x = one) -> (y = zero \/ y = one) -> 
     xor x y = zero <-> (x = y).
-  Proof. admit. Admitted.
+  Proof.
+    intros x y [H_x | H_x] [H_y | H_y].
+    admit.
+  Admitted.
   
   Lemma andn_bool : forall x y,
     (x = zero \/ x = one) -> (y = zero \/ y = one) ->
