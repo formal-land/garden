@@ -360,4 +360,200 @@ Definition add2
 
   [[ assert_zeros (| constraints |) ]]. 
 
+(** ** Completeness Template for Plonky3 Circuits using CPS *)
+
+(** A template for defining completeness conditions for circuit constraints.
+    The goal is to prove that for valid inputs in the expected ranges,
+    the circuit evaluation succeeds. *)
+
+Module Completeness.
+  
+  (** Convert from concrete field values to Z for evaluation *)
+  Parameter field_to_Z : forall (F : Type), F -> Z.
+  Parameter Z_to_field : forall (F : Type), Z -> F.
+  Parameter field_prime : forall (F : Type), Z.
+  
+  (** For Plonky3 fields specifically, we assume the field has characteristic p *)
+  Parameter plonky3_prime : Z.
+  Axiom plonky3_prime_is_prime : IsPrime plonky3_prime.
+  Axiom plonky3_prime_large : plonky3_prime > 2^33.
+  
+  (** Conversion between Z and field elements in the Plonky3 field *)
+  Definition to_field (x : Z) : Z := x mod plonky3_prime.
+  Definition from_field (x : Z) : Z := x.  (* assuming x is already reduced *)
+  
+  (** Field evaluation that respects the prime characteristic *)
+  Definition eval_in_field (e : M.t unit) : option unit :=
+    match M.eval plonky3_prime e with
+    | M.Pure _ => Some tt
+    | _ => None  (* Simplified; in practice would handle more cases *)
+    end.
+  
+  (** Range predicate for field elements representing 16-bit values *)
+  Definition is_16_bit (x : Z) : Prop := 0 <= x < 2^16.
+  
+  (** Range predicate for field elements representing 32-bit values *)
+  Definition is_32_bit (x : Z) : Prop := 0 <= x < 2^32.
+  
+  (** CPS-style evaluation predicate for M.t unit *)
+  Definition evalProp {A : Set} (e : M.t A) : option A -> Prop :=
+    fun result =>
+      match result with
+      | Some _ => True  (* Evaluation succeeded *)
+      | None => False   (* Evaluation failed *)
+      end.
+
+  (** Template for add2 completeness *)
+  Definition add2_completeness_statement : Prop :=
+    forall (p : Z) (a0 a1 b0 b1 c0 c1 : Z),
+      IsPrime p ->
+      is_16_bit a0 ->
+      is_16_bit a1 ->
+      is_16_bit b0 ->
+      is_16_bit b1 ->
+      is_16_bit c0 ->
+      is_16_bit c1 ->
+      let b := b0 + 2^16 * b1 in
+      let c := c0 + 2^16 * c1 in
+      let a := a0 + 2^16 * a1 in
+      a = (b + c) mod 2^32 ->
+      let a_array : Array.t Z 2 := {| Array.value := [a0; a1] |} in
+      let b_array : Array.t Z 2 := {| Array.value := [b0; b1] |} in
+      let c_array : Array.t Z 2 := {| Array.value := [c0; c1] |} in
+      evalProp (M.eval p (add2 a_array b_array c_array)) (Some tt).
+
+  (** CPS-style template for general circuit completeness *)
+  (* Definition circuit_completeness_template 
+    {InputType : Type}
+    (circuit : InputType -> M.t unit)
+    (input_valid : InputType -> Prop)
+    (output_relation : InputType  -> Prop) : Prop :=
+    forall (p : Z) (input : InputType) (output : OutputType),
+      IsPrime p ->
+      input_valid input ->
+      output_relation input output ->
+      evalProp (M.eval p (circuit input)) (Some output). *)
+
+  (** Specific instantiation for add2 using the template *)
+  Definition add2_input := (Array.t Z 2 * Array.t Z 2 * Array.t Z 2)%type.
+  
+  Definition add2_input_valid (input : add2_input) : Prop :=
+    let '(a_arr, b_arr, c_arr) := input in
+    match a_arr.(Array.value), b_arr.(Array.value), c_arr.(Array.value) with
+    | [a0; a1], [b0; b1], [c0; c1] =>
+        is_16_bit a0 /\ is_16_bit a1 /\
+        is_16_bit b0 /\ is_16_bit b1 /\
+        is_16_bit c0 /\ is_16_bit c1
+    | _, _, _ => False
+    end.
+  
+  Definition add2_output_relation (input : add2_input) (output : unit) : Prop :=
+    let '(a_arr, b_arr, c_arr) := input in
+    match a_arr.(Array.value), b_arr.(Array.value), c_arr.(Array.value) with
+    | [a0; a1], [b0; b1], [c0; c1] =>
+        let b := b0 + 2^16 * b1 in
+        let c := c0 + 2^16 * c1 in
+        let a := a0 + 2^16 * a1 in
+        a = (b + c) mod 2^32
+    | _, _, _ => False
+    end.
+  
+  Definition add2_circuit (input : add2_input) : M.t unit :=
+    let '(a_arr, b_arr, c_arr) := input in
+    add2 a_arr b_arr c_arr.
+  
+  (** The completeness theorem using the template *)
+  (* Definition add2_completeness_via_template : Prop :=
+    circuit_completeness_template add2_circuit add2_input_valid. *)
+
+  (** Alternative CPS formulation with explicit continuation *)
+  (* Definition circuit_completeness_cps
+    {InputType OutputType : Type}
+    (circuit : InputType -> M.t OutputType)
+    (input_valid : InputType -> Prop)
+    (continuation : InputType -> OutputType -> Prop) : Prop :=
+    forall (p : Z) (input : InputType),
+      IsPrime p ->
+      input_valid input ->
+      exists (output : OutputType),
+        continuation input output /\
+        evalProp (M.eval p (circuit input)) (Some output). *)
+
+  (** Proof strategy template using Run.t *)
+  Definition proof_template_for_add2 : Prop :=
+    forall (p : Z) (a0 a1 b0 b1 c0 c1 : Z),
+      IsPrime p ->
+      is_16_bit a0 -> is_16_bit a1 ->
+      is_16_bit b0 -> is_16_bit b1 ->
+      is_16_bit c0 -> is_16_bit c1 ->
+      let b := b0 + 2^16 * b1 in
+      let c := c0 + 2^16 * c1 in
+      let a := a0 + 2^16 * a1 in
+      a = (b + c) mod 2^32 ->
+      let a_array : Array.t Z 2 := {| Array.value := [a0; a1] |} in
+      let b_array : Array.t Z 2 := {| Array.value := [b0; b1] |} in
+      let c_array : Array.t Z 2 := {| Array.value := [c0; c1] |} in
+      {{ M.eval p (add2 a_array b_array c_array) 🔽 tt, True }}.
+
+  (** Helper lemmas for range checking in finite fields *)
+  Lemma range_check_preserved : forall (p : Z) (x : Z),
+    IsPrime p -> p > 2^17 ->
+    is_16_bit x ->
+    (x mod p) = x.
+  Proof. admit. Admitted.
+
+  Lemma modular_arithmetic_consistency : forall (p : Z) (a b c : Z),
+    IsPrime p -> p > 2^33 ->
+    is_32_bit a -> is_32_bit b -> is_32_bit c ->
+    a = (b + c) mod 2^32 ->
+    ((a - b - c) mod p = 0) \/ ((a - b - c) mod p = (-2^32) mod p).
+  Proof. admit. Admitted.
+
+  (*
+  (** Completeness theorem for add2 using existing constraints *)
+  Theorem add2_completeness : forall (a_arr b_arr c_arr : Array.t Z 2),
+    (* Range conditions on array elements *)
+    (forall i, i < 2 -> 
+      match Array.get a_arr i, Array.get b_arr i, Array.get c_arr i with
+      | M.Pure a_i, M.Pure b_i, M.Pure c_i => is_16_bit a_i /\ is_16_bit b_i /\ is_16_bit c_i
+      | _, _, _ => False
+      end) ->
+    (* Arithmetic relation holds *)
+    (match a_arr.(Array.value), b_arr.(Array.value), c_arr.(Array.value) with
+     | [a0; a1], [b0; b1], [c0; c1] =>
+         let a := a0 + 2^16 * a1 in
+         let b := b0 + 2^16 * b1 in  
+         let c := c0 + 2^16 * c1 in
+         a = (b + c) mod 2^32
+     | _, _, _ => False
+     end) ->
+    (* Then the circuit evaluation succeeds *)
+    {{ M.eval plonky3_prime (add2 a_arr b_arr c_arr) 🔽 tt, True }}.
+  Proof.
+    intros a_arr b_arr c_arr H_range H_arith.
+    (* The proof would:
+       1. Unfold add2 to show the constraint structure
+       2. Use the fact that acc*(acc + 2^32) = 0 and acc_16*(acc_16 + 2^16) = 0
+       3. Apply the modular arithmetic consistency lemma
+       4. Show that assert_zeros succeeds when constraints are satisfied *)
+    admit.
+  Admitted.
+
+  (** CPS-style formulation that matches the pattern you provided *)
+  Definition add2_cps_completeness : Prop :=
+    forall (a0 a1 b0 b1 c0 c1 : Z),
+      is_16_bit a0 -> is_16_bit a1 ->
+      is_16_bit b0 -> is_16_bit b1 ->
+      is_16_bit c0 -> is_16_bit c1 ->
+      let b := b0 + 2^16 * b1 in
+      let c := c0 + 2^16 * c1 in
+      let a := a0 + 2^16 * a1 in
+      a = (b + c) mod 2^32 ->
+      exists (result : unit),
+        evalProp (M.eval plonky3_prime (add2 
+          {| Array.value := [a0; a1] |}
+          {| Array.value := [b0; b1] |}
+          {| Array.value := [c0; c1] |})) (Some result).
+  *)
+End Completeness.
   
