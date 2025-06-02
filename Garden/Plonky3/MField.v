@@ -17,8 +17,6 @@ Global Open Scope bool_scope.
 
 Export List.ListNotations.
 
-(** ** Simple Field-based Monad *)
-
 (** Field-based monad for a specific field type F *)
 Module Type FieldType.
   Parameter F : Set.
@@ -41,49 +39,131 @@ Module Type FieldType.
   Axiom char_pos : char > 1.
 End FieldType.
 
-Module FieldM (Field : FieldType).
+Module FieldUnOp (Field : FieldType).
   Import Field.
   
-  (** Simple field monad *)
+  Inductive t : Set -> Set -> Set :=
+  | Neg : t F F
+  .
+
+  Definition eval {A B : Set} (op : t A B) : A -> B :=
+    match op in t A B return A -> B with
+    | Neg => neg
+    end.
+End FieldUnOp.
+
+Module FieldBinOp (Field : FieldType).
+  Import Field.
+  
+  Inductive t : Set -> Set -> Set -> Set :=
+  | Add : t F F F
+  | Sub : t F F F
+  | Mul : t F F F
+  .
+
+  Definition eval {A B C : Set} (op : t A B C) : A -> B -> C :=
+    match op in t A B C return A -> B -> C with
+    | Add => add
+    | Sub => sub
+    | Mul => mul
+    end.
+End FieldBinOp.
+
+Module FieldM (Field : FieldType).
+  Import Field.
+  Module FUnOp := FieldUnOp Field.
+  Module FBinOp := FieldBinOp Field.
+  
+  (** Field monad mimicking M.v structure *)
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
-  | Add (x y : F) : t F
-  | Sub (x y : F) : t F  
-  | Mul (x y : F) : t F
-  | Neg (x : F) : t F
-  | Equal (x y : F) : t unit
-  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
-  | Call {A : Set} (e : t A) : t A
+  | UnOp {A B : Set} (op : FUnOp.t A B) (x : A) : t B
+  | BinOp {A B C : Set} (op : FBinOp.t A B C) (x1 : A) (x2 : B) : t C
+  | Equal (x1 x2 : F) : t unit
   | Unwrap {A : Set} (value : option A) : t A
+  | Call {A : Set} (e : t A) : t A
+  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
   
-  (** Field operations *)
-  Definition add_op (x y : F) : t F := Add x y.
-  Definition sub_op (x y : F) : t F := Sub x y.
-  Definition mul_op (x y : F) : t F := Mul x y.
-  Definition neg_op (x : F) : t F := Neg x.
-  Definition equal_op (x y : F) : t unit := Equal x y.
-  Definition call {A : Set} (e : t A) : t A := Call e.
-  
-  (** Collapsing let for optimization *)
+  (** This is a marker that we remove with the following tactic. *)
+  Axiom run : forall {A : Set}, t A -> A.
+
+  (** A tactic that replaces all [run] markers with a bind operation.
+    This allows to represent programs without introducing
+    explicit names for all intermediate computation results. *)
+  Ltac monadic e :=
+    lazymatch e with
+    | context ctxt [let v := ?x in @?f v] =>
+      refine (Let _ _);
+        [ monadic x
+        | let v' := fresh v in
+          intro v';
+          let y := (eval cbn beta in (f v')) in
+          lazymatch context ctxt [let v := x in y] with
+          | let _ := x in y => monadic y
+          | _ =>
+            refine (Let _ _);
+              [ monadic y
+              | let w := fresh "v" in
+                intro w;
+                let z := context ctxt [w] in
+                monadic z
+              ]
+          end
+        ]
+    | context ctxt [run ?x] =>
+      lazymatch context ctxt [run x] with
+      | run x => monadic x
+      | _ =>
+        refine (Let _ _);
+          [ monadic x
+          | let v := fresh "v" in
+            intro v;
+            let y := context ctxt [v] in
+            monadic y
+          ]
+      end
+    | _ =>
+      lazymatch type of e with
+      | t _ => exact e
+      | _ => exact (Pure e)
+      end
+    end.
+
+  Definition neg_op (x : F) : t F :=
+    UnOp FUnOp.Neg x.
+
+  Definition add_op (x y : F) : t F :=
+    BinOp FBinOp.Add x y.
+
+  Definition sub_op (x y : F) : t F :=
+    BinOp FBinOp.Sub x y.
+
+  Definition mul_op (x y : F) : t F :=
+    BinOp FBinOp.Mul x y.
+
+  Definition equal_op (x y : F) : t unit :=
+    Equal x y.
+
+  Definition call {A : Set} (e : t A) : t A :=
+    Call e.
+
   Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
     match e, k with
     | Pure x, k => k x
     | e, k => Let e k
     end.
-  
-  (** Evaluate field operations *)
+
+  (** Evaluate only the primitive operations and keep everything else. *)
   Fixpoint eval {A : Set} (e : t A) : t A :=
     match e in t A return t A with
     | Pure x => Pure x
-    | Add x y => Pure (add x y)
-    | Sub x y => Pure (sub x y)
-    | Mul x y => Pure (mul x y)
-    | Neg x => Pure (neg x)
+    | UnOp op x => Pure (FUnOp.eval op x)
+    | BinOp op x y => Pure (FBinOp.eval op x y)
     | Equal x y => Equal x y
     | Unwrap value => Unwrap value
-    | Let e k => collapsing_let (eval e) (fun x => eval (k x))
     | Call e => Call (eval e)
+    | Let e k => collapsing_let (eval e) (fun x => eval (k x))
     end.
   
   (** Field-based array *)
@@ -160,22 +240,22 @@ Module FieldM (Field : FieldType).
     
     assert_zeros [constraint1; constraint2]
     )))))))))))))))).
-    
-  (** Notation *)
-  Notation "'let*' x ':=' e 'in' k" :=
-    (Let e (fun x => k))
-    (at level 200, x pattern, e at level 200, k at level 200).
-    
 End FieldM.
 
-(** Evaluation rules *)
+(** Notations need to be defined within each field instance since FieldM is a functor *)
+(** Example usage:
+    Module F7M := FieldM F7.
+    Import F7M.
+    Notation "'let*' x ':=' e 'in' k" := (Let e (fun x => k)) (at level 200).
+*)
+
 Module FieldRun (Field : FieldType).
   Module FM := FieldM Field.
   Import Field FM.
   
   Reserved Notation "{{ e ==> output , P }}".
   
-  Inductive run : forall {A : Set}, t A -> A -> Prop -> Prop :=
+  Inductive run : forall {A : Set}, FM.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
     {{ Pure value ==> value, True }}
   | Equal (x1 x2 : F) :
@@ -198,14 +278,12 @@ Module FieldRun (Field : FieldType).
     value1 = value2 ->
     {{ e ==> value2, P }}
   where "{{ e ==> output , P }}" := (run e output P).
-  
 End FieldRun.
 
-(** Completeness template *)
 Module FieldCompleteness (Field : FieldType).
   Module FR := FieldRun Field.
   Module FM := FieldM Field.
-  Import Field FR.
+  Import Field FM FR.
   
   (** Range predicates using built-in conversion *)
   Definition is_16_bit (x : F) : Prop := 0 <= to_Z x < 2^16.
@@ -238,7 +316,6 @@ Module FieldCompleteness (Field : FieldType).
       input_valid input ->
       arithmetic_relation input ->
       {{ FM.eval (circuit input) ==> tt, True }}.
-      
 End FieldCompleteness.
 
 (** ** Examples of Concrete Fields *)
