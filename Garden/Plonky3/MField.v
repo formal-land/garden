@@ -213,6 +213,126 @@ Module M (Field : FieldType).
     (only parsing).
 End M.
 
+
+(** Rules to check if the contraints are what we expect, typically a unique possible value. *)
+Module Run (Field : FieldType).
+  Module FM := M Field.
+  Import Field FM.
+  
+  Reserved Notation "{{ e 🔽 output , P }}".
+
+  Inductive t : forall {A : Set}, FM.t A -> A -> Prop -> Prop :=
+  | Pure {A : Set} (value : A) :
+    {{ Pure value 🔽 value, True }}
+  | Equal (x1 x2 : F) :
+    {{ Equal x1 x2 🔽 tt, Field.eq x1 x2 }}
+  | Unwrap {A : Set} (value : A) :
+    {{ Unwrap (Some value) 🔽 value, True }}
+  | Call {A : Set} (e : FM.t A) (value : A) (P : Prop) :
+    {{ e 🔽 value, P }} ->
+    {{ Call e 🔽 value, P }}
+  | Let {A B : Set} (e : FM.t A) (k : A -> FM.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    {{ k value 🔽 output, P2 }} ->
+    {{ Let e k 🔽 output, P1 /\ P2 }}
+  | Equiv {A : Set} (e : FM.t A) (value : A) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 <-> P2) ->
+    {{ e 🔽 value, P2 }}
+  | EquivOverConstrained {A : Set} (e : FM.t A) (value : A) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P2 -> P1) ->
+    {{ e 🔽 value, P2 }}
+  | Replace {A : Set} (e : FM.t A) (value1 value2 : A) (P : Prop) :
+    {{ e 🔽 value1, P }} ->
+    value1 = value2 ->
+    {{ e 🔽 value2, P }}
+  where "{{ e 🔽 output , P }}" := (t e output P).
+End Run.
+
+Module SimpleExample (Field : FieldType).
+  Module RF := Run Field.
+  Import Field RF.
+  Import RF.FM.
+
+  Definition zero_or_one (x : F) : FM.t unit :=
+    let* square_x := [[
+      mul (| x, x |)
+    ]] in
+    equal x square_x.
+  Opaque zero_or_one.
+
+  Lemma zero_or_one_correct (x : F) :
+    {{ eval (zero_or_one x) 🔽 tt, x = zero \/ x = one }}.
+  Proof.
+    with_strategy transparent [zero_or_one] unfold zero_or_one.
+    cbn.
+    eapply RF.EquivOverConstrained. {
+      apply RF.Equal.
+    }
+    intros [hzero | hone].
+    (* x = zero *)
+    {
+      admit.
+    }
+    (* x = one *)
+    {
+      admit.
+    }
+  Admitted.
+  (*
+  Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
+  match l with
+  | [] => M.Pure tt
+  | x :: l' =>
+    let* _ := M.call (zero_or_one x) in
+    all_zero_or_one l'
+  end.
+Opaque all_zero_or_one.
+  *)  
+  Fixpoint all_zero_or_one (l : list F) : FM.t unit :=
+    match l with
+    | [] => Pure tt
+    | x :: l' =>
+      let* _ := Call (zero_or_one x) in
+      all_zero_or_one l'
+    end.
+  Opaque all_zero_or_one.
+
+  Lemma all_zero_or_one_complete (l : list F) : 
+    {{ eval (all_zero_or_one l) 🔽 tt, List.Forall (fun x => x = zero \/ x = one) l }}.
+  Proof.
+    intros.
+    with_strategy transparent [all_zero_or_one] unfold all_zero_or_one.
+    induction l; cbn.
+    (* base case *)
+    { eapply RF.EquivOverConstrained. {
+        apply RF.Pure.
+      }
+      easy.
+    }
+    (* inductive case *)
+    { eapply RF.EquivOverConstrained. {
+        eapply RF.Let. {
+          apply RF.Call.
+          now apply zero_or_one_correct.
+        }
+        apply IHl.
+      }
+      sauto lq: on.
+    }
+  Qed.
+
+  (* cube function *)
+  Definition cube (x : F) : t F :=
+  [[
+    mul (|mul (| x, x |), x |)
+  ]].
+  Opaque cube.
+
+  
+End SimpleExample.
+
 (** Array module for field-based arrays *)
 Module Array (Field : FieldType).
   Module MF := M Field.
@@ -327,38 +447,6 @@ Module FieldUtils (Field : FieldType).
     let* xy := xor x y in
     xor xy z.
 End FieldUtils.
-
-(** Rules to check if the contraints are what we expect, typically a unique possible value. *)
-Module Run (Field : FieldType).
-  Module FM := M Field.
-  Import Field FM.
-  
-  Reserved Notation "{{ e 🔽 output , P }}".
-
-  Inductive t : forall {A : Set}, FM.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
-    {{ Pure value 🔽 value, True }}
-  | Equal (x1 x2 : F) :
-    {{ Equal x1 x2 🔽 tt, Field.eq x1 x2 }}
-  | Unwrap {A : Set} (value : A) :
-    {{ Unwrap (Some value) 🔽 value, True }}
-  | Call {A : Set} (e : FM.t A) (value : A) (P : Prop) :
-    {{ e 🔽 value, P }} ->
-    {{ Call e 🔽 value, P }}
-  | Let {A B : Set} (e : FM.t A) (k : A -> FM.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    {{ k value 🔽 output, P2 }} ->
-    {{ Let e k 🔽 output, P1 /\ P2 }}
-  | Equiv {A : Set} (e : FM.t A) (value : A) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    (P1 <-> P2) ->
-    {{ e 🔽 value, P2 }}
-  | Replace {A : Set} (e : FM.t A) (value1 value2 : A) (P : Prop) :
-    {{ e 🔽 value1, P }} ->
-    value1 = value2 ->
-    {{ e 🔽 value2, P }}
-  where "{{ e 🔽 output , P }}" := (t e output P).
-End Run.
 
 (** ** Examples of field instantiations *)
 
