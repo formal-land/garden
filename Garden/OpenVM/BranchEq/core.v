@@ -21,7 +21,14 @@ use openvm_stark_backend::{
 use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use strum::IntoEnumIterator;
+*)
+(* 
+TODO: define parameterized InteractionBuilder
+*)
+Record InteractionBuilder : Set := {
+}.
 
+(*
 #[repr(C)]
 #[derive(AlignedBorrow)]
 pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
@@ -56,20 +63,32 @@ pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
     pc_step: u32,
 }
 *)
+Record BranchEqualCoreCols (NUM_LIMBS : nat) : Set := {
+  offset : nat;
+  pc_step : nat;
+}.
 
-(*
-
-
+(* 
 impl<F: Field, const NUM_LIMBS: usize> BaseAir<F> for BranchEqualCoreAir<NUM_LIMBS> {
     fn width(&self) -> usize {
         BranchEqualCoreCols::<F, NUM_LIMBS>::width()
     }
 }
+*)
+Module Impl_BaseAir_for_BranchEqualCoreAir.
+(* TODO: axiomatize the original function *)
+End Impl_BaseAir_for_BranchEqualCoreAir.
+
+(* 
 impl<F: Field, const NUM_LIMBS: usize> BaseAirWithPublicValues<F>
     for BranchEqualCoreAir<NUM_LIMBS>
 {
 }
+*)
+Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
+End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
+(* 
 impl<AB, I, const NUM_LIMBS: usize> VmCoreAir<AB, I> for BranchEqualCoreAir<NUM_LIMBS>
 where
     AB: InteractionBuilder,
@@ -78,19 +97,42 @@ where
     I::Writes: Default,
     I::ProcessedInstruction: From<ImmInstruction<AB::Expr>>,
 {
-    fn eval(
+*)
+Section Impl_VmCoreAir_for_BranchEqualCoreAir.
+(* TODO: check if this is defined correctly *)
+(* TODO: define VmAdapterInterface, maybe custom type for I *)
+ Context InteractionBuilder : Set.
+ Context I : VmAdapterInterface.
+ Context NUM_LIMBS : nat.
+
+ Parameter AB : InteractionBuilder.
+
+(* 
+fn eval(
         &self,
         builder: &mut AB,
         local: &[AB::Var],
         from_pc: AB::Var,
     ) -> AdapterAirContext<AB::Expr, I> {
-        let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
-        let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+*)
+Definition eval (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : AdapterAirContext Expr I :=
+  (* 
+  let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
+  let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+  *)
+  let cols := local in
+  let flags := cols.(opcode_beq_flag) :: [cols.(opcode_bne_flag)] in
 
-        let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
+  (* 
+  let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
             builder.assert_bool(flag);
             acc + flag.into()
         });
+  *)
+  let is_valid := _ in
+  tt.
+
+(* 
         builder.assert_bool(is_valid.clone());
         builder.assert_bool(cols.cmp_result);
 
@@ -145,6 +187,11 @@ where
             .into(),
         }
     }
+*)
+
+End Impl_VmCoreAir_for_BranchEqualCoreAir.
+(*
+    
 
     fn start_offset(&self) -> usize {
         self.offset
