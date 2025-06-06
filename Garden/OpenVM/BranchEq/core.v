@@ -22,6 +22,10 @@ use serde::{Deserialize, Serialize};
 use serde_big_array::BigArray;
 use strum::IntoEnumIterator;
 *)
+
+(* ************* *)
+(* ****FOCUS**** *)
+(* ************* *)
 (* 
 TODO: define parameterized InteractionBuilder
 *)
@@ -132,19 +136,36 @@ Definition eval (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : Ad
   let is_valid := _ in
   tt.
 
+  (* 
+  builder.assert_bool(is_valid.clone());
+  builder.assert_bool(cols.cmp_result);
+  *)
+  let assert_result := if _ then true else false in
+  let assert_result := if _ then assert_result else false in
+  (* TODO: completely ignore all the followings if assertion is false *)
+
+  (* 
+  let a = &cols.a;
+  let b = &cols.b;
+  let inv_marker = &cols.diff_inv_marker;
+  *)
+  let a := cols.(a) in
+  let b := cols.(b) in
+  let inv_maker := cols.(diff_inv_marker) in
+
+  (* 
+  // 1 if cmp_result indicates a and b are equal, 0 otherwise
+  let cmp_eq =
+      cols.cmp_result * cols.opcode_beq_flag + not(cols.cmp_result) * cols.opcode_bne_flag;
+  let mut sum = cmp_eq.clone();
+  *)
+  let cmp_eq := cols.cmp_result * cols.opcode_beq_flag 
+    + not(cols.cmp_result) * cols.opcode_bne_flag in
+  let sum := cmp_eq in
+
+
+
 (* 
-        builder.assert_bool(is_valid.clone());
-        builder.assert_bool(cols.cmp_result);
-
-        let a = &cols.a;
-        let b = &cols.b;
-        let inv_marker = &cols.diff_inv_marker;
-
-        // 1 if cmp_result indicates a and b are equal, 0 otherwise
-        let cmp_eq =
-            cols.cmp_result * cols.opcode_beq_flag + not(cols.cmp_result) * cols.opcode_bne_flag;
-        let mut sum = cmp_eq.clone();
-
         // For BEQ, inv_marker is used to check equality of a and b:
         // - If a == b, all inv_marker values must be 0 (sum = 0)
         // - If a != b, inv_marker contains 0s for all positions except ONE position i where a[i] !=
