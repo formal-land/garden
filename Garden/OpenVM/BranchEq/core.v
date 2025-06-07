@@ -1,6 +1,9 @@
 (* 
 TODO:
-- InteractionBuilder
+- Implement enough functionality to make the following code works:
+  let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
+  let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+- Investigate `AB::Var`
 *)
 
 (* 
@@ -55,7 +58,7 @@ Module Dependency.
     message : list Expr;
     count : Expr;
     bus_index : BusIndex;
-    count_weight : nat;
+    count_weight : Z;
   }.
 
   (* 
@@ -90,14 +93,26 @@ Module Dependency.
           count: impl Into<Self::Expr>,
           count_weight: u32,
       );
-  
+
       /// Returns the current number of interactions.
       fn num_interactions(&self) -> usize;
-  
+
       /// Returns all interactions stored.
       fn all_interactions(&self) -> &[Interaction<Self::Expr>];
   }
   *)
+  Class InteractionBuilder : Set := {
+    (* Types from AirBuilder
+    type F: Field;
+    type Expr: Algebra<Self::F> + Algebra<Self::Var>;
+    type Var: Into<Self::Expr>
+    type M: Matrix<Self::Var>;
+    *)
+    F : Set;
+    Expr : Set;
+    Var : Set;
+    M : Set;
+  }.
 End Dependency.
 
 (*
@@ -117,7 +132,7 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
     pub diff_inv_marker: [T; NUM_LIMBS],
 }
 *)
-Record BranchEqualCoreCols (T : Set) (NUM_LIMBS : nat) : Set := {
+Record BranchEqualCoreCols (T : Set) (NUM_LIMBS : Z) : Set := {
   a : list T;
   b : list T;
   cmp_result : T;
@@ -134,9 +149,9 @@ pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
     pc_step: u32,
 }
 *)
-Record BranchEqualCoreCols (NUM_LIMBS : nat) : Set := {
-  offset : nat;
-  pc_step : nat;
+Record BranchEqualCoreCols (NUM_LIMBS : Z) : Set := {
+  offset : Z;
+  pc_step : Z;
 }.
 
 
@@ -181,18 +196,19 @@ where
 {
 *)
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
-(* TODO: check if this is defined correctly *)
-(* 
-TODO:
-- Investigate VmCoreAir, understand its role
-*)
-(* TODO: define custom type for I *)
-(* Types *)
-  Context InteractionBuilder : Set.
-  Context I : VmAdapterInterface.
-  Context NUM_LIMBS : nat.
+  (* 
+  TODO:
+  - Investigate VmCoreAir, understand its role
+  *)
+  (* TODO: define custom type for I *)
+  (* ********Types******** *)
+  (* TODO: check how to specify AB being an instance of a class *)
+  Context AB : Dependency.InteractionBuilder.
+  Context I : Dependency.VmAdapterInterface.
+  Context NUM_LIMBS : Z.
 
-  Parameter AB : InteractionBuilder.
+  (* TODO: maybe refine this code in the future *)
+  Definition VmCoreAir_Self : Set. Admitted.
 
   (* 
   fn eval(
@@ -202,7 +218,7 @@ TODO:
           from_pc: AB::Var,
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
-  Definition eval (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : AdapterAirContext Expr I :=
+  Definition eval (self : Set) (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : AdapterAirContext Expr I :=
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
