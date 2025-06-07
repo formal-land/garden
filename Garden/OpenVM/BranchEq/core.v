@@ -26,11 +26,36 @@ use strum::IntoEnumIterator;
 (* ************* *)
 (* ****FOCUS**** *)
 (* ************* *)
-(* 
-TODO: define parameterized InteractionBuilder
-*)
-Record InteractionBuilder : Set := {
-}.
+Module Dependency.
+  Inductive Expr : Set := | Make .
+  Inductive BusIndex : Set := | Make .
+
+  (* 
+  pub struct Interaction<Expr> {
+      pub message: Vec<Expr>,
+      pub count: Expr,
+      /// The bus index specifying the bus to send the message over. All valid instantiations of
+      /// `BusIndex` are safe.
+      pub bus_index: BusIndex,
+      /// Determines the contribution of each interaction message to a linear constraint on the trace
+      /// heights in the verifier.
+      ///
+      /// For each bus index and trace, `count_weight` values are summed per interaction on that
+      /// bus index and multiplied by the trace height. The total sum over all traces is constrained
+      /// by the verifier to not overflow the field characteristic \( p \).
+      ///
+      /// This is used to impose sufficient conditions for bus constraint soundness and setting a
+      /// proper value depends on the bus and the constraint it imposes.
+      pub count_weight: u32,
+  }
+  *)
+  Record InteractionBuilder : Set := {
+    message : list Expr;
+    count : Expr;
+    bus_index : BusIndex;
+    count_weight : nat;
+  }.
+End Dependency.
 
 (*
 #[repr(C)]
@@ -48,10 +73,9 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
 
     pub diff_inv_marker: [T; NUM_LIMBS],
 }
-
 *)
 Record BranchEqualCoreCols (T : Set) (NUM_LIMBS : nat) : Set := {
-  a : list T; (* TODO: create a slice datatype? *)
+  a : list T;
   b : list T;
   cmp_result : T;
   imm : T;
@@ -188,7 +212,7 @@ Definition eval (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : Ad
             .iter()
             .zip(BranchEqualOpcode::iter())
             .fold(AB::Expr::ZERO, |acc, (flag, opcode)| {
-                acc + (*flag).into() * AB::Expr::from_canonical_u8(opcode as u8)
+                acc + ( \*flag).into() * AB::Expr::from_canonical_u8(opcode as u8)
             })
             + AB::Expr::from_canonical_usize(self.offset);
 
