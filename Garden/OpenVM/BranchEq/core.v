@@ -1,4 +1,10 @@
 (* 
+TODO:
+- VmAdapterInterface
+- InteractionBuilder
+*)
+
+(* 
 use std::{
     array,
     borrow::{Borrow, BorrowMut},
@@ -23,9 +29,6 @@ use serde_big_array::BigArray;
 use strum::IntoEnumIterator;
 *)
 
-(* ************* *)
-(* ****FOCUS**** *)
-(* ************* *)
 Module Dependency.
   Inductive Expr : Set := | Make .
   Inductive BusIndex : Set := | Make .
@@ -96,6 +99,10 @@ Record BranchEqualCoreCols (NUM_LIMBS : nat) : Set := {
   pc_step : nat;
 }.
 
+
+(* ************* *)
+(* ****FOCUS**** *)
+(* ************* *)
 (* 
 impl<F: Field, const NUM_LIMBS: usize> BaseAir<F> for BranchEqualCoreAir<NUM_LIMBS> {
     fn width(&self) -> usize {
@@ -104,7 +111,12 @@ impl<F: Field, const NUM_LIMBS: usize> BaseAir<F> for BranchEqualCoreAir<NUM_LIM
 }
 *)
 Module Impl_BaseAir_for_BranchEqualCoreAir.
-(* TODO: axiomatize the original function *)
+(* TODO: investigate the macro to get the exact meaning *)
+(* 
+  pub const fn width() -> usize {
+      std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
+  }
+*)
 End Impl_BaseAir_for_BranchEqualCoreAir.
 
 (* 
@@ -114,6 +126,8 @@ impl<F: Field, const NUM_LIMBS: usize> BaseAirWithPublicValues<F>
 }
 *)
 Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
+  (* NOTE: BaseAirWithPublicValues should be able to use all functions from
+   BranchEqualCoreAir *)
 End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
 (* 
@@ -128,7 +142,12 @@ where
 *)
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
 (* TODO: check if this is defined correctly *)
-(* TODO: define VmAdapterInterface, maybe custom type for I *)
+(* 
+TODO:
+- Investigate VmCoreAir, understand its role
+*)
+(* TODO: define custom type for I *)
+(* Types *)
  Context InteractionBuilder : Set.
  Context I : VmAdapterInterface.
  Context NUM_LIMBS : nat.
