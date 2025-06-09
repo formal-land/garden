@@ -4,10 +4,10 @@ Import ListNotations.
 
 (* 
 TODO:
+- Investigate `local.borrow();`
 - Implement enough functionality to make the following code works:
   let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
   let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
-- Investigate `AB::Var`
 *)
 
 (* 
@@ -35,37 +35,37 @@ use serde_big_array::BigArray;
 use strum::IntoEnumIterator;
 *)
 
-Module Dependency.
-  Inductive Expr : Set := | Make_Expr .
-  Inductive BusIndex : Set := | Make_BusIndex .
+Inductive Expr : Set := | Make_Expr .
+Inductive BusIndex : Set := | Make_BusIndex .
 
-  (* 
-  pub struct Interaction<Expr> {
-      pub message: Vec<Expr>,
-      pub count: Expr,
-      /// The bus index specifying the bus to send the message over. All valid instantiations of
-      /// `BusIndex` are safe.
-      pub bus_index: BusIndex,
-      /// Determines the contribution of each interaction message to a linear constraint on the trace
-      /// heights in the verifier.
-      ///
-      /// For each bus index and trace, `count_weight` values are summed per interaction on that
-      /// bus index and multiplied by the trace height. The total sum over all traces is constrained
-      /// by the verifier to not overflow the field characteristic \( p \).
-      ///
-      /// This is used to impose sufficient conditions for bus constraint soundness and setting a
-      /// proper value depends on the bus and the constraint it imposes.
-      pub count_weight: u32,
-  }
-  *)
-  (* TODO: examine this type in the future *)
-  Record Interaction (e : Expr) : Set := {
+(* 
+pub struct Interaction<Expr> {
+    pub message: Vec<Expr>,
+    pub count: Expr,
+    /// The bus index specifying the bus to send the message over. All valid instantiations of
+    /// `BusIndex` are safe.
+    pub bus_index: BusIndex,
+    /// Determines the contribution of each interaction message to a linear constraint on the trace
+    /// heights in the verifier.
+    ///
+    /// For each bus index and trace, `count_weight` values are summed per interaction on that
+    /// bus index and multiplied by the trace height. The total sum over all traces is constrained
+    /// by the verifier to not overflow the field characteristic \( p \).
+    ///
+    /// This is used to impose sufficient conditions for bus constraint soundness and setting a
+    /// proper value depends on the bus and the constraint it imposes.
+    pub count_weight: u32,
+}
+*)
+(* TODO: examine this type in the future *)
+Module Interaction.
+  Record t (e : Expr) : Set := {
     message : list Expr;
     count : Expr;
     bus_index : BusIndex;
     count_weight : Z;
   }.
-End Dependency.
+End Interaction.
 
 Module VmAdapterInterface.
   (* 
@@ -124,6 +124,16 @@ Module InteractionBuilder.
   }.
 End InteractionBuilder.
 
+(* TODO: maybe implement a coercion
+Definition A := nat.
+Definition B := nat.  (* trivial here for demo purposes *)
+Coercion A_to_B (a : A) : B := a.
+*)
+
+(* *************************** *)
+(* ****END OF DEPENDENCIES**** *)
+(* *************************** *)
+
 (*
 #[repr(C)]
 #[derive(AlignedBorrow)]
@@ -163,9 +173,6 @@ Record BranchEqualCoreAir (NUM_LIMBS : Z) : Set := {
   pc_step : Z;
 }.
 
-(* ************* *)
-(* ****FOCUS**** *)
-(* ************* *)
 (* 
 impl<F: Field, const NUM_LIMBS: usize> BaseAir<F> for BranchEqualCoreAir<NUM_LIMBS> {
     fn width(&self) -> usize {
@@ -193,6 +200,10 @@ Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
    BranchEqualCoreAir *)
 End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
+
+(* ************* *)
+(* ****FOCUS**** *)
+(* ************* *)
 (* 
 impl<AB, I, const NUM_LIMBS: usize> VmCoreAir<AB, I> for BranchEqualCoreAir<NUM_LIMBS>
 where
@@ -206,28 +217,22 @@ where
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   Import InteractionBuilder.
 
-  (* TODO: fill correctly into the function below *)
-  Definition test (T : Set) (NUM_LIMBS : Z) (local : BranchEqualCoreCols T NUM_LIMBS): unit :=
-    let cols := local in 
-    let f1 := cols.(opcode_beq_flag T NUM_LIMBS) in
-    let f2 := cols.(opcode_bne_flag T NUM_LIMBS) in
-    let flags := [f1; f2] in
-    tt.
 
-  (* ********Types******** *)
+  (* ********TYPES******** *)
   (* TODO:
-  - Define custom type for I
   - Investigate VmCoreAir, understand its role
-  - Implement type conversion for BranchEqualCoreCols
+  - Investigate and implement type conversion for BranchEqualCoreCols
   *)
   Context `{AB : InteractionBuilder.t}.
-  (* TODO: specify constraints for I's fields *)
   Context `{I : VmAdapterInterface.t}.
+  (* NOTE: demo to require subfield of I to be instance *)
+  (* Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
-  (* TODO: maybe refine this code in the future *)
-  Definition VmCoreAir_Self : Set. Admitted.
+  (* Definition Self := VmCoreAir AB I. *)
+  Definition Self : Set. Admitted. (* NOTE: stub *)
 
+  (* ********FUNCTIIONS******** *)
   (* 
   fn eval(
           &self,
@@ -238,7 +243,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   *)
   Definition eval 
   (T : Set) (NUM_LIMBS : Z) (* TODO: parameters for InteractionBuilder. To be eliminated *)
-  (self : Set) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
+  (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
   unit :=
   (* AdapterAirContext Expr I := *)
     (* 
