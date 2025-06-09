@@ -1,3 +1,7 @@
+Require Import ZArith.
+Require Import List.
+Import ListNotations.
+
 (* 
 TODO:
 - Implement enough functionality to make the following code works:
@@ -32,8 +36,8 @@ use strum::IntoEnumIterator;
 *)
 
 Module Dependency.
-  Inductive Expr : Set := | Make .
-  Inductive BusIndex : Set := | Make .
+  Inductive Expr : Set := | Make_Expr .
+  Inductive BusIndex : Set := | Make_BusIndex .
 
   (* 
   pub struct Interaction<Expr> {
@@ -54,13 +58,16 @@ Module Dependency.
       pub count_weight: u32,
   }
   *)
-  Record InteractionBuilder : Set := {
+  (* TODO: examine this type in the future *)
+  Record Interaction (e : Expr) : Set := {
     message : list Expr;
     count : Expr;
     bus_index : BusIndex;
     count_weight : Z;
   }.
+End Dependency.
 
+Module VmAdapterInterface.
   (* 
   /// The interface between primitive AIR and machine adapter AIR.
   pub trait VmAdapterInterface<T> {
@@ -75,33 +82,35 @@ Module Dependency.
       type ProcessedInstruction;
   }
   *)
-  Class VmAdapterInterface (T : Set) : Set := {
+  Class t (T : Set) : Type := {
     Reads : Set;
     Writes : Set;
     ProcessedInstruction : Set;
   }.
+End VmAdapterInterface.
 
-  (* 
-  pub trait InteractionBuilder: AirBuilder {
-      /// Stores a new interaction in the builder.
-      ///
-      /// See [Interaction] for more details on `count_weight`.
-      fn push_interaction<E: Into<Self::Expr>>(
-          &mut self,
-          bus_index: BusIndex,
-          fields: impl IntoIterator<Item = E>,
-          count: impl Into<Self::Expr>,
-          count_weight: u32,
-      );
+(* 
+pub trait InteractionBuilder: AirBuilder {
+    /// Stores a new interaction in the builder.
+    ///
+    /// See [Interaction] for more details on `count_weight`.
+    fn push_interaction<E: Into<Self::Expr>>(
+        &mut self,
+        bus_index: BusIndex,
+        fields: impl IntoIterator<Item = E>,
+        count: impl Into<Self::Expr>,
+        count_weight: u32,
+    );
 
-      /// Returns the current number of interactions.
-      fn num_interactions(&self) -> usize;
+    /// Returns the current number of interactions.
+    fn num_interactions(&self) -> usize;
 
-      /// Returns all interactions stored.
-      fn all_interactions(&self) -> &[Interaction<Self::Expr>];
-  }
-  *)
-  Class InteractionBuilder : Set := {
+    /// Returns all interactions stored.
+    fn all_interactions(&self) -> &[Interaction<Self::Expr>];
+}
+*)
+Module InteractionBuilder.
+  Class t : Type := {
     (* Types from AirBuilder
     type F: Field;
     type Expr: Algebra<Self::F> + Algebra<Self::Var>;
@@ -113,7 +122,7 @@ Module Dependency.
     Var : Set;
     M : Set;
   }.
-End Dependency.
+End InteractionBuilder.
 
 (*
 #[repr(C)]
@@ -149,11 +158,10 @@ pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
     pc_step: u32,
 }
 *)
-Record BranchEqualCoreCols (NUM_LIMBS : Z) : Set := {
+Record BranchEqualCoreAir (NUM_LIMBS : Z) : Set := {
   offset : Z;
   pc_step : Z;
 }.
-
 
 (* ************* *)
 (* ****FOCUS**** *)
@@ -196,16 +204,26 @@ where
 {
 *)
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
-  (* 
-  TODO:
-  - Investigate VmCoreAir, understand its role
-  *)
-  (* TODO: define custom type for I *)
+  Import InteractionBuilder.
+
+  (* TODO: fill correctly into the function below *)
+  Definition test (T : Set) (NUM_LIMBS : Z) (local : BranchEqualCoreCols T NUM_LIMBS): unit :=
+    let cols := local in 
+    let f1 := cols.(opcode_beq_flag T NUM_LIMBS) in
+    let f2 := cols.(opcode_bne_flag T NUM_LIMBS) in
+    let flags := [f1; f2] in
+    tt.
+
   (* ********Types******** *)
-  (* TODO: check how to specify AB being an instance of a class *)
-  Context AB : Dependency.InteractionBuilder.
-  Context I : Dependency.VmAdapterInterface.
-  Context NUM_LIMBS : Z.
+  (* TODO:
+  - Define custom type for I
+  - Investigate VmCoreAir, understand its role
+  - Implement type conversion for BranchEqualCoreCols
+  *)
+  Context `{AB : InteractionBuilder.t}.
+  (* TODO: specify constraints for I's fields *)
+  Context `{I : VmAdapterInterface.t}.
+  Variable NUM_LIMBS : Z.
 
   (* TODO: maybe refine this code in the future *)
   Definition VmCoreAir_Self : Set. Admitted.
@@ -218,13 +236,25 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
           from_pc: AB::Var,
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
-  Definition eval (self : Set) (builder : AB) (local : list (AB.(Var))) (from_pc : AB.Var) : AdapterAirContext Expr I :=
+  Definition eval 
+  (T : Set) (NUM_LIMBS : Z) (* TODO: parameters for InteractionBuilder. To be eliminated *)
+  (self : Set) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
+  unit :=
+  (* AdapterAirContext Expr I := *)
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
     *)
-    let cols := local in
-    let flags := cols.(opcode_beq_flag) :: [cols.(opcode_bne_flag)] in
+    let cols := head local in (* TODO: examine this line of code *)
+    match cols with
+    | Some cols =>
+      let f1 := cols.(opcode_beq_flag T NUM_LIMBS) in
+      let f2 := cols.(opcode_bne_flag T NUM_LIMBS) in
+      let flags := [f1; f2] in
+      tt
+    | None => tt
+    end
+    .
 
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
