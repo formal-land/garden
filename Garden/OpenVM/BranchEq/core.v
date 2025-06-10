@@ -124,10 +124,83 @@ Module InteractionBuilder.
   }.
 End InteractionBuilder.
 
-(* TODO: maybe implement a coercion
-Definition A := nat.
-Definition B := nat.  (* trivial here for demo purposes *)
-Coercion A_to_B (a : A) : B := a.
+(* NOTE: for reference
+#[proc_macro_derive(AlignedBorrow)]
+pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as DeriveInput);
+    let name = &ast.ident;
+
+    // Get first generic which must be type (ex. `T`) for input <T, N: NumLimbs, const M: usize>
+    let type_generic = ast
+        .generics
+        .params
+        .iter()
+        .map(|param| match param {
+            GenericParam::Type(type_param) => &type_param.ident,
+            _ => panic!("Expected first generic to be a type"),
+        })
+        .next()
+        .expect("Expected at least one generic");
+
+    // Get generics after the first (ex. `N: NumLimbs, const M: usize`)
+    // We need this because when we assert the size, we want to substitute u8 for T.
+    let non_first_generics = ast
+        .generics
+        .params
+        .iter()
+        .skip(1)
+        .filter_map(|param| match param {
+            GenericParam::Type(type_param) => Some(&type_param.ident),
+            GenericParam::Const(const_param) => Some(&const_param.ident),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+
+    // Get impl generics (`<T, N: NumLimbs, const M: usize>`), type generics (`<T, N>`), where
+    // clause (`where T: Clone`)
+    let (impl_generics, type_generics, where_clause) = ast.generics.split_for_impl();
+
+    impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
+        fn borrow(&self) -> &#name #type_generics {
+            debug_assert_eq!(self.len(), #name::#type_generics::width());
+            let (prefix, shorts, _suffix) = unsafe { self.align_to::<#name #type_generics>() };
+            debug_assert!(prefix.is_empty(), "Alignment should match");
+            debug_assert_eq!(shorts.len(), 1);
+            &shorts[0]
+        }
+    }
+
+
+    let methods = quote! {
+        impl #impl_generics core::borrow::Borrow<#name #type_generics> for [#type_generic] #where_clause {
+            fn borrow(&self) -> &#name #type_generics {
+                debug_assert_eq!(self.len(), #name::#type_generics::width());
+                let (prefix, shorts, _suffix) = unsafe { self.align_to::<#name #type_generics>() };
+                debug_assert!(prefix.is_empty(), "Alignment should match");
+                debug_assert_eq!(shorts.len(), 1);
+                &shorts[0]
+            }
+        }
+
+        impl #impl_generics core::borrow::BorrowMut<#name #type_generics> for [#type_generic] #where_clause {
+            fn borrow_mut(&mut self) -> &mut #name #type_generics {
+                debug_assert_eq!(self.len(), #name::#type_generics::width());
+                let (prefix, shorts, _suffix) = unsafe { self.align_to_mut::<#name #type_generics>() };
+                debug_assert!(prefix.is_empty(), "Alignment should match");
+                debug_assert_eq!(shorts.len(), 1);
+                &mut shorts[0]
+            }
+        }
+
+        impl #impl_generics #name #type_generics {
+            pub const fn width() -> usize {
+                std::mem::size_of::<#name<u8 #(, #non_first_generics)*>>()
+            }
+        }
+    };
+
+    TokenStream::from(methods)
+}
 *)
 
 (* *************************** *)
@@ -160,6 +233,48 @@ Record BranchEqualCoreCols (T : Set) (NUM_LIMBS : Z) : Set := {
   opcode_bne_flag : T;
   diff_inv_marker : list T;
 }.
+
+(* From #[derive(AlignedBorrow)]
+impl <T NUM_LIMBS> core::borrow::Borrow<BranchEqualCoreCols T NUM_LIMBS> for [T] {
+    fn borrow(&self) -> &BranchEqualCoreCols T NUM_LIMBS {
+        debug_assert_eq!(self.len(), BranchEqualCoreCols::<T NUM_LIMBS>::width());
+        let (prefix, shorts, _suffix) = unsafe { self.align_to::<BranchEqualCoreCols T NUM_LIMBS>() };
+        debug_assert!(prefix.is_empty(), "Alignment should match");
+        debug_assert_eq!(shorts.len(), 1);
+        &shorts[0]
+    }
+}
+*)
+Module Impl_Borrow_BranchEqualCoreCols_for_T.
+  Fixpoint next_helper {T : Set} (n : nat) (src : list T) (store : list T) : list T * list T :=
+    match n with
+    | O => (src, [])
+    | S n' => match src with
+      | x :: xs => next_helper n' xs (store ++ [x])
+      | [] => (src, store)
+      end
+    end.
+
+  Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
+    next_helper n src [].
+
+  Definition borrow (T : Set) (cols : list T) (NUM_LIMBS : Z) (default_T : T)
+    : BranchEqualCoreCols T NUM_LIMBS :=
+    let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
+    let (cols, a) := next NUM_LIMBS' cols in
+    let (cols, b) := next NUM_LIMBS' cols in
+    let (cols, cmp_result) := next 1 cols in
+    let cmp_result := match (head cmp_result) with | Some x => x | None => default_T end in
+    let (cols, imm) := next 1 cols in
+    let imm := match (head imm) with | Some x => x | None => default_T end in
+    let (cols, opcode_beq_flag) := next 1 cols in
+    let opcode_beq_flag := match (head opcode_beq_flag) with | Some x => x | None => default_T end in
+    let (cols, opcode_bne_flag) := next 1 cols in
+    let opcode_bne_flag := match (head opcode_bne_flag) with | Some x => x | None => default_T end in
+    let (cols, diff_inv_marker) := next NUM_LIMBS' cols in
+    Build_BranchEqualCoreCols T NUM_LIMBS
+      a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
+End Impl_Borrow_BranchEqualCoreCols_for_T.
 
 (* 
 #[derive(Copy, Clone, Debug)]
@@ -200,10 +315,6 @@ Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
    BranchEqualCoreAir *)
 End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
-
-(* ************* *)
-(* ****FOCUS**** *)
-(* ************* *)
 (* 
 impl<AB, I, const NUM_LIMBS: usize> VmCoreAir<AB, I> for BranchEqualCoreAir<NUM_LIMBS>
 where
@@ -217,17 +328,17 @@ where
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   Import InteractionBuilder.
 
-
   (* ********TYPES******** *)
   (* TODO:
   - Investigate VmCoreAir, understand its role
-  - Investigate and implement type conversion for BranchEqualCoreCols
   *)
   Context `{AB : InteractionBuilder.t}.
   Context `{I : VmAdapterInterface.t}.
-  (* NOTE: demo to require subfield of I to be instance *)
-  (* Context `{From I.Reads}. *)
+  (* NOTE: demo to require subfield of I to be instance
+    Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
+
+  Parameter default_AB_Var : AB.(Var).
 
   (* Definition Self := VmCoreAir AB I. *)
   Definition Self : Set. Admitted. (* NOTE: stub *)
@@ -242,25 +353,24 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
   Definition eval 
-  (T : Set) (NUM_LIMBS : Z) (* TODO: parameters for InteractionBuilder. To be eliminated *)
-  (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
-  unit :=
-  (* AdapterAirContext Expr I := *)
-    (* 
-    let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
-    let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
-    *)
-    let cols := head local in (* TODO: examine this line of code *)
-    match cols with
-    | Some cols =>
-      let f1 := cols.(opcode_beq_flag T NUM_LIMBS) in
-      let f2 := cols.(opcode_bne_flag T NUM_LIMBS) in
+    (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
+      unit :=
+    (* AdapterAirContext Expr I := *)
+      (* 
+      let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
+      let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+      *)
+      let cols := Impl_Borrow_BranchEqualCoreCols_for_T.borrow 
+        AB.(Var) local NUM_LIMBS default_AB_Var in
+      let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS) in
+      let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS) in
       let flags := [f1; f2] in
-      tt
-    | None => tt
-    end
-    .
-
+      tt.
+    
+    (* ************* *)
+    (* ****FOCUS**** *)
+    (* ************* *)
+    (* TODO: Implement an `into` to just convert var into expr, in our case, actually just 1 bit(?) *)
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
               builder.assert_bool(flag);
