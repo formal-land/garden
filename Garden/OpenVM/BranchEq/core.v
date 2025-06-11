@@ -119,6 +119,9 @@ Module InteractionBuilder.
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
+    (* NOTE: in principle, these types are supposed to be able to do math. So here we
+    directly use Z to model them similar to what we do to all the Uints *)
+    (* TODO: figure out how to change the sets into Z *)
     F : Set;
     Expr : Set;
     Var : Set;
@@ -340,7 +343,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
-  Parameter default_AB_Var : AB.(Var).
+  Definition default_AB_Var : Z := 0.
 
   Axiom Var_is_Expr : AB.(Var) = AB.(Expr).
   (* TODO: write a function to convert AB.(Var) to AB.(Expr)
@@ -376,7 +379,11 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     (* ************* *)
     (* ****FOCUS**** *)
     (* ************* *)
-    (* TODO: Implement an `into` to just convert var into expr, in our case, actually just 1 bit(?) *)
+    (* TODO: 
+    - Implement an `into` to just convert var into expr, in our case, actually just 1 bit(?) 
+    - try to implement `add` for this type?
+    - Make a explicit expression to set constraint?
+    *)
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
               builder.assert_bool(flag);
