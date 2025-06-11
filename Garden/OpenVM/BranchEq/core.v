@@ -111,7 +111,23 @@ pub trait InteractionBuilder: AirBuilder {
     fn all_interactions(&self) -> &[Interaction<Self::Expr>];
 }
 *)
+
+
+(* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
+ we try to use Z to model them similar to what we do to all the Uints *)
+Class Number (N : Set) : Type := {
+  instance : N; (* Is this necessary? *)
+  number : Z;
+}.
+
 Module InteractionBuilder.
+  (* TODO: Define following functions:
+  - assert_bool
+  - assert_one
+  - assert_zero
+  return them as an expression rather than something to be computed immediately
+  *)
+
   Class t : Type := {
     (* Types from AirBuilder
     type F: Field;
@@ -119,12 +135,13 @@ Module InteractionBuilder.
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
-    (* NOTE: in principle, these types are supposed to be able to do math. So here we
-    directly use Z to model them similar to what we do to all the Uints *)
     (* TODO: figure out how to change the sets into Z *)
     F : Set;
+    Get_F : Number F;
     Expr : Set;
+    Get_Expr : Number Expr;
     Var : Set;
+    Get_Var : Number Var;
     M : Set;
   }.
 End InteractionBuilder.
@@ -229,7 +246,8 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
     pub diff_inv_marker: [T; NUM_LIMBS],
 }
 *)
-Record BranchEqualCoreCols (T : Set) (NUM_LIMBS : Z) : Set := {
+(* TODO: check if the number class works well *)
+Record BranchEqualCoreCols (T : Set) `{Number T} (NUM_LIMBS : Z) : Set := {
   a : list T;
   b : list T;
   cmp_result : T;
@@ -263,7 +281,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
   Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
     next_helper n src [].
 
-  Definition borrow (T : Set) (cols : list T) (NUM_LIMBS : Z) (default_T : T)
+  Definition borrow (T : Set) `{Number T} (cols : list T) (NUM_LIMBS : Z) (default_T : T)
     : BranchEqualCoreCols T NUM_LIMBS :=
     let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
     let (cols, a) := next NUM_LIMBS' cols in
@@ -277,7 +295,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
     let (cols, opcode_bne_flag) := next 1 cols in
     let opcode_bne_flag := match (head opcode_bne_flag) with | Some x => x | None => default_T end in
     let (cols, diff_inv_marker) := next NUM_LIMBS' cols in
-    Build_BranchEqualCoreCols T NUM_LIMBS
+    Build_BranchEqualCoreCols T _ NUM_LIMBS
       a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
 End Impl_Borrow_BranchEqualCoreCols_for_T.
 
@@ -343,7 +361,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
-  Definition default_AB_Var : Z := 0.
+  Parameter default_AB_Var : AB.(Var).
 
   Axiom Var_is_Expr : AB.(Var) = AB.(Expr).
   (* TODO: write a function to convert AB.(Var) to AB.(Expr)
@@ -361,6 +379,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
           from_pc: AB::Var,
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
+  Print Impl_Borrow_BranchEqualCoreCols_for_T.borrow.
   Definition eval 
     (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
       unit :=
