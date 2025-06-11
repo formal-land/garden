@@ -4,10 +4,12 @@ Import ListNotations.
 
 (* 
 TODO:
-- Investigate `local.borrow();`
-- Implement enough functionality to make the following code works:
-  let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
-  let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+- Find a way to make following code works:
+    let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
+              builder.assert_bool(flag);
+              acc + flag.into()
+          });
+- maybe design a unified way to express constraints defined by `assert_bool`
 *)
 
 (* 
@@ -340,6 +342,10 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
 
   Parameter default_AB_Var : AB.(Var).
 
+  Axiom Var_is_Expr : AB.(Var) = AB.(Expr).
+  (* TODO: write a function to convert AB.(Var) to AB.(Expr)
+    and assume that they are just the same *)
+
   (* Definition Self := VmCoreAir AB I. *)
   Definition Self : Set. Admitted. (* NOTE: stub *)
 
@@ -356,16 +362,16 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
       unit :=
     (* AdapterAirContext Expr I := *)
-      (* 
-      let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
-      let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
-      *)
-      let cols := Impl_Borrow_BranchEqualCoreCols_for_T.borrow 
-        AB.(Var) local NUM_LIMBS default_AB_Var in
-      let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS) in
-      let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS) in
-      let flags := [f1; f2] in
-      tt.
+    (* 
+    let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
+    let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
+    *)
+    let cols := Impl_Borrow_BranchEqualCoreCols_for_T.borrow 
+      AB.(Var) local NUM_LIMBS default_AB_Var in
+    let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS) in
+    let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS) in
+    let flags := [f1; f2] in
+    tt.
     
     (* ************* *)
     (* ****FOCUS**** *)
@@ -380,13 +386,12 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     let is_valid := _ in
     tt.
 
-    (* 
+    (* TODO: make some necessary checks for the thing below *)
+    (* TODOO: ask the purpose of is_valid
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    let assert_result := if _ then true else false in
-    let assert_result := if _ then assert_result else false in
-    (* TODO: completely ignore all the followings if assertion is false *)
+
 
     (* 
     let a = &cols.a;
@@ -407,21 +412,24 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
       + not(cols.cmp_result) * cols.opcode_bne_flag in
     let sum := cmp_eq in
 
+    (* 
+    // For BEQ, inv_marker is used to check equality of a and b:
+    // - If a == b, all inv_marker values must be 0 (sum = 0)
+    // - If a != b, inv_marker contains 0s for all positions except ONE position i where a[i] !=
+    //   b[i]
+    // - At this position, inv_marker[i] contains the multiplicative inverse of (a[i] - b[i])
+    // - This ensures inv_marker[i] * (a[i] - b[i]) = 1, making the sum = 1
+    // Note: There might be multiple valid inv_marker if a != b.
+    // But as long as the trace can provide at least one, that’s sufficient to prove a != b.
+    //
+    // Note:
+    // - If cmp_eq == 0, then it is impossible to have sum != 0 if a == b.
+    // - If cmp_eq == 1, then it is impossible for a[i] - b[i] == 0 to pass for all i if a != b.
+    *)
+
 
 
   (* 
-          // For BEQ, inv_marker is used to check equality of a and b:
-          // - If a == b, all inv_marker values must be 0 (sum = 0)
-          // - If a != b, inv_marker contains 0s for all positions except ONE position i where a[i] !=
-          //   b[i]
-          // - At this position, inv_marker[i] contains the multiplicative inverse of (a[i] - b[i])
-          // - This ensures inv_marker[i] * (a[i] - b[i]) = 1, making the sum = 1
-          // Note: There might be multiple valid inv_marker if a != b.
-          // But as long as the trace can provide at least one, that’s sufficient to prove a != b.
-          //
-          // Note:
-          // - If cmp_eq == 0, then it is impossible to have sum != 0 if a == b.
-          // - If cmp_eq == 1, then it is impossible for a[i] - b[i] == 0 to pass for all i if a != b.
           for i in 0..NUM_LIMBS {
               sum += (a[i] - b[i]) * inv_marker[i];
               builder.assert_zero(cmp_eq.clone() * (a[i] - b[i]));
