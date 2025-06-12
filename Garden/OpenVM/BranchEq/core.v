@@ -500,6 +500,10 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
       end
     in
     let (sum, record) := loop (Z.to_nat NUM_LIMBS) sum record in
+
+    (* ************* *)
+    (* ****FOCUS**** *)
+    (* ************* *)
     (* 
     let expected_opcode = flags
         .iter()
@@ -509,38 +513,27 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
         })
         + AB::Expr::from_canonical_usize(self.offset);
     *)
-
-    (* ************* *)
-    (* ****FOCUS**** *)
-    (* ************* *)
+    (* 
+    let to_pc = from_pc
+              + cols.cmp_result * cols.imm
+              + not(cols.cmp_result) * AB::Expr::from_canonical_u32(self.pc_step);
+    *)
+    (* 
+    AdapterAirContext {
+        to_pc: Some(to_pc),
+        reads: [cols.a.map(Into::into), cols.b.map(Into::into)].into(),
+        writes: Default::default(),
+        instruction: ImmInstruction {
+            is_valid,
+            opcode: expected_opcode,
+            immediate: cols.imm.into(),
+        }
+        .into(),
+    }
+    *)
     
     (tt, record)
     .
-
-
-
-  (* 
-          
-
-          
-
-          let to_pc = from_pc
-              + cols.cmp_result * cols.imm
-              + not(cols.cmp_result) * AB::Expr::from_canonical_u32(self.pc_step);
-
-          AdapterAirContext {
-              to_pc: Some(to_pc),
-              reads: [cols.a.map(Into::into), cols.b.map(Into::into)].into(),
-              writes: Default::default(),
-              instruction: ImmInstruction {
-                  is_valid,
-                  opcode: expected_opcode,
-                  immediate: cols.imm.into(),
-              }
-              .into(),
-          }
-      }
-  *)
 
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
 
