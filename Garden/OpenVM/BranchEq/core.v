@@ -40,10 +40,8 @@ Writer monad is definitely better but I feel it too heavy to implement for now
 *)
 Definition RecordRun {A B : Set} : Type := A * (list B).
 
+(* Datatype to present all asserted constraints *)
 Module Assert.
-  (* 
-  Datatype to present all generated assertions
-  *)
   Inductive t (A : Set) : Set :=
     | Mul : t A -> t A -> t A
     | _Add : t A -> t A -> t A
@@ -80,11 +78,11 @@ Definition assert_bool {A : Set} (c : A) : Assert.t A :=
 Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
   Assert._Add (assert_zero_A a) (assert_one_A a).
 
-(* A helper function just to make the assert definitions standing out *)
+(* A helper function just to make the assert operations standing out *)
 Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
   a :: l.
 
-(* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
+(* In principle, these types are supposed to be able to do math. So for InteractionBuilder
  we try to use Z to model them similar to what we do to all the Uints *)
 Class Number (N : Set) : Type := {
   get_number : Z;
