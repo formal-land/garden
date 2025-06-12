@@ -4,6 +4,8 @@ Import ListNotations.
 
 (* 
 TODO(PROGRESS):
+- Implement `AdapterAirContext`
+- Thought: can we just ignore all the computations and integrate assert functionality directly into the builder?
 - (Future)Write a convertion function to transform between `Number T` and its `T`, especially 
   in the context of list. Alternatively can we just delete the `Number` class safely?
 - (Future)Investigate how `builder` uses `assert` and see if its necessary to use builder to invoke them
@@ -40,7 +42,8 @@ Writer monad is definitely better but I feel it too heavy to implement for now
 *)
 Definition RecordRun {A B : Set} : Type := A * (list B).
 
-(* Datatype to present all asserted constraints *)
+(* Datatype to present all asserted constraints
+  Something that should actually be done by `AirBuilder` instances *)
 Module Assert.
   Inductive t (A : Set) : Set :=
     | Mul : t A -> t A -> t A
@@ -82,8 +85,8 @@ Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
 Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
   a :: l.
 
-(* In principle, these types are supposed to be able to do math. So for InteractionBuilder
- we try to use Z to model them similar to what we do to all the Uints *)
+(* In principle, types appeared in functions below are supposed to be able to do math. 
+  So for InteractionBuilder we try to use Z to model them similar to what we do to all the Uints *)
 Class Number (N : Set) : Type := {
   get_number : Z;
 }.
@@ -262,6 +265,7 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
 (* *************************** *)
 (* ****END OF DEPENDENCIES**** *)
 (* *************************** *)
+
 (*
 #[repr(C)]
 #[derive(AlignedBorrow)]
@@ -310,6 +314,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
       end
     end.
 
+  (* slice the first n elements of a list, return it with the remaining part of the list *)
   Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
     next_helper n src [].
 
@@ -494,6 +499,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
       end
     in
     let (sum, record) := loop (Z.to_nat NUM_LIMBS) sum record in
+    let record := assert record (Assert.Mul is_valid (assert_one_A sum)) in
 
     (* ************* *)
     (* ****FOCUS**** *)
