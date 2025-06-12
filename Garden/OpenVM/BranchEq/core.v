@@ -413,6 +413,11 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
           from_pc: AB::Var,
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
+  (* NOTE: In this function:
+  - `unit` is a stub for the actual return type
+  - `record` collects all constraints, which is the primary goal for current implementation
+  - `builder` hasn't been actually used
+  *)
   Definition eval 
     (self : Self) (local : list (Number AB.(Var))) (from_pc : AB.(Var)) : 
       (@RecordRun unit (Assert.t Z)) :=
