@@ -4,7 +4,6 @@ Import ListNotations.
 
 (* 
 TODO(PROGRESS):
-- Implement a foldr for obvious reason
 - (Future)Write a convertion function to transform between `Number T` and its `T`, especially 
   in the context of list. Alternatively can we just delete the `Number` class safely?
 - (Future)Investigate how `builder` uses `assert` and see if its necessary to use builder to invoke them
@@ -163,11 +162,12 @@ pub trait InteractionBuilder: AirBuilder {
 (* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
  we try to use Z to model them similar to what we do to all the Uints *)
 Class Number (N : Set) : Type := {
-  instance : N; (* Is this necessary? *)
   get_number : Z;
 }.
 
 Module InteractionBuilder.
+  (* NOTE: maybe we should require all types to be `Number T`
+  on the instance side *)
   Class t : Type := {
     (* Types from AirBuilder
     type F: Field;
@@ -176,11 +176,8 @@ Module InteractionBuilder.
     type M: Matrix<Self::Var>;
     *)
     F : Set;
-    Get_F : Number F;
     Expr : Set;
-    Get_Expr : Number Expr;
     Var : Set;
-    Get_Var : Number Var;
     M : Set;
   }.
 End InteractionBuilder.
