@@ -84,11 +84,10 @@ Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
 Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
   a :: l.
 
-
 (* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
  we try to use Z to model them similar to what we do to all the Uints *)
- Class Number (N : Set) : Type := {
- get_number : Z;
+Class Number (N : Set) : Type := {
+  get_number : Z;
 }.
 
 (* ****DEPENDENCIES**** *)
