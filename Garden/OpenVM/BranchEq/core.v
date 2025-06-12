@@ -173,6 +173,7 @@ Module InteractionBuilder.
     type M: Matrix<Self::Var>;
     *)
     F : Set;
+    (* Get_F : Number F; *)
     Expr : Set;
     Var : Set;
     M : Set;
@@ -261,7 +262,6 @@ pub fn aligned_borrow_derive(input: TokenStream) -> TokenStream {
 (* *************************** *)
 (* ****END OF DEPENDENCIES**** *)
 (* *************************** *)
-
 (*
 #[repr(C)]
 #[derive(AlignedBorrow)]
@@ -391,7 +391,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   Context `{AB : InteractionBuilder.t}.
   Context `{I : VmAdapterInterface.t}.
   (* NOTE: demo to require subfield of I to be instance
-    Context `{From I.Reads}. *)
+  Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
   Parameter default_AB_Var : Number AB.(Var).
