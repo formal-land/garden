@@ -3,10 +3,11 @@ Require Import List.
 Import ListNotations.
 
 (* 
-TODO:
-- Write a convertion function to transform between `Number T` and its `T`, especially 
-  in the context of list
-- maybe design a unified way to express constraints defined by `assert_bool`
+TODO(PROGRESS):
+- Implement a foldr for obvious reason
+- (Future)Write a convertion function to transform between `Number T` and its `T`, especially 
+  in the context of list. Alternatively can we just delete the `Number` class safely?
+- (Future)Investigate how `builder` uses `assert` and see if its necessary to use builder to invoke them
 *)
 
 (* 
@@ -34,6 +35,57 @@ use serde_big_array::BigArray;
 use strum::IntoEnumIterator;
 *)
 
+(* ****TOOLS**** *)
+(* Just a modified product type to conviniently record the constraints.
+Writer monad is definitely better but I feel it too heavy to implement for now
+*)
+Definition RecordRun {A B : Set} : Type := A * (list B).
+
+Module Assert.
+  (* 
+  Datatype to present all generated assertions
+  *)
+  Inductive t (A : Set) : Set :=
+    | Mul : t A -> t A -> t A
+    | _Add : t A -> t A -> t A
+    | Neg : t A -> t A
+    | Eq : t A -> t A -> t A
+    | Var : A -> t A
+    | One : t A
+    | Zero : t A
+    .
+  Arguments Mul {_} _ _.
+  Arguments _Add {_} _ _.
+  Arguments Neg {_} _.
+  Arguments Eq {_} _ _.
+  Arguments Var {_} _.
+  Arguments One {_}.
+  Arguments Zero {_}.
+End Assert.
+
+Definition assert_zero {A : Set} (c : A) : Assert.t A :=
+  Assert.Eq Assert.Zero (Assert.Var c).
+
+Definition assert_zero_A {A : Set} (a : Assert.t A) : Assert.t A :=
+  Assert.Eq Assert.Zero a.
+
+Definition assert_one {A : Set} (c : A) : Assert.t A :=
+  Assert.Eq Assert.One (Assert.Var c).
+
+Definition assert_one_A {A : Set} (a : Assert.t A) : Assert.t A :=
+  Assert.Eq Assert.One a.
+
+Definition assert_bool {A : Set} (c : A) : Assert.t A :=
+  Assert._Add (assert_zero c) (assert_one c).
+
+Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
+  Assert._Add (assert_zero_A a) (assert_one_A a).
+
+(* A helper function just to make the assert definitions standing out *)
+Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
+  a :: l.
+
+(* ****DEPENDENCIES**** *)
 Inductive Expr : Set := | Make_Expr .
 Inductive BusIndex : Set := | Make_BusIndex .
 
@@ -56,7 +108,6 @@ pub struct Interaction<Expr> {
     pub count_weight: u32,
 }
 *)
-(* TODO: examine this type in the future *)
 Module Interaction.
   Record t (e : Expr) : Set := {
     message : list Expr;
@@ -117,13 +168,6 @@ Class Number (N : Set) : Type := {
 }.
 
 Module InteractionBuilder.
-  (* TODO: Define following functions:
-  - assert_bool
-  - assert_one
-  - assert_zero
-  return them as an expression rather than something to be computed immediately
-  *)
-
   Class t : Type := {
     (* Types from AirBuilder
     type F: Field;
@@ -131,7 +175,6 @@ Module InteractionBuilder.
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
-    (* TODO: figure out how to change the sets into Z *)
     F : Set;
     Get_F : Number F;
     Expr : Set;
@@ -333,41 +376,6 @@ Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
    BranchEqualCoreAir *)
 End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
-(* Just a modified either type to conviniently record the constraints.
-  Writer monad is definitely better but I feel it too heavy to implement for now
-*)
-
-Definition RecordRun {A B : Set} : Type := A * (list B).
-
-Inductive Assert (A : Set) : Set :=
-  | And : Assert A -> Assert A -> Assert A
-  | Or : Assert A -> Assert A -> Assert A
-  | Neg : Assert A -> Assert A
-  | Eq : Assert A -> Assert A -> Assert A
-  | Var : A -> Assert A
-  | One : Assert A
-  | Zero : Assert A
-  .
-Arguments And {_} _ _.
-Arguments Or {_} _ _.
-Arguments Eq {_} _ _.
-Arguments Var {_} _.
-Arguments One {_}.
-Arguments Zero {_}.
-
-Definition assert_zero {A : Set} (c : A) : Assert A :=
-  Eq Zero (Var c).
-
-Definition assert_one {A : Set} (c : A) : Assert A :=
-  Eq One (Var c).
-
-Definition assert_bool {A : Set} (c : A) : Assert A :=
-  Or (assert_zero c) (assert_one c).
-
-(* A helper function just to make the assert definitions standing out *)
-Definition assert {A : Set} (l : list (Assert A)) (a : Assert A) :=
-  a :: l.
-
 (* 
 impl<AB, I, const NUM_LIMBS: usize> VmCoreAir<AB, I> for BranchEqualCoreAir<NUM_LIMBS>
 where
@@ -394,10 +402,6 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
 
   Parameter default_AB_Var : Number AB.(Var).
 
-  Axiom Var_is_Expr : AB.(Var) = AB.(Expr).
-  (* TODO: write a function to convert AB.(Var) to AB.(Expr)
-    and assume that they are just the same *)
-
   (* Definition Self := VmCoreAir AB I. *)
   Definition Self : Set. Admitted. (* NOTE: stub *)
 
@@ -412,19 +416,17 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   *)
   Definition eval 
     (self : Self) (local : list (Number AB.(Var))) (from_pc : AB.(Var)) : 
-      (@RecordRun unit (Assert Z)) :=
+      (@RecordRun unit (Assert.t Z)) :=
       (* AdapterAirContext Expr I := *)
-    let record : list (Assert Z) := [] in
+    let record : list (Assert.t Z) := [] in
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
     *)
     let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow AB.(Var)
       local NUM_LIMBS default_AB_Var in
-    let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS) in
-    let f1 := f1.(get_number) in
-    let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS) in
-    let f2 := f2.(get_number) in    
+    let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS).(get_number) in
+    let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS).(get_number) in
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
               builder.assert_bool(flag);
@@ -433,40 +435,34 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     *)
     let record := assert record (assert_bool f1) in
     let record := assert record (assert_bool f2) in
-    let is_valid := Z.add f1 f2 in
+    let is_valid := Assert._Add (Assert.Var f1) (Assert.Var f2) in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    let record := assert record (assert_bool is_valid) in
-    let cmp_result := cols.(cmp_result AB.(Var) NUM_LIMBS) in
-    let cmp_result := cmp_result.(get_number) in
+    let record := assert record (assert_bool_A is_valid) in
+    let cmp_result := cols.(cmp_result AB.(Var) NUM_LIMBS).(get_number) in
     let record := assert record (assert_bool cmp_result) in
-    (tt, record)
-    .
-    
-    (* ************* *)
-    (* ****FOCUS**** *)
-    (* ************* *)
     (* 
     let a = &cols.a;
     let b = &cols.b;
     let inv_marker = &cols.diff_inv_marker;
     *)
-    let a := cols.(a) in
-    let b := cols.(b) in
-    let inv_maker := cols.(diff_inv_marker) in
-
+    let a := cols.(a AB.(Var) NUM_LIMBS) in
+    let b := cols.(b AB.(Var) NUM_LIMBS) in
+    let inv_maker := cols.(diff_inv_marker AB.(Var) NUM_LIMBS) in
     (* 
     // 1 if cmp_result indicates a and b are equal, 0 otherwise
     let cmp_eq =
         cols.cmp_result * cols.opcode_beq_flag + not(cols.cmp_result) * cols.opcode_bne_flag;
     let mut sum = cmp_eq.clone();
     *)
-    let cmp_eq := cols.cmp_result * cols.opcode_beq_flag 
-      + not(cols.cmp_result) * cols.opcode_bne_flag in
+    let opcode_beq_flag := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS).(get_number) in
+    let opcode_bne_flag := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS).(get_number) in
+    let cmp_eq := Assert._Add 
+      (Assert.Mul (Assert.Var cmp_result) (Assert.Var opcode_beq_flag))
+      (Assert.Mul (Assert.Neg (Assert.Var cmp_result)) (Assert.Var opcode_bne_flag)) in
     let sum := cmp_eq in
-
     (* 
     // For BEQ, inv_marker is used to check equality of a and b:
     // - If a == b, all inv_marker values must be 0 (sum = 0)
@@ -480,24 +476,53 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     // Note:
     // - If cmp_eq == 0, then it is impossible to have sum != 0 if a == b.
     // - If cmp_eq == 1, then it is impossible for a[i] - b[i] == 0 to pass for all i if a != b.
+    for i in 0..NUM_LIMBS {
+        sum += (a[i] - b[i]) * inv_marker[i];
+        builder.assert_zero(cmp_eq.clone() * (a[i] - b[i]));
+    }
+    builder.when(is_valid.clone()).assert_one(sum); 
     *)
+    (* NOTE: A sole line `when(a).b` works as just a * b. If a sub builder 
+      is built with `when`, every constraints for the sub builder are prefixed with `a *`.
+    *)
+    let fix loop (n : nat) (sum : Assert.t Z) (record : list (Assert.t Z)) {struct n} := 
+      match n with 
+      | O => (sum, record)
+      | S n' =>
+        let x := minus (minus (Z.to_nat NUM_LIMBS) 1) n' in
+        let a_i := (nth n a default_AB_Var).(get_number) in
+        let b_i := (nth n b default_AB_Var).(get_number) in
+        let inv_maker_i := (nth n inv_maker default_AB_Var).(get_number) in
+        (* I feel minus doesnt need to be put into the contraint and can be computed immediately *)
+        let sum := Assert._Add sum (Assert.Mul (Assert.Var (Zminus a_i b_i)) (Assert.Var inv_maker_i)) in
+        let record := assert record (assert_zero_A (Assert.Mul cmp_eq (Assert.Var (Zminus a_i b_i)))) in
+        loop n' sum record
+      end
+    in
+    let (sum, record) := loop (Z.to_nat NUM_LIMBS) sum record in
+    (* 
+    let expected_opcode = flags
+        .iter()
+        .zip(BranchEqualOpcode::iter())
+        .fold(AB::Expr::ZERO, |acc, (flag, opcode)| {
+            acc + ( \*flag).into() * AB::Expr::from_canonical_u8(opcode as u8)
+        })
+        + AB::Expr::from_canonical_usize(self.offset);
+    *)
+
+    (* ************* *)
+    (* ****FOCUS**** *)
+    (* ************* *)
+    
+    (tt, record)
+    .
 
 
 
   (* 
-          for i in 0..NUM_LIMBS {
-              sum += (a[i] - b[i]) * inv_marker[i];
-              builder.assert_zero(cmp_eq.clone() * (a[i] - b[i]));
-          }
-          builder.when(is_valid.clone()).assert_one(sum);
+          
 
-          let expected_opcode = flags
-              .iter()
-              .zip(BranchEqualOpcode::iter())
-              .fold(AB::Expr::ZERO, |acc, (flag, opcode)| {
-                  acc + ( \*flag).into() * AB::Expr::from_canonical_u8(opcode as u8)
-              })
-              + AB::Expr::from_canonical_usize(self.offset);
+          
 
           let to_pc = from_pc
               + cols.cmp_result * cols.imm
