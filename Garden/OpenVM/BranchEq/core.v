@@ -84,6 +84,13 @@ Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
 Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
   a :: l.
 
+
+(* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
+ we try to use Z to model them similar to what we do to all the Uints *)
+ Class Number (N : Set) : Type := {
+ get_number : Z;
+}.
+
 (* ****DEPENDENCIES**** *)
 Inductive Expr : Set := | Make_Expr .
 Inductive BusIndex : Set := | Make_BusIndex .
@@ -158,13 +165,6 @@ pub trait InteractionBuilder: AirBuilder {
     fn all_interactions(&self) -> &[Interaction<Self::Expr>];
 }
 *)
-
-(* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
- we try to use Z to model them similar to what we do to all the Uints *)
-Class Number (N : Set) : Type := {
-  get_number : Z;
-}.
-
 Module InteractionBuilder.
   (* NOTE: maybe we should require all types to be `Number T`
   on the instance side *)
