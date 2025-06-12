@@ -4,11 +4,8 @@ Import ListNotations.
 
 (* 
 TODO:
-- Find a way to make following code works:
-    let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
-              builder.assert_bool(flag);
-              acc + flag.into()
-          });
+- Write a convertion function to transform between `Number T` and its `T`, especially 
+  in the context of list
 - maybe design a unified way to express constraints defined by `assert_bool`
 *)
 
@@ -112,12 +109,11 @@ pub trait InteractionBuilder: AirBuilder {
 }
 *)
 
-
 (* NOTE: In principle, these types are supposed to be able to do math. So for InteractionBuilder
  we try to use Z to model them similar to what we do to all the Uints *)
 Class Number (N : Set) : Type := {
   instance : N; (* Is this necessary? *)
-  number : Z;
+  get_number : Z;
 }.
 
 Module InteractionBuilder.
@@ -246,15 +242,14 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
     pub diff_inv_marker: [T; NUM_LIMBS],
 }
 *)
-(* TODO: check if the number class works well *)
 Record BranchEqualCoreCols (T : Set) `{Number T} (NUM_LIMBS : Z) : Set := {
-  a : list T;
-  b : list T;
-  cmp_result : T;
-  imm : T;
-  opcode_beq_flag : T;
-  opcode_bne_flag : T;
-  diff_inv_marker : list T;
+  a : list (Number T);
+  b : list (Number T);
+  cmp_result : (Number T);
+  imm : (Number T);
+  opcode_beq_flag : (Number T);
+  opcode_bne_flag : (Number T);
+  diff_inv_marker : list (Number T);
 }.
 
 (* From #[derive(AlignedBorrow)]
@@ -281,7 +276,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
   Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
     next_helper n src [].
 
-  Definition borrow (T : Set) `{Number T} (cols : list T) (NUM_LIMBS : Z) (default_T : T)
+  Definition borrow {T : Set} (cols : list (Number T)) (NUM_LIMBS : Z) (default_T : Number T)
     : BranchEqualCoreCols T NUM_LIMBS :=
     let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
     let (cols, a) := next NUM_LIMBS' cols in
@@ -338,6 +333,41 @@ Module Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
    BranchEqualCoreAir *)
 End Impl_BaseAirWithPublicValues_for_BranchEqualCoreAir.
 
+(* Just a modified either type to conviniently record the constraints.
+  Writer monad is definitely better but I feel it too heavy to implement for now
+*)
+
+Definition RecordRun {A B : Set} : Type := A * (list B).
+
+Inductive Assert (A : Set) : Set :=
+  | And : Assert A -> Assert A -> Assert A
+  | Or : Assert A -> Assert A -> Assert A
+  | Neg : Assert A -> Assert A
+  | Eq : Assert A -> Assert A -> Assert A
+  | Var : A -> Assert A
+  | One : Assert A
+  | Zero : Assert A
+  .
+Arguments And {_} _ _.
+Arguments Or {_} _ _.
+Arguments Eq {_} _ _.
+Arguments Var {_} _.
+Arguments One {_}.
+Arguments Zero {_}.
+
+Definition assert_zero {A : Set} (c : A) : Assert A :=
+  Eq Zero (Var c).
+
+Definition assert_one {A : Set} (c : A) : Assert A :=
+  Eq One (Var c).
+
+Definition assert_bool {A : Set} (c : A) : Assert A :=
+  Or (assert_zero c) (assert_one c).
+
+(* A helper function just to make the assert definitions standing out *)
+Definition assert {A : Set} (l : list (Assert A)) (a : Assert A) :=
+  a :: l.
+
 (* 
 impl<AB, I, const NUM_LIMBS: usize> VmCoreAir<AB, I> for BranchEqualCoreAir<NUM_LIMBS>
 where
@@ -350,6 +380,7 @@ where
 *)
 Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   Import InteractionBuilder.
+  Import Number.
 
   (* ********TYPES******** *)
   (* TODO:
@@ -361,7 +392,7 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
-  Parameter default_AB_Var : AB.(Var).
+  Parameter default_AB_Var : Number AB.(Var).
 
   Axiom Var_is_Expr : AB.(Var) = AB.(Expr).
   (* TODO: write a function to convert AB.(Var) to AB.(Expr)
@@ -379,46 +410,44 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
           from_pc: AB::Var,
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
-  Print Impl_Borrow_BranchEqualCoreCols_for_T.borrow.
   Definition eval 
-    (self : Self) (local : list (AB.(Var))) (from_pc : AB.(Var)) : 
-      unit :=
-    (* AdapterAirContext Expr I := *)
+    (self : Self) (local : list (Number AB.(Var))) (from_pc : AB.(Var)) : 
+      (@RecordRun unit (Assert Z)) :=
+      (* AdapterAirContext Expr I := *)
+    let record : list (Assert Z) := [] in
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
     *)
-    let cols := Impl_Borrow_BranchEqualCoreCols_for_T.borrow 
-      AB.(Var) local NUM_LIMBS default_AB_Var in
+    let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow AB.(Var)
+      local NUM_LIMBS default_AB_Var in
     let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS) in
+    let f1 := f1.(get_number) in
     let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS) in
-    let flags := [f1; f2] in
-    tt.
-    
-    (* ************* *)
-    (* ****FOCUS**** *)
-    (* ************* *)
-    (* TODO: 
-    - Implement an `into` to just convert var into expr, in our case, actually just 1 bit(?) 
-    - try to implement `add` for this type?
-    - Make a explicit expression to set constraint?
-    *)
+    let f2 := f2.(get_number) in    
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
               builder.assert_bool(flag);
               acc + flag.into()
           });
     *)
-    let is_valid := _ in
-    tt.
-
-    (* TODO: make some necessary checks for the thing below *)
-    (* TODOO: ask the purpose of is_valid
+    let record := assert record (assert_bool f1) in
+    let record := assert record (assert_bool f2) in
+    let is_valid := Z.add f1 f2 in
+    (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-
-
+    let record := assert record (assert_bool is_valid) in
+    let cmp_result := cols.(cmp_result AB.(Var) NUM_LIMBS) in
+    let cmp_result := cmp_result.(get_number) in
+    let record := assert record (assert_bool cmp_result) in
+    (tt, record)
+    .
+    
+    (* ************* *)
+    (* ****FOCUS**** *)
+    (* ************* *)
     (* 
     let a = &cols.a;
     let b = &cols.b;
