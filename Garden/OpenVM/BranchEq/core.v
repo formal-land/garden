@@ -43,11 +43,14 @@ Writer monad is definitely better but I feel it too heavy to implement for now
 Definition RecordRun {A B : Set} : Type := A * (list B).
 
 (* Datatype to present all asserted constraints
-  Something that should actually be done by `AirBuilder` instances *)
+  Something that should actually be done by `AirBuilder` instances 
+  as a intermediate way that deserves a better integration *)
 Module Assert.
   Inductive t (A : Set) : Set :=
+    (* We can safely use these operations as being required for `AirBuilder::Var` *)
     | Mul : t A -> t A -> t A
     | _Add : t A -> t A -> t A
+    | Sub : t A -> t A -> t A
     | Neg : t A -> t A
     | Eq : t A -> t A -> t A
     | Var : A -> t A
@@ -56,6 +59,7 @@ Module Assert.
     .
   Arguments Mul {_} _ _.
   Arguments _Add {_} _ _.
+  Arguments Sub {_} _ _.
   Arguments Neg {_} _.
   Arguments Eq {_} _ _.
   Arguments Var {_} _.
@@ -166,20 +170,51 @@ pub trait InteractionBuilder: AirBuilder {
 }
 *)
 Module InteractionBuilder.
-  (* NOTE: maybe we should require all types to be `Number T`
-  on the instance side *)
-  Class t : Type := {
+
+  (* NOTE: for future reference
+  Class F {T : Type} : Type := {
+    get_num : Z;
+  }.
+  *)
+
+  Class F (T : Type) : Type := {
+    get_num : T;
+    (* TODO: other constraints to make T closer to Z and vice versa... *)
+  }.
+
+  (* TODO: figure out how to 
+    implement an instance so that `Z` is always recognized? *)
+  Global Instance F_Z : F Z. Admitted.
+
+  Class Var (T : Type) `{F T} : Type := {
+    get_f : F T;
+  }.
+
+  (* TODO: define some helpers...
+  - get_var_num : get the underlying number from var wrapper
+  - assert_zero : for obvious reason and purpose
+  - when : should we implement this?
+  *)
+
+  Class Expr (T : Type) `{Var T} : Type := {
+    get_var : Var T;
+  }.
+
+  Definition M (T : Type) `{F T} := list (list (Var T)).
+  (* NOTE: maybe we should require all types to be `Number T` on the instance side *)
+  Class t (T : Type) 
+    `{F T} `{Expr T} `{Var T}
+  : Type := {
     (* Types from AirBuilder
     type F: Field;
     type Expr: Algebra<Self::F> + Algebra<Self::Var>;
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
-    F : Set;
-    (* Get_F : Number F; *)
-    Expr : Set;
-    Var : Set;
-    M : Set;
+    _F : F T;
+    _Expr : Expr T;
+    _Var : Var T;
+    _M : M T;
   }.
 End InteractionBuilder.
 
@@ -497,9 +532,10 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
         let a_i := (nth n a default_AB_Var).(get_number) in
         let b_i := (nth n b default_AB_Var).(get_number) in
         let inv_maker_i := (nth n inv_maker default_AB_Var).(get_number) in
-        (* I feel minus doesnt need to be put into the contraint and can be computed immediately *)
-        let sum := Assert._Add sum (Assert.Mul (Assert.Var (Zminus a_i b_i)) (Assert.Var inv_maker_i)) in
-        let record := assert record (assert_zero_A (Assert.Mul cmp_eq (Assert.Var (Zminus a_i b_i)))) in
+        let sum := Assert._Add sum 
+          (Assert.Mul (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)) (Assert.Var inv_maker_i)) in
+        let record := assert record (assert_zero_A 
+          (Assert.Mul cmp_eq (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)))) in
         loop n' sum record
       end
     in
