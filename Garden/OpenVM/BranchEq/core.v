@@ -6,9 +6,6 @@ Import ListNotations.
 TODO(PROGRESS):
 - Implement `AdapterAirContext`
 - Thought: can we just ignore all the computations and integrate assert functionality directly into the builder?
-- (Future)Write a convertion function to transform between `Number T` and its `T`, especially 
-  in the context of list. Alternatively can we just delete the `Number` class safely?
-- (Future)Investigate how `builder` uses `assert` and see if its necessary to use builder to invoke them
 *)
 
 (* 
@@ -40,7 +37,7 @@ use strum::IntoEnumIterator;
 (* Just a modified product type to conviniently record the constraints.
 Writer monad is definitely better but I feel it too heavy to implement for now
 *)
-Definition RecordRun {A B : Set} : Type := A * (list B).
+Definition RecordRun {A B : Set} : Type := A * B.
 
 (* ****DEPENDENCIES**** *)
 (* Inductive Expr : Set := | Make_Expr . *)
@@ -118,7 +115,7 @@ pub trait InteractionBuilder: AirBuilder {
 *)
 Module InteractionBuilder.
 
-(* Datatype to present all asserted constraints
+  (* Datatype to present all asserted constraints
   Something that should actually be done by `AirBuilder` instances 
   as a intermediate tool deserving a better integration *)
   Module Assert.
@@ -160,21 +157,13 @@ Module InteractionBuilder.
   Record Expr := {
     num_expr : Var;
   }.
-  (* Global Instance make_Expr_Z `{Var Z} (* Look at this cute little extra parameter that we cannot eliminate *) 
-    (varz : Var Z) : Expr Z := {
-    get_var := varz;
-  }. *)
 
   Definition to_expr (v : Var) : Expr :=
     Build_Expr v.
 
-  Definition M := list (list Var). (* Should we also model with a class? *)
+  Definition M := list (list Var).
 
-  (* TODO: define functions...
-  - get_var_num : get the underlying number from var wrapper
-  - assert_zero : for obvious reason and purpose
-  - when : should we implement this?
-  *)
+  (* TODO: Extend to any types beyond Z in the future *)
   Record Builder := {
     (* Types from AirBuilder
     type F: Field;
@@ -192,36 +181,51 @@ Module InteractionBuilder.
     constraints : list (Assert.t Expr);
     assertions : list (Assert.t Expr);
   }.
+  Fixpoint aggregate_constraints (l : list (Assert.t Expr)) : Assert.t Expr :=
+    match l with
+    | [] => Assert.Zero
+    | x :: xs => Assert.Mul x (aggregate_constraints xs)
+    end.
 
-  (* TODO:
-  - extend to any types beyond Z in the future
-  - make it more integrated into the builder class
-  *)
-  (* NOTE: we try to use the types inside the builder, to enforce consistency between the types *)
-  Definition assert_zero (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
-    Assert.Eq Assert.Zero (Assert.Var e).
+  Definition assert (builder : Builder) (a : Assert.t builder.(_Expr)) : Builder :=
+    let c' := builder.(constraints) in
+    let a' := builder.(assertions) in
+    let a := Assert.Mul (aggregate_constraints c') a in
+    Build_Builder c' (a' ++ [a]).
 
-  Definition assert_zero_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
-    Assert.Eq Assert.Zero a.
+  Definition when (builder : Builder) (c : Assert.t builder.(_Expr)) : Builder :=
+    let c' := builder.(constraints) in
+    let a' := builder.(assertions) in
+    Build_Builder (c :: c') a'.
+  
+  (* Pop a constraint off to simulate one constraint being removed *)
+  Definition end_when (builder : Builder) : Builder :=
+    let c' := builder.(constraints) in
+    let c := match c' with
+    | [] => c'
+    | _ :: c => c
+    end in
+    let a' := builder.(assertions) in
+    Build_Builder c a'.
 
-  Definition assert_one (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
-    Assert.Eq Assert.One (Assert.Var e).
+  Definition assert_zero_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Builder :=
+    assert builder (Assert.Eq Assert.Zero a).
 
-  Definition assert_one_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
-    Assert.Eq Assert.One a.
+  Definition assert_zero (builder : Builder) (e : builder.(_Expr)) : Builder :=
+    assert_zero_A builder (Assert.Var e).
 
-  Definition assert_bool (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
-    Assert._Add (assert_zero builder e) (assert_one builder e).
+  Definition assert_one_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Builder :=
+    assert builder (Assert.Eq Assert.One a).
 
-  Definition assert_bool_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
-    Assert._Add (assert_zero_A builder a) (assert_one_A builder a).
+  Definition assert_one (builder : Builder) (e : builder.(_Expr)) : Builder :=
+    assert_one_A builder (Assert.Var e).
 
-  (* A helper function just to make the assert operations standing out *)
-  Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
-    a :: l.
+  (* x * (1 - x) *)
+  Definition assert_bool_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Builder :=
+    assert builder (Assert.Mul a (Assert.Neg a)).
 
-  Definition when (builder : Builder) (a : Assert.t builder.(_Expr)) : unit :=
-    let _F := builder.(_F) in tt. (* stub*)
+  Definition assert_bool (builder : Builder) (e : builder.(_Expr)) : Builder :=
+    assert_bool_A builder (Assert.Var e).
 End InteractionBuilder.
 
 (* NOTE: for reference
@@ -436,14 +440,16 @@ where
 {
 *)
 Module Impl_VmCoreAir_for_BranchEqualCoreAir.
+  (* TODO:
+  - Investigate VmCoreAir, understand its role
+  *)
+  (* Definition Self := VmCoreAir AB I. *)
+  Definition Self : Set. Admitted. (* NOTE: stub *)
+
   Section Impl.
   Import InteractionBuilder.
   Import Number.
 
-  (* ********TYPES******** *)
-  (* TODO:
-  - Investigate VmCoreAir, understand its role
-  *)
   Context (builder : InteractionBuilder.Builder). (* We ignore the AB for now *)
   Context `{I : VmAdapterInterface.t}.
   (* NOTE: demo to require subfield of I to be instance
@@ -452,9 +458,6 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
 
   Parameter default_AB_Var : builder.(_Var).
   Parameter default_AB_Expr : builder.(_Expr).
-
-  (* Definition Self := VmCoreAir AB I. *)
-  Definition Self : Set. Admitted. (* NOTE: stub *)
 
   (* ********FUNCTIIONS******** *)
   (* 
@@ -473,9 +476,8 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   Definition eval 
     (self : Self) 
     (local : list builder.(_Var)) (from_pc : builder.(_Var)) : 
-      (@RecordRun unit (Assert.t builder.(_Expr))) :=
+      (@RecordRun unit Builder) :=
       (* AdapterAirContext Expr I := *)
-    let record : list (Assert.t builder.(_Expr)) := [] in
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
@@ -490,16 +492,16 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
               acc + flag.into()
           });
     *)
-    let record := assert record (assert_bool builder f1) in
-    let record := assert record (assert_bool builder f2) in
+    let builder := assert_bool builder f1 in
+    let builder := assert_bool builder f2 in
     let is_valid := Assert._Add (Assert.Var f1) (Assert.Var f2) in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    let record := assert record (assert_bool_A builder is_valid) in
+    let builder := assert_bool_A builder is_valid in
     let cmp_result := cols.(cmp_result NUM_LIMBS) in
-    let record := assert record (assert_bool builder cmp_result) in
+    let builder := assert_bool builder cmp_result in
     (* 
     let a = &cols.a;
     let b = &cols.b;
@@ -543,9 +545,9 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
       is built with `when`, every constraints for the sub builder are prefixed with `a *`.
     *)
     let fix loop (n : nat) (sum : Assert.t builder.(_Expr)) 
-      (record : list (Assert.t builder.(_Expr))) {struct n} := 
+      (builder : Builder) {struct n} := 
       match n with 
-      | O => (sum, record)
+      | O => (sum, builder)
       | S n' =>
         let x := minus (minus (Z.to_nat NUM_LIMBS) 1) n' in
         let a_i := nth n a default_AB_Expr in
@@ -553,13 +555,15 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
         let inv_maker_i := nth n inv_maker default_AB_Expr in
         let sum := Assert._Add sum 
           (Assert.Mul (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)) (Assert.Var inv_maker_i)) in
-        let record := assert record (assert_zero_A builder
-          (Assert.Mul cmp_eq (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)))) in
-        loop n' sum record
+        let builder := assert_zero_A builder
+          (Assert.Mul cmp_eq (Assert.Sub (Assert.Var a_i) (Assert.Var b_i))) in
+        loop n' sum builder
       end
     in
-    let (sum, record) := loop (Z.to_nat NUM_LIMBS) sum record in
-    let record := assert record (Assert.Mul is_valid (assert_one_A builder sum)) in
+    let (sum, builder) := loop (Z.to_nat NUM_LIMBS) sum builder in
+    let builder := when builder is_valid in
+    let builder := assert_one_A builder sum in     
+    let builder := end_when builder in
     (* ************* *)
     (* ****FOCUS**** *)
     (* ************* *)
@@ -590,11 +594,9 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
         .into(),
     }
     *)
-    (tt, record).
+    (tt, builder).
   End Impl.
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
-
-Print Impl_VmCoreAir_for_BranchEqualCoreAir.eval.
 
 (*
     fn start_offset(&self) -> usize {
