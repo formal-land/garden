@@ -141,6 +141,8 @@ Module InteractionBuilder.
     Arguments Zero {_}.
   End Assert.
 
+  (* TODO: define axioms specifying when `Eq Zero` is true *)
+
   (* NOTE: for future reference
   Class F {T : Type} : Type := {
     get_num : Z;
@@ -181,16 +183,26 @@ Module InteractionBuilder.
     constraints : list (Assert.t Expr);
     assertions : list (Assert.t Expr);
   }.
-  Fixpoint aggregate_constraints (l : list (Assert.t Expr)) : Assert.t Expr :=
+
+  (* TODO: this function is totally wrong. Rewrite this *)
+  Fixpoint aggregate_constraints (l : list (Assert.t Expr)) : option (Assert.t Expr) :=
     match l with
-    | [] => Assert.Zero
-    | x :: xs => Assert.Mul x (aggregate_constraints xs)
+    | x :: [] => Some x
+    | x :: xs => match (aggregate_constraints xs) with
+      | Some x' => Some (Assert.Mul x x')
+      | None => None
+      end
+    | [] => None
     end.
 
   Definition assert (builder : Builder) (a : Assert.t builder.(_Expr)) : Builder :=
     let c' := builder.(constraints) in
     let a' := builder.(assertions) in
-    let a := Assert.Mul (aggregate_constraints c') a in
+    let c'' := aggregate_constraints c' in
+    let a := match c'' with
+    | Some c'' => Assert.Mul c'' a
+    | None => a
+    end in
     Build_Builder c' (a' ++ [a]).
 
   Definition when (builder : Builder) (c : Assert.t builder.(_Expr)) : Builder :=
