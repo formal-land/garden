@@ -42,62 +42,9 @@ Writer monad is definitely better but I feel it too heavy to implement for now
 *)
 Definition RecordRun {A B : Set} : Type := A * (list B).
 
-(* Datatype to present all asserted constraints
-  Something that should actually be done by `AirBuilder` instances 
-  as a intermediate way that deserves a better integration *)
-Module Assert.
-  Inductive t (A : Set) : Set :=
-    (* We can safely use these operations as being required for `AirBuilder::Var` *)
-    | Mul : t A -> t A -> t A
-    | _Add : t A -> t A -> t A
-    | Sub : t A -> t A -> t A
-    | Neg : t A -> t A
-    | Eq : t A -> t A -> t A
-    | Var : A -> t A
-    | One : t A
-    | Zero : t A
-    .
-  Arguments Mul {_} _ _.
-  Arguments _Add {_} _ _.
-  Arguments Sub {_} _ _.
-  Arguments Neg {_} _.
-  Arguments Eq {_} _ _.
-  Arguments Var {_} _.
-  Arguments One {_}.
-  Arguments Zero {_}.
-End Assert.
-
-Definition assert_zero {A : Set} (c : A) : Assert.t A :=
-  Assert.Eq Assert.Zero (Assert.Var c).
-
-Definition assert_zero_A {A : Set} (a : Assert.t A) : Assert.t A :=
-  Assert.Eq Assert.Zero a.
-
-Definition assert_one {A : Set} (c : A) : Assert.t A :=
-  Assert.Eq Assert.One (Assert.Var c).
-
-Definition assert_one_A {A : Set} (a : Assert.t A) : Assert.t A :=
-  Assert.Eq Assert.One a.
-
-Definition assert_bool {A : Set} (c : A) : Assert.t A :=
-  Assert._Add (assert_zero c) (assert_one c).
-
-Definition assert_bool_A {A : Set} (a : Assert.t A) : Assert.t A :=
-  Assert._Add (assert_zero_A a) (assert_one_A a).
-
-(* A helper function just to make the assert operations standing out *)
-Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
-  a :: l.
-
-(* In principle, types appeared in functions below are supposed to be able to do math. 
-  So for InteractionBuilder we try to use Z to model them similar to what we do to all the Uints *)
-Class Number (N : Set) : Type := {
-  get_number : Z;
-}.
-
 (* ****DEPENDENCIES**** *)
-Inductive Expr : Set := | Make_Expr .
-Inductive BusIndex : Set := | Make_BusIndex .
+(* Inductive Expr : Set := | Make_Expr . *)
+(* Inductive BusIndex : Set := | Make_BusIndex . *)
 
 (* 
 pub struct Interaction<Expr> {
@@ -118,14 +65,14 @@ pub struct Interaction<Expr> {
     pub count_weight: u32,
 }
 *)
-Module Interaction.
+(* Module Interaction.
   Record t (e : Expr) : Set := {
     message : list Expr;
     count : Expr;
     bus_index : BusIndex;
     count_weight : Z;
   }.
-End Interaction.
+End Interaction. *)
 
 Module VmAdapterInterface.
   (* 
@@ -171,51 +118,110 @@ pub trait InteractionBuilder: AirBuilder {
 *)
 Module InteractionBuilder.
 
+(* Datatype to present all asserted constraints
+  Something that should actually be done by `AirBuilder` instances 
+  as a intermediate tool deserving a better integration *)
+  Module Assert.
+    (* TODO: directly convert the generated terms into a proposition *)
+    Inductive t (A : Set) : Set :=
+      (* We can safely use these operations as being required for `AirBuilder::Var` *)
+      | Mul : t A -> t A -> t A
+      | _Add : t A -> t A -> t A
+      | Sub : t A -> t A -> t A
+      | Neg : t A -> t A
+      | Eq : t A -> t A -> t A
+      | Var : A -> t A
+      | One : t A
+      | Zero : t A
+      .
+    Arguments Mul {_} _ _.
+    Arguments _Add {_} _ _.
+    Arguments Sub {_} _ _.
+    Arguments Neg {_} _.
+    Arguments Eq {_} _ _.
+    Arguments Var {_} _.
+    Arguments One {_}.
+    Arguments Zero {_}.
+  End Assert.
+
   (* NOTE: for future reference
   Class F {T : Type} : Type := {
     get_num : Z;
   }.
   *)
-
-  Class F (T : Type) : Type := {
-    get_num : T;
-    (* TODO: other constraints to make T closer to Z and vice versa... *)
+  Record F := {
+    num : Z;
   }.
 
-  (* TODO: figure out how to 
-    implement an instance so that `Z` is always recognized? *)
-  Global Instance F_Z : F Z. Admitted.
-
-  Class Var (T : Type) `{F T} : Type := {
-    get_f : F T;
+  Record Var := {
+    num_var : F;
   }.
 
-  (* TODO: define some helpers...
+  Record Expr := {
+    num_expr : Var;
+  }.
+  (* Global Instance make_Expr_Z `{Var Z} (* Look at this cute little extra parameter that we cannot eliminate *) 
+    (varz : Var Z) : Expr Z := {
+    get_var := varz;
+  }. *)
+
+  Definition to_expr (v : Var) : Expr :=
+    Build_Expr v.
+
+  Definition M := list (list Var). (* Should we also model with a class? *)
+
+  (* TODO: define functions...
   - get_var_num : get the underlying number from var wrapper
   - assert_zero : for obvious reason and purpose
   - when : should we implement this?
   *)
-
-  Class Expr (T : Type) `{Var T} : Type := {
-    get_var : Var T;
-  }.
-
-  Definition M (T : Type) `{F T} := list (list (Var T)).
-  (* NOTE: maybe we should require all types to be `Number T` on the instance side *)
-  Class t (T : Type) 
-    `{F T} `{Expr T} `{Var T}
-  : Type := {
+  Record Builder := {
     (* Types from AirBuilder
     type F: Field;
     type Expr: Algebra<Self::F> + Algebra<Self::Var>;
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
-    _F : F T;
-    _Expr : Expr T;
-    _Var : Var T;
-    _M : M T;
+    (* The dependencies between the types seem to be a little bit hard to express.
+    We might find another external way to express this *)
+    _F := F; 
+    _Expr := Expr;
+    _Var := Var;
+    _M := M;
+
+    constraints : list (Assert.t Expr);
+    assertions : list (Assert.t Expr);
   }.
+
+  (* TODO:
+  - extend to any types beyond Z in the future
+  - make it more integrated into the builder class
+  *)
+  (* NOTE: we try to use the types inside the builder, to enforce consistency between the types *)
+  Definition assert_zero (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
+    Assert.Eq Assert.Zero (Assert.Var e).
+
+  Definition assert_zero_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
+    Assert.Eq Assert.Zero a.
+
+  Definition assert_one (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
+    Assert.Eq Assert.One (Assert.Var e).
+
+  Definition assert_one_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
+    Assert.Eq Assert.One a.
+
+  Definition assert_bool (builder : Builder) (e : builder.(_Expr)) : Assert.t builder.(_Expr) :=
+    Assert._Add (assert_zero builder e) (assert_one builder e).
+
+  Definition assert_bool_A (builder : Builder) (a : Assert.t (builder.(_Expr))) : Assert.t builder.(_Expr) :=
+    Assert._Add (assert_zero_A builder a) (assert_one_A builder a).
+
+  (* A helper function just to make the assert operations standing out *)
+  Definition assert {A : Set} (l : list (Assert.t A)) (a : Assert.t A) :=
+    a :: l.
+
+  Definition when (builder : Builder) (a : Assert.t builder.(_Expr)) : unit :=
+    let _F := builder.(_F) in tt. (* stub*)
 End InteractionBuilder.
 
 (* NOTE: for reference
@@ -318,14 +324,17 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
     pub diff_inv_marker: [T; NUM_LIMBS],
 }
 *)
-Record BranchEqualCoreCols (T : Set) `{Number T} (NUM_LIMBS : Z) : Set := {
-  a : list (Number T);
-  b : list (Number T);
-  cmp_result : (Number T);
-  imm : (Number T);
-  opcode_beq_flag : (Number T);
-  opcode_bne_flag : (Number T);
-  diff_inv_marker : list (Number T);
+(* For similar reason to above, here we put in a concrete type and later we will
+see how to extend the type *)
+(* NOTE that we didnt use the T here... *)
+Record BranchEqualCoreCols (NUM_LIMBS : Z) : Set := {
+  a : list InteractionBuilder.Expr;
+  b : list InteractionBuilder.Expr;
+  cmp_result : InteractionBuilder.Expr;
+  imm : InteractionBuilder.Expr;
+  opcode_beq_flag : InteractionBuilder.Expr;
+  opcode_bne_flag : InteractionBuilder.Expr;
+  diff_inv_marker : list InteractionBuilder.Expr;
 }.
 
 (* From #[derive(AlignedBorrow)]
@@ -353,21 +362,27 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
   Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
     next_helper n src [].
 
-  Definition borrow {T : Set} (cols : list (Number T)) (NUM_LIMBS : Z) (default_T : Number T)
-    : BranchEqualCoreCols T NUM_LIMBS :=
+  Print map.
+
+  (* NOTE: for now, InteractionBuilder only *)
+  Definition borrow (cols : list InteractionBuilder.Var) (NUM_LIMBS : Z) (default_T : InteractionBuilder.Var)
+    : BranchEqualCoreCols NUM_LIMBS :=
     let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
     let (cols, a) := next NUM_LIMBS' cols in
+    let a := map InteractionBuilder.to_expr a in
     let (cols, b) := next NUM_LIMBS' cols in
+    let b := map InteractionBuilder.to_expr b in
     let (cols, cmp_result) := next 1 cols in
-    let cmp_result := match (head cmp_result) with | Some x => x | None => default_T end in
+    let cmp_result := InteractionBuilder.to_expr (match (head cmp_result) with | Some x => x | None => default_T end) in
     let (cols, imm) := next 1 cols in
-    let imm := match (head imm) with | Some x => x | None => default_T end in
+    let imm := InteractionBuilder.to_expr (match (head imm) with | Some x => x | None => default_T end) in
     let (cols, opcode_beq_flag) := next 1 cols in
-    let opcode_beq_flag := match (head opcode_beq_flag) with | Some x => x | None => default_T end in
+    let opcode_beq_flag := InteractionBuilder.to_expr (match (head opcode_beq_flag) with | Some x => x | None => default_T end) in
     let (cols, opcode_bne_flag) := next 1 cols in
-    let opcode_bne_flag := match (head opcode_bne_flag) with | Some x => x | None => default_T end in
+    let opcode_bne_flag := InteractionBuilder.to_expr (match (head opcode_bne_flag) with | Some x => x | None => default_T end) in
     let (cols, diff_inv_marker) := next NUM_LIMBS' cols in
-    Build_BranchEqualCoreCols T _ NUM_LIMBS
+    let diff_inv_marker := map InteractionBuilder.to_expr diff_inv_marker in
+    Build_BranchEqualCoreCols NUM_LIMBS
       a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
 End Impl_Borrow_BranchEqualCoreCols_for_T.
 
@@ -420,7 +435,8 @@ where
     I::ProcessedInstruction: From<ImmInstruction<AB::Expr>>,
 {
 *)
-Section Impl_VmCoreAir_for_BranchEqualCoreAir.
+Module Impl_VmCoreAir_for_BranchEqualCoreAir.
+  Section Impl.
   Import InteractionBuilder.
   Import Number.
 
@@ -428,13 +444,14 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   (* TODO:
   - Investigate VmCoreAir, understand its role
   *)
-  Context `{AB : InteractionBuilder.t}.
+  Context (builder : InteractionBuilder.Builder). (* We ignore the AB for now *)
   Context `{I : VmAdapterInterface.t}.
   (* NOTE: demo to require subfield of I to be instance
   Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
-  Parameter default_AB_Var : Number AB.(Var).
+  Parameter default_AB_Var : builder.(_Var).
+  Parameter default_AB_Expr : builder.(_Expr).
 
   (* Definition Self := VmCoreAir AB I. *)
   Definition Self : Set. Admitted. (* NOTE: stub *)
@@ -454,50 +471,51 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
   - `builder` hasn't been actually used
   *)
   Definition eval 
-    (self : Self) (local : list (Number AB.(Var))) (from_pc : AB.(Var)) : 
-      (@RecordRun unit (Assert.t Z)) :=
+    (self : Self) 
+    (local : list builder.(_Var)) (from_pc : builder.(_Var)) : 
+      (@RecordRun unit (Assert.t builder.(_Expr))) :=
       (* AdapterAirContext Expr I := *)
-    let record : list (Assert.t Z) := [] in
+    let record : list (Assert.t builder.(_Expr)) := [] in
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
     *)
-    let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow AB.(Var)
+    let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow
       local NUM_LIMBS default_AB_Var in
-    let f1 := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS).(get_number) in
-    let f2 := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS).(get_number) in
+    let f1 := cols.(opcode_beq_flag NUM_LIMBS) in
+    let f2 := cols.(opcode_bne_flag NUM_LIMBS) in
     (* 
     let is_valid = flags.iter().fold(AB::Expr::ZERO, |acc, &flag| {
               builder.assert_bool(flag);
               acc + flag.into()
           });
     *)
-    let record := assert record (assert_bool f1) in
-    let record := assert record (assert_bool f2) in
+    let record := assert record (assert_bool builder f1) in
+    let record := assert record (assert_bool builder f2) in
     let is_valid := Assert._Add (Assert.Var f1) (Assert.Var f2) in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    let record := assert record (assert_bool_A is_valid) in
-    let cmp_result := cols.(cmp_result AB.(Var) NUM_LIMBS).(get_number) in
-    let record := assert record (assert_bool cmp_result) in
+    let record := assert record (assert_bool_A builder is_valid) in
+    let cmp_result := cols.(cmp_result NUM_LIMBS) in
+    let record := assert record (assert_bool builder cmp_result) in
     (* 
     let a = &cols.a;
     let b = &cols.b;
     let inv_marker = &cols.diff_inv_marker;
     *)
-    let a := cols.(a AB.(Var) NUM_LIMBS) in
-    let b := cols.(b AB.(Var) NUM_LIMBS) in
-    let inv_maker := cols.(diff_inv_marker AB.(Var) NUM_LIMBS) in
+    let a := cols.(a NUM_LIMBS) in
+    let b := cols.(b NUM_LIMBS) in
+    let inv_maker := cols.(diff_inv_marker NUM_LIMBS) in
     (* 
     // 1 if cmp_result indicates a and b are equal, 0 otherwise
     let cmp_eq =
         cols.cmp_result * cols.opcode_beq_flag + not(cols.cmp_result) * cols.opcode_bne_flag;
     let mut sum = cmp_eq.clone();
     *)
-    let opcode_beq_flag := cols.(opcode_beq_flag AB.(Var) NUM_LIMBS).(get_number) in
-    let opcode_bne_flag := cols.(opcode_bne_flag AB.(Var) NUM_LIMBS).(get_number) in
+    let opcode_beq_flag := cols.(opcode_beq_flag NUM_LIMBS) in
+    let opcode_bne_flag := cols.(opcode_bne_flag NUM_LIMBS) in
     let cmp_eq := Assert._Add 
       (Assert.Mul (Assert.Var cmp_result) (Assert.Var opcode_beq_flag))
       (Assert.Mul (Assert.Neg (Assert.Var cmp_result)) (Assert.Var opcode_bne_flag)) in
@@ -524,24 +542,24 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
     (* NOTE: A sole line `when(a).b` works as just a * b. If a sub builder 
       is built with `when`, every constraints for the sub builder are prefixed with `a *`.
     *)
-    let fix loop (n : nat) (sum : Assert.t Z) (record : list (Assert.t Z)) {struct n} := 
+    let fix loop (n : nat) (sum : Assert.t builder.(_Expr)) 
+      (record : list (Assert.t builder.(_Expr))) {struct n} := 
       match n with 
       | O => (sum, record)
       | S n' =>
         let x := minus (minus (Z.to_nat NUM_LIMBS) 1) n' in
-        let a_i := (nth n a default_AB_Var).(get_number) in
-        let b_i := (nth n b default_AB_Var).(get_number) in
-        let inv_maker_i := (nth n inv_maker default_AB_Var).(get_number) in
+        let a_i := nth n a default_AB_Expr in
+        let b_i := nth n b default_AB_Expr in
+        let inv_maker_i := nth n inv_maker default_AB_Expr in
         let sum := Assert._Add sum 
           (Assert.Mul (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)) (Assert.Var inv_maker_i)) in
-        let record := assert record (assert_zero_A 
+        let record := assert record (assert_zero_A builder
           (Assert.Mul cmp_eq (Assert.Sub (Assert.Var a_i) (Assert.Var b_i)))) in
         loop n' sum record
       end
     in
     let (sum, record) := loop (Z.to_nat NUM_LIMBS) sum record in
-    let record := assert record (Assert.Mul is_valid (assert_one_A sum)) in
-
+    let record := assert record (Assert.Mul is_valid (assert_one_A builder sum)) in
     (* ************* *)
     (* ****FOCUS**** *)
     (* ************* *)
@@ -572,11 +590,11 @@ Section Impl_VmCoreAir_for_BranchEqualCoreAir.
         .into(),
     }
     *)
-    
-    (tt, record)
-    .
-
+    (tt, record).
+  End Impl.
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
+
+Print Impl_VmCoreAir_for_BranchEqualCoreAir.eval.
 
 (*
     fn start_offset(&self) -> usize {
