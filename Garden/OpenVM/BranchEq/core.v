@@ -5,7 +5,7 @@ Import ListNotations.
 (* 
 TODO(PROGRESS):
 - Implement `AdapterAirContext`
-- Thought: can we just ignore all the computations and integrate assert functionality directly into the builder?
+- Thoughts: can we just ignore all the computations?
 *)
 
 (* 
@@ -40,6 +40,24 @@ Writer monad is definitely better but I feel it too heavy to implement for now
 Definition RecordRun {A B : Set} : Type := A * B.
 
 (* ****DEPENDENCIES**** *)
+(* 
+#[repr(C)]
+#[derive(AlignedBorrow)]
+pub struct ImmInstruction<T> {
+    pub is_valid: T,
+    /// Absolute opcode number
+    pub opcode: T,
+    pub immediate: T,
+}
+*)
+Module ImmInstruction.
+  Record t : Set := {
+    is_valid : Z;
+    op_code : Z;
+    immediate : Z;
+  }.
+End ImmInstruction.
+
 (* Inductive Expr : Set := | Make_Expr . *)
 (* Inductive BusIndex : Set := | Make_BusIndex . *)
 
@@ -62,6 +80,7 @@ pub struct Interaction<Expr> {
     pub count_weight: u32,
 }
 *)
+
 (* Module Interaction.
   Record t (e : Expr) : Set := {
     message : list Expr;
@@ -71,6 +90,7 @@ pub struct Interaction<Expr> {
   }.
 End Interaction. *)
 
+(* NOTE: UNUSED *)
 Module VmAdapterInterface.
   (* 
   /// The interface between primitive AIR and machine adapter AIR.
@@ -92,6 +112,52 @@ Module VmAdapterInterface.
     ProcessedInstruction : Set;
   }.
 End VmAdapterInterface.
+
+(* 
+pub struct AdapterAirContext<T, I: VmAdapterInterface<T>> {
+    /// Leave as `None` to allow the adapter to decide the `to_pc` automatically.
+    pub to_pc: Option<T>,
+    pub reads: I::Reads,
+    pub writes: I::Writes,
+    pub instruction: I::ProcessedInstruction,
+}
+*)
+Module AdapterAirContext.
+  Record t (instruction_type : Set) : Set := {
+    to_pc : option Z;
+    (* NOTE: for now we only design them as simple as they can be. We will
+    see how to extend them in the future *)
+    reads : list Z;
+    writes : list Z;
+    instruction : instruction_type;
+  }.
+End AdapterAirContext.
+
+(* 
+#[opcode_offset = 0x220]
+#[repr(usize)]
+#[allow(non_camel_case_types)]
+pub enum BranchEqualOpcode {
+    BEQ,
+    BNE,
+}
+*)
+Module BranchEqualOpcode.
+  Definition opcode_offset : Z := 0x220.
+
+  Inductive t :=
+  | BEQ
+  | BNE
+  .
+
+  Definition as_usize (x : t) :=
+    match x with
+    | BEQ => Z.add 0 opcode_offset
+    | BNE => Z.add 1 opcode_offset
+    end.
+
+  Definition iter := [BEQ; BNE].
+End BranchEqualOpcode.
 
 (* 
 pub trait InteractionBuilder: AirBuilder {
@@ -159,10 +225,6 @@ Module InteractionBuilder.
   Record Expr := {
     num_expr : Var;
   }.
-
-  Definition to_expr (v : Var) : Expr :=
-    Build_Expr v.
-
   Definition M := list (list Var).
 
   (* TODO: Extend to any types beyond Z in the future *)
@@ -184,7 +246,15 @@ Module InteractionBuilder.
     assertions : list (Assert.t Expr);
   }.
 
-  (* TODO: this function is totally wrong. Rewrite this *)
+  Definition to_expr (v : Var) : Expr :=
+    Build_Expr v.
+
+  Definition f_to_z (f : F) : Z := let '(Build_F n) := f in n.
+
+  Definition var_to_z (v : Var) : Z := let '(Build_Var f) := v in f_to_z f.
+
+  Definition expr_to_z (e : Expr) : Z := let '(Build_Expr v) := e in var_to_z v.
+
   Fixpoint aggregate_constraints (l : list (Assert.t Expr)) : option (Assert.t Expr) :=
     match l with
     | x :: [] => Some x
@@ -210,7 +280,8 @@ Module InteractionBuilder.
     let a' := builder.(assertions) in
     Build_Builder (c :: c') a'.
   
-  (* Pop a constraint off to simulate one constraint being removed *)
+  (* Pop a constraint off to simulate one constraint being removed. When it comes to 
+  monad, a structure similar tos a stack would be helpful *)
   Definition end_when (builder : Builder) : Builder :=
     let c' := builder.(constraints) in
     let c := match c' with
@@ -409,10 +480,12 @@ pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
     pc_step: u32,
 }
 *)
-Record BranchEqualCoreAir (NUM_LIMBS : Z) : Set := {
-  offset : Z;
-  pc_step : Z;
-}.
+Module BranchEqualCoreAir.
+  Record t (NUM_LIMBS : Z) : Set := {
+    offset : Z;
+    pc_step : Z;
+  }.
+End BranchEqualCoreAir.
 
 (* 
 impl<F: Field, const NUM_LIMBS: usize> BaseAir<F> for BranchEqualCoreAir<NUM_LIMBS> {
@@ -455,9 +528,6 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   (* TODO:
   - Investigate VmCoreAir, understand its role
   *)
-  (* Definition Self := VmCoreAir AB I. *)
-  Definition Self : Set. Admitted. (* NOTE: stub *)
-
   Section Impl.
   Import InteractionBuilder.
   Import Number.
@@ -467,6 +537,8 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   (* NOTE: demo to require subfield of I to be instance
   Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
+
+  Definition Self := BranchEqualCoreAir.t NUM_LIMBS.
 
   Parameter default_AB_Var : builder.(_Var).
   Parameter default_AB_Expr : builder.(_Expr).
@@ -488,7 +560,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   Definition eval 
     (self : Self) 
     (local : list builder.(_Var)) (from_pc : builder.(_Var)) : 
-      (@RecordRun unit Builder) :=
+      (@RecordRun (AdapterAirContext.t ImmInstruction.t) Builder) :=
       (* AdapterAirContext Expr I := *)
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
@@ -507,6 +579,8 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     let builder := assert_bool builder f1 in
     let builder := assert_bool builder f2 in
     let is_valid := Assert._Add (Assert.Var f1) (Assert.Var f2) in
+    (* NOTE: for later use, and as a very bad ad hoc idea *)
+    let is_valid' := Z.add (InteractionBuilder.expr_to_z f1) (InteractionBuilder.expr_to_z f2) in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
@@ -576,9 +650,6 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     let builder := when builder is_valid in
     let builder := assert_one_A builder sum in     
     let builder := end_when builder in
-    (* ************* *)
-    (* ****FOCUS**** *)
-    (* ************* *)
     (* 
     let expected_opcode = flags
         .iter()
@@ -588,11 +659,31 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
         })
         + AB::Expr::from_canonical_usize(self.offset);
     *)
+    (* NOTE: WARNING: 
+    - We dont't check the boundary for u8
+    - The computation here is being completed immediately. Maybe we should also do it 
+      for other computations. Same for the code blocks followed 
+    *)
+    let opcodes := map BranchEqualOpcode.as_usize BranchEqualOpcode.iter in
+    let o1 := nth 0 opcodes BranchEqualOpcode.opcode_offset in
+    let o2 := nth 1 opcodes BranchEqualOpcode.opcode_offset in
+    let expected_opcode := Z.add 
+      (Z.mul (InteractionBuilder.expr_to_z f1) o1) (Z.mul (InteractionBuilder.expr_to_z f2) o2) in
+    (* ************* *)
+    (* ****FOCUS**** *)
+    (* ************* *) 
     (* 
     let to_pc = from_pc
               + cols.cmp_result * cols.imm
               + not(cols.cmp_result) * AB::Expr::from_canonical_u32(self.pc_step);
     *)
+    let to_pc := InteractionBuilder.var_to_z from_pc in
+    let cmp_result := InteractionBuilder.expr_to_z cmp_result in
+    let imm := InteractionBuilder.expr_to_z (cols.(imm NUM_LIMBS)) in
+    let to_pc := Z.add to_pc (Z.mul cmp_result imm) in
+    let pc_step := self.(BranchEqualCoreAir.pc_step NUM_LIMBS) in
+    let to_pc := Z.add to_pc (Z.mul (Z.sub 1 cmp_result) pc_step) in
+
     (* 
     AdapterAirContext {
         to_pc: Some(to_pc),
@@ -606,7 +697,14 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
         .into(),
     }
     *)
-    (tt, builder).
+    let a := map InteractionBuilder.expr_to_z a in
+    let b := map InteractionBuilder.expr_to_z b in
+    let reads := a ++ b in
+    let context := (AdapterAirContext.Build_t ImmInstruction.t
+      (Some to_pc) reads []
+      (ImmInstruction.Build_t is_valid' expected_opcode imm)
+    ) in
+    (context, builder).
   End Impl.
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
 
