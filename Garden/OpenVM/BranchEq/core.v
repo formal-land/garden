@@ -4,8 +4,7 @@ Import ListNotations.
 
 (* 
 TODO(PROGRESS):
-- Implement `AdapterAirContext`
-- Thoughts: can we just ignore all the computations?
+- redesign the architecture to perform all computations immediately
 *)
 
 (* 
