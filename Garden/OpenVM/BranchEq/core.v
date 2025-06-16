@@ -2,7 +2,8 @@ Require Import ZArith.
 Require Import List.
 Import ListNotations.
 
-(* TODO: test the functionality of `borrow` *)
+(* TODO: redesign the `when` and the `assert_zero` so that `assert_zero`
+ works particularily for sub builders *)
 
 (* 
 use std::{
@@ -241,6 +242,7 @@ Module InteractionBuilder.
   Definition assert_expr_to_z (a : Assert.t Expr) : Z :=
     let '(Assert.Var x) := a in expr_to_z x.
 
+  (* NOTE: to be optimized *)
   Fixpoint aggregate_constraints (l : list (Assert.t Expr)) : option (Assert.t Expr) :=
     match l with
     | x :: [] => Some x
@@ -253,17 +255,6 @@ Module InteractionBuilder.
       end
     | [] => None
     end.
-
-  Definition assert (builder : Builder) (a : Assert.t builder.(_Expr)) : Builder :=
-    let c' := builder.(constraints) in
-    let a' := builder.(assertions) in
-    let a'' := aggregate_constraints (c' ++ [a]) in
-    (* desugar the option *)
-    let a'' := match a'' with
-    | Some a'' => a''
-    | None => a
-    end in
-    Build_Builder c' (a' ++ [a'']).
 
   Definition when (builder : Builder) (c : Assert.t builder.(_Expr)) : Builder :=
     let c' := builder.(constraints) in
@@ -280,21 +271,29 @@ Module InteractionBuilder.
     end in
     let a' := builder.(assertions) in
     Build_Builder c a'.
-
-  Definition assert_zero (builder : Builder) (e : builder.(_Expr)) : Builder :=
-    let z := expr_to_z e in
-    let z' := if Z.eqb 0 z then 1%Z else 0%Z in
-    assert builder (Assert.Var (z_to_expr z')).
+  
+  (* NOTE: every other primitives are built on this primitive *)
+  Definition assert_zero (builder : Builder) 
+    (e : builder.(_Expr)) : Builder :=
+    let c' := builder.(constraints) in
+    let a := aggregate_constraints (c' ++ [Assert.Var e]) in
+    (* desugar the option *)
+    let a := match a with
+    | Some a' => a'
+    | None => Assert.Var e
+    end in
+    let '(Assert.Var a) := a in
+    let a := if Z.eqb 0 (expr_to_z a) then 1%Z else 0%Z in
+    Build_Builder c' (builder.(assertions) ++ [Assert.Var (z_to_expr a)]).
 
   Definition assert_one (builder : Builder) (e : builder.(_Expr)) : Builder :=
     let z := expr_to_z e in
-    let z' := if Z.eqb 1 z then 1%Z else 0%Z in
-    assert builder (Assert.Var (z_to_expr z')).
+    assert_zero builder (z_to_expr (Z.sub 1 z)).
 
   Definition assert_bool (builder : Builder) (e : builder.(_Expr)) : Builder :=
     let z := expr_to_z e in
-    let z' := if orb (Z.eqb 1 z) (Z.eqb 0 z) then 1%Z else 0%Z in
-    assert builder (Assert.Var e).
+    let bool_check := Z.mul z (Z.sub 1%Z z) in
+    assert_zero builder (z_to_expr bool_check).
 End InteractionBuilder.
 
 (* NOTE: for reference
@@ -424,7 +423,7 @@ impl <T NUM_LIMBS> core::borrow::Borrow<BranchEqualCoreCols T NUM_LIMBS> for [T]
 Module Impl_Borrow_BranchEqualCoreCols_for_T.
   Fixpoint next_helper {T : Set} (n : nat) (src : list T) (store : list T) : list T * list T :=
     match n with
-    | O => (src, [])
+    | O => (src, store)
     | S n' => match src with
       | x :: xs => next_helper n' xs (store ++ [x])
       | [] => (src, store)
@@ -434,8 +433,6 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
   (* slice the first n elements of a list, return it with the remaining part of the list *)
   Definition next {T : Set} (n : nat) (src : list T) : list T * list T :=
     next_helper n src [].
-
-  Print map.
 
   (* NOTE: for now, InteractionBuilder only *)
   Definition borrow (cols : list InteractionBuilder.Var) (NUM_LIMBS : Z) (default_T : InteractionBuilder.Var)
@@ -539,15 +536,12 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
       ) -> AdapterAirContext<AB::Expr, I> {
   *)
   (* NOTE: In this function:
-  - `unit` is a stub for the actual return type
   - `record` collects all constraints, which is the primary goal for current implementation
-  - `builder` hasn't been actually used
   *)
   Definition eval 
     (self : Self) 
     (local : list builder.(_Var)) (from_pc : builder.(_Var)) : 
-      (@RecordRun (BranchEqualCoreCols NUM_LIMBS) Builder) :=
-      (* (@RecordRun (AdapterAirContext.t ImmInstruction.t) Builder) := *)
+      (@RecordRun (AdapterAirContext.t ImmInstruction.t) Builder) :=
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
@@ -564,37 +558,37 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     *)
     let builder := assert_bool builder f1 in
     let builder := assert_bool builder f2 in
-    (* let is_valid := Z.add (InteractionBuilder.expr_to_z f1) (InteractionBuilder.expr_to_z f2) in
-    let is_valid_expr := InteractionBuilder.z_to_expr is_valid in *)
+    let is_valid := Z.add (InteractionBuilder.expr_to_z f1) (InteractionBuilder.expr_to_z f2) in
+    let is_valid_expr := InteractionBuilder.z_to_expr is_valid in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    (* let builder := assert_bool builder is_valid_expr in
+    let builder := assert_bool builder is_valid_expr in
     let cmp_result_expr := cols.(cmp_result NUM_LIMBS) in
     let cmp_result := InteractionBuilder.expr_to_z cmp_result_expr in
-    let builder := assert_bool builder cmp_result_expr in *)
+    let builder := assert_bool builder cmp_result_expr in
     (* 
     let a = &cols.a;
     let b = &cols.b;
     let inv_marker = &cols.diff_inv_marker;
     *)
-    (* let a := cols.(a NUM_LIMBS) in
+    let a := cols.(a NUM_LIMBS) in
     let b := cols.(b NUM_LIMBS) in
-    let inv_maker := cols.(diff_inv_marker NUM_LIMBS) in *)
+    let inv_maker := cols.(diff_inv_marker NUM_LIMBS) in
     (* 
     // 1 if cmp_result indicates a and b are equal, 0 otherwise
     let cmp_eq =
         cols.cmp_result * cols.opcode_beq_flag + not(cols.cmp_result) * cols.opcode_bne_flag;
     let mut sum = cmp_eq.clone();
     *)
-    (* let opcode_beq_flag_expr := cols.(opcode_beq_flag NUM_LIMBS) in
+    let opcode_beq_flag_expr := cols.(opcode_beq_flag NUM_LIMBS) in
     let opcode_beq_flag := InteractionBuilder.expr_to_z opcode_beq_flag_expr in
     let opcode_bne_flag_expr := cols.(opcode_bne_flag NUM_LIMBS) in
     let opcode_bne_flag := InteractionBuilder.expr_to_z opcode_bne_flag_expr in
     let cmp_eq := Z.add (Z.mul cmp_result opcode_beq_flag)
       (Z.mul (Z.sub 1 cmp_result) opcode_bne_flag) in
-    let sum := cmp_eq in *)
+    let sum := cmp_eq in
     (* 
     // For BEQ, inv_marker is used to check equality of a and b:
     // - If a == b, all inv_marker values must be 0 (sum = 0)
@@ -617,16 +611,17 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     (* NOTE: A sole line `when(a).b` works as just a * b. If a sub builder 
       is built with `when`, every constraints for the sub builder are prefixed with `a *`.
     *)
-    (* let fix loop (n : nat) (sum : Z) 
+    let fix loop (n : nat) (sum : Z) 
       (builder : Builder) {struct n} := 
       match n with 
       | O => (sum, builder)
       | S n' =>
+        (* 0 <= x < NUM_LIMBS *)
         let x := minus (minus (Z.to_nat NUM_LIMBS) 1) n' in
-        let a_i := InteractionBuilder.expr_to_z (nth n a default_AB_Expr) in
-        let b_i := InteractionBuilder.expr_to_z (nth n b default_AB_Expr) in
+        let a_i := InteractionBuilder.expr_to_z (nth x a default_AB_Expr) in
+        let b_i := InteractionBuilder.expr_to_z (nth x b default_AB_Expr) in
         let inv_maker_i := InteractionBuilder.expr_to_z 
-          (nth n inv_maker default_AB_Expr) in
+          (nth x inv_maker default_AB_Expr) in
         let sum := Z.add sum (Z.mul (Z.sub a_i b_i) inv_maker_i) in
         let builder := assert_zero builder 
           (InteractionBuilder.z_to_expr (Z.mul cmp_eq (Z.sub a_i b_i))) in
@@ -635,8 +630,8 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     in
     let (sum, builder) := loop (Z.to_nat NUM_LIMBS) sum builder in
     let builder := when builder (Assert.Var is_valid_expr) in
-    let builder := assert_one builder (InteractionBuilder.z_to_expr sum ) in 
-    let builder := end_when builder in *)
+    let builder := assert_one builder (InteractionBuilder.z_to_expr sum) in 
+    let builder := end_when builder in
     (* 
     let expected_opcode = flags
         .iter()
@@ -651,21 +646,21 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     - The computation here is being completed immediately. Maybe we should also do it 
       for other computations. Same for the code blocks followed 
     *)
-    (* let opcodes := map BranchEqualOpcode.as_usize BranchEqualOpcode.iter in
+    let opcodes := map BranchEqualOpcode.as_usize BranchEqualOpcode.iter in
     let o1 := nth 0 opcodes BranchEqualOpcode.opcode_offset in
     let o2 := nth 1 opcodes BranchEqualOpcode.opcode_offset in
     let expected_opcode := Z.add 
-      (Z.mul (InteractionBuilder.expr_to_z f1) o1) (Z.mul (InteractionBuilder.expr_to_z f2) o2) in *)
+      (Z.mul (InteractionBuilder.expr_to_z f1) o1) (Z.mul (InteractionBuilder.expr_to_z f2) o2) in
     (* 
     let to_pc = from_pc
               + cols.cmp_result * cols.imm
               + not(cols.cmp_result) * AB::Expr::from_canonical_u32(self.pc_step);
     *)
-    (* let to_pc := InteractionBuilder.var_to_z from_pc in
+    let to_pc := InteractionBuilder.var_to_z from_pc in
     let imm := InteractionBuilder.expr_to_z (cols.(imm NUM_LIMBS)) in
     let to_pc := Z.add to_pc (Z.mul cmp_result imm) in
     let pc_step := self.(BranchEqualCoreAir.pc_step NUM_LIMBS) in
-    let to_pc := Z.add to_pc (Z.mul (Z.sub 1 cmp_result) pc_step) in *)
+    let to_pc := Z.add to_pc (Z.mul (Z.sub 1 cmp_result) pc_step) in
     (* 
     AdapterAirContext {
         to_pc: Some(to_pc),
@@ -679,15 +674,14 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
         .into(),
     }
     *)
-    (* let a := map InteractionBuilder.expr_to_z a in
+    let a := map InteractionBuilder.expr_to_z a in
     let b := map InteractionBuilder.expr_to_z b in
     let reads := a ++ b in
     let context := (AdapterAirContext.Build_t ImmInstruction.t
       (Some to_pc) reads []
       (ImmInstruction.Build_t is_valid expected_opcode imm)
-    ) in *)
-    (* (context, builder). *)
-    (cols, builder).
+    ) in
+    (context, builder).
   End Impl.
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
 
@@ -698,6 +692,7 @@ Definition NUM_LIMBS : Z := 8.
 
 Definition a := map Z.of_nat [0; 0; 0; 0; 0; 0; 0; 0].
 Definition b := map Z.of_nat [0; 0; 0; 0; 0; 0; 0; 0].
+
 Definition cmp_result := 1%Z.
 Definition imm := 1%Z.
 Definition opcode_beq_flag := 1%Z.
@@ -714,16 +709,11 @@ Definition self : BranchEqualCoreAir.t NUM_LIMBS := BranchEqualCoreAir.Build_t N
 
 Definition result := Impl_VmCoreAir_for_BranchEqualCoreAir.eval builder NUM_LIMBS self local from_pc.
 
-Definition cols := let '(c, _) := result in c.
+Definition result_builder := let '(_, b) := result in b.
 
-Definition builder_result := let '(_, b) := result in b.
+Definition builder_assertions := result_builder.(InteractionBuilder.assertions).
 
-Definition builder_assertions := builder_result.(InteractionBuilder.assertions).
-
-Compute cols.
-
-(* TODO: figure out why the test result is filled with `default`s *)
-Compute result.
+Compute builder_assertions.
 
 End _Test.
 
