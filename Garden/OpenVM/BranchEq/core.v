@@ -2,6 +2,8 @@ Require Import ZArith.
 Require Import List.
 Import ListNotations.
 
+(* TODO: test the functionality of `borrow` *)
+
 (* 
 use std::{
     array,
@@ -227,11 +229,8 @@ Module InteractionBuilder.
   Definition z_to_var (z : Z) : Var :=
     num_var (num_f z).
 
-  Definition var_to_expr (v : Var) : Expr :=
-    num_expr v.
-
   Definition z_to_expr (z : Z) : Expr :=
-    var_to_expr (z_to_var z).
+    num_expr (z_to_var z).
 
   Definition f_to_z (f : F) : Z := let '(num_f n) := f in n.
 
@@ -443,19 +442,19 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
     : BranchEqualCoreCols NUM_LIMBS :=
     let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
     let (cols, a) := next NUM_LIMBS' cols in
-    let a := map InteractionBuilder.var_to_expr a in
+    let a := map InteractionBuilder.num_expr a in
     let (cols, b) := next NUM_LIMBS' cols in
-    let b := map InteractionBuilder.var_to_expr b in
+    let b := map InteractionBuilder.num_expr b in
     let (cols, cmp_result) := next 1 cols in
-    let cmp_result := InteractionBuilder.var_to_expr (match (head cmp_result) with | Some x => x | None => default_T end) in
+    let cmp_result := InteractionBuilder.num_expr (match (head cmp_result) with | Some x => x | None => default_T end) in
     let (cols, imm) := next 1 cols in
-    let imm := InteractionBuilder.var_to_expr (match (head imm) with | Some x => x | None => default_T end) in
+    let imm := InteractionBuilder.num_expr (match (head imm) with | Some x => x | None => default_T end) in
     let (cols, opcode_beq_flag) := next 1 cols in
-    let opcode_beq_flag := InteractionBuilder.var_to_expr (match (head opcode_beq_flag) with | Some x => x | None => default_T end) in
+    let opcode_beq_flag := InteractionBuilder.num_expr (match (head opcode_beq_flag) with | Some x => x | None => default_T end) in
     let (cols, opcode_bne_flag) := next 1 cols in
-    let opcode_bne_flag := InteractionBuilder.var_to_expr (match (head opcode_bne_flag) with | Some x => x | None => default_T end) in
+    let opcode_bne_flag := InteractionBuilder.num_expr (match (head opcode_bne_flag) with | Some x => x | None => default_T end) in
     let (cols, diff_inv_marker) := next NUM_LIMBS' cols in
-    let diff_inv_marker := map InteractionBuilder.var_to_expr diff_inv_marker in
+    let diff_inv_marker := map InteractionBuilder.num_expr diff_inv_marker in
     Build_BranchEqualCoreCols NUM_LIMBS
       a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
 End Impl_Borrow_BranchEqualCoreCols_for_T.
@@ -547,7 +546,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   Definition eval 
     (self : Self) 
     (local : list builder.(_Var)) (from_pc : builder.(_Var)) : 
-      (@RecordRun unit Builder) :=
+      (@RecordRun (BranchEqualCoreCols NUM_LIMBS) Builder) :=
       (* (@RecordRun (AdapterAirContext.t ImmInstruction.t) Builder) := *)
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
@@ -688,7 +687,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
       (ImmInstruction.Build_t is_valid expected_opcode imm)
     ) in *)
     (* (context, builder). *)
-    (tt, builder).
+    (cols, builder).
   End Impl.
 End Impl_VmCoreAir_for_BranchEqualCoreAir.
 
@@ -713,10 +712,15 @@ Definition from_pc : InteractionBuilder.Var := InteractionBuilder.z_to_var 0%Z.
 
 Definition self : BranchEqualCoreAir.t NUM_LIMBS := BranchEqualCoreAir.Build_t NUM_LIMBS 0%Z 4%Z.
 
-Definition result := 
-  let (_, builder ) := Impl_VmCoreAir_for_BranchEqualCoreAir.eval builder NUM_LIMBS
-    self local from_pc in
-  builder.(InteractionBuilder.assertions).
+Definition result := Impl_VmCoreAir_for_BranchEqualCoreAir.eval builder NUM_LIMBS self local from_pc.
+
+Definition cols := let '(c, _) := result in c.
+
+Definition builder_result := let '(_, b) := result in b.
+
+Definition builder_assertions := builder_result.(InteractionBuilder.assertions).
+
+Compute cols.
 
 (* TODO: figure out why the test result is filled with `default`s *)
 Compute result.
