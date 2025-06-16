@@ -2,9 +2,6 @@ Require Import ZArith.
 Require Import List.
 Import ListNotations.
 
-(* TODO: redesign the `when` and the `assert_zero` so that `assert_zero`
- works particularily for sub builders *)
-
 (* 
 use std::{
     array,
@@ -147,13 +144,13 @@ Module BranchEqualOpcode.
   | BNE
   .
 
-  Definition as_usize (x : t) :=
+  Definition as_usize (x : t) : Z :=
     match x with
     | BEQ => Z.add 0 opcode_offset
     | BNE => Z.add 1 opcode_offset
     end.
 
-  Definition iter := [BEQ; BNE].
+  Definition iter : list t := [BEQ; BNE].
 End BranchEqualOpcode.
 
 (* 
@@ -209,7 +206,7 @@ Module InteractionBuilder.
   Definition M := list (list Var).
 
   (* TODO: Extend to any types beyond Z in the future *)
-  Record Builder := {
+  Record Builder : Type := {
     (* Types from AirBuilder
     type F: Field;
     type Expr: Algebra<Self::F> + Algebra<Self::Var>;
