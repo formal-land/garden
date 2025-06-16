@@ -63,6 +63,11 @@ End BinOp.
 
 (* TODO: build the builder into the monad? *)
 Module Builder.
+  (* Parameters
+  1. constraints being stored from using `when` (should we even use this?)
+  2. assertions being stored from all assert zeros being invoked so far
+  *)
+  Definition t := list Z * list Z.
 End Builder.
 
 Module M.
