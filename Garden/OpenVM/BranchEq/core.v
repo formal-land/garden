@@ -703,7 +703,7 @@ Definition result_builder := let '(_, b) := result in b.
 
 Definition builder_assertions := result_builder.(InteractionBuilder.assertions).
 
-Compute builder_assertions.
+(* Compute builder_assertions. *)
 
 End _Test.
 
