@@ -61,21 +61,29 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
-(* TODO: build the builder into the monad? *)
+(* TODO: 
+- integrate the builder into the monad, maybe as a state? 
+- write a function to create a sub builder *)
 Module Builder.
   (* Parameters
   1. constraints being stored from using `when` (should we even use this?)
   2. assertions being stored from all assert zeros being invoked so far
   *)
-  Definition t := list Z * list Z.
+  Definition t : Type := (list Prop) * (list Prop).
+
+  Definition add_assert (b : t) (p : Prop) : t :=
+    let (c, a) := b in
+    (c, (a ++ [p])).
 End Builder.
 
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
-  Inductive t : Set -> Set :=
+  Inductive t {b : Builder.t} : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
-  | Equal (x1 x2 : Z) : t unit
-  | Zeros {N : Z} (array : Array.t Z N) : t unit
+  | AssertZero (x : Z) : t unit
+  | When (x : Z) : t unit
+  (* | Equal (x1 x2 : Z) : t unit *)
+  (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
   | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
@@ -85,12 +93,13 @@ Module M.
   .
 
   (** This is a marker that we remove with the following tactic. *)
-  Axiom run : forall {A : Set}, t A -> A.
+  Axiom run : forall {A : Set} {b : Builder.t}, @t b A -> A.
 
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
     explicit names for all intermediate computation results. *)
-  Ltac monadic e :=
+
+  (* Ltac monadic e :=
     lazymatch e with
     | context ctxt [let v := ?x in @?f v] =>
       refine (Let _ _);
@@ -127,29 +136,29 @@ Module M.
       | t _ => exact e
       | _ => exact (Pure e)
       end
-    end.
+    end. *)
 
-  Definition pure {A : Set} (x : A) : t A :=
+  Definition pure {A : Set} {b : Builder.t} (x : A) : @t b A :=
     Pure x.
 
-  (* TODO: we might be able to remove this equal function along with its primitives *)
-  Definition equal (x y : Z) : t unit :=
+  (* TODO: we might be able to remove this equal function along with its primitives
+  Definition equal {b : Builder.t} (x y : Z) : @t b unit :=
     Equal x y.
 
-  Definition zeros {N : Z} (array : Array.t Z N) : t unit :=
+  Definition zeros {N : Z} {b : Builder.t} (array : Array.t Z N) : @t b unit :=
     Zeros array.
 
-  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
+  Definition for_in_zero_to_n {b : Builder.t} (N : Z) (f : Z -> t unit) : @t b unit :=
     ForInZeroToN N f.
 
-  Definition call {A : Set} (e : t A) : t A :=
+  Definition call {A : Set} {b : Builder.t} (e : t A) : @t b A :=
     Call e.
 
-  Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
+  Definition collapsing_let {A B : Set} {b : Builder.t} (e : t A) (k : A -> t B) : @t b B :=
     match e, k with
     | Pure x, k => k x
     | e, k => Let e k
-    end.
+    end. *)
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
@@ -164,28 +173,28 @@ Notation "e (||)" :=
   (M.run e)
   (at level 100).
 
-Notation "[[ e ]]" :=
+(* Notation "[[ e ]]" :=
   (ltac:(M.monadic e))
   (* Use the version below for debugging and show errors that are made obscure by the tactic *)
   (* (M.Pure e) *)
-  (only parsing).
+  (only parsing). *)
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
 
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
+  Inductive t : forall {A : Set} {b : Builder.t}, M.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | Equal (x1 x2 : Z) :
-    {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | Zeros {N : Z} (array : Array.t Z N) :
-    {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
-  | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
+  | AssertZero (z : Z) : {{ M.AssertZero z 🔽 tt, 0 = z}}
+  | When (x : Z) : {{ M.When z 🔽 tt, 0 = z}} (* stub *)
+  (* | Zeros {N : Z} (array : Array.t Z N) :
+    {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }} *)
+  (* | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
     (forall i, 0 <= i < N ->
       {{ f i 🔽 tt, P i }}
     ) ->
-    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }}
+    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }} *)
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -202,7 +211,7 @@ Module Run.
     value1 = value2 ->
     {{ e 🔽 value2, P }}
 
-  where "{{ e 🔽 output , P }}" := (t e output P).
+    where "{{ e 🔽 output , B }}" := (t e output B).
 
   Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
     {{ M.Zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
