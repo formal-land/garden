@@ -1,7 +1,7 @@
 Require Export Coq.Strings.Ascii.
 Require Export Coq.Strings.String.
 Require Export Coq.ZArith.ZArith.
-Require Export RecordUpdate.
+Require Export RecordUpdate. 
 
 Require Export Lia.
 From Hammer Require Export Tactics.
@@ -82,9 +82,9 @@ Module M.
   | Pure {A : Set} (value : A) : t A
   | AssertZero (x : Z) : t unit
   | When (x : Z) : t unit
-  (* | Equal (x1 x2 : Z) : t unit *)
+  | EndWhen (x : Z) : t  unit
   (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
-  | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
+  (* | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit *)
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -184,10 +184,12 @@ Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
 
   Inductive t : forall {A : Set} {b : Builder.t}, M.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
-    {{ M.Pure value 🔽 value, True }}
+  | Pure {b : Builder.t} {A : Set} (value : A) :
+    {{ (M.Pure b value) 🔽 value, (True, b) }}
   | AssertZero (z : Z) : {{ M.AssertZero z 🔽 tt, 0 = z}}
-  | When (x : Z) : {{ M.When z 🔽 tt, 0 = z}} (* stub *)
+
+  | When (z : Z) {b : Builder.t} : {{ M.When z 🔽 tt, 0 = z }} (* stub *) 
+  | EndWhen (z : Z) {b : Builder.t} : {{ M.EndWhen z 🔽 tt, 0 = z }} (* stub *) 
   (* | Zeros {N : Z} (array : Array.t Z N) :
     {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }} *)
   (* | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
