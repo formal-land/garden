@@ -80,9 +80,9 @@ Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t {b : Builder.t} : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
-  | AssertZero (x : Z) : t unit
-  | When (x : Z) : t unit
-  | EndWhen (x : Z) : t  unit
+  | AssertZero {A : Set} (x : Z) : t A
+  | When {A : Set} (x : Z) : t A
+  | EndWhen {A : Set} (x : Z) : t A
   (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
   (* | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit *)
   (** This constructor does nothing, but helps to delimit what is inside the current the current
@@ -181,15 +181,16 @@ Notation "e (||)" :=
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
-  Reserved Notation "{{ e 🔽 output , P }}".
+  Reserved Notation "{{ e , B1 🔽 output , P , B2 }}".
 
-  Inductive t : forall {A : Set} {b : Builder.t}, M.t A -> A -> Prop -> Prop :=
+  Inductive t : forall (builder : Builder.t) {A : Set}, (@M.t builder A) -> A -> (Prop * Builder.t) -> Prop :=
   | Pure {b : Builder.t} {A : Set} (value : A) :
-    {{ (M.Pure b value) 🔽 value, (True, b) }}
-  | AssertZero (z : Z) : {{ M.AssertZero z 🔽 tt, 0 = z}}
-
-  | When (z : Z) {b : Builder.t} : {{ M.When z 🔽 tt, 0 = z }} (* stub *) 
-  | EndWhen (z : Z) {b : Builder.t} : {{ M.EndWhen z 🔽 tt, 0 = z }} (* stub *) 
+    {{ (M.Pure value), b 🔽 value, True, b }}
+  | AssertZero {b : Builder.t} (z : Z) : {{ M.AssertZero z, b 🔽 tt, 
+  (* TODO: compute the assert with the `when` constraint *)
+    0 = z, Builder.add_assert b (0 = z) }}
+  | When {b : Builder.t} (z : Z) : {{ M.When z, b 🔽 tt, True, b }} (* stub *)
+  | EndWhen {b : Builder.t} (z : Z) : {{ M.EndWhen z, b 🔽 tt, True, b }} (* stub *)
   (* | Zeros {N : Z} (array : Array.t Z N) :
     {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }} *)
   (* | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
@@ -197,30 +198,31 @@ Module Run.
       {{ f i 🔽 tt, P i }}
     ) ->
     {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }} *)
-  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
-    {{ e 🔽 value, P }} ->
-    {{ M.Call e 🔽 value, P }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    {{ k value 🔽 output, P2 }} ->
-    {{ M.Let e k 🔽 output, P1 /\ P2 }}
-  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
+
+  | Call {b : Builder.t} {A : Set} (e : M.t A) (value : A) (P : Prop) :
+    {{ e, b 🔽 value, P, b }} ->
+    {{ M.Call e, b 🔽 value, P, b }}
+  | Let {b : Builder.t} {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e, b 🔽 value, P1, b }} ->
+    {{ k value, b 🔽 output, P2, b }} ->
+    {{ M.Let e k, b🔽 output, P1 /\ P2, b }}
+  | Implies {b : Builder.t} {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+    {{ e, b 🔽 value, P1, b }} ->
     (P1 -> P2) ->
-    {{ e 🔽 value, P2 }}
-  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
-    {{ e 🔽 value1, P }} ->
+    {{ e, b 🔽 value, P2, b }}
+  | Replace {b : Builder.t} {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+    {{ e, b 🔽 value1, P, b }} ->
     value1 = value2 ->
-    {{ e 🔽 value2, P }}
+    {{ e, b 🔽 value2, P, b }}
 
-    where "{{ e 🔽 output , B }}" := (t e output B).
+    where "{{ e , B1 🔽 output , P , B2 }}" := (t B1 e output (P, B2)).
 
-  Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
+  (* Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
     {{ M.Zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt, forall i, 0 <= i < N -> f i = g i
     }}.
   Proof.
-  Admitted.
+  Admitted. *)
 End Run.
 Export Run.
 
