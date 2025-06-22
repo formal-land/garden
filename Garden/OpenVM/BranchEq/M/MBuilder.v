@@ -8,6 +8,7 @@ From Hammer Require Export Tactics.
 
 (* TODO:
 - Seriously investigate how a State monad is constructed
+- CallPrimitiveStateAllocMutable
 *)
 
 (* Activate the modulo arithmetic in [lia] *)
@@ -191,6 +192,12 @@ Notation "e (||)" :=
 (* TODO:
 - Refer to Coq of Python
 - Try to build a(two?) state to reason with
+*)
+(* NOTE: DRAFT
+Options to design a predicate "when": 
+- forall ci in constraints, if a is true, then ci is true;
+- if forall ci in constraints is true, and the real part of a is true, then a is true;
+- alternatively, we just use a parameter marker
 *)
 Module Run.
   Reserved Notation "{{ e , B1 🔽 output , P , B2 }}".
