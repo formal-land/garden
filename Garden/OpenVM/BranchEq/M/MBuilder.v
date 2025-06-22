@@ -6,6 +6,10 @@ Require Export RecordUpdate.
 Require Export Lia.
 From Hammer Require Export Tactics.
 
+(* TODO:
+- Seriously investigate how a State monad is constructed
+*)
+
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 
@@ -71,9 +75,14 @@ Module Builder.
   *)
   Definition t : Type := (list Prop) * (list Prop).
 
+  Definition aggregate_constraints
+
   Definition add_assert (b : t) (p : Prop) : t :=
     let (c, a) := b in
     (c, (a ++ [p])).
+
+  Definition build_assert (b : t) (p : Prop) : t :=
+    let (c, a) := b in
 End Builder.
 
 Module M.
@@ -179,7 +188,10 @@ Notation "e (||)" :=
   (* (M.Pure e) *)
   (only parsing). *)
 
-(** Rules to check if the contraints are what we expect, typically a unique possible value. *)
+(* TODO:
+- Refer to Coq of Python
+- Try to build a(two?) state to reason with
+*)
 Module Run.
   Reserved Notation "{{ e , B1 🔽 output , P , B2 }}".
 
