@@ -296,10 +296,8 @@ Module Examples.
   
   (* NOTE: is there a way to make the implicit builder much more convenient? *)
   Definition zero_or_absolute_one {b : Builder.t} {p} `{Prime p} (x : Z) : @M.t b unit :=
-    let* square_x := [[
-      M.mul (| x, x |)
-    ]] in
-    M.pure (assert_bool square_x).
+    let* square_x := [[ BinOp.mul x x ]] in
+    assert_bool square_x.
   Opaque zero_or_one.
 
   Lemma zero_or_one_correct (p : Z) (x : Z) :
