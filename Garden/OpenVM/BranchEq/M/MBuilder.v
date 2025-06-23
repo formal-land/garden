@@ -232,6 +232,7 @@ Module Run.
     {{ M.Let e k | builder 🔽 output| P_Builder }}
   (* NOTE: since we should do the computations asap, we might be able to remove this? *)
   | Replace {A : Set} (e : M.t A) (value1 value2 : A) :
+    (* Note: the P_Builder here looks unsatisfying *)
     {{ e | builder 🔽 value1 | P_Builder }} ->
     value1 = value2 ->
     {{ e | builder 🔽 value2 | P_Builder }}
