@@ -284,3 +284,38 @@ End Pair.
   BinOp.mul x 2. *)
 
 (* Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z. *)
+
+(* TODO: use some examples to test our notations... *)
+Module Examples.
+  (** Here we see the use of the monadic notations defined above. *)
+  Definition zero_or_one (x : Z) : M.t unit :=
+    let* square_x := [[
+      M.mul (| x, x |)
+    ]] in
+    M.equal x square_x.
+  Opaque zero_or_one.
+
+  Lemma zero_or_one_correct (p : Z) (x : Z) :
+    IsPrime p ->
+    {{ M.eval p (zero_or_one x) 🔽 tt, x = 0 \/ x = 1 }}.
+  Proof.
+    intros.
+    with_strategy transparent [zero_or_one] unfold zero_or_one.
+    cbn.
+    eapply Run.Equiv. {
+      apply Run.Equal.
+    }
+    (* This property should be handled automatically by some field reasoning tactic. *)
+    admit.
+  Admitted.
+
+  (** A function with an arbitrary number of constraints. *)
+  Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
+    match l with
+    | [] => M.Pure tt
+    | x :: l' =>
+      let* _ := M.call (zero_or_one x) in
+      all_zero_or_one l'
+    end.
+  Opaque all_zero_or_one.
+End Examples.
