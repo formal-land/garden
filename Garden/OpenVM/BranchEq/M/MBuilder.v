@@ -167,10 +167,9 @@ Module M.
   Definition for_in_zero_to_n {b : Builder.t} (N : Z) (f : Z -> t unit) : @t b unit :=
     ForInZeroToN N f.
   *)
+  Definition mul {b : Builder.t} {p} `{Prime p} (x y : Z) : @t b Z :=
+    pure (BinOp.mul x y).
 End M.
-
-(* TODO: define M.mul and maybe other operations *)
-Definition test := M.mul.
 
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
@@ -295,7 +294,8 @@ Module Examples.
   Definition zero_or_one {b : Builder.t} (x : Z) : @M.t b unit := 
     assert_bool x.
   
-  Definition zero_or_absolute_one {b : Builder.t} (x : Z) : @M.t b unit :=
+  (* NOTE: is there a way to make the implicit builder much more convenient? *)
+  Definition zero_or_absolute_one {b : Builder.t} {p} `{Prime p} (x : Z) : @M.t b unit :=
     let* square_x := [[
       M.mul (| x, x |)
     ]] in
