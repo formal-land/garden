@@ -6,11 +6,6 @@ Require Export RecordUpdate.
 Require Export Lia.
 From Hammer Require Export Tactics.
 
-(* TODO:
-- Seriously investigate how a State monad is constructed
-- CallPrimitiveStateAllocMutable
-*)
-
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 
@@ -66,24 +61,26 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
-(* TODO: 
-- integrate the builder into the monad, maybe as a state? 
-- write a function to create a sub builder *)
+(* NOTE: 
+- The monad currently designed is unfinished.
+- Proposition as an output has been removed
+- Instead, we save necessary information inside a state machine being called builder
+- I don't know yet how should I update the builder with the `Run`
+*)
 Module Builder.
+  (* Here we use record for easier access *)
+  Record t : Type := 
+  {
   (* Parameters
   1. constraints being stored from using `when` (should we even use this?)
-  2. assertions being stored from all assert zeros being invoked so far
+  2. assertions as a proposition of all assert zeros being invoked so far.
+     Whenever a new assertions is being added, it is supposed to be appended by
+     all constraints stored in `constraints` before appending to the tail of 
+     `assertions`
   *)
-  Definition t : Type := (list Prop) * (list Prop).
-
-  Definition aggregate_constraints
-
-  Definition add_assert (b : t) (p : Prop) : t :=
-    let (c, a) := b in
-    (c, (a ++ [p])).
-
-  Definition build_assert (b : t) (p : Prop) : t :=
-    let (c, a) := b in
+    constraints : list Prop;
+    assertions : Prop;
+  }.
 End Builder.
 
 Module M.
@@ -92,7 +89,7 @@ Module M.
   | Pure {A : Set} (value : A) : t A
   | AssertZero {A : Set} (x : Z) : t A
   | When {A : Set} (x : Z) : t A
-  | EndWhen {A : Set} (x : Z) : t A
+  | EndWhen {A : Set} : t A
   (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
   (* | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit *)
   (** This constructor does nothing, but helps to delimit what is inside the current the current
@@ -109,7 +106,7 @@ Module M.
     This allows to represent programs without introducing
     explicit names for all intermediate computation results. *)
 
-  (* Ltac monadic e :=
+  Ltac monadic e :=
     lazymatch e with
     | context ctxt [let v := ?x in @?f v] =>
       refine (Let _ _);
@@ -146,7 +143,7 @@ Module M.
       | t _ => exact e
       | _ => exact (Pure e)
       end
-    end. *)
+    end.
 
   Definition pure {A : Set} {b : Builder.t} (x : A) : @t b A :=
     Pure x.
@@ -183,65 +180,62 @@ Notation "e (||)" :=
   (M.run e)
   (at level 100).
 
-(* Notation "[[ e ]]" :=
+Notation "[[ e ]]" :=
   (ltac:(M.monadic e))
   (* Use the version below for debugging and show errors that are made obscure by the tactic *)
   (* (M.Pure e) *)
-  (only parsing). *)
+  (only parsing).
 
-(* TODO:
-- Refer to Coq of Python
-- Try to build a(two?) state to reason with
-*)
-(* NOTE: DRAFT
-Options to design a predicate "when": 
-- forall ci in constraints, if a is true, then ci is true;
-- if forall ci in constraints is true, and the real part of a is true, then a is true;
-- alternatively, we just use a parameter marker
+(* NOTE: Ideas I'm thinking of
+Issue with builder: 
+- assertions are supposed to perform calculations as quick as possible, while
+constraints are lazy-style stacks
+- We are not supposed to perform calculations in propositions so we would better leave the 
+  computation somewhere(where?) else
+
+Example predicates(?), for `P_Builder` below:
+- fun builder' => builder'.(constraints) = c :: builder.(constraints)
+- let a := (compute_with_constraint c (eqb 0%z a)) in 
+    fun builder' => builder'.(assertions) = builder.(assertions) /\ a
 *)
 Module Run.
-  Reserved Notation "{{ e , B1 🔽 output , P , B2 }}".
+  (* UNUSED. Maybe just a marker. Parameters:
+  - The builder instance
+  - The proposition to assert 
+  *)
+  Parameter P_Assert : Builder.t -> Prop -> Prop. 
+  (* UNUSED. Maybe just a marker. Parameters:
+  - The builder instance
+  - The proposition to add into conatraint?
+  *)
+  Parameter P_When : Builder.t -> Prop -> Prop.
 
-  Inductive t : forall (builder : Builder.t) {A : Set}, (@M.t builder A) -> A -> (Prop * Builder.t) -> Prop :=
-  | Pure {b : Builder.t} {A : Set} (value : A) :
-    {{ (M.Pure value), b 🔽 value, True, b }}
-  | AssertZero {b : Builder.t} (z : Z) : {{ M.AssertZero z, b 🔽 tt, 
-  (* TODO: compute the assert with the `when` constraint *)
-    0 = z, Builder.add_assert b (0 = z) }}
-  | When {b : Builder.t} (z : Z) : {{ M.When z, b 🔽 tt, True, b }} (* stub *)
-  | EndWhen {b : Builder.t} (z : Z) : {{ M.EndWhen z, b 🔽 tt, True, b }} (* stub *)
-  (* | Zeros {N : Z} (array : Array.t Z N) :
-    {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }} *)
-  (* | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
-    (forall i, 0 <= i < N ->
-      {{ f i 🔽 tt, P i }}
-    ) ->
-    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }} *)
+  Reserved Notation "{{ e | B 🔽 output | P_B }}".
 
-  | Call {b : Builder.t} {A : Set} (e : M.t A) (value : A) (P : Prop) :
-    {{ e, b 🔽 value, P, b }} ->
-    {{ M.Call e, b 🔽 value, P, b }}
-  | Let {b : Builder.t} {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ e, b 🔽 value, P1, b }} ->
-    {{ k value, b 🔽 output, P2, b }} ->
-    {{ M.Let e k, b🔽 output, P1 /\ P2, b }}
-  | Implies {b : Builder.t} {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
-    {{ e, b 🔽 value, P1, b }} ->
-    (P1 -> P2) ->
-    {{ e, b 🔽 value, P2, b }}
-  | Replace {b : Builder.t} {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
-    {{ e, b 🔽 value1, P, b }} ->
+  Definition eqb_to_Z (eqb : bool) : Z :=
+    if eqb then 1%Z else 0%Z.
+
+  Inductive t (builder : Builder.t) (P_Builder : Builder.t -> Prop) : forall {A : Set}, 
+    (@M.t builder A) -> A -> Prop :=
+  | Pure {A : Set} (value : A) :
+    (* TODO: define separate notations in the future to enforce P_Builder *)
+    {{ M.Pure value | builder 🔽 value | P_Builder }} (* Usually: fun b => builder = b *)
+  | AssertZero (z : Z) : {{ M.AssertZero z | builder 🔽 tt | P_Builder }}
+  | When (z : Z) : {{ M.When z | builder 🔽 tt | P_Builder }}
+  | EndWhen : {{ M.EndWhen | builder 🔽 tt | P_Builder }}
+  | Call {A : Set} (e : M.t A) (value : A) :
+    {{ e | builder 🔽 value | P_Builder }} ->
+    {{ M.Call e | builder 🔽 value | P_Builder }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
+    {{ e | builder 🔽 value| P_Builder }} ->
+    {{ k value | builder 🔽 output| P_Builder }} ->
+    {{ M.Let e k | builder 🔽 output| P_Builder }}
+  (* NOTE: since we should do the computations asap, we might be able to remove this? *)
+  | Replace {A : Set} (e : M.t A) (value1 value2 : A) :
+    {{ e | builder 🔽 value1 | P_Builder }} ->
     value1 = value2 ->
-    {{ e, b 🔽 value2, P, b }}
-
-    where "{{ e , B1 🔽 output , P , B2 }}" := (t B1 e output (P, B2)).
-
-  (* Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
-    {{ M.Zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
-    }}.
-  Proof.
-  Admitted. *)
+    {{ e | builder 🔽 value2 | P_Builder }}
+  where "{{ e | builder 🔽 output | P_Builder }}" := (t builder P_Builder e output).
 End Run.
 Export Run.
 
@@ -256,36 +250,36 @@ Module Pair.
 End Pair.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_zero (x : Z) : M.t unit :=
-  M.equal x 0.
+(* Definition assert_zero (x : Z) : M.t unit :=
+  M.equal x 0. *)
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_one (x : Z) : M.t unit :=
-  assert_zero (Z.sub 1 x).
+(* Definition assert_one (x : Z) : M.t unit :=
+  assert_zero (Z.sub 1 x). *)
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  assert_zero (Z.mul x (Z.sub 1 x)).
+(* Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
+  assert_zero (Z.mul x (Z.sub 1 x)). *)
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
-Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
+(* Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
   M.zeros (N := N) {|
     Array.get i :=
       let x := l.(Array.get) i in
       BinOp.sub (BinOp.mul x x) x
-  |}.
+  |}. *)
 
-Definition when (condition : bool) (e : M.t unit) : M.t unit :=
+(* Definition when (condition : bool) (e : M.t unit) : M.t unit :=
   if condition then
     e
   else
-    M.pure tt.
+    M.pure tt. *)
 
-Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
+(* Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z. *)
 
-Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z.
+(* Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z. *)
 
-Definition double {p} `{Prime p} (x : Z) : Z :=
-  BinOp.mul x 2.
+(* Definition double {p} `{Prime p} (x : Z) : Z :=
+  BinOp.mul x 2. *)
 
-Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+(* Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z. *)
