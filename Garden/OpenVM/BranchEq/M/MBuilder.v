@@ -145,7 +145,16 @@ Module M.
       end
     end.
 
-  Definition pure {A : Set} {b : Builder.t} (x : A) : @t b A :=
+  Definition call {b : Builder.t} {A : Set} (e : t A) : @t b A :=
+    Call e.
+
+  Definition collapsing_let {b : Builder.t} {A B : Set} (e : t A) (k : A -> t B) : @t b B :=
+    match e, k with
+    | Pure x, k => k x
+    | e, k => Let e k
+    end.
+
+  Definition pure {b : Builder.t} {A : Set} (x : A) : @t b A :=
     Pure x.
 
   (* TODO: we might be able to remove this equal function along with its primitives
@@ -157,16 +166,11 @@ Module M.
 
   Definition for_in_zero_to_n {b : Builder.t} (N : Z) (f : Z -> t unit) : @t b unit :=
     ForInZeroToN N f.
-
-  Definition call {A : Set} {b : Builder.t} (e : t A) : @t b A :=
-    Call e.
-
-  Definition collapsing_let {A B : Set} {b : Builder.t} (e : t A) (k : A -> t B) : @t b B :=
-    match e, k with
-    | Pure x, k => k x
-    | e, k => Let e k
-    end. *)
+  *)
 End M.
+
+(* TODO: define M.mul and maybe other operations *)
+Definition test := M.mul.
 
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
@@ -251,16 +255,16 @@ Module Pair.
 End Pair.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-(* Definition assert_zero (x : Z) : M.t unit :=
-  M.equal x 0. *)
+Definition assert_zero {b : Builder.t} (x : Z) : @M.t b unit :=
+  M.AssertZero x.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
-(* Definition assert_one (x : Z) : M.t unit :=
-  assert_zero (Z.sub 1 x). *)
+Definition assert_one {b : Builder.t} (x : Z) : @M.t b unit :=
+  assert_zero (Z.sub 1 x).
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
-(* Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  assert_zero (Z.mul x (Z.sub 1 x)). *)
+Definition assert_bool {b : Builder.t} (x : Z) : @M.t b unit :=
+  assert_zero (Z.mul x (Z.sub 1 x)).
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 (* Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
@@ -276,23 +280,26 @@ End Pair.
   else
     M.pure tt. *)
 
-(* Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z. *)
+Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
-(* Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z. *)
+Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z.
 
-(* Definition double {p} `{Prime p} (x : Z) : Z :=
-  BinOp.mul x 2. *)
+Definition double {p} `{Prime p} (x : Z) : Z :=
+  BinOp.mul x 2.
 
-(* Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z. *)
+Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
 
 (* TODO: use some examples to test our notations... *)
 Module Examples.
-  (** Here we see the use of the monadic notations defined above. *)
-  Definition zero_or_one (x : Z) : M.t unit :=
+
+  Definition zero_or_one {b : Builder.t} (x : Z) : @M.t b unit := 
+    assert_bool x.
+  
+  Definition zero_or_absolute_one {b : Builder.t} (x : Z) : @M.t b unit :=
     let* square_x := [[
       M.mul (| x, x |)
     ]] in
-    M.equal x square_x.
+    M.pure (assert_bool square_x).
   Opaque zero_or_one.
 
   Lemma zero_or_one_correct (p : Z) (x : Z) :
