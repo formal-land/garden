@@ -16,11 +16,11 @@ Module ImmInstruction.
 End ImmInstruction.
 
 Module AdapterAirContext.
-  Record t (instruction_type : Set) : Set := {
+  Record t (Instruction : Set) : Set := {
     to_pc : option Z;
     reads : list Z;
     writes : list Z;
-    instruction : instruction_type;
+    instruction : Instruction;
   }.
 End AdapterAirContext.
 
@@ -41,15 +41,17 @@ Module BranchEqualOpcode.
   Definition iter : list t := [BEQ; BNE].
 End BranchEqualOpcode.
 
-Record BranchEqualCoreCols (NUM_LIMBS : Z) : Set := {
-  a : list Z;
-  b : list Z;
-  cmp_result : Z;
-  imm : Z;
-  opcode_beq_flag : Z;
-  opcode_bne_flag : Z;
-  diff_inv_marker : list Z;
-}.
+Module BranchEqualCoreCols.
+  Record t (NUM_LIMBS : Z) : Set := {
+    a : list Z;
+    b : list Z;
+    cmp_result : Z;
+    imm : Z;
+    opcode_beq_flag : Z;
+    opcode_bne_flag : Z;
+    diff_inv_marker : list Z;
+  }.
+End BranchEqualCoreCols.
 
 
 Module Impl_Borrow_BranchEqualCoreCols_for_T.
@@ -67,7 +69,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
     next_helper n src [].
 
   Definition borrow_helper (cols : list Z) (NUM_LIMBS : Z) (default_T : Z)
-    : BranchEqualCoreCols NUM_LIMBS :=
+    : BranchEqualCoreCols.t NUM_LIMBS :=
     let NUM_LIMBS' := Z.to_nat NUM_LIMBS in
     let (cols, a) := next NUM_LIMBS' cols in
     let (cols, b) := next NUM_LIMBS' cols in
@@ -81,10 +83,10 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
     let opcode_bne_flag := match (head opcode_bne_flag) with | Some x => x | None => default_T end in
     let (cols, diff_inv_marker) := next NUM_LIMBS' cols in
     let diff_inv_marker := diff_inv_marker in
-    Build_BranchEqualCoreCols NUM_LIMBS
+    BranchEqualCoreCols.Build_t NUM_LIMBS
       a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
 
-  Definition borrow (cols : list Z) (NUM_LIMBS : Z) : BranchEqualCoreCols NUM_LIMBS 
+  Definition borrow (cols : list Z) (NUM_LIMBS : Z) : BranchEqualCoreCols.t NUM_LIMBS 
     := borrow_helper cols NUM_LIMBS 999. (* After we can make sure the translation works well we should
     switch the number to 0 *)
 End Impl_Borrow_BranchEqualCoreCols_for_T.
