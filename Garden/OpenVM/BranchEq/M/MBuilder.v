@@ -215,9 +215,33 @@ Module Run.
 
   Reserved Notation "{{ e | B 🔽 output | P_B }}".
 
-  Inductive test_design_proposition : Prop -> Prop :=
-  | Test : ttt (if eqb "0" "0" then True else False)
+  Inductive test_primitives :=
+  | Eq0 (_ : Z)
+  | P2
   .
+
+  Reserved Notation "{{{ e | L }}}".
+
+  (* TODO: 
+  - add a more complicated computation to similar `when`
+  *)
+  Inductive test_design_proposition : 
+    test_primitives -> list Z -> Prop :=
+  | PEq (l : list Z) (x : Z) : 
+    {{{ Eq0 x | 
+      if Z.eqb x 0%Z then 1 :: l else 0 :: l }}}
+
+  where "{{{ e | L }}}" := (test_design_proposition e L).
+
+  Compute (PEq [] 0%Z).
+
+  Compute (PEq [0] 0%Z).
+
+  Theorem test_item (l : list Z):
+  {{{ Eq0 0%Z | 1 :: l }}}.
+  Proof.
+    apply (PEq l).
+  Qed.
 
 (* 
 (* 
