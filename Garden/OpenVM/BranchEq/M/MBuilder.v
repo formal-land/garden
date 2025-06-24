@@ -61,12 +61,6 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
-(* NOTE: 
-- The monad currently designed is unfinished.
-- Proposition as an output has been removed
-- Instead, we save necessary information inside a state machine being called builder
-- I don't know yet how should I update the builder with the `Run`
-*)
 Module Builder.
   (* Here we use record for easier access *)
   Record t : Type := 
@@ -89,7 +83,8 @@ Definition pop_list (l : list Z) : list Z :=
   | [] => []
   end.
 
-Definition add_assert (x : Z) (b : Builder.t) : Builder.t :=
+Definition add_assert (x : Z) (b : Builder.t)
+  : Builder.t :=
   {|
     Builder.when_context := b.(Builder.when_context);
     Builder.assertions := x :: b.(Builder.assertions);
@@ -117,7 +112,7 @@ Definition compute_context (b : Builder.t) : Z :=
   let '(Builder.Build_t c _) := b in all_ones_or_empty c.
 
 Definition compute_assert (x : Z) (b : Builder.t) : bool :=
-  if Z.eqb 1 (compute_context b) then (Z.eqb x 0%Z) else false.
+  andb (Z.eqb 1 (compute_context b)) (Z.eqb x 0%Z).
 
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
@@ -194,13 +189,13 @@ Module M.
     Pure x.
 
   (* TODO: we might be able to remove this equal function along with its primitives
-  Definition equal {b : Builder.t} (x y : Z) : @t b unit :=
+  Definition equal (x y : Z) : @t b unit :=
     Equal x y.
 
-  Definition zeros {N : Z} {b : Builder.t} (array : Array.t Z N) : @t b unit :=
+  Definition zeros {N : Z} (array : Array.t Z N) : @t b unit :=
     Zeros array.
 
-  Definition for_in_zero_to_n {b : Builder.t} (N : Z) (f : Z -> t unit) : @t b unit :=
+  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : @t b unit :=
     ForInZeroToN N f.
   *)
   Definition mul {p} `{Prime p} (x y : Z) : t Z :=
@@ -225,18 +220,6 @@ Notation "[[ e ]]" :=
   (* (M.Pure e) *)
   (only parsing).
 
-(* NOTE: Ideas I'm thinking of
-Issue with builder: 
-- assertions are supposed to be calculated as quick as possible, while
-when_context is a lazy-style stack
-- We are not supposed to perform calculations in propositions so we would better leave the 
-  computation somewhere(where?) else
-
-Example predicates(?), for `P_Builder` below:
-- fun builder' => builder'.(when_context) = c :: builder.(when_context)
-- let a := (compute_with_when c (eqb 0%z a)) in 
-    fun builder' => builder'.(assertions) = builder.(assertions) /\ a
-*)
 Module Run.
   (* TEST SECTION BELOW *)
   Inductive test_primitives :=
@@ -244,67 +227,103 @@ Module Run.
   | TWhen (_ : Z)
   | TEndWhen
   .
-  
-  Reserved Notation "{{{ e | L }}}".
-  Inductive test_design_proposition : 
-  (* monad instance -> builder instance -> prop *)
+
+    (* NOTE: ideas:
+  - necessary universal parameters should be collected at lhs of colon so 
+    that they're accessible to constructors of inductive types
+  - types at rhs of the colon are supposed to be tags for the type being 
+    presented altogether as a proposition
+  - rhs tags can depend only from lhs parameters
+  - parameters under the constructors are supposed to be as few and necessary
+    as possible
+  - reason for above: if we put same parameters under constructors plus rhs
+    we will have a problem unifying these copies
+    for rhs and constructors sharing the same copy we should put what they 
+    share in the left
+  - when designing the propositions, take it carefully for the tags to hold
+    necessary informations without being computed, for example an extra 
+    uncalculated builder. this helps the prover to set up less necessary
+    equations to reason between unlinked variables
+  - TODO: write more clearly what are necessary informations and when will 
+    we need them
+  - TODO: figure out more clearly when will Coq prove false
+  *)
+  Reserved Notation "{{{ e , b | L }}}".
+  Inductive test_design_proposition (b : Builder.t) : 
     test_primitives -> Builder.t -> Prop :=
-  | PEq (b : Builder.t) (x : Z) : 
-    {{{ TEq0 x | if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}}
-  where "{{{ e | L }}}" := (test_design_proposition e L).
+  | PEq (x : Z) : 
+    {{{ TEq0 x, b | 
+      if (compute_assert x b) 
+      then add_assert 1 b
+      else add_assert 0 b }}}
+  where "{{{ e , b | L }}}" := (test_design_proposition b e L).
 
-  Definition default_builder : Builder.t := Builder.Build_t [] [].
-
-  Compute (PEq default_builder 0%Z).
-  Compute (PEq (add_assert 1 default_builder) 0%Z).
-
-  Theorem eq0_appends_1 : forall (b : Builder.t),
+  Theorem eqx0_to_eq0 : forall (b : Builder.t) (x : Z),
     compute_context b = 1 ->
-    {{{ TEq0 0%Z | add_assert 1 b }}}.
+    x = 0 ->
+    {{{ TEq0 x, b | 
+    add_assert 1 b
+    }}}.
   Proof.
-    intros b valid.
-    (* NOTE: is there a better way to perform the proof than posing 
-    this statement during the proof? *)
-    pose (PEq b 0) as PEq0.
+    intros b x valid eqx.
+    pose (PEq b x) as PEq0.
     unfold compute_assert in PEq0.
     rewrite -> valid in PEq0.
+    rewrite -> eqx in PEq0.
+    simpl in PEq0.
+    rewrite <- eqx in PEq0.
     exact PEq0.
   Qed.
-
-  Theorem eq1_appends_0 : forall (b : Builder.t),
-    compute_context b = 1 ->
-    {{{ TEq0 1%Z | add_assert 0 b }}}.
+  
+  (* NOTE: 
+  When designing this theorem, one previous attempt is stating the
+  proposition like this:
+  {{{ TEq0 0, b | add_assert 1 b }}}
+  and we can see that 0 is not dependent on x
+  the experience we get here is that we want to carry as much information(?)
+  as possible in the type, and know that x doesn't automatically change into
+  0 without an equation 
+  *)
+  Theorem eq0_to_eqx0 : forall (b : Builder.t) (x : Z),
+  compute_context b = 1 ->
+  {{{ TEq0 x, b | add_assert 1 b }}} ->
+  x = 0.
   Proof.
-    intros b valid.
-    pose (PEq b 1) as PEq1.
-    unfold compute_assert in PEq1.
-    rewrite -> valid in PEq1.
-    exact PEq1.
+    intros b x valid e.
+    inversion e.
+    simpl in H.
+    symmetry in valid.
+    unfold compute_assert in H.
+    rewrite <- valid in H.
+    simpl in H.
+    destruct (x =? 0) eqn:Eqx0 in H.
+    - apply Z.eqb_eq in Eqx0. exact Eqx0.
+    - inversion H.  (* OMFG *)
   Qed.
   (* TEST SECTION END *)
 
-  Reserved Notation "{{ e 🔽 output | B }}".
-  
-  Inductive t : forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
-  | Pure (b : Builder.t) {A : Set} (value : A): {{ M.Pure value 🔽 value | b }}
-  | AssertZero (b : Builder.t) (x : Z) : 
-    {{ M.AssertZero x 🔽 tt | 
-      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}
-  | When (b : Builder.t) (x : Z)  : {{ M.When x 🔽 tt | push_context x b }}
-  | EndWhen (b : Builder.t) : {{ M.EndWhen 🔽 tt | pop_context b }}
-  | Call (b : Builder.t) {A : Set} (e : M.t A) (value : A) :
-    {{ e 🔽 value | b }} ->
-    {{ M.Call e 🔽 value | b }}
-  | Let (b : Builder.t) {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
-    {{ e 🔽 value | b }} ->
-    {{ k value 🔽 output | b }} ->
-    {{ M.Let e k 🔽 output | b }}
-  | Replace (b : Builder.t) {A : Set} (e : M.t A) (value1 value2 : A) :
-    {{ e 🔽 value1 | b }} ->
-    value1 = value2 ->
-    {{ e 🔽 value2 | b }}
+  Reserved Notation "{{ e | b1 🔽 output | b2 }}".
 
-  where "{{ e 🔽 output | B }}" := (t e output B).
+  Inductive t (b : Builder.t) : 
+    forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
+  | Pure {A : Set} (value : A) : {{ M.Pure value | b 🔽 value | b }}
+  | AssertZero (x : Z) : 
+    {{ M.AssertZero x | b 🔽 tt | 
+      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}
+  | When (x : Z) : {{ M.When x | b 🔽 tt | push_context x b }}
+  | EndWhen : {{ M.EndWhen | b 🔽 tt | pop_context b }}
+  | Call {A : Set} (e : M.t A) (value : A) :
+    {{ e | b 🔽 value | b }} ->
+    {{ M.Call e | b 🔽 value | b }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
+    {{ e | b 🔽 value | b }} ->
+    {{ k value | b 🔽 output | b }} ->
+    {{ M.Let e k | b 🔽 output | b }}
+  | Replace {A : Set} (e : M.t A) (value1 value2 : A) :
+    {{ e | b 🔽 value1 | b }} ->
+    value1 = value2 ->
+    {{ e | b 🔽 value2 | b }}
+    where "{{ e | b1 🔽 output | b2 }}" := (t b1 e output b2).
 End Run.
 Export Run.
 
@@ -319,15 +338,15 @@ Module Pair.
 End Pair.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_zero {b : Builder.t} (x : Z) : @M.t b unit :=
+Definition assert_zero (x : Z) : M.t unit :=
   M.AssertZero x.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_one {b : Builder.t} (x : Z) : @M.t b unit :=
+Definition assert_one (x : Z) : M.t unit :=
   assert_zero (Z.sub 1 x).
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_bool {b : Builder.t} (x : Z) : @M.t b unit :=
+Definition assert_bool (x : Z) : M.t unit :=
   assert_zero (Z.mul x (Z.sub 1 x)).
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
@@ -356,40 +375,59 @@ Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
 (* TODO: use some examples to test our notations... *)
 Module Examples.
 
-  Definition zero_or_one {b : Builder.t} (x : Z) : @M.t b unit := 
+  Definition zero_or_one (x : Z) : M.t unit := 
     assert_bool x.
   
   (* NOTE: is there a way to make the implicit builder much more convenient? *)
-  Definition zero_or_absolute_one {b : Builder.t} {p} `{Prime p} (x : Z) : @M.t b unit :=
+  Definition zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
     let* square_x := [[ BinOp.mul x x ]] in
     assert_bool square_x.
   Opaque zero_or_one.
 
-  Lemma assert_zero_correct {builder : Builder.t} :
-  {{ (M.AssertZero 0%Z) 
-  | 
-  builder 
-  🔽 
-  tt 
-  | 
-  (fun b : Builder.t => builder.(Builder.assertions) = 0 :: b.(Builder.assertions)) }}.
-  
-  
-
-  Lemma zero_abs_one_correct {b : Builder.t} {p} `{Prime p} (x : Z) :
-  {{ zero_or_one x 🔽 tt
-    (fun builder' => 1 :: builder'.(assertions) = b.(assertions) ) }} -> 
-  (x = 0 \/ x = 1).
+  Lemma eq_to_assert_zero : forall (x : Z) (b : Builder.t), 
+    compute_context b = 1 ->
+    x = 0 -> {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }}.
   Proof.
-  Admitted.
+    intros x b valid eqx.
+    pose (AssertZero b x) as AEqx.
+    unfold compute_assert in AEqx.
+    symmetry in valid. rewrite <- valid in AEqx.
+    rewrite -> eqx in AEqx. simpl in AEqx.
+    rewrite -> eqx.
+    exact AEqx.
+  Qed.
 
-  (** A function with an arbitrary number of constraints. *)
-  Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
-    match l with
-    | [] => M.Pure tt
-    | x :: l' =>
-      let* _ := M.call (zero_or_one x) in
-      all_zero_or_one l'
-    end.
-  Opaque all_zero_or_one.
+  Require Import Eqdep. (* ??? *)
+
+  Lemma assert_zero_to_eq : forall (x : Z) (b : Builder.t), 
+    compute_context b = 1 ->
+    {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }} -> x = 0.
+  Proof.
+    intros x b valid run.
+    inversion run.
+    - apply inj_pair2 in H1.
+      exfalso.
+      apply H1.
+
+      injection H1.
+      simpl.
+    (* unfold add_assert in run. *)
+    inversion run as [_ _ _ _ _ _ _].
+    - exfalso.
+      inversion H1.
+
+    (* pose (AssertZero b x) as AEqx.
+    (* Step 1: Use valid to simplify the posed hypothesis *)
+    unfold compute_assert in AEqx.
+    symmetry in valid.
+    rewrite <- valid in AEqx.
+    simpl in AEqx.
+    (* Step 2: try to use run to enforce the hypothesis *)
+    destruct (x =? 0) eqn:H_AEqx in AEqx.
+    - apply Z.eqb_eq in H_AEqx.
+      exact H_AEqx.
+    - apply Z.eqb_neq in H_AEqx.
+    (* Stuck: to prove the goal we have to assume x = 0. But x = 0 
+      is the object we want to construct *) *)
+  Admitted.
 End Examples.
