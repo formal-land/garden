@@ -72,14 +72,14 @@ Module Builder.
   Record t : Type := 
   {
   (* Parameters
-  1. constraints being stored from using `when` (should we even use this?)
+  1. when_context being stored from using `when`
   2. assertions as a proposition of all assert zeros being invoked so far.
      Whenever a new assertions is being added, it is supposed to be appended by
-     all constraints stored in `constraints` before appending to the tail of 
+     all constraints stored in `when_context` before appending to the tail of 
      `assertions`
   *)
-    constraints : list Prop;
-    assertions : Prop;
+    when_context : list Z;
+    assertions : list Z;
   }.
 End Builder.
 
@@ -191,14 +191,14 @@ Notation "[[ e ]]" :=
 
 (* NOTE: Ideas I'm thinking of
 Issue with builder: 
-- assertions are supposed to perform calculations as quick as possible, while
-constraints are lazy-style stacks
+- assertions are supposed to be calculated as quick as possible, while
+when_context is a lazy-style stack
 - We are not supposed to perform calculations in propositions so we would better leave the 
   computation somewhere(where?) else
 
 Example predicates(?), for `P_Builder` below:
-- fun builder' => builder'.(constraints) = c :: builder.(constraints)
-- let a := (compute_with_constraint c (eqb 0%z a)) in 
+- fun builder' => builder'.(when_context) = c :: builder.(when_context)
+- let a := (compute_with_when c (eqb 0%z a)) in 
     fun builder' => builder'.(assertions) = builder.(assertions) /\ a
 *)
 Module Run.
@@ -215,13 +215,56 @@ Module Run.
 
   Reserved Notation "{{ e | B 🔽 output | P_B }}".
 
-  Definition eqb_to_Z (eqb : bool) : Z :=
-    if eqb then 1%Z else 0%Z.
+  Inductive test_design_proposition : Prop -> Prop :=
+  | Test : ttt (if eqb "0" "0" then True else False)
+  .
 
+(* 
+(* 
+Inductive t `{Heap.Trait} {A B : Set}
+      (stack : Stack.t) (heap : Heap)
+      (to_value : A -> B) (P_stack : Stack.t -> Prop) (P_heap : Heap -> Prop) :
+      LowM.t B -> Set :=
+  | Pure
+    (result : A)
+    (result' : B) :
+    result' = to_value result ->
+    P_stack stack ->
+    P_heap heap ->
+    {{ stack, heap |
+      LowM.Pure result' ⇓
+      to_value
+    | P_stack, P_heap }}
+*)
+
+Definition run_pop (stack : Stack.t) (heap : Heap.t) :
+  {{ stack, heap |
+    stack.pop (make_list [Evm.stack_to_value]) (make_dict []) ⇓
+    (fun (result : unit + builtins.Exception.t) =>
+      match result with
+      | inl tt => inl Constant.None_
+      | inr exn => inr (Exception.Raise (Some (builtins.Exception.to_value exn)))
+      end)
+  |
+    fun stack' => exists fresh_stack, stack' = stack ++ fresh_stack,
+    fun heap' => True
+  }}.
+*)
+
+(* 
+P_Builder for AssertZero : 
+fun builder' => 
+  (* TODO: perform calculations on constraints....? or find a better way to design it? *)
+  if eqb x 0 then
+    builder' = 1 :: builder
+    else
+    builder' = 0 :: builder 
+  *)
   Inductive t (builder : Builder.t) (P_Builder : Builder.t -> Prop) : forall {A : Set}, 
     (@M.t builder A) -> A -> Prop :=
   | Pure {A : Set} (value : A) :
     (* TODO: define separate notations in the future to enforce P_Builder *)
+    P_Builder builder ->
     {{ M.Pure value | builder 🔽 value | P_Builder }} (* Usually: fun b => builder = b *)
   | AssertZero (z : Z) : {{ M.AssertZero z | builder 🔽 tt | P_Builder }}
   | When (z : Z) : {{ M.When z | builder 🔽 tt | P_Builder }}
@@ -300,18 +343,22 @@ Module Examples.
     assert_bool square_x.
   Opaque zero_or_one.
 
-  Lemma zero_or_one_correct (p : Z) (x : Z) :
-    IsPrime p ->
-    {{ M.eval p (zero_or_one x) 🔽 tt, x = 0 \/ x = 1 }}.
+  Lemma assert_zero_correct {builder : Builder.t} :
+  {{ (M.AssertZero 0%Z) 
+  | 
+  builder 
+  🔽 
+  tt 
+  | 
+  (fun b : Builder.t => builder.(Builder.assertions) = 0 :: b.(Builder.assertions)) }}.
+  
+  
+
+  Lemma zero_abs_one_correct {b : Builder.t} {p} `{Prime p} (x : Z) :
+  {{ zero_or_one x 🔽 tt
+    (fun builder' => 1 :: builder'.(assertions) = b.(assertions) ) }} -> 
+  (x = 0 \/ x = 1).
   Proof.
-    intros.
-    with_strategy transparent [zero_or_one] unfold zero_or_one.
-    cbn.
-    eapply Run.Equiv. {
-      apply Run.Equal.
-    }
-    (* This property should be handled automatically by some field reasoning tactic. *)
-    admit.
   Admitted.
 
   (** A function with an arbitrary number of constraints. *)
