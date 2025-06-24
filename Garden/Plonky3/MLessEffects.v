@@ -233,11 +233,20 @@ Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
       BinOp.sub (BinOp.mul x x) x
   |}.
 
-Definition when (condition : bool) (e : M.t unit) : M.t unit :=
+Definition when (condition : Z) (e : M.t unit) : M.t unit :=
+  if condition =? 0 then
+    M.pure tt
+  else
+    e.
+
+Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
   if condition then
     e
   else
     M.pure tt.
+
+Definition not {p} `{Prime p} (x : Z) : Z :=
+  BinOp.sub 1 x.
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
@@ -247,3 +256,13 @@ Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
 Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+
+Module List.
+  Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
+    match l with
+    | nil => M.pure acc
+    | cons x xs =>
+      let* acc := f acc x in
+      fold_left f acc xs
+    end.
+End List.
