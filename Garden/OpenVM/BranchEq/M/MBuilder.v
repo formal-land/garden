@@ -83,9 +83,45 @@ Module Builder.
   }.
 End Builder.
 
+Definition pop_list (l : list Z) : list Z :=
+  match l with
+  | _ :: l => l
+  | [] => []
+  end.
+
+Definition add_assert (x : Z) (b : Builder.t) : Builder.t :=
+  {|
+    Builder.when_context := b.(Builder.when_context);
+    Builder.assertions := x :: b.(Builder.assertions);
+  |}.
+
+Definition push_context (x : Z) (b : Builder.t) : Builder.t :=
+  {|
+    Builder.when_context := x :: b.(Builder.when_context);
+    Builder.assertions := b.(Builder.assertions);
+  |}.
+
+Definition pop_context (b : Builder.t) : Builder.t :=
+  {|
+    Builder.when_context := pop_list b.(Builder.when_context);
+    Builder.assertions := b.(Builder.assertions);
+  |}.
+
+Fixpoint all_ones_or_empty (l : list Z) : Z :=
+  match l with
+  | [] => 1
+  | x :: xs => if Z.eqb x 1 then all_ones_or_empty xs else 0
+  end.
+
+Definition compute_context (b : Builder.t) : Z := 
+  let '(Builder.Build_t c _) := b in all_ones_or_empty c.
+
+Definition compute_assert (x : Z) (b : Builder.t) : bool :=
+  if Z.eqb 1 (compute_context b) then (Z.eqb x 0%Z) else false.
+
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
-  Inductive t {b : Builder.t} : Set -> Set :=
+  Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | AssertZero {A : Set} (x : Z) : t A
   | When {A : Set} (x : Z) : t A
@@ -100,7 +136,7 @@ Module M.
   .
 
   (** This is a marker that we remove with the following tactic. *)
-  Axiom run : forall {A : Set} {b : Builder.t}, @t b A -> A.
+  Axiom run : forall {A : Set}, t A -> A.
 
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
@@ -145,16 +181,16 @@ Module M.
       end
     end.
 
-  Definition call {b : Builder.t} {A : Set} (e : t A) : @t b A :=
+  Definition call {A : Set} (e : t A) : t A :=
     Call e.
 
-  Definition collapsing_let {b : Builder.t} {A B : Set} (e : t A) (k : A -> t B) : @t b B :=
+  Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
     match e, k with
     | Pure x, k => k x
     | e, k => Let e k
     end.
 
-  Definition pure {b : Builder.t} {A : Set} (x : A) : @t b A :=
+  Definition pure {A : Set} (x : A) : t A :=
     Pure x.
 
   (* TODO: we might be able to remove this equal function along with its primitives
@@ -167,7 +203,7 @@ Module M.
   Definition for_in_zero_to_n {b : Builder.t} (N : Z) (f : Z -> t unit) : @t b unit :=
     ForInZeroToN N f.
   *)
-  Definition mul {b : Builder.t} {p} `{Prime p} (x y : Z) : @t b Z :=
+  Definition mul {p} `{Prime p} (x y : Z) : t Z :=
     pure (BinOp.mul x y).
 End M.
 
@@ -202,88 +238,57 @@ Example predicates(?), for `P_Builder` below:
     fun builder' => builder'.(assertions) = builder.(assertions) /\ a
 *)
 Module Run.
-  (* UNUSED. Maybe just a marker. Parameters:
-  - The builder instance
-  - The proposition to assert 
-  *)
-  Parameter P_Assert : Builder.t -> Prop -> Prop. 
-  (* UNUSED. Maybe just a marker. Parameters:
-  - The builder instance
-  - The proposition to add into conatraint?
-  *)
-  Parameter P_When : Builder.t -> Prop -> Prop.
-
   Reserved Notation "{{ e | B 🔽 output | P_B }}".
-
-  Inductive test_primitives :=
-  | Eq0 (_ : Z)
-  | P2
-  .
-
-  Reserved Notation "{{{ e | L }}}".
-
+  (* TEST SECTION BELOW *)
   (* TODO: 
   - add a more complicated computation to similar `when`
   *)
+  
+  Inductive test_primitives :=
+  | TEq0 (_ : Z)
+  | TWhen (_ : Z)
+  | TEndWhen
+  .
+  
+  Reserved Notation "{{{ e | L }}}".
+
   Inductive test_design_proposition : 
-    test_primitives -> list Z -> Prop :=
-  | PEq (l : list Z) (x : Z) : 
-    {{{ Eq0 x | 
-      if Z.eqb x 0%Z then 1 :: l else 0 :: l }}}
+    test_primitives -> Builder.t -> Prop :=
+  | PEq (b : Builder.t) (x : Z) : 
+    {{{ TEq0 x | 
+      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}}
 
   where "{{{ e | L }}}" := (test_design_proposition e L).
 
-  Compute (PEq [] 0%Z).
+  Definition default_builder : Builder.t := Builder.Build_t [] [].
 
-  Compute (PEq [0] 0%Z).
+  Compute (PEq default_builder 0%Z).
 
-  Theorem test_item (l : list Z):
-  {{{ Eq0 0%Z | 1 :: l }}}.
+  Compute (PEq (add_assert 1 default_builder) 0%Z).
+
+  Theorem eq0_appends_1 : forall (b : Builder.t),
+    compute_context b = 1 ->
+    {{{ TEq0 0%Z | add_assert 1 b }}}.
   Proof.
-    apply (PEq l).
+    intros b valid.
+    (* NOTE: is there a better way to perform the proof than posing 
+    this statement during the proof? *)
+    pose (PEq b 0) as PEq0.
+    unfold compute_assert in PEq0.
+    rewrite -> valid in PEq0.
+    simpl in PEq0.
+    exact PEq0.
   Qed.
 
-(* 
-(* 
-Inductive t `{Heap.Trait} {A B : Set}
-      (stack : Stack.t) (heap : Heap)
-      (to_value : A -> B) (P_stack : Stack.t -> Prop) (P_heap : Heap -> Prop) :
-      LowM.t B -> Set :=
-  | Pure
-    (result : A)
-    (result' : B) :
-    result' = to_value result ->
-    P_stack stack ->
-    P_heap heap ->
-    {{ stack, heap |
-      LowM.Pure result' ⇓
-      to_value
-    | P_stack, P_heap }}
-*)
+  (* Theorem eq1_appends_0 : forall (b : Builder.t),
+  {{{ TEq0 1%Z | add_assert 0 b }}}.
+  Proof.
+    intros l.
+    apply (PEq l).
+  Qed. *)
+  
+  (* TEST SECTION END *)
 
-Definition run_pop (stack : Stack.t) (heap : Heap.t) :
-  {{ stack, heap |
-    stack.pop (make_list [Evm.stack_to_value]) (make_dict []) ⇓
-    (fun (result : unit + builtins.Exception.t) =>
-      match result with
-      | inl tt => inl Constant.None_
-      | inr exn => inr (Exception.Raise (Some (builtins.Exception.to_value exn)))
-      end)
-  |
-    fun stack' => exists fresh_stack, stack' = stack ++ fresh_stack,
-    fun heap' => True
-  }}.
-*)
-
-(* 
-P_Builder for AssertZero : 
-fun builder' => 
-  (* TODO: perform calculations on constraints....? or find a better way to design it? *)
-  if eqb x 0 then
-    builder' = 1 :: builder
-    else
-    builder' = 0 :: builder 
-  *)
   Inductive t (builder : Builder.t) (P_Builder : Builder.t -> Prop) : forall {A : Set}, 
     (@M.t builder A) -> A -> Prop :=
   | Pure {A : Set} (value : A) :
