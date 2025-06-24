@@ -43,7 +43,7 @@ Definition eval
   let* _ :=
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      when is_first_step (
+      when_bool is_first_step (
         M.zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
@@ -68,7 +68,7 @@ Definition eval
   let* _ :=
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      when (is_not_final_step && is_transition) (
+      when_bool (is_not_final_step && is_transition) (
         M.zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
@@ -86,7 +86,7 @@ Definition eval
     .when(not_final_step.clone())
     .assert_zero(local.export);
   *)
-  let* _ := when is_not_final_step (
+  let* _ := when_bool is_not_final_step (
     assert_zero local.(KeccakCols.export)
   ) in
 
@@ -164,7 +164,7 @@ Definition eval
                 (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
                 (List.seq 0 (Z.to_nat BITS_PER_LIMB))
               ) in
-            List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
+            Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
           BinOp.sub
             computed_limb
             (((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb)
@@ -187,7 +187,7 @@ Definition eval
       M.zeros (N := 64) {|
         Array.get z :=
           let sum : Z :=
-            List.fold_left (fun acc y =>
+            Lists.List.fold_left (fun acc y =>
               BinOp.add acc
                 (Array.get (Array.get (Array.get local.(KeccakCols.a_prime) y) x) z)
             )
@@ -235,7 +235,7 @@ Definition eval
                 (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
                 (List.seq 0 (Z.to_nat BITS_PER_LIMB))
               ) in
-            List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
+            Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
           BinOp.sub
             computed_limb
             (((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb)
@@ -264,7 +264,7 @@ Definition eval
               (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
               (List.seq 0 (Z.to_nat BITS_PER_LIMB))
             ) in
-          List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) z)) l 0 in
+          Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) z)) l 0 in
         BinOp.sub
           computed_a_prime_prime_0_0_limb
           (((local.(KeccakCols.a_prime_prime).(Array.get) 0).(Array.get) 0).(Array.get) limb)
@@ -284,7 +284,7 @@ Definition eval
   *)
   let get_xored_bit (i : Z) : Z :=
     let rc_bit_i : Z :=
-      List.fold_left (fun acc r =>
+      Lists.List.fold_left (fun acc r =>
         let this_round := Array.get local.(KeccakCols.step_flags) r in
         let this_round_constant :=
           Z.b2z (rc_value_bit r i) in
@@ -312,7 +312,7 @@ Definition eval
               (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
               (List.seq 0 (Z.to_nat BITS_PER_LIMB))
             ) in
-          List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_xored_bit z)) l 0 in
+          Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_xored_bit z)) l 0 in
         BinOp.sub
           computed_a_prime_prime_prime_0_0_limb
           (Array.get local.(KeccakCols.a_prime_prime_prime_0_0_limbs) limb)
@@ -333,8 +333,8 @@ Definition eval
   let* _ :=
     M.for_in_zero_to_n 5 (fun x =>
     M.for_in_zero_to_n 5 (fun y =>
-      when is_transition (
-      when is_not_final_step (
+      when_bool is_transition (
+      when_bool is_not_final_step (
         M.zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
