@@ -238,12 +238,7 @@ Example predicates(?), for `P_Builder` below:
     fun builder' => builder'.(assertions) = builder.(assertions) /\ a
 *)
 Module Run.
-  Reserved Notation "{{ e | B 🔽 output | P_B }}".
   (* TEST SECTION BELOW *)
-  (* TODO: 
-  - add a more complicated computation to similar `when`
-  *)
-  
   Inductive test_primitives :=
   | TEq0 (_ : Z)
   | TWhen (_ : Z)
@@ -251,19 +246,16 @@ Module Run.
   .
   
   Reserved Notation "{{{ e | L }}}".
-
   Inductive test_design_proposition : 
+  (* monad instance -> builder instance -> prop *)
     test_primitives -> Builder.t -> Prop :=
   | PEq (b : Builder.t) (x : Z) : 
-    {{{ TEq0 x | 
-      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}}
-
+    {{{ TEq0 x | if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}}
   where "{{{ e | L }}}" := (test_design_proposition e L).
 
   Definition default_builder : Builder.t := Builder.Build_t [] [].
 
   Compute (PEq default_builder 0%Z).
-
   Compute (PEq (add_assert 1 default_builder) 0%Z).
 
   Theorem eq0_appends_1 : forall (b : Builder.t),
@@ -276,42 +268,43 @@ Module Run.
     pose (PEq b 0) as PEq0.
     unfold compute_assert in PEq0.
     rewrite -> valid in PEq0.
-    simpl in PEq0.
     exact PEq0.
   Qed.
 
-  (* Theorem eq1_appends_0 : forall (b : Builder.t),
-  {{{ TEq0 1%Z | add_assert 0 b }}}.
+  Theorem eq1_appends_0 : forall (b : Builder.t),
+    compute_context b = 1 ->
+    {{{ TEq0 1%Z | add_assert 0 b }}}.
   Proof.
-    intros l.
-    apply (PEq l).
-  Qed. *)
-  
+    intros b valid.
+    pose (PEq b 1) as PEq1.
+    unfold compute_assert in PEq1.
+    rewrite -> valid in PEq1.
+    exact PEq1.
+  Qed.
   (* TEST SECTION END *)
 
-  Inductive t (builder : Builder.t) (P_Builder : Builder.t -> Prop) : forall {A : Set}, 
-    (@M.t builder A) -> A -> Prop :=
-  | Pure {A : Set} (value : A) :
-    (* TODO: define separate notations in the future to enforce P_Builder *)
-    P_Builder builder ->
-    {{ M.Pure value | builder 🔽 value | P_Builder }} (* Usually: fun b => builder = b *)
-  | AssertZero (z : Z) : {{ M.AssertZero z | builder 🔽 tt | P_Builder }}
-  | When (z : Z) : {{ M.When z | builder 🔽 tt | P_Builder }}
-  | EndWhen : {{ M.EndWhen | builder 🔽 tt | P_Builder }}
-  | Call {A : Set} (e : M.t A) (value : A) :
-    {{ e | builder 🔽 value | P_Builder }} ->
-    {{ M.Call e | builder 🔽 value | P_Builder }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
-    {{ e | builder 🔽 value| P_Builder }} ->
-    {{ k value | builder 🔽 output| P_Builder }} ->
-    {{ M.Let e k | builder 🔽 output| P_Builder }}
-  (* NOTE: since we should do the computations asap, we might be able to remove this? *)
-  | Replace {A : Set} (e : M.t A) (value1 value2 : A) :
-    (* Note: the P_Builder here looks unsatisfying *)
-    {{ e | builder 🔽 value1 | P_Builder }} ->
+  Reserved Notation "{{ e 🔽 output | B }}".
+  
+  Inductive t : forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
+  | Pure (b : Builder.t) {A : Set} (value : A): {{ M.Pure value 🔽 value | b }}
+  | AssertZero (b : Builder.t) (x : Z) : 
+    {{ M.AssertZero x 🔽 tt | 
+      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}
+  | When (b : Builder.t) (x : Z)  : {{ M.When x 🔽 tt | push_context x b }}
+  | EndWhen (b : Builder.t) : {{ M.EndWhen 🔽 tt | pop_context b }}
+  | Call (b : Builder.t) {A : Set} (e : M.t A) (value : A) :
+    {{ e 🔽 value | b }} ->
+    {{ M.Call e 🔽 value | b }}
+  | Let (b : Builder.t) {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
+    {{ e 🔽 value | b }} ->
+    {{ k value 🔽 output | b }} ->
+    {{ M.Let e k 🔽 output | b }}
+  | Replace (b : Builder.t) {A : Set} (e : M.t A) (value1 value2 : A) :
+    {{ e 🔽 value1 | b }} ->
     value1 = value2 ->
-    {{ e | builder 🔽 value2 | P_Builder }}
-  where "{{ e | builder 🔽 output | P_Builder }}" := (t builder P_Builder e output).
+    {{ e 🔽 value2 | b }}
+
+  where "{{ e 🔽 output | B }}" := (t e output B).
 End Run.
 Export Run.
 
