@@ -4,7 +4,7 @@ Import ListNotations.
 Require Import Garden.OpenVM.BranchEq.M.MBuilder.
 
 (* TODO: 
-- copy MLessEffects to make a completely separate monad 
+- Implement eval using MBuilder
 *)
 
 Module ImmInstruction.

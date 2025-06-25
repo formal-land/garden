@@ -18,6 +18,9 @@ Global Open Scope type_scope.
 Global Open Scope Z_scope.
 Global Open Scope bool_scope.
 
+Require Import Eqdep. (* ??? *)
+Require Import Coq.Program.Equality.
+
 Export List.ListNotations.
 
 Module Array.
@@ -62,16 +65,15 @@ Module BinOp.
 End BinOp.
 
 Module Builder.
-  (* Here we use record for easier access *)
-  Record t : Type := 
-  {
-  (* Parameters
+  (* NOTE: Here we use record for easier access. Parameters
   1. when_context being stored from using `when`
   2. assertions as a proposition of all assert zeros being invoked so far.
      Whenever a new assertions is being added, it is supposed to be appended by
      all constraints stored in `when_context` before appending to the tail of 
      `assertions`
   *)
+  Record t : Type := 
+  {
     when_context : list Z;
     assertions : list Z;
   }.
@@ -115,8 +117,9 @@ Definition compute_assert (x : Z) (b : Builder.t) : bool :=
   andb (Z.eqb 1 (compute_context b)) (Z.eqb x 0%Z).
 
 Module M.
-  (** The monad to write constraints generation in a certain field [F] *)
-  Inductive t : Set -> Set :=
+  (* NOTE: eventually monad is a `type` or otherwise `discriminate` will not work.
+  Is there a better way to handle this? *)
+  Inductive t : Set -> Type :=
   | Pure {A : Set} (value : A) : t A
   | AssertZero {A : Set} (x : Z) : t A
   | When {A : Set} (x : Z) : t A
@@ -129,6 +132,13 @@ Module M.
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   | Impossible {A : Set} (message : string) : t A
   .
+
+  Lemma pure_assert_zero_neq :
+    forall value x, @M.Pure unit value = @M.AssertZero unit x -> False.
+  Proof.
+    intros value x H.
+    inversion H.
+  Qed.
 
   (** This is a marker that we remove with the following tactic. *)
   Axiom run : forall {A : Set}, t A -> A.
@@ -206,6 +216,19 @@ Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
+Notation "'when*' x { k1 } k2" := (
+  let* _ := M.When x in 
+  let* _ := k1 in
+  k2
+  ) (at level 100).
+Notation "'@when*' A x { k1 } k2 " := (
+  let* _ := @M.When A x in 
+  let* _ := k1 in
+  k2
+) (at level 100).
+
+(* TODO: write test for `when` *)
+
 Notation "e (| e1 , .. , en |)" :=
   (M.run ((.. (e e1) ..) en))
   (at level 100).
@@ -221,14 +244,14 @@ Notation "[[ e ]]" :=
   (only parsing).
 
 Module Run.
-  (* TEST SECTION BELOW *)
+  (* TEST SECTION BEGINS *)
   Inductive test_primitives :=
   | TEq0 (_ : Z)
   | TWhen (_ : Z)
   | TEndWhen
   .
 
-    (* NOTE: ideas:
+  (* NOTE: ideas:
   - necessary universal parameters should be collected at lhs of colon so 
     that they're accessible to constructors of inductive types
   - types at rhs of the colon are supposed to be tags for the type being 
@@ -298,12 +321,11 @@ Module Run.
     simpl in H.
     destruct (x =? 0) eqn:Eqx0 in H.
     - apply Z.eqb_eq in Eqx0. exact Eqx0.
-    - inversion H.  (* OMFG *)
+    - inversion H.
   Qed.
   (* TEST SECTION END *)
 
   Reserved Notation "{{ e | b1 🔽 output | b2 }}".
-
   Inductive t (b : Builder.t) : 
     forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
   | Pure {A : Set} (value : A) : {{ M.Pure value | b 🔽 value | b }}
@@ -397,37 +419,24 @@ Module Examples.
     exact AEqx.
   Qed.
 
-  Require Import Eqdep. (* ??? *)
-
   Lemma assert_zero_to_eq : forall (x : Z) (b : Builder.t), 
     compute_context b = 1 ->
     {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }} -> x = 0.
   Proof.
     intros x b valid run.
     inversion run.
-    - apply inj_pair2 in H1.
-      exfalso.
-      apply H1.
-
-      injection H1.
-      simpl.
-    (* unfold add_assert in run. *)
-    inversion run as [_ _ _ _ _ _ _].
-    - exfalso.
-      inversion H1.
-
-    (* pose (AssertZero b x) as AEqx.
-    (* Step 1: Use valid to simplify the posed hypothesis *)
-    unfold compute_assert in AEqx.
     symmetry in valid.
-    rewrite <- valid in AEqx.
-    simpl in AEqx.
-    (* Step 2: try to use run to enforce the hypothesis *)
-    destruct (x =? 0) eqn:H_AEqx in AEqx.
-    - apply Z.eqb_eq in H_AEqx.
-      exact H_AEqx.
-    - apply Z.eqb_neq in H_AEqx.
-    (* Stuck: to prove the goal we have to assume x = 0. But x = 0 
-      is the object we want to construct *) *)
+    - unfold compute_assert in H0.
+      rewrite <- valid in H0. simpl in H0.
+      destruct (x =? 0) eqn:Eqx0 in H.
+      + apply Z.eqb_eq in Eqx0. exact Eqx0.
+      + rewrite -> Eqx0 in H0. inversion H0.
+    - unfold add_assert in H4.
+      assert (b = b -> b.(Builder.assertions) = b.(Builder.assertions)).
+      { intro. reflexivity. }
+      (* inversion in H4.  *)
+      (* inversion in Eqx0. *)
+      (* inversion_sigma H1. *)
+      (* apply inj_pair2 in H1_0. *)
   Admitted.
 End Examples.
