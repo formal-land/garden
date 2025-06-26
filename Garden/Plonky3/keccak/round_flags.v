@@ -57,7 +57,7 @@ Module Spec.
     eapply Run.Implies. {
       progress repeat (
         apply Run.Pure ||
-        eapply Run.Let ||
+        (eapply Run.Let; [|intro]) ||
         apply Run.Equal ||
         apply Run.Zeros ||
         cbn
@@ -92,7 +92,7 @@ Module Spec.
     eapply Run.Implies. {
       progress repeat (
         apply Run.Pure ||
-        eapply Run.Let ||
+        (eapply Run.Let; [|intro]) ||
         apply Run.Equal ||
         apply Run.AssertZerosFromFnSub ||
         cbn
