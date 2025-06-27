@@ -401,10 +401,9 @@ Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z.
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
-Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+Definition andn {p} `{Prime p} (x1 x2 : Z) : Z :=
+  BinOp.sub 1 (BinOp.mul x1 x2).
 
-(* TODO: find a way to correctly use inversion to eliminate
-  constructors for the monad *)
 Module Theorems.
   Example zero_or_one (x : Z) : M.t unit := assert_bool x.
   
