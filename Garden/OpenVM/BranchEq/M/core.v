@@ -100,6 +100,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
 
   Definition default_Z : Z := 999.
 
+  (* NOTE: should we replace the `let` clauses with `let* _ := [[ ]]` ? *)
   Definition eval (NUM_LIMBS : Z) (self : (Self NUM_LIMBS)) (local : list Z) (from_pc : Z) : 
     M.t (AdapterAirContext.t ImmInstruction.t) :=
     (* 
