@@ -49,7 +49,6 @@ Module BranchEqualCoreCols.
   }.
 End BranchEqualCoreCols.
 
-
 Module Impl_Borrow_BranchEqualCoreCols_for_T.
   Fixpoint next_helper {T : Set} (n : nat) (src : list T) (store : list T) : list T * list T :=
     match n with
@@ -83,8 +82,7 @@ Module Impl_Borrow_BranchEqualCoreCols_for_T.
       a b cmp_result imm opcode_beq_flag opcode_bne_flag diff_inv_marker.
 
   Definition borrow (cols : list Z) (NUM_LIMBS : Z) : BranchEqualCoreCols.t NUM_LIMBS 
-    := borrow_helper cols NUM_LIMBS 999. (* After we can make sure the translation works well we should
-    switch the number to 0 *)
+    := borrow_helper cols NUM_LIMBS 999.
 End Impl_Borrow_BranchEqualCoreCols_for_T.
 
 Module BranchEqualCoreAir.
