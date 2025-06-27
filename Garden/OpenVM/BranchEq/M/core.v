@@ -3,10 +3,6 @@ Require Import List.
 Import ListNotations.
 Require Import Garden.OpenVM.BranchEq.M.MBuilder.
 
-(* TODO: 
-- Implement eval using MBuilder
-*)
-
 Module ImmInstruction.
   Record t : Set := {
     is_valid : Z;
@@ -102,17 +98,15 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   Import BranchEqualCoreCols.
   Definition Self (NUM_LIMBS : Z) := BranchEqualCoreAir.t NUM_LIMBS.
 
-  Definition default_Z : Z := 0.
+  Definition default_Z : Z := 999.
 
   Definition eval (NUM_LIMBS : Z) (self : (Self NUM_LIMBS)) (local : list Z) (from_pc : Z) : 
-    (* M.t (AdapterAirContext.t ImmInstruction.t) := *)
     M.t (AdapterAirContext.t ImmInstruction.t) :=
     (* 
     let cols: &BranchEqualCoreCols<_, NUM_LIMBS> = local.borrow();
     let flags = [cols.opcode_beq_flag, cols.opcode_bne_flag];
     *)
-    let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow
-      local NUM_LIMBS in
+    let cols := @Impl_Borrow_BranchEqualCoreCols_for_T.borrow local NUM_LIMBS in
     let f1 := cols.(opcode_beq_flag NUM_LIMBS) in
     let f2 := cols.(opcode_bne_flag NUM_LIMBS) in
     (* 
@@ -150,7 +144,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     let cmp_eq := Z.add (Z.mul cmp_result opcode_beq_flag)
       (Z.mul (Z.sub 1 cmp_result) opcode_bne_flag) in
     let sum := cmp_eq in
-        (* 
+    (* 
     // For BEQ, inv_marker is used to check equality of a and b:
     // - If a == b, all inv_marker values must be 0 (sum = 0)
     // - If a != b, inv_marker contains 0s for all positions except ONE position i where a[i] !=
@@ -198,8 +192,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
     let opcodes := map BranchEqualOpcode.as_usize BranchEqualOpcode.iter in
     let o1 := nth 0 opcodes BranchEqualOpcode.opcode_offset in
     let o2 := nth 1 opcodes BranchEqualOpcode.opcode_offset in
-    let expected_opcode := Z.add 
-      (Z.mul f1 o1) (Z.mul f2 o2) in
+    let expected_opcode := Z.add (Z.mul f1 o1) (Z.mul f2 o2) in
     (* 
     let to_pc = from_pc
               + cols.cmp_result * cols.imm
