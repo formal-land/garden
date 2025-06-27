@@ -402,12 +402,14 @@ Definition double {p} `{Prime p} (x : Z) : Z :=
 
 Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
 
+Theorem eq_builder_assertions : forall (b1 b2 : Builder.t),
+  b1 = b2 -> b1.(Builder.assertions) = b2.(Builder.assertions).
+Proof. intros. subst. reflexivity. Qed.
+
 (* TODO: find a way to correctly use inversion to eliminate
   constructors for the monad *)
 Module Examples.
-
-  Definition zero_or_one (x : Z) : M.t unit := 
-    assert_bool x.
+  Definition zero_or_one (x : Z) : M.t unit := assert_bool x.
   
   Definition zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
     let* square_x := [[ BinOp.mul x x ]] in
@@ -440,8 +442,7 @@ Module Examples.
       + apply Z.eqb_eq in Eqx0. exact Eqx0.
       + rewrite -> Eqx0 in H0. inversion H0.
     - unfold add_assert in H4.
-      assert (b = b -> b.(Builder.assertions) = b.(Builder.assertions)).
-      { intro. reflexivity. }
+      apply eq_builder_assertions in H4. simpl in H4.
       (* inversion in H4.  *)
       (* inversion in Eqx0. *)
       (* inversion_sigma H1. *)
