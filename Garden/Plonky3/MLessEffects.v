@@ -5,6 +5,7 @@ Require Export RecordUpdate.
 
 Require Export Lia.
 From Hammer Require Export Tactics.
+Require Export smpl.Smpl.
 
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
@@ -66,8 +67,10 @@ Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | Equal (x1 x2 : Z) : t unit
+  | AssertBool (x : Z) : t unit
   | Zeros {N : Z} (array : Array.t Z N) : t unit
   | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
+  | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -132,6 +135,9 @@ Module M.
   Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
     ForInZeroToN N f.
 
+  Definition sum_for_in_zero_to_n (N : Z) (f : Z -> Z) : t Z :=
+    SumForInZeroToN N f.
+
   Definition call {A : Set} (e : t A) : t A :=
     Call e.
 
@@ -169,6 +175,8 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
+  | AssertBool (x : Z) :
+    {{ M.AssertBool x 🔽 tt, exists (b : bool), x = Z.b2z b }}
   | Zeros {N : Z} (array : Array.t Z N) :
     {{ M.Zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
   | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
@@ -181,7 +189,7 @@ Module Run.
     {{ M.Call e 🔽 value, P }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
-    {{ k value 🔽 output, P2 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
     {{ M.Let e k 🔽 output, P1 /\ P2 }}
   | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
@@ -223,7 +231,7 @@ Definition assert_one (x : Z) : M.t unit :=
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  M.equal x (BinOp.mul x x).
+  M.AssertBool x.
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
@@ -233,11 +241,20 @@ Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
       BinOp.sub (BinOp.mul x x) x
   |}.
 
-Definition when (condition : bool) (e : M.t unit) : M.t unit :=
+Definition when (condition : Z) (e : M.t unit) : M.t unit :=
+  if condition =? 0 then
+    M.pure tt
+  else
+    e.
+
+Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
   if condition then
     e
   else
     M.pure tt.
+
+Definition not {p} `{Prime p} (x : Z) : Z :=
+  BinOp.sub 1 x.
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
@@ -247,3 +264,21 @@ Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
 Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+
+Module List.
+  Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
+    match l with
+    | nil => M.pure acc
+    | cons x xs =>
+      let* acc := f acc x in
+      fold_left f acc xs
+    end.
+
+  Fixpoint fold_right {A B : Set} (f : B -> A -> M.t A) (l : list B) (acc : A) : M.t A :=
+    match l with
+    | nil => M.pure acc
+    | cons x xs =>
+      let* acc := fold_right f xs acc in
+      f x acc
+    end.
+End List.

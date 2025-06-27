@@ -29,13 +29,13 @@ Definition eval_round_flags {p} `{Prime p}
     (is_first_row is_transition : bool)
     (local next : KeccakCols.t) :
     M.t unit :=
-  let* _ := when is_first_row (
+  let* _ := when_bool is_first_row (
     M.equal (local.(KeccakCols.step_flags).(Array.get) 0) 1
   ) in
-  let* _ := when is_first_row (
+  let* _ := when_bool is_first_row (
     M.zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
   ) in
-  let* _ := when is_transition (
+  let* _ := when_bool is_transition (
     M.zeros (N := NUM_ROUNDS) {|
       Array.get i :=
         BinOp.sub (local.(KeccakCols.step_flags).(Array.get) i)
@@ -57,7 +57,7 @@ Module Spec.
     eapply Run.Implies. {
       progress repeat (
         apply Run.Pure ||
-        eapply Run.Let ||
+        (eapply Run.Let; [|intro]) ||
         apply Run.Equal ||
         apply Run.Zeros ||
         cbn
@@ -92,7 +92,7 @@ Module Spec.
     eapply Run.Implies. {
       progress repeat (
         apply Run.Pure ||
-        eapply Run.Let ||
+        (eapply Run.Let; [|intro]) ||
         apply Run.Equal ||
         apply Run.AssertZerosFromFnSub ||
         cbn
