@@ -446,16 +446,19 @@ Module Theorems.
     {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }} -> x = 0.
   Proof.
     intros x b valid run.
-    inversion run.
     symmetry in valid.
+    inversion run. (* We only generate 2 of 7 cases *)
+    (* Can we ensure the construct `add_assert 1 b` from original primitive 
+      with arbitary x? *)
     - unfold compute_assert in H0.
       rewrite <- valid in H0.
       destruct (x =? 0) eqn:Eqx0 in H.
-      + apply Z.eqb_eq in Eqx0. exact Eqx0.
-      + rewrite -> Eqx0 in H0. inversion H0.
-    - unfold add_assert in H4.
-      apply eq_builder_assertions in H4.
+      (* For arbitary x, is (x = 0) = true or false? *)
+      + apply Z.eqb_eq in Eqx0. exact Eqx0. (* If true, we can get exactly a proof of x=0 *)
+      + rewrite -> Eqx0 in H0. inversion H0. (* Otherwise, we can get a proof of exfalso *)
+    (* Could it be that we're generating the proposition from `Replace` primitive? *)
+    - apply eq_builder_assertions in H4.
       apply neq_list_append in H4. 
       contradiction.
-    Qed.
+  Qed.
 End Theorems.
