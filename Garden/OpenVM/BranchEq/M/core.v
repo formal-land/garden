@@ -104,7 +104,8 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
   Definition eval (NUM_LIMBS : Z) (self : (Self NUM_LIMBS)) (local : list Z) (from_pc : Z) : 
     (* M.t (AdapterAirContext.t ImmInstruction.t) := *)
     M.t unit :=
-    let* _ := M.pure tt in
+    let* _ := M.when is_firt_row in
+    let* _ := M.EndWhen in
     (* let* _ := when is_first_row (
       M.zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
     ) in

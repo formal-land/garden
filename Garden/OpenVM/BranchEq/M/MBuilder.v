@@ -123,7 +123,7 @@ Module M.
   | Pure {A : Set} (value : A) : t A
   | AssertZero {A : Set} (x : Z) : t A
   | When {A : Set} (x : Z) : t A
-  | EndWhen {A : Set} : t A
+  | EndWhen : t unit
   (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
   (* | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit *)
   (** This constructor does nothing, but helps to delimit what is inside the current the current
@@ -216,18 +216,12 @@ Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
-Notation "'when*' x { k1 } k2" := (
-  let* _ := M.When x in 
-  let* _ := k1 in
-  k2
-  ) (at level 100).
-Notation "'@when*' A x { k1 } k2 " := (
+Notation "'when*' A x k1 'endwhen' 'in' k2" := (
   let* _ := @M.When A x in 
   let* _ := k1 in
+  let* _ := M.EndWhen in
   k2
-) (at level 100).
-
-(* TODO: write test for `when` *)
+) (at level 200, format "'when*' A x k1 'endwhen' 'in' k2").
 
 Notation "e (| e1 , .. , en |)" :=
   (M.run ((.. (e e1) ..) en))
@@ -242,6 +236,16 @@ Notation "[[ e ]]" :=
   (* Use the version below for debugging and show errors that are made obscure by the tactic *)
   (* (M.Pure e) *)
   (only parsing).
+
+(* Definition test1 : M.t unit := M.Pure tt.
+Definition test2 : M.t unit := M.EndWhen.
+Definition test3 := 
+  let* _ := @M.When unit 0%Z in 
+  let* _ := M.Pure tt in
+  let* _ := M.EndWhen in
+  M.Pure tt.
+Print test3.
+Definition test4 := when* unit 1%Z ( M.Pure tt ) endwhen in (M.Pure tt). *)
 
 Module Run.
   (* TEST SECTION BEGINS *)
