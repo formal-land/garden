@@ -174,20 +174,13 @@ pub trait InteractionBuilder: AirBuilder {
 }
 *)
 Module InteractionBuilder.
-
-  (* Datatype to present all asserted constraints
-  Something that should actually be done by `AirBuilder` instances 
-  as a intermediate tool deserving a better integration *)
+  (* Datatype to present all asserted constraints from `assert_zero`, always and only *)
   Module Assert.
-    (* TODO: directly convert the generated terms into a proposition *)
     Inductive t (A : Set) : Set :=
-      (* We can safely use these operations as being required for `AirBuilder::Var` *)
       | Var : A -> t A
       .
     Arguments Var {_} _.
   End Assert.
-
-  (* TODO: define axioms specifying when `Eq Zero` is true *)
 
   (* NOTE: for future reference
   Class F {T : Type} : Type := {
@@ -205,7 +198,9 @@ Module InteractionBuilder.
 
   Definition M := list (list Var).
 
-  (* TODO: Extend to any types beyond Z in the future *)
+  (* TODO: Extend to any types beyond Z in the future. The dependencies between 
+    the types seem to be a little bit hard to express. We might find some external way
+    to express this *)
   Record Builder : Type := {
     (* Types from AirBuilder
     type F: Field;
@@ -213,14 +208,14 @@ Module InteractionBuilder.
     type Var: Into<Self::Expr>
     type M: Matrix<Self::Var>;
     *)
-    (* The dependencies between the types seem to be a little bit hard to express.
-    We might find another external way to express this *)
     _F := F; 
     _Expr := Expr;
     _Var := Var;
     _M := M;
 
+    (* Stores the context generated from `when` *)
     constraints : list (Assert.t Expr);
+    (* Stores the result `assert_zero` makes *)
     assertions : list (Assert.t Expr);
   }.
 
@@ -505,16 +500,14 @@ where
 {
 *)
 Module Impl_VmCoreAir_for_BranchEqualCoreAir.
-  (* TODO:
-  - Investigate VmCoreAir, understand its role
-  *)
   Section Impl.
   Import InteractionBuilder.
   Import Number.
 
   Context (builder : InteractionBuilder.Builder). (* We ignore the AB for now *)
   (* Context `{I : VmAdapterInterface.t}. *)
-  (* NOTE: demo to require subfield of I to be instance
+  (* NOTE: I stands for a `AdapterInterface` type being used in other places
+  Demo to require subfield of I to be instance:
   Context `{From I.Reads}. *)
   Variable NUM_LIMBS : Z.
 
