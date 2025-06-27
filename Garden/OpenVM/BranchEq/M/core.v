@@ -178,9 +178,9 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
       loop n' sum
     end in
     let* sum := loop (Z.to_nat NUM_LIMBS) sum in
-    let* _ := @M.When unit is_valid in
+    let* _ := when is_valid in
     let* _ := assert_one sum in
-    let* _ := M.EndWhen in
+    let* _ := end_when in
     (* 
     let expected_opcode = flags
         .iter()

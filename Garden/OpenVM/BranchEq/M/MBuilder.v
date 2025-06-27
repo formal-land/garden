@@ -23,6 +23,18 @@ Require Import Coq.Program.Equality.
 
 Export List.ListNotations.
 
+(* NOTE: Currently there are 2 major issues in the monad.
+1. I have attempted to define a notation for `when`, and it didn't work out well. 
+  Search `the keyword `when` and see related parts.
+2. Since the monad involves `forall` in its type, it turns out that Coq will have
+  some difficulty to perform `inversion` on the types. I have tried to
+  - Write a simpler example ("test section") to normally prove a bidirectional proposition
+  - Prove and fail on a simple test case `pure_assert_zero_neq` to see how inversion 
+    on constructors go
+  - Eventually, changing the type of monad from `Set` to `Type` seems to make the 
+    inversion on the monad a lot simpler, but I still cannot work it out. See the 
+    unfinished part of the  Example` at the bottom of this file
+*)
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -117,15 +129,13 @@ Definition compute_assert (x : Z) (b : Builder.t) : bool :=
   andb (Z.eqb 1 (compute_context b)) (Z.eqb x 0%Z).
 
 Module M.
-  (* NOTE: eventually monad is a `type` or otherwise `discriminate` will not work.
+  (* NOTE: eventually monad is a `Type` or otherwise `discriminate` will not work.
   Is there a better way to handle this? *)
   Inductive t : Set -> Type :=
   | Pure {A : Set} (value : A) : t A
   | AssertZero {A : Set} (x : Z) : t A
   | When {A : Set} (x : Z) : t A
   | EndWhen : t unit
-  (* | Zeros {N : Z} (array : Array.t Z N) : t unit *)
-  (* | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit *)
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -133,6 +143,7 @@ Module M.
   | Impossible {A : Set} (message : string) : t A
   .
 
+  (* NOTE: test on inversion on constructors *)
   Lemma pure_assert_zero_neq :
     forall value x, @M.Pure unit value = @M.AssertZero unit x -> False.
   Proof.
@@ -146,7 +157,6 @@ Module M.
   (** A tactic that replaces all [run] markers with a bind operation.
     This allows to represent programs without introducing
     explicit names for all intermediate computation results. *)
-
   Ltac monadic e :=
     lazymatch e with
     | context ctxt [let v := ?x in @?f v] =>
