@@ -27,13 +27,8 @@ Export List.ListNotations.
 1. I have attempted to define a notation for `when`, and it didn't work out well. 
   Search `the keyword `when` and see related parts.
 2. Since the monad involves `forall` in its type, it turns out that Coq will have
-  some difficulty to perform `inversion` on the types. I have tried to
-  - Write a simpler example ("test section") to normally prove a bidirectional proposition
-  - Prove and fail on a simple test case `pure_assert_zero_neq` to see how inversion 
-    on constructors go
-  - Eventually, changing the type of monad from `Set` to `Type` seems to make the 
-    inversion on the monad a lot simpler, but I still cannot work it out. See the 
-    unfinished part of the  Example` at the bottom of this file
+  some difficulty to perform `inversion` on the types. Currently the only problem is,
+  I have changed the type of monad from `Set` to `Type` 
 *)
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -248,6 +243,7 @@ Notation "[[ e ]]" :=
   (* (M.Pure e) *)
   (only parsing).
 
+(* NOTE: tests for `when` notation *)
 (* Definition test1 : M.t unit := M.Pure tt.
 Definition test2 : M.t unit := M.EndWhen.
 Definition test3 := 
@@ -258,8 +254,12 @@ Definition test3 :=
 Print test3.
 Definition test4 := when* unit 1%Z ( M.Pure tt ) in (M.Pure tt). *)
 
-Module Run.
-  (* TEST SECTION BEGINS *)
+(* A smaller example than monad to tackle around and prepare to prove 
+  properties on the monad 
+  From which some ideas on developing the proofs are also being written 
+  down
+*)
+Module TestSection.
   Inductive test_primitives :=
   | TEq0 (_ : Z)
   | TWhen (_ : Z)
@@ -323,9 +323,9 @@ Module Run.
   0 without an equation 
   *)
   Theorem eq0_to_eqx0 : forall (b : Builder.t) (x : Z),
-  compute_context b = 1 ->
-  {{{ TEq0 x, b | add_assert 1 b }}} ->
-  x = 0.
+    compute_context b = 1 ->
+    {{{ TEq0 x, b | add_assert 1 b }}} ->
+    x = 0.
   Proof.
     intros b x valid e.
     inversion e.
@@ -338,8 +338,9 @@ Module Run.
     - apply Z.eqb_eq in Eqx0. exact Eqx0.
     - inversion H.
   Qed.
-  (* TEST SECTION END *)
+End TestSection.
 
+Module Run.
   Reserved Notation "{{ e | b1 🔽 output | b2 }}".
   Inductive t (b : Builder.t) : 
     forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
@@ -402,19 +403,31 @@ Definition double {p} `{Prime p} (x : Z) : Z :=
 
 Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
 
-Theorem eq_builder_assertions : forall (b1 b2 : Builder.t),
-  b1 = b2 -> b1.(Builder.assertions) = b2.(Builder.assertions).
-Proof. intros. subst. reflexivity. Qed.
-
 (* TODO: find a way to correctly use inversion to eliminate
   constructors for the monad *)
-Module Examples.
-  Definition zero_or_one (x : Z) : M.t unit := assert_bool x.
+Module Theorems.
+  Example zero_or_one (x : Z) : M.t unit := assert_bool x.
   
-  Definition zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
+  Example zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
     let* square_x := [[ BinOp.mul x x ]] in
     assert_bool square_x.
-  Opaque zero_or_one.
+  Opaque zero_or_absolute_one.
+
+  Theorem eq_builder_assertions : forall (b1 b2 : Builder.t),
+    b1 = b2 -> b1.(Builder.assertions) = b2.(Builder.assertions).
+  Proof. intros. subst. reflexivity. Qed.
+
+  Theorem neq_list_append : forall (x : Z) (l : list Z), l <> x :: l.
+  Proof.
+    intros x l H.
+    induction l as [| h t IH].
+    - simpl in H.
+      discriminate H.
+    - simpl in H.
+      inversion H.
+      apply IH in H2.
+      contradiction.
+  Qed.
 
   Lemma eq_to_assert_zero : forall (x : Z) (b : Builder.t), 
     compute_context b = 1 ->
@@ -424,7 +437,7 @@ Module Examples.
     pose (AssertZero b x) as AEqx.
     unfold compute_assert in AEqx.
     symmetry in valid. rewrite <- valid in AEqx.
-    rewrite -> eqx in AEqx. simpl in AEqx.
+    rewrite -> eqx in AEqx.
     rewrite -> eqx.
     exact AEqx.
   Qed.
@@ -437,15 +450,13 @@ Module Examples.
     inversion run.
     symmetry in valid.
     - unfold compute_assert in H0.
-      rewrite <- valid in H0. simpl in H0.
+      rewrite <- valid in H0.
       destruct (x =? 0) eqn:Eqx0 in H.
       + apply Z.eqb_eq in Eqx0. exact Eqx0.
       + rewrite -> Eqx0 in H0. inversion H0.
     - unfold add_assert in H4.
-      apply eq_builder_assertions in H4. simpl in H4.
-      (* inversion in H4.  *)
-      (* inversion in Eqx0. *)
-      (* inversion_sigma H1. *)
-      (* apply inj_pair2 in H1_0. *)
-  Admitted.
-End Examples.
+      apply eq_builder_assertions in H4.
+      apply neq_list_append in H4. 
+      contradiction.
+    Qed.
+End Theorems.
