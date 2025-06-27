@@ -216,12 +216,13 @@ Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
-Notation "'when*' A x k1 'endwhen' 'in' k2" := (
+(* NOTE: BROKEN. Don't know why it doesn't work out *)
+Notation "'when*' A x k1 'in' k2" := (
   let* _ := @M.When A x in 
   let* _ := k1 in
   let* _ := M.EndWhen in
   k2
-) (at level 200, format "'when*' A x k1 'endwhen' 'in' k2").
+) (at level 200, format "'when*' A x k1 'in' k2").
 
 Notation "e (| e1 , .. , en |)" :=
   (M.run ((.. (e e1) ..) en))
@@ -245,7 +246,7 @@ Definition test3 :=
   let* _ := M.EndWhen in
   M.Pure tt.
 Print test3.
-Definition test4 := when* unit 1%Z ( M.Pure tt ) endwhen in (M.Pure tt). *)
+Definition test4 := when* unit 1%Z ( M.Pure tt ) in (M.Pure tt). *)
 
 Module Run.
   (* TEST SECTION BEGINS *)
@@ -376,18 +377,11 @@ Definition assert_bool (x : Z) : M.t unit :=
   assert_zero (Z.mul x (Z.sub 1 x)).
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
-(* Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
-  M.zeros (N := N) {|
-    Array.get i :=
-      let x := l.(Array.get) i in
-      BinOp.sub (BinOp.mul x x) x
-  |}. *)
 
-(* Definition when (condition : bool) (e : M.t unit) : M.t unit :=
-  if condition then
-    e
-  else
-    M.pure tt. *)
+Definition when (condition : Z) : M.t unit :=
+  @M.When unit condition.
+
+Definition end_when : (M.t unit) := M.EndWhen.
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
@@ -398,13 +392,13 @@ Definition double {p} `{Prime p} (x : Z) : Z :=
 
 Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
 
-(* TODO: use some examples to test our notations... *)
+(* TODO: find a way to correctly use inversion to eliminate
+  constructors for the monad *)
 Module Examples.
 
   Definition zero_or_one (x : Z) : M.t unit := 
     assert_bool x.
   
-  (* NOTE: is there a way to make the implicit builder much more convenient? *)
   Definition zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
     let* square_x := [[ BinOp.mul x x ]] in
     assert_bool square_x.
