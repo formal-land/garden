@@ -98,7 +98,7 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
 
   Definition default_Z : Z := 999.
 
-  (* NOTE: should we replace the `let` clauses with `let* _ := [[ ]]` ? *)
+  (* NOTE: should we replace the `let` clauses with `let*B _ := [[ ]]` ? *)
   Definition eval (NUM_LIMBS : Z) (self : (Self NUM_LIMBS)) (local : list Z) (from_pc : Z) : 
     M.t (AdapterAirContext.t ImmInstruction.t) :=
     (* 
@@ -114,16 +114,16 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
               acc + flag.into()
           });
     *)
-    let* _ := assert_bool f1 in
-    let* _ := assert_bool f2 in
+    let*B _ := assert_bool f1 in
+    let*B _ := assert_bool f2 in
     let is_valid := Z.add f1 f2 in
     (* 
     builder.assert_bool(is_valid.clone());
     builder.assert_bool(cols.cmp_result);
     *)
-    let* _ := assert_bool is_valid in
+    let*B _ := assert_bool is_valid in
     let cmp_result := cols.(cmp_result NUM_LIMBS) in
-    let* _ := assert_bool cmp_result in
+    let*B _ := assert_bool cmp_result in
     (* 
     let a = &cols.a;
     let b = &cols.b;
@@ -172,13 +172,13 @@ Module Impl_VmCoreAir_for_BranchEqualCoreAir.
       let b_i := nth x b default_Z in
       let inv_maker_i := nth x inv_maker default_Z in
       let sum := Z.add sum (Z.mul (Z.sub a_i b_i) inv_maker_i) in
-      let* _ := assert_zero (Z.mul cmp_eq (Z.sub a_i b_i)) in
+      let*B _ := assert_zero (Z.mul cmp_eq (Z.sub a_i b_i)) in
       loop n' sum
     end in
-    let* sum := loop (Z.to_nat NUM_LIMBS) sum in
-    let* _ := when is_valid in
-    let* _ := assert_one sum in
-    let* _ := end_when in
+    let*B sum := loop (Z.to_nat NUM_LIMBS) sum in
+    let*B _ := when is_valid in
+    let*B _ := assert_one sum in
+    let*B _ := end_when in
     (* 
     let expected_opcode = flags
         .iter()

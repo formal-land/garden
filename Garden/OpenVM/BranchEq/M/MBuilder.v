@@ -217,15 +217,15 @@ Module M.
     pure (BinOp.mul x y).
 End M.
 
-Notation "'let*' x ':=' e 'in' k" :=
+Notation "'let*B' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
 (* NOTE: BROKEN. Don't know why it doesn't work out *)
 Notation "'when*' A x k1 'in' k2" := (
-  let* _ := @M.When A x in 
-  let* _ := k1 in
-  let* _ := M.EndWhen in
+  let*B _ := @M.When A x in 
+  let*B _ := k1 in
+  let*B _ := M.EndWhen in
   k2
 ) (at level 200, format "'when*' A x k1 'in' k2").
 
@@ -233,15 +233,65 @@ Notation "e (| e1 , .. , en |)" :=
   (M.run ((.. (e e1) ..) en))
   (at level 100).
 
-Notation "e (||)" :=
+Notation "e (||)*" :=
   (M.run e)
   (at level 100).
 
-Notation "[[ e ]]" :=
+Notation "[[ e ]]*" :=
   (ltac:(M.monadic e))
   (* Use the version below for debugging and show errors that are made obscure by the tactic *)
   (* (M.Pure e) *)
   (only parsing).
+
+
+(* NOTE: unfinished draft *)
+Ltac m_3_trace e :=
+  match e with
+  (* | context ctxt [M.Pure ?x] =>
+    let x := context ctxt [M.Pure "OUT_OF_CONTEXT"] in
+    constr:(("match M.Pure", x)) *)
+  | context ctxt [let v := ?x in @?f v] =>
+    refine (M.Let _ _);
+    let x := context ctxt [M.Pure "OUT_OF_CONTEXT"] in
+    constr:(("match let context", x))
+  | context ctxt [M.run ?x] =>
+    let x := context ctxt [M.Pure "OUT_OF_CONTEXT"] in
+    constr:(("match run context", x))
+  | _ => 
+    constr:(("match default", e))
+  end. 
+
+(* Definition test_term := let y := Nat.add 1%nat 1%nat in Nat.mul y y. *)
+Definition test_term := let x := 1 in M.Pure x.
+
+(* Goal let x := 1 + 1 in True. *)
+(* refine (M.Let _ _). *)
+
+(* Goal True.
+  let x := eval cbv delta in test_term in
+  (* pose x as x. *)
+  let t := m_3_trace x in
+  pose t as extracted_ctxt.
+  pose (let* _ := [[ (3 * 3) ]] in M.Pure tt) as xxx.
+  [pose constr:(M.monadic xxx) 1 as sss | idtac "1"].
+  exact I.
+Qed. *)
+
+(* Definition testtest : True.
+Proof.
+  pose test2 as t2. 
+  let x := m_3_trace t2 in pose x as t3_trace.
+Admitted.
+
+Print test2.
+
+Compute (ltac:(M.monadic (1 + 1))). *)
+
+(* Definition test := [[ 
+    let* x := [[ 1 + 1 ]] in
+    [[ x ]]
+]].
+Print test. Compute test. *)
 
 (* NOTE: tests for `when` notation *)
 (* Definition test1 : M.t unit := M.Pure tt.
@@ -341,27 +391,27 @@ Module TestSection.
 End TestSection.
 
 Module Run.
-  Reserved Notation "{{ e | b1 🔽 output | b2 }}".
+  Reserved Notation "{{ e | b1 🔽 output | b2 }}*".
   Inductive t (b : Builder.t) : 
     forall {A : Set}, M.t A -> A -> Builder.t -> Prop :=
-  | Pure {A : Set} (value : A) : {{ M.Pure value | b 🔽 value | b }}
+  | Pure {A : Set} (value : A) : {{ M.Pure value | b 🔽 value | b }}*
   | AssertZero (x : Z) : 
     {{ M.AssertZero x | b 🔽 tt | 
-      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}
-  | When (x : Z) : {{ M.When x | b 🔽 tt | push_context x b }}
-  | EndWhen : {{ M.EndWhen | b 🔽 tt | pop_context b }}
+      if (compute_assert x b) then add_assert 1 b else add_assert 0 b }}*
+  | When (x : Z) : {{ M.When x | b 🔽 tt | push_context x b }}*
+  | EndWhen : {{ M.EndWhen | b 🔽 tt | pop_context b }}*
   | Call {A : Set} (e : M.t A) (value : A) :
-    {{ e | b 🔽 value | b }} ->
-    {{ M.Call e | b 🔽 value | b }}
+    {{ e | b 🔽 value | b }}* ->
+    {{ M.Call e | b 🔽 value | b }}*
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
-    {{ e | b 🔽 value | b }} ->
-    {{ k value | b 🔽 output | b }} ->
-    {{ M.Let e k | b 🔽 output | b }}
+    {{ e | b 🔽 value | b }}* ->
+    {{ k value | b 🔽 output | b }}* ->
+    {{ M.Let e k | b 🔽 output | b }}*
   | Replace {A : Set} (e : M.t A) (value1 value2 : A) :
-    {{ e | b 🔽 value1 | b }} ->
+    {{ e | b 🔽 value1 | b }}* ->
     value1 = value2 ->
-    {{ e | b 🔽 value2 | b }}
-    where "{{ e | b1 🔽 output | b2 }}" := (t b1 e output b2).
+    {{ e | b 🔽 value2 | b }}*
+    where "{{ e | b1 🔽 output | b2 }}*" := (t b1 e output b2).
 End Run.
 Export Run.
 
@@ -408,7 +458,7 @@ Module Theorems.
   Example zero_or_one (x : Z) : M.t unit := assert_bool x.
   
   Example zero_or_absolute_one {p} `{Prime p} (x : Z) : M.t unit :=
-    let* square_x := [[ BinOp.mul x x ]] in
+    let*B square_x := [[ BinOp.mul x x ]]* in
     assert_bool square_x.
   Opaque zero_or_absolute_one.
 
@@ -430,7 +480,7 @@ Module Theorems.
 
   Lemma eq_to_assert_zero : forall (x : Z) (b : Builder.t), 
     compute_context b = 1 ->
-    x = 0 -> {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }}.
+    x = 0 -> {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }}*.
   Proof.
     intros x b valid eqx.
     pose (AssertZero b x) as AEqx.
@@ -443,7 +493,7 @@ Module Theorems.
 
   Lemma assert_zero_to_eq : forall (x : Z) (b : Builder.t), 
     compute_context b = 1 ->
-    {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }} -> x = 0.
+    {{ M.AssertZero x | b 🔽 tt | add_assert 1 b }}* -> x = 0.
   Proof.
     intros x b valid run.
     symmetry in valid.
