@@ -53,7 +53,7 @@ Module Equality.
     {{ [[ MLessEffects_test.test1 ]] 🔽 o2, True }} ->
     o1 = o2.
   Admitted.
-  
+
   (* 
   Theorem eq_output_test2 : forall (x1 x2 : Z) (o1 o2 : unit),
     x1 = x2 ->
@@ -80,11 +80,7 @@ Module Equality.
     (* Stuck *)
     injection x.
     Abort.
-    (* subst in H1. *)
-    (* inversion runLE4. *)
-    (* rewrite <- eqbuilder in runB4. *)
 
-    (* TODO: prove o1 = 8 from Run.Pure's formation *)
     (* apply (MBuilder.Run.Pure b1 8) in runB4. *)
   (* Admitted. *)
 
