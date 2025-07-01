@@ -31,6 +31,11 @@ Module Array.
     {|
       get index := x.(get) (start + index)
     |}.
+
+  (** It is possible to find counter examples to this axiom. TODO: find a better approach. *)
+  Axiom eq : forall {A : Set} {N : Z} (x y : t A N),
+    (forall i, 0 <= i < N -> x.(get) i = y.(get) i) ->
+    x = y.
 End Array.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
@@ -66,6 +71,7 @@ Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
+  | Explicit {A : Set} (value : A) (post : Prop) : t A
   | Equal (x1 x2 : Z) : t unit
   | AssertBool (x : Z) : t unit
   | Zeros {N : Z} (array : Array.t Z N) : t unit
@@ -126,6 +132,9 @@ Module M.
   Definition pure {A : Set} (x : A) : t A :=
     Pure x.
 
+  Definition explicit {A : Set} (x : A) (post : Prop) : t A :=
+    Explicit x post.
+
   Definition equal (x y : Z) : t unit :=
     Equal x y.
 
@@ -173,6 +182,8 @@ Module Run.
   Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
     {{ M.Pure value 🔽 value, True }}
+  | Explicit {A : Set} (value : A) (post : Prop) :
+    {{ M.Explicit value post 🔽 value, post }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
