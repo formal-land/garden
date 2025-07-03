@@ -261,12 +261,6 @@ Ltac m_3_trace e :=
     constr:(("match default", e))
   end. 
 
-(* Definition test_term := let y := Nat.add 1%nat 1%nat in Nat.mul y y. *)
-Definition test_term := let x := 1 in M.Pure x.
-
-(* Goal let x := 1 + 1 in True. *)
-(* refine (M.Let _ _). *)
-
 (* Goal True.
   let x := eval cbv delta in test_term in
   (* pose x as x. *)
