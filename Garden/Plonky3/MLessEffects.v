@@ -31,6 +31,11 @@ Module Array.
     {|
       get index := x.(get) (start + index)
     |}.
+  
+  Definition slice_first {A : Set} {N : Z} (x : t A N) (count: Z) : t A count :=
+    {|
+      get index := x.(get) index
+    |}.
 End Array.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
