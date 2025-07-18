@@ -45,3 +45,47 @@ Definition IV : Array.t (Array.t Z 2) 8 :=
         | _ => IV_val 0 0 (* Default case, should not happen *)
         end
   |}.
+
+
+
+(* const MSG_PERMUTATION: [usize; 16] = [2, 6, 3, 10, 7, 0, 4, 13, 1, 11, 12, 5, 9, 14, 15, 8]; *)
+Definition MSG_PERMUTATION : Array.t Z 16 :=
+  {| Array.get i :=
+        match i with
+        | 0 => 2
+        | 1 => 6
+        | 2 => 3
+        | 3 => 10
+        | 4 => 7
+        | 5 => 0   
+        | 6 => 4
+        | 7 => 13
+        | 8 => 1
+        | 9 => 11
+        | 10 => 12
+        | 11 => 5
+        | 12 => 9
+        | 13 => 14
+        | 14 => 15
+        | 15 => 8
+        | _ => -1 (* Default case, should not happen *)
+        end
+  |}.
+
+
+(* 
+Applying MSG_PERMUTATION to an array of 16 elements.
+pub(crate) fn permute<T: Clone>(m: &mut [T; 16]) {
+    let mut permuted = m.clone();
+    for i in 0..16 {
+        permuted[i] = m[MSG_PERMUTATION[i]].clone();
+    }
+    *m = permuted;
+}
+ *)
+Definition permute {T : Set} (m : Array.t T 16) : Array.t T 16 :=
+  {|
+    Array.get i :=
+      let idx := Array.get MSG_PERMUTATION i in
+      Array.get m idx
+  |}.
