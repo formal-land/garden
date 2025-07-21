@@ -46,6 +46,8 @@ Class Prime (p : Z) : Prop := {
 }.
 
 Module UnOp.
+  Definition from {p} `{Prime p} (x : Z) : Z :=
+    x mod p.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
     (-x) mod p.
 End UnOp.
