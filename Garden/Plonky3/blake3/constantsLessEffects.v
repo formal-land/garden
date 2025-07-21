@@ -21,7 +21,7 @@ pub(crate) const IV: [[u16; 2]; 8] = [
 ];
 *)
 
-Definition IV_val (val1 val2 : Z) : Array.t Z 2 :=
+Definition double_val (val1 val2 : Z) : Array.t Z 2 :=
   {| Array.get i := 
         match i with
         | 0 => val1
@@ -34,15 +34,15 @@ Definition IV : Array.t (Array.t Z 2) 8 :=
   {|
     Array.get i :=
         match i with
-        | 0 => IV_val 0xE667 0x6A09
-        | 1 => IV_val 0xAE85 0xBB67
-        | 2 => IV_val 0xF372 0x3C6E
-        | 3 => IV_val 0xF53A 0xA54F
-        | 4 => IV_val 0x527F 0x510E
-        | 5 => IV_val 0x688C 0x9B05
-        | 6 => IV_val 0xD9AB 0x1F83
-        | 7 => IV_val 0xCD19 0x5BE0
-        | _ => IV_val 0 0 (* Default case, should not happen *)
+        | 0 => double_val 0xE667 0x6A09
+        | 1 => double_val 0xAE85 0xBB67
+        | 2 => double_val 0xF372 0x3C6E
+        | 3 => double_val 0xF53A 0xA54F
+        | 4 => double_val 0x527F 0x510E
+        | 5 => double_val 0x688C 0x9B05
+        | 6 => double_val 0xD9AB 0x1F83
+        | 7 => double_val 0xCD19 0x5BE0
+        | _ => double_val 0 0 (* Default case, should not happen *)
         end
   |}.
 
