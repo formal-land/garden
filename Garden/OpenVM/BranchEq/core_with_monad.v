@@ -125,7 +125,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
     assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get a i) (Array.get b i)))
   ) in
-  let* sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
+  let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
     BinOp.mul (Array.get inv_marker i) (BinOp.sub (Array.get a i) (Array.get b i))
   ) in
   let sum := BinOp.add sum cmp_eq in
