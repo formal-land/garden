@@ -24,7 +24,7 @@ Definition pack_bits_le_list {p} `{Prime p} (bits : list Z) : M.t Z :=
     let reversed_bits := List.rev bits in 
     List.fold_left (fun acc x => M.pure (BinOp.add (BinOp.mul 2 acc) x)) 0 reversed_bits.
 
-Definition pack_bits_le_array {p} `{Prime p} {N : Z} (bits : Array.t Z N) : M.t Z :=
+Definition pack_bits_le_array {p} `{Prime p} {N : Z} (bits : Array.t Z N) : Z :=
     M.sum_for_in_zero_to_n N (fun i => BinOp.mul (Array.get bits i) (2 ^ i)).
 
 
@@ -86,7 +86,7 @@ Definition xor_32_shift {p} `{Prime p}
   |} in 
 
   (* let sum_0_16: AB::Expr = pack_bits_le(xor_shift_c_0_16); *)
-  let* sum_0_16 := pack_bits_le_array xor_shift_c_0_16 in
+  let sum_0_16 := pack_bits_le_array xor_shift_c_0_16 in
 
   (*
       let xor_shift_c_16_32 = b[16..]
@@ -102,7 +102,7 @@ Definition xor_32_shift {p} `{Prime p}
   |} in
 
   (* let sum_16_32: AB::Expr = pack_bits_le(xor_shift_c_16_32); *)
-  let* sum_16_32 := pack_bits_le_array xor_shift_c_16_32 in
+  let sum_16_32 := pack_bits_le_array xor_shift_c_16_32 in
 
   (* builder.assert_zeros([a[0] - sum_0_16, a[1] - sum_16_32]); *)
   let* zero_1 := assert_zero (BinOp.sub (Array.get a 0) sum_0_16) in

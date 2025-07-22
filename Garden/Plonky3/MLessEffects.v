@@ -38,6 +38,11 @@ Module Array.
     {|
       get index := x.(get) (start + index)
     |}.
+  
+  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count :=
+    {|
+      get index := x.(get) index
+    |}.
 
   Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
     x.(get) i mod p.
@@ -51,6 +56,9 @@ End Array.
 Module UnOp.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
     (-x) mod p.
+  
+  Definition from {p} `{Prime p} (x : Z) : Z := 
+    x mod p.
 End UnOp.
 
 Module BinOp.

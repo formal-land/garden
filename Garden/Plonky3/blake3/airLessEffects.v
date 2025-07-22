@@ -9,10 +9,10 @@ Definition quarter_round_function {p} `{Prime p} (trace : QuarterRound.t Z Z) : 
     let b_16_32 = pack_bits_le(trace.b[BITS_PER_LIMB..].iter().copied());  
     *)
     let b_bits_low := Array.slice_first trace.(QuarterRound.b) BITS_PER_LIMB in
-    let* b_0_16 := pack_bits_le_array b_bits_low in
+    let b_0_16 := pack_bits_le_array b_bits_low in
 
     let b_bits_high := Array.slice_from trace.(QuarterRound.b) BITS_PER_LIMB in
-    let* b_16_32 := pack_bits_le_array b_bits_high in  
+    let b_16_32 := pack_bits_le_array b_bits_high in  
 
 
     (*
@@ -43,9 +43,9 @@ Definition quarter_round_function {p} `{Prime p} (trace : QuarterRound.t Z Z) : 
         let d_output_16_32 = pack_bits_le(trace.d_output[BITS_PER_LIMB..].iter().copied());  
     *)    
     let d_output_bits_low := Array.slice_first trace.(QuarterRound.d_output) BITS_PER_LIMB in
-    let* d_output_0_16 := pack_bits_le_array d_output_bits_low in
+    let d_output_0_16 := pack_bits_le_array d_output_bits_low in
     let d_output_bits_high := Array.slice_from trace.(QuarterRound.d_output) BITS_PER_LIMB in
-    let* d_output_16_32 := pack_bits_le_array d_output_bits_high in
+    let d_output_16_32 := pack_bits_le_array d_output_bits_high in
     (*
         add2(
             builder,
@@ -280,8 +280,8 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     M.for_in_zero_to_n 4 ( fun i =>
       let bits := Array.get chaining_values_0 i in
       let word := Array.get initial_row_0 i in
-      let* low_16 := pack_bits_le_array (Array.slice_first bits BITS_PER_LIMB) in
-      let* hi_16 := pack_bits_le_array (Array.slice_from bits BITS_PER_LIMB) in
+      let low_16 := pack_bits_le_array (Array.slice_first bits BITS_PER_LIMB) in
+      let hi_16 := pack_bits_le_array (Array.slice_from bits BITS_PER_LIMB) in
       let* _ := M.equal low_16 (Array.get word 0) in
       let* _ := M.equal hi_16 (Array.get word 1) in
       M.pure tt
