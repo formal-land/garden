@@ -51,6 +51,11 @@ Module Array.
     {|
       get index := x
     |}.
+  
+  Definition map {A B : Set} {N : Z} (x : t A N) (f : A -> B) : t B N := 
+    {|
+      get index := f (x.(get) index)
+    |}.
 End Array.
 
 Module UnOp.

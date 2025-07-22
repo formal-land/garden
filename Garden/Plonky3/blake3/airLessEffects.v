@@ -257,8 +257,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
           .chain(initial_row_3.iter())
           .for_each(|elem| elem.iter().for_each(|&bool| builder.assert_bool(bool)));
   *)
-  let local_inputs := local.(Blake3Cols.inputs) in
-  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) local_inputs in
+  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) local.(Blake3Cols.inputs) in
   let chaining_values_0 := Array.get local.(Blake3Cols.chaining_values) 0 in
   let* _ := M.for_each (M.for_each (fun x => assert_bool x)) chaining_values_0 in
   let chaining_values_1 := Array.get local.(Blake3Cols.chaining_values) 1 in
@@ -286,29 +285,6 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
       let* _ := M.equal hi_16 (Array.get word 1) in
       M.pure tt
     ) in
-  (* let* _ := 
-    for_in_zero_to_n 4 (fun i =>
-      (* Get the bits array and the corresponding word *)
-      let* bits := [[ Array.get (| chaining_values_0, i |) ]] in
-      let* word := [[ Array.get (| local.(Blake3Cols.initial_row0), i |) ]] in
-      
-      (* Extract the first BITS_PER_LIMB bits and the remaining bits *)
-      let bits_low_list := List.firstn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
-      let bits_high_list := List.skipn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
-      
-      let* low_16 := [[ pack_bits_le (| bits_low_list |) ]] in
-      let* hi_16 := [[ pack_bits_le (| bits_high_list |) ]] in
-      
-      let* word_low := [[ Array.get (| word, 0 |) ]] in
-      let* word_high := [[ Array.get (| word, 1 |) ]] in
-      
-      let* _ := [[ M.equal (| low_16, word_low |) ]] in
-      let* _ := [[ M.equal (| hi_16, word_high |) ]] in
-      
-      M.Pure tt
-    ) in *)
-  M.Pure tt.
-  (*
   (*
   local
     .initial_row2
@@ -319,19 +295,16 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         builder.assert_eq(row_elem[1], AB::Expr::from_u16(constant[1]));
     });
   *)
-  let* _ := for_in_zero_to_n 4 ( fun i => 
-    let* row_elem := [[ Array.get (| local.(Blake3Cols.initial_row2), i |) ]] in
-    let* constant := [[ Array.get (| IV, i |) ]] in
+  
+  let* _ := M.for_in_zero_to_n 4 (fun i => 
+    let row_elem := Array.get (local.(Blake3Cols.initial_row2)) i in
+    let constant := Array.get IV i in
 
-    let* row_elem_0 := [[ Array.get (| row_elem, 0 |) ]] in
-    let* row_elem_1 := [[ Array.get (| row_elem, 1 |) ]] in
-    let* constant_0 := [[ Array.get (| constant, 0 |) ]] in
-    let* constant_1 := [[ Array.get (| constant, 1 |) ]] in
-    let* _ := [[ M.equal (| row_elem_0, constant_0 |) ]] in
-    let* _ := [[ M.equal (| row_elem_1, constant_1 |) ]] in
+    let* _ := M.equal (Array.get row_elem 0) (UnOp.from (Array.get constant 0)) in
+    let* _ := M.equal (Array.get row_elem 1) (UnOp.from (Array.get constant 1)) in
     M.Pure tt
   ) in
-
+  
   (*
       let mut m_values: [[AB::Expr; 2]; 16] = local.inputs.map(|bits| {
         [
@@ -339,20 +312,12 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
             pack_bits_le(bits[BITS_PER_LIMB..].iter().copied()),
         ]
     });
-  *)
-  let* m_values := 
-    [[
-      Array.from_fn (N := 16) (| fun i =>
-        let* input := [[ Array.get (| local.(Blake3Cols.inputs), i |) ]] in
-        let bits_low := List.firstn (Z.to_nat BITS_PER_LIMB) input.(Array.value) in
-        let bits_high := List.skipn (Z.to_nat BITS_PER_LIMB) input.(Array.value) in
-        
-        let* low_packed := [[ pack_bits_le (| bits_low |) ]] in
-        let* high_packed := [[ pack_bits_le (| bits_high |) ]] in
-        
-        M.Pure ({| Array.value := [low_packed; high_packed] |} : Array.t Z 2)
-      |)
-    ]] in
+  *) 
+  let m_values := Array.map local.(Blake3Cols.inputs) (fun bits =>
+    let bits_low := Array.slice_first bits BITS_PER_LIMB in
+    let bits_high := Array.slice_from bits BITS_PER_LIMB in
+    double_val (pack_bits_le_array bits_low) (pack_bits_le_array bits_high)
+  ) in
   
   (*
     let initial_state = Blake3State {
@@ -364,7 +329,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   *)
   let initial_state : Blake3State.t Z := {|
     Blake3State.row0 := local.(Blake3Cols.initial_row0);
-    Blake3State.row1 := Array.get (| local.(Blake3Cols.chaining_values), 1 |);
+    Blake3State.row1 := Array.get local.(Blake3Cols.chaining_values) 1;
     Blake3State.row2 := local.(Blake3Cols.initial_row2);
     Blake3State.row3 := initial_row_3
   |} in
@@ -375,13 +340,15 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   // Round 1:
   self.verify_round(builder, &initial_state, &local.full_rounds[0], &m_values);
   *)
-  let* full_round_0 := [[ Array.get (| local.(Blake3Cols.full_rounds), 0 |) ]] in
-  let* _ := [[ verify_round (| initial_state, full_round_0, m_values |) ]] in
+  let full_round_0 := Array.get local.(Blake3Cols.full_rounds) 0 in
+  let* _ := verify_round initial_state full_round_0 m_values in
+
   (* 
   // Permute the vector of m_values.
   permute(&mut m_values);  
   *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
+
   (*
     // Round 2:
     self.verify_round(
@@ -391,10 +358,11 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );  
   *)
-  let* full_round_1 := [[ Array.get (| local.(Blake3Cols.full_rounds), 1 |) ]] in
-  let* _ := [[ verify_round (| full_round_0.(FullRound.state_output), full_round_1, m_values |) ]] in
+  let full_round_1 := Array.get local.(Blake3Cols.full_rounds) 1 in
+  let* _ := verify_round full_round_0.(FullRound.state_output) full_round_1 m_values in
+
   (* permute(&mut m_values); *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
   (*
     // Round 3:
     self.verify_round(
@@ -404,10 +372,10 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );
   *)
-  let* full_round_2 := [[ Array.get (| local.(Blake3Cols.full_rounds), 2 |) ]] in
-  let* _ := [[ verify_round (| full_round_1.(FullRound.state_output), full_round_2, m_values |) ]] in
+  let full_round_2 := Array.get local.(Blake3Cols.full_rounds) 2 in
+  let* _ := verify_round full_round_1.(FullRound.state_output) full_round_2 m_values in
   (* permute(&mut m_values); *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
   (*
     // Round 4:
     self.verify_round(
@@ -417,10 +385,10 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );
   *)
-  let* full_round_3 := [[ Array.get (| local.(Blake3Cols.full_rounds), 3 |) ]] in
-  let* _ := [[ verify_round (| full_round_2.(FullRound.state_output), full_round_3, m_values |) ]] in
+  let full_round_3 := Array.get local.(Blake3Cols.full_rounds) 3 in
+  let* _ := verify_round full_round_2.(FullRound.state_output) full_round_3 m_values in
   (* permute(&mut m_values); *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
   (*
     // Round 5:
     self.verify_round(
@@ -430,10 +398,10 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );
   *)
-  let* full_round_4 := [[ Array.get (| local.(Blake3Cols.full_rounds), 4 |) ]] in
-  let* _ := [[ verify_round (| full_round_3.(FullRound.state_output), full_round_4, m_values |) ]] in
+  let full_round_4 := Array.get local.(Blake3Cols.full_rounds) 4 in
+  let* _ := verify_round full_round_3.(FullRound.state_output) full_round_4 m_values in
   (* permute(&mut m_values); *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
   (*
     // Round 6:
     self.verify_round(
@@ -443,10 +411,10 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );
   *)
-  let* full_round_5 := [[ Array.get (| local.(Blake3Cols.full_rounds), 5 |) ]] in
-  let* _ := [[ verify_round (| full_round_4.(FullRound.state_output), full_round_5, m_values |) ]] in
+  let full_round_5 := Array.get local.(Blake3Cols.full_rounds) 5 in
+  let* _ := verify_round full_round_4.(FullRound.state_output) full_round_5 m_values in
   (* permute(&mut m_values); *)
-  let* m_values := [[ permute (| m_values |) ]] in
+  let m_values := permute m_values in
   (*
     // Round 7:
     self.verify_round(
@@ -456,8 +424,8 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         &m_values,
     );
   *)
-  let* full_round_6 := [[ Array.get (| local.(Blake3Cols.full_rounds), 6 |) ]] in
-  let* _ := [[ verify_round (| full_round_5.(FullRound.state_output), full_round_6, m_values |) ]] in
+  let full_round_6 := Array.get local.(Blake3Cols.full_rounds) 6 in
+  let* _ := verify_round full_round_5.(FullRound.state_output) full_round_6 m_values in
   
   (*
   local
@@ -472,26 +440,19 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     });
   *)
   let* _ := 
-    for_in_zero_to_n 4 (fun i =>
+    M.for_in_zero_to_n 4 (fun i =>
       (* Get the bits array and the corresponding word *)
-      let* bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
-      let* word := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row2), i |) ]] in 
-      
-      (* Extract the first BITS_PER_LIMB bits and the remaining bits *)
-      let bits_low_list := List.firstn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
-      let bits_high_list := List.skipn (Z.to_nat BITS_PER_LIMB) bits.(Array.value) in
-      
-      let* low_16 := [[ pack_bits_le (| bits_low_list |) ]] in
-      let* hi_16 := [[ pack_bits_le (| bits_high_list |) ]] in
-      
-      let* word_low := [[ Array.get (| word, 0 |) ]] in
-      let* word_high := [[ Array.get (| word, 1 |) ]] in
-      
-      let* _ := [[ M.equal (| low_16, word_low |) ]] in
-      let* _ := [[ M.equal (| hi_16, word_high |) ]] in
-      
+      let bits := Array.get local.(Blake3Cols.final_round_helpers) i in
+      let word := Array.get full_round_6.(FullRound.state_output).(Blake3State.row2) i in
+      (* Pack the bits into two 16-bit words *)
+      let low_16 := pack_bits_le_array (Array.slice_first bits BITS_PER_LIMB) in
+      let hi_16 := pack_bits_le_array (Array.slice_from bits BITS_PER_LIMB) in
+      (* Assert that the packed values match the corresponding word *)
+      let* _ := M.equal low_16 (Array.get word 0) in
+      let* _ := M.equal hi_16 (Array.get word 1) in
       M.Pure tt
     ) in 
+
   (*
   local
     .final_round_helpers
@@ -501,15 +462,9 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   *)
   (* final_round_helpers *)
   let* _ := 
-    for_in local.(Blake3Cols.final_round_helpers).(Array.value) (fun helper_array =>
-      [[ assert_bools (| helper_array |) ]]
-    ) in
+    M.for_each (M.for_each (fun x => assert_bool x)) local.(Blake3Cols.final_round_helpers) in
   (* outputs[0] *)
-  let* outputs_0 := [[ Array.get (| local.(Blake3Cols.outputs), 0 |) ]] in
-  let* _ := 
-    for_in outputs_0.(Array.value) (fun output_array =>
-      [[ assert_bools (| output_array |) ]]
-    ) in
+  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) (Array.get local.(Blake3Cols.outputs) 0) in    
   
   (*
     // Finally we check the xor by xor'ing the output with final_round_helpers, packing the bits
@@ -524,13 +479,16 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     }
   *)
   let* _ := 
-    for_in_zero_to_n 4 (fun i => 
-      let* out_bits := [[ Array.get (| outputs_0, i |) ]] in
-      let* left_words := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row0), i |) ]] in
-      let* right_bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
-      [[ xor_32_shift (| left_words, out_bits, right_bits, 0 |) ]]
+    M.for_in_zero_to_n 4 (fun i => 
+      let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 0) i in
+      let left_words := Array.get full_round_6.(FullRound.state_output).(Blake3State.row0) i in
+      let right_bits := Array.get local.(Blake3Cols.final_round_helpers) i in
+      (* Perform the xor operation *)
+      let* _ := xor_32_shift left_words out_bits right_bits 0 in
+      M.Pure tt
     )
    in
+
   (*
   for (out_bits, left_bits, right_bits) in izip!(
       local.outputs[1], // [[T; 32]; 4],
@@ -543,23 +501,24 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
       }
   }
   *)
-  let* outputs_1 := [[ Array.get (| local.(Blake3Cols.outputs), 1 |) ]] in
-  let* _ :=
-    for_in_zero_to_n 4 (fun i => 
-      let* out_bits := [[ Array.get (| outputs_1, i |) ]] in
-      let* left_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row1), i |) ]] in
-      let* right_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row3), i |) ]] in
-      let* _ := 
-        for_in_zero_to_n 32 (fun j =>
-          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
-          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
-          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
-          [[ M.equal (| out_bit, left_xor_right |) ]]
-        )
-      in
-      M.Pure tt
-    ) in
+
+        
+  let* _ := M.for_in_zero_to_n 4 (fun i => 
+    let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 1) i in
+    let left_bits := Array.get full_round_6.(FullRound.state_output).(Blake3State.row1) i in
+    let right_bits := Array.get full_round_6.(FullRound.state_output).(Blake3State.row3) i in
+    let* _ := 
+      M.for_in_zero_to_n 32 (fun j =>
+        let out_bit := Array.get out_bits j in
+        let left_bit := Array.get left_bits j in
+        let right_bit := Array.get right_bits j in
+        let left_xor_right := xor left_bit right_bit in
+        M.equal out_bit left_xor_right
+      )
+    in
+    M.Pure tt
+  ) in
+     
   (*
     for (out_bits, left_bits, right_bits) in izip!(
         local.outputs[2],
@@ -571,24 +530,22 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         }
     }  
   *)
-  let* outputs_2 := [[ Array.get (| local.(Blake3Cols.outputs), 2 |) ]] in
-  let* chaining_values_0 := [[ Array.get (| local.(Blake3Cols.chaining_values), 0 |) ]] in
-  let* _ :=
-    for_in_zero_to_n 4 (fun i => 
-      let* out_bits := [[ Array.get (| outputs_2, i |) ]] in
-      let* left_bits := [[ Array.get (| chaining_values_0, i |) ]] in
-      let* right_bits := [[ Array.get (| local.(Blake3Cols.final_round_helpers), i |) ]] in
-      let* _ := 
-        for_in_zero_to_n 32 (fun j =>
-          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
-          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
-          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
-          [[ M.equal (| out_bit, left_xor_right |) ]]
-        )
-      in
-      M.Pure tt
-    ) in
+  let* _ := M.for_in_zero_to_n 4 (fun i => 
+    let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 2) i in
+    let left_bits := Array.get (Array.get local.(Blake3Cols.chaining_values) 0) i in
+    let right_bits := Array.get local.(Blake3Cols.final_round_helpers) i in
+    let* _ := 
+      M.for_in_zero_to_n 32 (fun j =>
+        let out_bit := Array.get out_bits j in
+        let left_bit := Array.get left_bits j in
+        let right_bit := Array.get right_bits j in
+        let left_xor_right := xor left_bit right_bit in
+        M.equal out_bit left_xor_right
+      )
+    in
+    M.Pure tt
+  ) in
+   
   (*
     for (out_bits, left_bits, right_bits) in izip!(
         local.outputs[3],
@@ -600,22 +557,20 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         }
     }  
   *)
-  let* outputs_3 := [[ Array.get (| local.(Blake3Cols.outputs), 3 |) ]] in
-  let* chaining_values_1 := [[ Array.get (| local.(Blake3Cols.chaining_values), 1 |) ]] in
-  let* _ :=
-    for_in_zero_to_n 4 (fun i => 
-      let* out_bits := [[ Array.get (| outputs_3, i |) ]] in
-      let* left_bits := [[ Array.get (| chaining_values_1, i |) ]] in
-      let* right_bits := [[ Array.get (| full_round_6.(FullRound.state_output).(Blake3State.row3), i |) ]] in
-      let* _ := 
-        for_in_zero_to_n 32 (fun j =>
-          let* out_bit := [[ Array.get (| out_bits, j |) ]] in
-          let* left_bit := [[ Array.get (| left_bits, j |) ]] in
-          let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
-          [[ M.equal (| out_bit, left_xor_right |) ]]
-        )
-      in
-      M.Pure tt
-    ) in
-  M.Pure tt. *)
+  let* _ := M.for_in_zero_to_n 4 (fun i => 
+    let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 3) i in
+    let left_bits := Array.get (Array.get local.(Blake3Cols.chaining_values) 1) i in
+    let right_bits := Array.get full_round_6.(FullRound.state_output).(Blake3State.row3) i in
+    (* For each bit in the out_bits, left_bits, and right_bits arrays *)
+    let* _ := 
+      M.for_in_zero_to_n 32 (fun j =>
+        let out_bit := Array.get out_bits j in
+        let left_bit := Array.get left_bits j in
+        let right_bit := Array.get right_bits j in
+        let left_xor_right := xor left_bit right_bit in
+        M.equal out_bit left_xor_right
+      )
+    in
+    M.Pure tt
+  ) in  
+  M.Pure tt.
