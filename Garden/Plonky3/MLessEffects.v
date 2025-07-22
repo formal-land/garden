@@ -41,6 +41,11 @@ Module Array.
 
   Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
     x.(get) i mod p.
+  
+  Definition placeholder {A : Set} {N : Z} (x : A) : t A N :=
+    {|
+      get index := x
+    |}.
 End Array.
 
 Module UnOp.
@@ -137,6 +142,12 @@ Module M.
 
   Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
     ForInZeroToN N f.
+  
+  (* helper: acting on all elements in an array *)
+  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
+    for_in_zero_to_n N (fun i => f (Array.get x i)).
+
+  (* helper: acting on all elements in an array, but returning a sum *)    
 
   Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
     match N with
