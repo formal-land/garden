@@ -1,7 +1,7 @@
 Require Import Garden.Plonky3.M.
-Require Import Garden.Plonky3.Util.
-Require Import Garden.Plonky3.blake3.columns.
-Require Import Garden.Plonky3.blake3.constants.
+Require Import Garden.Plonky3.UtilOld.
+Require Import Garden.Plonky3.blake3.columnsOld.
+Require Import Garden.Plonky3.blake3.constantsOld.
 
 Definition quarter_round_function (trace : QuarterRound.t Z Z) : M.t unit := 
   (*

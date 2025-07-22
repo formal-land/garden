@@ -1,5 +1,5 @@
 Require Import Garden.Plonky3.MLessEffects.
-Require Import Garden.Plonky3.blake3.constantsLessEffects.
+Require Import Garden.Plonky3.blake3.constants.
 
 (*
 /// A state at a single instance of time.

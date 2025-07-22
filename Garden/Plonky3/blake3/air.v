@@ -1,7 +1,7 @@
 Require Import Garden.Plonky3.MLessEffects.
-Require Import Garden.Plonky3.UtilLessEffects.
-Require Import Garden.Plonky3.blake3.columnsLessEffects.
-Require Import Garden.Plonky3.blake3.constantsLessEffects.
+Require Import Garden.Plonky3.Util.
+Require Import Garden.Plonky3.blake3.columns.
+Require Import Garden.Plonky3.blake3.constants.
 
 Definition quarter_round_function {p} `{Prime p} (trace : QuarterRound.t Z Z) : M.t unit :=    
     (*
@@ -28,7 +28,7 @@ Definition quarter_round_function {p} `{Prime p} (trace : QuarterRound.t Z Z) : 
     let trace_a := trace.(QuarterRound.a) in
     let trace_m_two_i := trace.(QuarterRound.m_two_i) in
     let b_packed := double_val b_0_16 b_16_32 in
-    let* _ := UtilLessEffects.add3 trace_a_prime trace_a b_packed trace_m_two_i in
+    let* _ := add3 trace_a_prime trace_a b_packed trace_m_two_i in
 
     (*
     xor_32_shift(builder, trace.a_prime, trace.d, trace.d_prime, 16);  
