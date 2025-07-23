@@ -39,9 +39,9 @@ Module Array.
       get index := x.(get) (start + index)
     |}.
   
-  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count :=
+  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count := 
     {|
-      get index := x.(get) index
+      get := x.(get)
     |}.
 
   Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
