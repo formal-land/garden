@@ -337,7 +337,10 @@ Proof.
           ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
           ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
         else
-          True
+          (* NOTE: here we have to adapt to `Run.ForInZeroToN`'s constructor to
+          give a placeholder of type Z -> Prop 
+          Question: what should be exactly the proposition? *)
+          forall i, 0 <= i < NUM_LIMBS -> True
       ). {
       destruct cmp_eq; cbn.
       (* NOTE: case when cmp_eq is 1? *)
@@ -362,7 +365,8 @@ Proof.
           }
       }
       {
-        (* TODO: prove that this branch is false? *)
+      apply Run.ForInZeroToN; intros.
+      unfold assert_zero.
       }
 Admitted.
 (*
