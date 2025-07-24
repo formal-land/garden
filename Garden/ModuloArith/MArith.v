@@ -1,6 +1,7 @@
 From Coqtail Require Import Arith.Zeqm.
 
 Require Export Coq.ZArith.ZArith.
+Require Export Garden.Basics.
 
 Require Export Lia.
 From Hammer Require Export Tactics.
@@ -104,4 +105,13 @@ Ltac bubble_mod_expr e :=
     try rewrite mod_mul_left;
     try rewrite mod_mul_right
   | _ => idtac
+  end.
+
+Ltac bubble_mod_goal :=
+  unfold BinOp.add, BinOp.sub, BinOp.mul, Array.get_mod;
+  repeat rewrite mod_mod;
+  repeat match goal with
+  | |- context [?e1 mod ?p = ?e2 mod ?p] =>
+    bubble_mod_expr (e1 mod p);
+    bubble_mod_expr (e2 mod p)
   end.
