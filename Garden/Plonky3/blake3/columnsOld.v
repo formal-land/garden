@@ -1,5 +1,5 @@
-Require Import Garden.Plonky3.MLessEffects.
-Require Import Garden.Plonky3.blake3.constants.
+Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.blake3.constantsOld.
 
 (*
 /// A state at a single instance of time.
@@ -23,6 +23,14 @@ Module Blake3State.
   }.
   Arguments t : clear implicits.
 
+  Module Valid.
+    Record t {T : Set} (P : T -> Prop) (x : Blake3State.t T) : Prop := {
+      row0 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(row0);
+      row1 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(row1);
+      row2 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(row2);
+      row3 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(row3);
+    }.
+  End Valid.
 End Blake3State.
 
 (*
@@ -52,8 +60,15 @@ Module FullRound.
   }.
   Arguments t : clear implicits.
 
+  Module Valid.
+    Record t {T : Set} (P : T -> Prop) (x : FullRound.t T) : Prop := {
+      state_prime : Blake3State.Valid.t P x.(state_prime);
+      state_middle : Blake3State.Valid.t P x.(state_middle);
+      state_middle_prime : Blake3State.Valid.t P x.(state_middle_prime);
+      state_output : Blake3State.Valid.t P x.(state_output);
+    }.
+  End Valid.
 End FullRound.
-
 
 (* Main Blake3 columns structure *)
 (*
@@ -82,6 +97,7 @@ pub struct Blake3Cols<T> {
     pub outputs: [[[T; 32]; 4]; 4],
 }
 *)
+(* Main Blake3 columns structure *)
 Module Blake3Cols.
   Record t {T : Set} : Set := {
     inputs : Array.t (Array.t T 32) 16;
@@ -97,8 +113,23 @@ Module Blake3Cols.
     outputs : Array.t (Array.t (Array.t T 32) 4) 4;
   }.
   Arguments t : clear implicits.
-End Blake3Cols.
 
+  Module Valid.
+    Record t {T : Set} (P : T -> Prop) (x : Blake3Cols.t T) : Prop := {
+      inputs : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(inputs);
+      chaining_values : Array.Valid.t (Array.Valid.t (Array.Valid.t (fun val => P val))) x.(chaining_values);
+      counter_low : Array.Valid.t (fun val => P val) x.(counter_low);
+      counter_hi : Array.Valid.t (fun val => P val) x.(counter_hi);
+      block_len : Array.Valid.t (fun val => P val) x.(block_len);
+      flags : Array.Valid.t (fun val => P val) x.(flags);
+      initial_row0 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(initial_row0);
+      initial_row2 : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(initial_row2);
+      full_rounds : Array.Valid.t (FullRound.Valid.t P) x.(full_rounds);
+      final_round_helpers : Array.Valid.t (Array.Valid.t (fun val => P val)) x.(final_round_helpers);
+      outputs : Array.Valid.t (Array.Valid.t (Array.Valid.t (fun val => P val))) x.(outputs);
+    }.
+  End Valid.
+End Blake3Cols.
 
 (* 
 #[repr(C)]
@@ -125,7 +156,7 @@ pub(crate) struct QuarterRound<'a, T, U> {
     pub c_output: &'a [T; U32_LIMBS],
     pub d_output: &'a [T; 32],
 }
-*)
+ *)
 Module QuarterRound.
   Record t {T U : Set} : Set := {
     a : Array.t T U32_LIMBS;
@@ -144,6 +175,25 @@ Module QuarterRound.
     d_output : Array.t T 32;
   }.
   Arguments t : clear implicits.
+
+  Module Valid.
+    Record t {T U : Set} (P_T : T -> Prop) (P_U : U -> Prop) (x : QuarterRound.t T U) : Prop := {
+      a : Array.Valid.t P_T x.(a);
+      b : Array.Valid.t P_T x.(b);
+      c : Array.Valid.t P_T x.(c);
+      d : Array.Valid.t P_T x.(d);
+      m_two_i : Array.Valid.t P_U x.(m_two_i);
+      a_prime : Array.Valid.t P_T x.(a_prime);
+      b_prime : Array.Valid.t P_T x.(b_prime);
+      c_prime : Array.Valid.t P_T x.(c_prime);
+      d_prime : Array.Valid.t P_T x.(d_prime);
+      m_two_i_plus_one : Array.Valid.t P_U x.(m_two_i_plus_one);
+      a_output : Array.Valid.t P_T x.(a_output);
+      b_output : Array.Valid.t P_T x.(b_output);
+      c_output : Array.Valid.t P_T x.(c_output);
+      d_output : Array.Valid.t P_T x.(d_output);
+    }.
+  End Valid.
 End QuarterRound.
 
 (* pub const NUM_BLAKE3_COLS: usize = size_of::<Blake3Cols<u8>>(); 

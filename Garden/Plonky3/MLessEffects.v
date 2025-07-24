@@ -21,6 +21,13 @@ Global Open Scope bool_scope.
 
 Export List.ListNotations.
 
+(** We will need later to make the field reasoning. For now we axiomatize it. *)
+Parameter IsPrime : Z -> Prop.
+
+Class Prime (p : Z) : Prop := {
+  is_prime : IsPrime p;
+}.
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -31,18 +38,32 @@ Module Array.
     {|
       get index := x.(get) (start + index)
     |}.
+  
+  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count := 
+    {|
+      get := x.(get)
+    |}.
+
+  Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
+    x.(get) i mod p.
+  
+  Definition placeholder {A : Set} {N : Z} (x : A) : t A N :=
+    {|
+      get index := x
+    |}.
+  
+  Definition map {A B : Set} {N : Z} (x : t A N) (f : A -> B) : t B N := 
+    {|
+      get index := f (x.(get) index)
+    |}.
 End Array.
-
-(** We will need later to make the field reasoning. For now we axiomatize it. *)
-Parameter IsPrime : Z -> Prop.
-
-Class Prime (p : Z) : Prop := {
-  is_prime : IsPrime p;
-}.
 
 Module UnOp.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
     (-x) mod p.
+  
+  Definition from {p} `{Prime p} (x : Z) : Z := 
+    x mod p.
 End UnOp.
 
 Module BinOp.
@@ -134,9 +155,21 @@ Module M.
 
   Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
     ForInZeroToN N f.
+  
+  (* helper: acting on all elements in an array *)
+  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
+    for_in_zero_to_n N (fun i => f (Array.get x i)).
 
-  Definition sum_for_in_zero_to_n (N : Z) (f : Z -> Z) : t Z :=
-    SumForInZeroToN N f.
+  (* helper: acting on all elements in an array, but returning a sum *)    
+
+  Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
+    match N with
+    | O => 0
+    | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
+    end.
+
+  Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
+    sum_for_in_zero_to_n_aux (Z.to_nat N) f.
 
   Definition call {A : Set} (e : t A) : t A :=
     Call e.
@@ -226,8 +259,8 @@ Definition assert_zero (x : Z) : M.t unit :=
   M.equal x 0.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_one (x : Z) : M.t unit :=
-  M.equal x 1.
+Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
+  M.equal x (1 mod p).
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
