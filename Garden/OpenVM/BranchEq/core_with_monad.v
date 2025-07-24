@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
 pub struct ImmInstruction<T> {
@@ -339,6 +340,7 @@ Proof.
           True
       ). {
       destruct cmp_eq; cbn.
+      (* NOTE: case when cmp_eq is 1? *)
       { apply Run.ForInZeroToN; intros.
         unfold assert_zero.
         repeat destruct Array.to_limbs. 
@@ -347,14 +349,21 @@ Proof.
           (BinOp.sub (get i) (get0 i))) = 0
         ).
         - apply Run.Equal.
-        - unfold BinOp.mul, BinOp.sub. 
-          simpl. 
-          rewrite -> Zminus_mod.
-          destruct (get i mod 23 = get0 i mod 23).
-          tauto.
-        
-        (* Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i != 0 *)
-        apply Run.Equal.
+        - unfold BinOp.mul, BinOp.sub.
+          replace (1 * ((get i - get0 i) mod 23)) with ((get i - get0 i) mod 23).
+          2: { 
+            rewrite -> Z.mul_1_l.
+            reflexivity.
+          }
+          1: {
+          rewrite -> foo_mod_mod.
+          rewrite <- foo_sub.
+          apply foo_eq_sub.
+          }
+      }
+      {
+        (* TODO: prove that this branch is false? *)
+      }
 Admitted.
 (*
         apply Run.Equal.

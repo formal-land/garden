@@ -54,6 +54,7 @@ Axiom foo_sub_left : forall a b p, (a mod p - b) mod p = (a - b) mod p.
 Axiom foo_sub_right : forall a b p, (a - b mod p) mod p = (a - b) mod p.
 Axiom foo_mul_left : forall a b p, ((a mod p) * b) mod p = (a * b) mod p.
 Axiom foo_mul_right : forall a b p, (a * (b mod p)) mod p = (a * b) mod p.
+Axiom foo_eq_sub : forall a b p, (a mod p - b mod p) mod p = 0 -> a mod p = b mod p.
 
 Ltac bubble_mod_expr e :=
   match e with
@@ -104,7 +105,7 @@ Proof.
     }
     intros _.
     replace NUM_LIMBS with (Z.of_nat (Z.to_nat NUM_LIMBS)) in * by lia.
-    replace (M.sum_for_in_zero_to_n _ _) with (0 mod p). 2: {
+    replace (M.sum_for_in_zero_to_n _ _) with (0 mod p). 2: { 
       unfold M.sum_for_in_zero_to_n.
       generalize H_a_eq_b.
       set (foo := NUM_LIMBS).
