@@ -38,24 +38,6 @@ Module Index.
     nat.
 End Index.
 
-Module Array.
-  Parameter t : Set -> list nat -> Set.
-
-  Module MultiIndex.
-    Fixpoint t (N : list nat) : Set :=
-      match N with
-      | nil => unit
-      | _ :: N => Index.t * t N
-      end.
-  End MultiIndex.
-
-  Parameter new : forall {A : Set} {N : list nat}, list A -> t A N.
-
-  Parameter read : forall {A : Set} {N : list nat}, t A N -> MultiIndex.t N -> A.
-
-  Parameter extract : forall {A : Set} {N M : list nat}, t A N -> list nat -> t A M.
-End Array.
-
 Module UnOp.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
     (-x) mod p.
@@ -81,6 +63,53 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
+Module Array.
+  Module MultiIndex.
+    Fixpoint t (Ns : list nat) : Set :=
+      match Ns with
+      | nil => unit
+      | _ :: Ns => Index.t * t Ns
+      end.
+
+    Fixpoint concat {Ns Ms : list nat}
+        (indexes : MultiIndex.t Ns)
+        (indexes' : MultiIndex.t Ms) :
+        MultiIndex.t (Ns ++ Ms) :=
+      match Ns, indexes with
+      | nil, _ => indexes'
+      | _ :: Ns, (index, indexes) => (index, concat indexes indexes')
+      end.
+  End MultiIndex.
+
+  Record t {A : Set} {Ns : list nat} := {
+    get : MultiIndex.t Ns -> A;
+  }.
+  Arguments t : clear implicits.
+
+  (** How to get an index into the flat list of values *)
+  Fixpoint new_aux (Ns : list nat) (indexes : MultiIndex.t Ns) : nat :=
+    match Ns, indexes with
+    | nil, _ => 0
+    | N :: Ns, (index, indexes) => index + N * new_aux Ns indexes
+    end.
+
+  Definition new {p} `{Prime p} {Ns : list nat} (l : list Felt.t) : t Felt.t Ns :=
+    {|
+      get indexes := List.nth (new_aux Ns indexes) l (UnOp.from 0);
+    |}.
+
+  Definition read {A : Set} {Ns : list nat} (array : t A Ns) : MultiIndex.t Ns -> A :=
+    array.(get).
+
+  Definition extract {A : Set} {Ns Ms : list nat}
+      (array : t A (Ns ++ Ms))
+      (indexes : MultiIndex.t Ns) :
+      t A Ms :=
+    {|
+      get indexes' := array.(get) (MultiIndex.concat indexes indexes');
+    |}.
+End Array.
+
 Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
@@ -90,13 +119,29 @@ Module M.
   | FieldWrite {A : Set} (field : A) (value : A) : t unit
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
-
-  Parameter For : nat -> nat -> nat -> (nat -> t unit) -> t unit.
-
-  Definition Yield := @Pure.
-  Arguments Yield {_}.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
+
+Definition yield := @M.Pure.
+Arguments yield {_}.
+
+Fixpoint iter (actions : list (M.t unit)) : M.t unit :=
+  match actions with
+  | nil => M.Pure tt
+  | action :: actions =>
+    let* _ := action in
+    iter actions
+  end.
+
+Parameter for_ : nat -> nat -> nat -> (nat -> M.t unit) -> M.t unit.
+
+(** To start with, we will only reason on for loops with step 1. *)
+Definition for_step_one (start end_ : nat) (body : nat -> M.t unit) : M.t unit :=
+  let indexes : list nat := List.seq start end_ in
+  iter (List.map body indexes).
+
+Axiom for_step_one_eq : forall (start end_ : nat) (body : nat -> M.t unit),
+  for_ start end_ 1 body = for_step_one start end_ body.

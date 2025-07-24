@@ -170,10 +170,10 @@ Module Module_Line_219.
       let var_c5 : Index.t := 5 in
       let var_c1 : Index.t := 1 in
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
-      let* _ : unit := M.For var_c0 (* to *) var_c5 (* step *) var_c1 (fun (arg_for_226_7 : Index.t) =>
+      let* _ : unit := M.for_ var_c0 (* to *) var_c5 (* step *) var_c1 (fun (arg_for_226_7 : Index.t) =>
         let var_0 : Felt.t := Array.read arg_fun_1 (arg_for_226_7, tt) in
         let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
-        M.Yield tt      ) in
+        M.yield tt      ) in
       M.Pure tt.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]) : M.t ArrayForCheck.t :=
@@ -227,11 +227,11 @@ Module Module_Line_270.
     Definition constrain {p} `{Prime p} (arg_fun_0 : MatrixConstrain.t) (arg_fun_1 : Array.t Felt.t [2; 3]) : M.t unit :=
       let var_0 : ArrayConstrain.t 7 11 := arg_fun_0.(MatrixConstrain.check0) in
       let var_c0 : Index.t := 0 in
-      let var_1 : Array.t Felt.t [3] := Array.extract arg_fun_1 [var_c0] in
+      let var_1 : Array.t Felt.t [3] := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
       let* _ : unit := ArrayConstrain.constrain var_0 var_1 in
       let var_2 : ArrayConstrain.t 13 17 := arg_fun_0.(MatrixConstrain.check1) in
       let var_c1 : Index.t := 1 in
-      let var_3 : Array.t Felt.t [3] := Array.extract arg_fun_1 [var_c1] in
+      let var_3 : Array.t Felt.t [3] := Array.extract (Ns := [_]) arg_fun_1 (var_c1, tt) in
       let* _ : unit := ArrayConstrain.constrain var_2 var_3 in
       M.Pure tt.
 
@@ -278,7 +278,7 @@ Module Module_Line_331.
       let var_array : Array.t Felt.t [2; 3] := Array.new [var_0; var_1; var_2; var_3; var_4; var_5] in
       let var_6 : ArrayConstrain.t := arg_fun_0.(MatrixConstrain.check) in
       let var_c0 : Index.t := 0 in
-      let var_7 : Array.t Felt.t [3] := Array.extract var_array [var_c0] in
+      let var_7 : Array.t Felt.t [3] := Array.extract (Ns := [_]) var_array (var_c0, tt) in
       let* _ : unit := ArrayConstrain.constrain var_6 var_7 in
       M.Pure tt.
 
@@ -330,7 +330,7 @@ Module Module_Line_415.
     Definition constrain {p} `{Prime p} {M N : nat} (arg_fun_0 : UnknownMatrixConstrain.t M N) (arg_fun_1 : Array.t Felt.t [M; N]) : M.t unit :=
       let var_0 : UnknownArrayConstrain.t N := arg_fun_0.(UnknownMatrixConstrain.check) in
       let var_c0 : Index.t := 0 in
-      let var_1 : Array.t Felt.t [N] := Array.extract arg_fun_1 [var_c0] in
+      let var_1 : Array.t Felt.t [N] := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
       let* _ : unit := UnknownArrayConstrain.constrain var_0 var_1 in
       M.Pure tt.
 
