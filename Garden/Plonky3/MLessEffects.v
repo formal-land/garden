@@ -354,4 +354,4 @@ Module Testtest.
     }
     tauto.
   Qed.
-End testtest.
+End Testtest.
