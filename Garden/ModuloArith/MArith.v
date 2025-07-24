@@ -3,10 +3,6 @@ From Coqtail Require Import Arith.Zeqm.
 Require Export Coq.ZArith.ZArith.
 Require Export Garden.Basics.
 
-Require Export Lia.
-From Hammer Require Export Tactics.
-Require Export smpl.Smpl.
-
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 
@@ -85,6 +81,19 @@ Theorem mod_mul_right : forall a b p, (a * (b mod p)) mod p = (a * b) mod p.
 Proof.
     intros a b.
     apply (Zmult_mod_idemp_r b a).
+Qed.
+
+Theorem mod_eq_eq_sub_eq_0 : forall a b p, (a mod p = b mod p) <-> ((a - b) mod p = 0).
+Proof.
+    apply eqm_minus_0.
+Qed.
+
+Theorem mod_sub_implies_eq_mod : forall a b p, (a mod p - b mod p) mod p = 0 -> a mod p = b mod p.
+Proof.
+    intros a b p H.
+    rewrite <- Zminus_mod in H.
+    apply mod_eq_eq_sub_eq_0 in H.
+    apply H.
 Qed.
 
 Ltac bubble_mod_expr e :=
