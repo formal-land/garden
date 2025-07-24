@@ -105,7 +105,7 @@ Proof.
     }
     intros _.
     replace NUM_LIMBS with (Z.of_nat (Z.to_nat NUM_LIMBS)) in * by lia.
-    replace (M.sum_for_in_zero_to_n _ _) with (0 mod p). 2: { 
+    replace (M.sum_for_in_zero_to_n _ _) with (0 mod p). 2: {
       unfold M.sum_for_in_zero_to_n.
       generalize H_a_eq_b.
       set (foo := NUM_LIMBS).
