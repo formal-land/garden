@@ -333,14 +333,28 @@ Proof.
       (P1 :=
         if cmp_eq then
           forall i, 0 <= i < NUM_LIMBS ->
-          (Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i =
-          (Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i
+          ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
+          ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
         else
           True
       ). {
       destruct cmp_eq; cbn.
       { apply Run.ForInZeroToN; intros.
         unfold assert_zero.
+        repeat destruct Array.to_limbs. 
+        eapply Run.Implies with (P1 := 
+          (BinOp.mul 1
+          (BinOp.sub (get i) (get0 i))) = 0
+        ).
+        - apply Run.Equal.
+        - unfold BinOp.mul, BinOp.sub. 
+          simpl. 
+          rewrite -> Zminus_mod.
+          destruct (get i mod 23 = get0 i mod 23).
+          tauto.
+        
+        (* Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i != 0 *)
+        apply Run.Equal.
 Admitted.
 (*
         apply Run.Equal.

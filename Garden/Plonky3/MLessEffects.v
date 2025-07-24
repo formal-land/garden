@@ -282,3 +282,43 @@ Module List.
       f x acc
     end.
 End List.
+
+
+Module Testtest.
+  Definition test_a : Array.t Z 2 := Array.Build_t Z 2 (fun x => x).
+  Definition test_b : Array.t Z 2 := Array.Build_t Z 2 (fun x => x).
+
+  Definition test_eval `{Prime 23} (NUM_LIMBS : Z) :=
+    let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
+      assert_zero (BinOp.sub (Array.get test_a i) (Array.get test_b i))
+  ) in
+  M.Pure tt.
+
+  Parameter to_limbs : forall (NUM_LIMBS value : Z), Array.t Z NUM_LIMBS.
+
+  Theorem test_eval_is_valid `{Prime 23} (NUM_LIMBS : Z) :
+    {{ test_eval NUM_LIMBS 🔽 tt, True }}.
+  Proof.
+    eapply Run.Implies.
+    {
+      eapply Run.Let with (P1 := 
+      forall i, 0 <= i < NUM_LIMBS ->
+          test_a.(Array.get) i =
+          test_b.(Array.get) i
+      ).
+      apply Run.ForInZeroToN; intros.
+      - unfold assert_zero.
+        unfold BinOp.sub.
+        unfold test_a. unfold test_b. 
+        simpl.
+        eapply Run.Implies with (P1 :=
+          (i - i) mod 23 = 0
+        ).
+        apply Run.Equal.
+        tauto.
+      - intros.
+        apply Run.Pure.
+    }
+    tauto.
+  Qed.
+End testtest.
