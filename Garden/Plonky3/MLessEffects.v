@@ -3,6 +3,7 @@ Require Export Coq.Strings.String.
 Require Export Coq.ZArith.ZArith.
 Require Export RecordUpdate.
 Require Export Garden.Basics.
+Require Export Garden.ModuloArith.MArith.
 
 Require Export Lia.
 From Hammer Require Export Tactics.
@@ -21,6 +22,7 @@ Global Open Scope Z_scope.
 Global Open Scope bool_scope.
 
 Export List.ListNotations.
+
 
 
 Module M.
