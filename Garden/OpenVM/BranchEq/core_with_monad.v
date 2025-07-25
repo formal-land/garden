@@ -337,13 +337,17 @@ Proof.
           ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
           ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
         else
-          (* NOTE: here we have to adapt to `Run.ForInZeroToN`'s constructor to
-          give a placeholder of type Z -> Prop 
-          Question: what should be exactly the proposition? *)
-          forall i, 0 <= i < NUM_LIMBS -> True
+          (* NOTE: What happened here is:
+          1. `Let` constructor requires a `P1` of type `Prop`
+          2. Eventually, we will have to destruct cases on shape of `ForInZeroToN`
+          3. `Run.ForInZeroToN`'s takes a `Z -> Prop` rather than a `Prop`
+          4. Eventually, the `else` case cannot be just a `True` otherwise 
+            we cannot eliminate the `ForInZeroToN` in this case. Here we use
+            a `0=0` to stub it up instead...(?) Is this even the correct way to 
+            deal with the proof? *)
+          forall i, 0 <= i < NUM_LIMBS -> 0 = 0
       ). {
       destruct cmp_eq; cbn.
-      (* NOTE: case when cmp_eq is 1? *)
       { apply Run.ForInZeroToN; intros.
         unfold assert_zero.
         repeat destruct Array.to_limbs. 
