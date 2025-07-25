@@ -340,11 +340,15 @@ Proof.
           (* NOTE: What happened here is:
           1. `Let` constructor requires a `P1` of type `Prop`
           2. Eventually, we will have to destruct cases on shape of `ForInZeroToN`
-          3. `Run.ForInZeroToN`'s takes a `Z -> Prop` rather than a `Prop`
-          4. Eventually, the `else` case cannot be just a `True` otherwise 
-            we cannot eliminate the `ForInZeroToN` in this case. Here we use
-            a `0=0` to stub it up instead...(?) Is this even the correct way to 
-            deal with the proof? *)
+          3. `Run.ForInZeroToN` takes a `Z -> Prop` rather than a `Prop`.
+          4. After `ForInZeroToN`, we have the goal in the shape of `Equal`, which
+           requires a proposition of a equal type. A mere `True` doesnt match the form
+           of `Equal`.
+          4. Therefore, the `else` case cannot be just a `True` otherwise 
+            we cannot eliminate the `ForInZeroToN` in this case. What we need to do 
+            instead, is stub the proof with a combination of trivial cases for each 
+            of the constructors, resulting in the proposition below... is this even
+            the correct way to deal with the proof? *)
           forall i, 0 <= i < NUM_LIMBS -> 0 = 0
       ). {
       destruct cmp_eq; cbn.
@@ -357,20 +361,16 @@ Proof.
         ).
         - apply Run.Equal.
         - unfold BinOp.mul, BinOp.sub.
-          replace (1 * ((get i - get0 i) mod 23)) with ((get i - get0 i) mod 23).
-          2: { 
-            rewrite -> Z.mul_1_l.
-            reflexivity.
-          }
-          1: {
+          rewrite -> Z.mul_1_l.
           rewrite -> foo_mod_mod.
           rewrite <- foo_sub.
           apply foo_eq_sub.
           }
       }
+      (* The `else` case of `0 = 0` *)
       {
-      apply Run.ForInZeroToN; intros.
-      unfold assert_zero.
+        apply Run.ForInZeroToN; intros.
+        unfold assert_zero.
       }
 Admitted.
 (*
