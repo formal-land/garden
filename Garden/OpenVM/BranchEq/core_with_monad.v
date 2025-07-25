@@ -337,27 +337,14 @@ Proof.
             ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
             ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
           else
-            (* NOTE: What happened here is:
-            1. `Let` constructor requires a `P1` of type `Prop`
-            2. Eventually, we will have to destruct cases on shape of `ForInZeroToN`
-            3. `Run.ForInZeroToN` takes a `Z -> Prop` rather than a `Prop`.
-            4. After `ForInZeroToN`, we have the goal in the shape of `Equal`, which
-            requires a proposition of a equal type. A mere `True` doesnt match the form
-            of `Equal`.
-            5. Therefore, the `else` case cannot be just a `True` otherwise 
-              we cannot eliminate the `ForInZeroToN` in this case. What we need to do 
-              instead, is stub the proof with a combination of trivial cases for each 
-              of the constructors, resulting in the proposition below... is this even
-              the correct way to deal with the proof? *)
-            forall i, 0 <= i < NUM_LIMBS -> 0 = 0
+            True
         ). 
       { destruct cmp_eq; cbn.
         { apply Run.ForInZeroToN; intros.
           unfold assert_zero.
           repeat destruct Array.to_limbs. 
           eapply Run.Implies with (P1 := 
-            (BinOp.mul 1
-            (BinOp.sub (get i) (get0 i))) = 0
+            (BinOp.mul 1 (BinOp.sub (get i) (get0 i))) = 0
           ).
           - apply Run.Equal.
           - unfold BinOp.mul, BinOp.sub.
@@ -365,9 +352,17 @@ Proof.
             rewrite -> foo_mod_mod.
             rewrite <- foo_sub.
             apply foo_eq_sub. }
-        (* The `else` case of `0 = 0` *)
-        { apply Run.ForInZeroToN; intros.
-          unfold assert_zero. }
+        (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
+        so we want to stub the proof with a `True`. This `True` should be obtained
+        by constructing a combination of trivial cases for all constructors appeared
+        in the part of the program. *)
+        { eapply Run.Implies with (P1 := forall i, 0 <= i < NUM_LIMBS -> 0 = 0).
+          { apply Run.ForInZeroToN; intros.
+            unfold assert_zero.
+            apply Run.Equal.
+          }
+          { tauto. } 
+        }
       }
       destruct cmp_eq; cbn.
       { 
