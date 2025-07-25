@@ -306,13 +306,9 @@ Proof.
       }
     }
     intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
+    eapply Run.Let. { smpl run_auto. }
     intros [].
-    eapply Run.Let. {
-      apply Run.AssertBool.
-    }
+    eapply Run.Let. { apply Run.AssertBool. }
     intros [cmp_result H_cmp_result_eq].
     rewrite H_cmp_result_eq.
     set (cmp_eq :=
@@ -329,7 +325,8 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
-    eapply Run.Implies. {
+    eapply Run.Implies. 
+    {
       eapply Run.Let with
         (P1 :=
           if cmp_eq then
@@ -367,16 +364,23 @@ Proof.
           { tauto. } 
         }
       }
-      destruct cmp_eq; cbn.
-      { 
-        intros.
-        (* TODO: fill in correct proposition to prove *)
-        eapply Run.Let.
-        { unfold assert_one.
-        }
-        { admit.
-        }
-      admit. }
+      intros.
+      (* let* _ := when is_valid (assert_one sum) in *)
+      set (is_valid := 0
+      (* TODO: fill in correct definition for `is_valid` *)
+      ).
+      (* TODO: fill in correct proposition to prove *)
+      eapply Run.Let with (P1 :=
+        if is_valid then 
+        True
+        (* express that sum asserts to one *)
+        else True
+      ).
+      { unfold assert_one.
+        apply Run.Equal.
+      }
+      { admit.
+      }
       { admit. }
     }
 Admitted.
