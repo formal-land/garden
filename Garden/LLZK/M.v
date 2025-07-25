@@ -71,6 +71,15 @@ Module Array.
       | _ :: Ns => Index.t * t Ns
       end.
 
+    Module Valid.
+      Fixpoint t {Ns : list nat} (indexes : MultiIndex.t Ns) : Prop :=
+        match Ns, indexes with
+        | nil, _ => True
+        | N :: Ns, (index, indexes) =>
+          index < N /\ t indexes
+        end.
+    End Valid.
+
     Fixpoint concat {Ns Ms : list nat}
         (indexes : MultiIndex.t Ns)
         (indexes' : MultiIndex.t Ms) :
@@ -114,9 +123,8 @@ Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | AssertEqual {A : Set} (x1 x2 : A) : t unit
-  | AssertIn {A : Set} {N : nat} (x : A) (array : Array.t A [N]) : t unit
+  | AssertIn {A : Set} {Ns : list nat} (x : A) (array : Array.t A Ns) : t unit
   | CreateStruct {A : Set} : t A
-  | FieldWrite {A : Set} (field : A) (value : A) : t unit
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
 End M.
@@ -145,3 +153,34 @@ Definition for_step_one (start end_ : nat) (body : nat -> M.t unit) : M.t unit :
 
 Axiom for_step_one_eq : forall (start end_ : nat) (body : nat -> M.t unit),
   for_ start end_ 1 body = for_step_one start end_ body.
+
+Module Run.
+  Reserved Notation "{{ e 🔽 output , P }}".
+
+  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
+  | Pure {A : Set} (value : A) :
+    {{ M.Pure value 🔽 value, True }}
+  | AssertEqual (x1 x2 : Z) :
+    {{ M.AssertEqual x1 x2 🔽 tt, x1 = x2 }}
+  | AssertIn {A : Set} {Ns : list nat} (x : A) (array : Array.t A Ns) :
+    {{ M.AssertIn x array 🔽
+      tt, exists indexes, Array.MultiIndex.Valid.t indexes /\ Array.read array indexes = x
+    }}
+  | CreateStruct {A : Set} (struct_value : A) :
+    {{ M.CreateStruct 🔽 struct_value, True }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
+    {{ M.Let e k 🔽 output, P1 /\ P2 }}
+  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> P2) ->
+    {{ e 🔽 value, P2 }}
+  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+    {{ e 🔽 value1, P }} ->
+    value1 = value2 ->
+    {{ e 🔽 value2, P }}
+
+  where "{{ e 🔽 output , P }}" := (t e output P).
+End Run.
+Export Run.
