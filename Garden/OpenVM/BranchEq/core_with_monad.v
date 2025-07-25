@@ -339,28 +339,31 @@ Proof.
           else
             True
         ). 
-      { destruct cmp_eq; cbn.
-        { apply Run.ForInZeroToN; intros.
+      { 
+        destruct cmp_eq; cbn.
+        { 
+          apply Run.ForInZeroToN; intros.
           unfold assert_zero.
           repeat destruct Array.to_limbs. 
           eapply Run.Implies with (P1 := 
             (BinOp.mul 1 (BinOp.sub (get i) (get0 i))) = 0
           ).
-          - apply Run.Equal.
-          - unfold BinOp.mul, BinOp.sub.
+          { apply Run.Equal. }
+          { unfold BinOp.mul, BinOp.sub.
             rewrite -> Z.mul_1_l.
             rewrite -> foo_mod_mod.
             rewrite <- foo_sub.
             apply foo_eq_sub. }
+        }
         (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
         so we want to stub the proof with a `True`. This `True` should be obtained
         by constructing a combination of trivial cases for all constructors appeared
         in the part of the program. *)
-        { eapply Run.Implies with (P1 := forall i, 0 <= i < NUM_LIMBS -> 0 = 0).
+        { 
+          eapply Run.Implies with (P1 := forall i, 0 <= i < NUM_LIMBS -> 0 = 0).
           { apply Run.ForInZeroToN; intros.
             unfold assert_zero.
-            apply Run.Equal.
-          }
+            apply Run.Equal. }
           { tauto. } 
         }
       }
