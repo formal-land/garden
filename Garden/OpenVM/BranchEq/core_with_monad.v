@@ -350,27 +350,28 @@ Proof.
             of the constructors, resulting in the proposition below... is this even
             the correct way to deal with the proof? *)
           forall i, 0 <= i < NUM_LIMBS -> 0 = 0
-      ). {
-      destruct cmp_eq; cbn.
-      { apply Run.ForInZeroToN; intros.
-        unfold assert_zero.
-        repeat destruct Array.to_limbs. 
-        eapply Run.Implies with (P1 := 
-          (BinOp.mul 1
-          (BinOp.sub (get i) (get0 i))) = 0
-        ).
-        - apply Run.Equal.
-        - unfold BinOp.mul, BinOp.sub.
-          rewrite -> Z.mul_1_l.
-          rewrite -> foo_mod_mod.
-          rewrite <- foo_sub.
-          apply foo_eq_sub.
-          }
-      }
-      (* The `else` case of `0 = 0` *)
+      ). 
       {
-        apply Run.ForInZeroToN; intros.
-        unfold assert_zero.
+        destruct cmp_eq; cbn.
+        { apply Run.ForInZeroToN; intros.
+          unfold assert_zero.
+          repeat destruct Array.to_limbs. 
+          eapply Run.Implies with (P1 := 
+            (BinOp.mul 1
+            (BinOp.sub (get i) (get0 i))) = 0
+          ).
+          - apply Run.Equal.
+          - unfold BinOp.mul, BinOp.sub.
+            rewrite -> Z.mul_1_l.
+            rewrite -> foo_mod_mod.
+            rewrite <- foo_sub.
+            apply foo_eq_sub.
+        }
+        (* The `else` case of `0 = 0` *)
+        {
+          apply Run.ForInZeroToN; intros.
+          unfold assert_zero.
+        }
       }
 Admitted.
 (*
