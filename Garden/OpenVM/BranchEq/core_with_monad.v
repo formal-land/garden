@@ -382,10 +382,11 @@ Proof.
       ).
       (* TODO: fill in correct proposition to prove *)
       eapply Run.Let with (P1 :=
-        if is_valid then 
+        (* TODO: express is_valid as a boolean value *)
+        (* if is_valid then  *)
         True
-        (* express that sum asserts to one *)
-        else True
+        (* TODO: express that sum asserts to one *)
+        (* else True *)
       ).
       { unfold assert_one.
         apply Run.Equal.
