@@ -29,58 +29,63 @@ Ltac show_equality_modulo :=
 
 Theorem mod_add : forall a b p, (a mod p + b mod p) mod p = (a + b) mod p.
 Proof.
-  symmetry.
-  apply Zplus_mod.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_sub : forall a b p, (a mod p - b mod p) mod p = (a - b) mod p.
 Proof.
-  symmetry.
-  apply Zminus_mod.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_mul : forall a b p, ((a mod p) * (b mod p)) mod p = (a * b) mod p.
 Proof.
-  symmetry.
-  apply Zmult_mod.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_mod : forall a p, (a mod p) mod p = a mod p.
 Proof.
-  apply Zmod_mod.
+  intros a p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_add_left : forall a b p, (a mod p + b) mod p = (a + b) mod p.
 Proof.
-    apply Zplus_mod_idemp_l.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_add_right : forall a b p, (a + b mod p) mod p = (a + b) mod p.
 Proof.
-    intros a b.
-    apply (Zplus_mod_idemp_r b a).
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_sub_left : forall a b p, (a mod p - b) mod p = (a - b) mod p.
 Proof.
-    apply Zminus_mod_idemp_l.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 
 Theorem mod_sub_right : forall a b p, (a - b mod p) mod p = (a - b) mod p.
 Proof.
-    apply Zminus_mod_idemp_r.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_mul_left : forall a b p, ((a mod p) * b) mod p = (a * b) mod p.
 Proof.
-    apply Zmult_mod_idemp_l.
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_mul_right : forall a b p, (a * (b mod p)) mod p = (a * b) mod p.
 Proof.
-    intros a b.
-    apply (Zmult_mod_idemp_r b a).
+  intros a b p.
+  show_equality_modulo.
 Qed.
 
 Theorem mod_eq_eq_sub_eq_0 : forall a b p, (a mod p = b mod p) <-> ((a - b) mod p = 0).
@@ -91,14 +96,18 @@ Qed.
 Theorem mod_sub_mod_eq_0_iff_eq_mod : forall a b p, (a mod p - b mod p) mod p = 0 <-> a mod p = b mod p.
 Proof.
   intros a b p.
-    split; intros H.
-    - rewrite <- Zminus_mod in H.
-      apply mod_eq_eq_sub_eq_0 in H.
-      apply H.
-    - rewrite H.
-      rewrite Z.sub_diag.
-      rewrite Zmod_0_l.
-      reflexivity.
+  split; intros H.
+  {
+    rewrite <- Zminus_mod in H.
+    apply mod_eq_eq_sub_eq_0 in H.
+    apply H.
+  }
+  {
+    rewrite H.
+    rewrite Z.sub_diag.
+    rewrite Zmod_0_l.
+    reflexivity.
+  }
 Qed.
 
 
