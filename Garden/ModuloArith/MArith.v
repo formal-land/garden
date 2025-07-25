@@ -88,13 +88,19 @@ Proof.
     apply eqm_minus_0.
 Qed.
 
-Theorem mod_sub_implies_eq_mod : forall a b p, (a mod p - b mod p) mod p = 0 -> a mod p = b mod p.
+Theorem mod_sub_mod_eq_0_iff_eq_mod : forall a b p, (a mod p - b mod p) mod p = 0 <-> a mod p = b mod p.
 Proof.
-    intros a b p H.
-    rewrite <- Zminus_mod in H.
-    apply mod_eq_eq_sub_eq_0 in H.
-    apply H.
+    intros a b p.
+    split; intros H.
+    - rewrite <- Zminus_mod in H.
+      apply mod_eq_eq_sub_eq_0 in H.
+      apply H.
+    - rewrite H.
+      rewrite Z.sub_diag.
+      rewrite Zmod_0_l.
+      reflexivity.
 Qed.
+
 
 Ltac bubble_mod_expr e :=
   match e with
