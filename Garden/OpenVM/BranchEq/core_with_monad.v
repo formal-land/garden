@@ -311,6 +311,14 @@ Proof.
     eapply Run.Let. { apply Run.AssertBool. }
     intros [cmp_result H_cmp_result_eq].
     rewrite H_cmp_result_eq.
+    (* 
+    let* cmp_eq : Z :=
+      M.pure (
+        BinOp.add
+          (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.opcode_beq_flag))
+          (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
+      ) in
+    *)
     set (cmp_eq :=
       match input.(Input.opcode) with
       | BranchEqualOpcode.BEQ => cmp_result
@@ -331,8 +339,8 @@ Proof.
         (P1 :=
           if cmp_eq then
             forall i, 0 <= i < NUM_LIMBS ->
-            ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
-            ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i =
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i
           else
             True
         ). 
@@ -361,13 +369,16 @@ Proof.
           { apply Run.ForInZeroToN; intros.
             unfold assert_zero.
             apply Run.Equal. }
-          { tauto. } 
+          { trivial. } 
         }
       }
-      intros.
+      intros H_a_b_eq.
       (* let* _ := when is_valid (assert_one sum) in *)
-      set (is_valid := 0
-      (* TODO: fill in correct definition for `is_valid` *)
+      set (cols := @Input.to_cols NUM_LIMBS input extra).
+      (* How are the variables defined? *)
+      set (is_valid := 
+        BinOp.add cols.(BranchEqualCoreCols.opcode_beq_flag)
+          cols.(BranchEqualCoreCols.opcode_bne_flag)
       ).
       (* TODO: fill in correct proposition to prove *)
       eapply Run.Let with (P1 :=
@@ -381,7 +392,8 @@ Proof.
       }
       { admit.
       }
-      { admit. }
+      { admit. 
+      }
     }
 Admitted.
 (*
