@@ -179,10 +179,22 @@ Module Run.
 
   Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
     {{ M.Zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
+      tt, forall i, 0 <= i < N -> (f i) mod p = (g i) mod p
     }}.
   Proof.
-  Admitted.
+    eapply Implies.
+    {
+      apply Zeros.
+    }
+    {
+      cbn.
+      intros Hi i Hr.
+      unfold BinOp.sub in Hi.
+      assert (Hfg := Hi i Hr).
+      apply mod_eq_eq_sub_eq_0.
+      auto.
+    }
+  Qed.
 End Run.
 Export Run.
 
