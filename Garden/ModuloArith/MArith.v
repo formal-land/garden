@@ -105,8 +105,7 @@ Proof.
   {
     rewrite H.
     rewrite Z.sub_diag.
-    rewrite Zmod_0_l.
-    reflexivity.
+    apply Zmod_0_l.
   }
 Qed.
 
