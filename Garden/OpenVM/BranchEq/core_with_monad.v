@@ -330,29 +330,28 @@ Proof.
     }
     intros [].
     eapply Run.Implies. {
-    eapply Run.Let with
-      (P1 :=
-        if cmp_eq then
-          forall i, 0 <= i < NUM_LIMBS ->
-          ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
-          ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
-        else
-          (* NOTE: What happened here is:
-          1. `Let` constructor requires a `P1` of type `Prop`
-          2. Eventually, we will have to destruct cases on shape of `ForInZeroToN`
-          3. `Run.ForInZeroToN` takes a `Z -> Prop` rather than a `Prop`.
-          4. After `ForInZeroToN`, we have the goal in the shape of `Equal`, which
-           requires a proposition of a equal type. A mere `True` doesnt match the form
-           of `Equal`.
-          4. Therefore, the `else` case cannot be just a `True` otherwise 
-            we cannot eliminate the `ForInZeroToN` in this case. What we need to do 
-            instead, is stub the proof with a combination of trivial cases for each 
-            of the constructors, resulting in the proposition below... is this even
-            the correct way to deal with the proof? *)
-          forall i, 0 <= i < NUM_LIMBS -> 0 = 0
-      ). 
-      {
-        destruct cmp_eq; cbn.
+      eapply Run.Let with
+        (P1 :=
+          if cmp_eq then
+            forall i, 0 <= i < NUM_LIMBS ->
+            ((Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i ) mod 23 =
+            ((Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i ) mod 23
+          else
+            (* NOTE: What happened here is:
+            1. `Let` constructor requires a `P1` of type `Prop`
+            2. Eventually, we will have to destruct cases on shape of `ForInZeroToN`
+            3. `Run.ForInZeroToN` takes a `Z -> Prop` rather than a `Prop`.
+            4. After `ForInZeroToN`, we have the goal in the shape of `Equal`, which
+            requires a proposition of a equal type. A mere `True` doesnt match the form
+            of `Equal`.
+            5. Therefore, the `else` case cannot be just a `True` otherwise 
+              we cannot eliminate the `ForInZeroToN` in this case. What we need to do 
+              instead, is stub the proof with a combination of trivial cases for each 
+              of the constructors, resulting in the proposition below... is this even
+              the correct way to deal with the proof? *)
+            forall i, 0 <= i < NUM_LIMBS -> 0 = 0
+        ). 
+      { destruct cmp_eq; cbn.
         { apply Run.ForInZeroToN; intros.
           unfold assert_zero.
           repeat destruct Array.to_limbs. 
@@ -365,14 +364,23 @@ Proof.
             rewrite -> Z.mul_1_l.
             rewrite -> foo_mod_mod.
             rewrite <- foo_sub.
-            apply foo_eq_sub.
-        }
+            apply foo_eq_sub. }
         (* The `else` case of `0 = 0` *)
-        {
-          apply Run.ForInZeroToN; intros.
-          unfold assert_zero.
-        }
+        { apply Run.ForInZeroToN; intros.
+          unfold assert_zero. }
       }
+      destruct cmp_eq; cbn.
+      { 
+        intros.
+        (* TODO: fill in correct proposition to prove *)
+        eapply Run.Let.
+        { unfold assert_one.
+        }
+        { admit.
+        }
+      admit. }
+      { admit. }
+    }
 Admitted.
 (*
         apply Run.Equal.
