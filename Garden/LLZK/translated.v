@@ -33,7 +33,7 @@ Module Module_Line_20.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder.t :=
       let* var_self : Adder.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.FieldWrite var_self.(Adder.sum) var_0 in
+      let* _ : unit := M.AssertEqual var_self.(Adder.sum) var_0 in
       M.Pure var_self.
   End Adder.
 End Module_Line_20.
@@ -58,7 +58,7 @@ Module Module_Line_52.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder2.t :=
       let* var_self : Adder2.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.FieldWrite var_self.(Adder2.sum) var_0 in
+      let* _ : unit := M.AssertEqual var_self.(Adder2.sum) var_0 in
       M.Pure var_self.
   End Adder2.
 End Module_Line_52.
@@ -119,7 +119,7 @@ Module Module_Line_147.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t Passthrough.t :=
       let* var_self : Passthrough.t := M.CreateStruct in
-      let* _ : unit := M.FieldWrite var_self.(Passthrough.out) arg_fun_0 in
+      let* _ : unit := M.AssertEqual var_self.(Passthrough.out) arg_fun_0 in
       M.Pure var_self.
   End Passthrough.
 
@@ -139,7 +139,7 @@ Module Module_Line_147.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t EnsureIsZero.t :=
       let* var_self : EnsureIsZero.t := M.CreateStruct in
       let* var_0 : Passthrough.t := Passthrough.compute arg_fun_0 in
-      let* _ : unit := M.FieldWrite var_self.(EnsureIsZero.p) var_0 in
+      let* _ : unit := M.AssertEqual var_self.(EnsureIsZero.p) var_0 in
       M.Pure var_self.
   End EnsureIsZero.
 End Module_Line_147.
@@ -405,7 +405,7 @@ Module Module_Line_669.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder2.t :=
       let* var_self : Adder2.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.FieldWrite var_self.(Adder2.sum) var_0 in
+      let* _ : unit := M.AssertEqual var_self.(Adder2.sum) var_0 in
       M.Pure var_self.
   End Adder2.
 End Module_Line_669.
@@ -421,7 +421,7 @@ Module Module_Line_707.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t Signal.t :=
       let* var_self : Signal.t := M.CreateStruct in
-      let* _ : unit := M.FieldWrite var_self.(Signal.reg) arg_fun_0 in
+      let* _ : unit := M.AssertEqual var_self.(Signal.reg) arg_fun_0 in
       M.Pure var_self.
   End Signal.
 
@@ -437,7 +437,7 @@ Module Module_Line_707.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Signal.t) : M.t Component00.t :=
       let* var_self : Component00.t := M.CreateStruct in
-      let* _ : unit := M.FieldWrite var_self.(Component00.f) arg_fun_0 in
+      let* _ : unit := M.AssertEqual var_self.(Component00.f) arg_fun_0 in
       M.Pure var_self.
   End Component00.
 
@@ -453,7 +453,7 @@ Module Module_Line_707.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Signal.t [2]) : M.t Component01.t :=
       let* var_self : Component01.t := M.CreateStruct in
-      let* _ : unit := M.FieldWrite var_self.(Component01.f) arg_fun_0 in
+      let* _ : unit := M.AssertEqual var_self.(Component01.f) arg_fun_0 in
       M.Pure var_self.
   End Component01.
 End Module_Line_707.
