@@ -90,7 +90,7 @@ Qed.
 
 Theorem mod_sub_mod_eq_0_iff_eq_mod : forall a b p, (a mod p - b mod p) mod p = 0 <-> a mod p = b mod p.
 Proof.
-    intros a b p.
+  intros a b p.
     split; intros H.
     - rewrite <- Zminus_mod in H.
       apply mod_eq_eq_sub_eq_0 in H.
