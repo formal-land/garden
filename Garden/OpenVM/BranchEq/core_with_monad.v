@@ -396,6 +396,7 @@ Proof.
         unfold Output.to_adapter_air_context.
         unfold Output.of_input. simpl.
         rewrite -> foo_add.
+        destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl.
         (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
         proving the final result matches *)
         (* original code for AdapterAirContext.instruction field:
@@ -427,6 +428,10 @@ Proof.
               input.(Input.to_pc) + input.(Input.imm)
               else input.(Input.to_pc) + 4
           end;
+        *)
+        (* 
+        Several things gathered here:
+        1. ImmInstruction.opcode might need a `mod` operation
         *)
         admit.
       }
