@@ -374,22 +374,39 @@ Proof.
       }
       intros H_a_b_eq.
       (* let* _ := when is_valid (assert_one sum) in *)
-      set (cols := @Input.to_cols NUM_LIMBS input extra).
+
       (* How are the variables defined? *)
-      set (is_valid := 
-        BinOp.add cols.(BranchEqualCoreCols.opcode_beq_flag)
-          cols.(BranchEqualCoreCols.opcode_bne_flag)
-      ).
-      (* TODO: fill in correct proposition to prove *)
+      (* 
+        Record t : Set := {
+          a : Z;
+          b : Z;
+          opcode : BranchEqualOpcode.t;
+          imm : Z;
+          to_pc : Z;
+        }.
+
+        let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
+          BinOp.mul (Array.get inv_marker i) (BinOp.sub (Array.get a i) (Array.get b i))
+        ) in
+        let sum := BinOp.add sum cmp_eq in
+        let* _ := when is_valid (assert_one sum) in
+      *)
+      (* Enforced by our current definition on Input *)
+      set (is_valid := true).
+      (* TODO: add `cmp_eq`into the equation *)
+      set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
+        BinOp.mul 
+          (Array.get_mod ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
+          (BinOp.sub 
+            (Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
+            (Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
+      )).
       eapply Run.Let with (P1 :=
-        (* TODO: express is_valid as a boolean value *)
-        (* if is_valid then  *)
-        True
-        (* TODO: express that sum asserts to one *)
-        (* else True *)
+        if is_valid then sum = 1 else True
       ).
-      { unfold assert_one.
-        apply Run.Equal.
+      { unfold assert_one, when, sum.
+        unfold BinOp.add, BinOp.sub, BinOp.mul. simpl.
+        admit.
       }
       { admit.
       }
