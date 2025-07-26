@@ -124,7 +124,7 @@ Definition compute_assert (x : Z) (b : Builder.t) : bool :=
   andb (Z.eqb 1 (compute_context b)) (Z.eqb x 0%Z).
 
 Module M.
-  (* NOTE: eventually monad is a `Type` or otherwise `discriminate` will not work.
+  (* NOTE: note that this monad is a `Type` or otherwise `discriminate` will not work.
   Is there a better way to handle this? *)
   Inductive t : Set -> Type :=
   | Pure {A : Set} (value : A) : t A
@@ -137,14 +137,6 @@ Module M.
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   | Impossible {A : Set} (message : string) : t A
   .
-
-  (* NOTE: test on inversion on constructors *)
-  Lemma pure_assert_zero_neq :
-    forall value x, @M.Pure unit value = @M.AssertZero unit x -> False.
-  Proof.
-    intros value x H.
-    inversion H.
-  Qed.
 
   (** This is a marker that we remove with the following tactic. *)
   Axiom run : forall {A : Set}, t A -> A.
@@ -261,15 +253,18 @@ Ltac m_3_trace e :=
     constr:(("match default", e))
   end. 
 
-(* Goal True.
-  let x := eval cbv delta in test_term in
+(* NOTE: never uncomment below line under production environment or for CI test *)
+(* Set Ltac Debug. *)
+
+Goal True.
+  (* let x := eval cbv delta in test_term in
   (* pose x as x. *)
   let t := m_3_trace x in
-  pose t as extracted_ctxt.
-  pose (let* _ := [[ (3 * 3) ]] in M.Pure tt) as xxx.
-  [pose constr:(M.monadic xxx) 1 as sss | idtac "1"].
+  pose t as extracted_ctxt. *)
+  pose (let*B _ := [[ (3 * 3) ]]* in M.Pure tt) as xxx.
+  (* [pose constr:(M.monadic xxx) 1 as sss | idtac "1"]. *)
   exact I.
-Qed. *)
+Qed.
 
 (* Definition testtest : True.
 Proof.

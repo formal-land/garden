@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
 pub struct ImmInstruction<T> {
@@ -305,13 +306,9 @@ Proof.
       }
     }
     intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
+    eapply Run.Let. { smpl run_auto. }
     intros [].
-    eapply Run.Let. {
-      apply Run.AssertBool.
-    }
+    eapply Run.Let. { apply Run.AssertBool. }
     intros [cmp_result H_cmp_result_eq].
     rewrite H_cmp_result_eq.
     set (cmp_eq :=
@@ -328,19 +325,119 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
-    eapply Run.Implies. {
-    eapply Run.Let with
-      (P1 :=
-        if cmp_eq then
-          forall i, 0 <= i < NUM_LIMBS ->
-          (Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i =
-          (Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i
-        else
-          True
-      ). {
-      destruct cmp_eq; cbn.
-      { apply Run.ForInZeroToN; intros.
-        unfold assert_zero.
+    eapply Run.Implies. 
+    {
+      eapply Run.Let with
+        (P1 :=
+          if cmp_eq then
+            forall i, 0 <= i < NUM_LIMBS ->
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i =
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i
+          else
+            True
+        ). 
+      { 
+        destruct cmp_eq; cbn.
+        { 
+          apply Run.ForInZeroToN; intros.
+          unfold assert_zero.
+          repeat destruct Array.to_limbs. 
+          eapply Run.Implies with (P1 := 
+            (BinOp.mul 1 (BinOp.sub (get i) (get0 i))) = 0
+          ).
+          { apply Run.Equal. }
+          { unfold BinOp.mul, BinOp.sub.
+            rewrite -> Z.mul_1_l.
+            rewrite -> foo_mod_mod.
+            rewrite <- foo_sub.
+            apply foo_eq_sub. }
+        }
+        (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
+          so we want to stub the proof with a `True`. This `True` should be obtained
+          by constructing a combination of trivial cases for all constructors appeared
+          in the part of the program. 
+          Applying `Run.Implies` automatically allows the constructors being used to 
+          generate such a case.
+        *)
+        { 
+          eapply Run.Implies.
+          (* Using the constructors *)
+          { apply Run.ForInZeroToN; intros.
+            apply Run.Equal. }
+          (* The generated case *)
+          { trivial. } 
+        }
+      }
+      intros H_a_b_eq.
+      (* Enforced by our current definition on Input *)
+      set (is_valid := true).
+      set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
+        BinOp.mul 
+          (Array.get ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
+          (BinOp.sub 
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
+      )).
+      eapply Run.Let with (P1 :=
+        if is_valid then BinOp.add sum (Z.b2z cmp_eq) = 1 else True
+      ).
+      { unfold assert_one, when, sum.
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        repeat destruct Array.to_limbs.
+        eapply Run.Implies.
+        simpl.
+        { apply Run.Equal. }
+        { trivial. }
+      }
+      intros H_valid_sum_1.
+      eapply Run.Implies.
+      {
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        unfold Output.to_adapter_air_context.
+        unfold Output.of_input. simpl.
+        rewrite -> foo_add.
+        destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl.
+        (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
+        proving the final result matches *)
+        (* original code for AdapterAirContext.instruction field:
+        Some
+          ((from_pc +
+            (Z.b2z cmp_result * input.(Input.imm))
+            mod 23 +
+            not (Z.b2z cmp_result) *
+            core_air.(BranchEqualCoreAir.pc_step))
+           mod 23);
+        *)
+        (* simulated code as well as the goal:
+        1. where's the `from_pc`?
+        2. why we have a `add 4`? Is it exactly `from_pc`?
+        3. why we don't have `cmp_result`?
+        Some
+          match input.(Input.opcode) with
+          | BranchEqualOpcode.BEQ =>
+              if input.(Input.a) =? input.(Input.b)
+              then
+              input.(Input.to_pc) + input.(Input.imm)
+              else
+              input.(Input.to_pc) +
+              core_air.(BranchEqualCoreAir.pc_step)
+          | BranchEqualOpcode.BNE =>
+              if
+              negb (input.(Input.a) =? input.(Input.b))
+              then
+              input.(Input.to_pc) + input.(Input.imm)
+              else input.(Input.to_pc) + 4
+          end;
+        *)
+        (* 
+        Several things gathered here:
+        1. ImmInstruction.opcode might need a `mod` operation
+        *)
+        admit.
+      }
+      { admit.
+      }
+      
 Admitted.
 (*
         apply Run.Equal.
