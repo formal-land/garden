@@ -374,24 +374,21 @@ Proof.
       set (is_valid := true).
       set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
         BinOp.mul 
-          (Array.get_mod ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
+          (Array.get ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
           (BinOp.sub 
-            (Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
-            (Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
       )).
       eapply Run.Let with (P1 :=
-        if is_valid then BinOp.add (Z.b2z cmp_eq) sum = 1 else True
+        if is_valid then BinOp.add sum (Z.b2z cmp_eq) = 1 else True
       ).
       { unfold assert_one, when, sum.
         unfold BinOp.add, BinOp.sub, BinOp.mul.
         repeat destruct Array.to_limbs.
         eapply Run.Implies.
+        simpl.
         { apply Run.Equal. }
-        {
-          (* TODO: tackle with equations... *)
-          simpl.
-          admit.
-        }
+        { trivial. }
       }
       intros H_valid_sum_1.
       eapply Run.Implies.
