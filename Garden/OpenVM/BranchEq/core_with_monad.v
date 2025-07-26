@@ -356,13 +356,15 @@ Proof.
           so we want to stub the proof with a `True`. This `True` should be obtained
           by constructing a combination of trivial cases for all constructors appeared
           in the part of the program. 
-          Applying `Run.Implies` automatically generates such a case.
+          Applying `Run.Implies` automatically allows the constructors being used to 
+          generate such a case.
         *)
         { 
           eapply Run.Implies.
+          (* Using the constructors *)
           { apply Run.ForInZeroToN; intros.
-            unfold assert_zero.
             apply Run.Equal. }
+          (* The generated case *)
           { trivial. } 
         }
       }
@@ -383,10 +385,23 @@ Proof.
       { unfold assert_one, when, sum.
         unfold BinOp.add, BinOp.sub, BinOp.mul.
         repeat destruct Array.to_limbs.
-        simpl.
-
-        (* TODO: tackle with equations... *)
-    }
+        eapply Run.Implies.
+        { apply Run.Equal. }
+        {
+          (* TODO: tackle with equations... *)
+          simpl.
+          admit.
+        }
+      }
+      intros H_valid_sum_1.
+      eapply Run.Implies.
+      {
+        (* apply Run.Pure. *)
+        admit.
+      }
+      { admit.
+      }
+      
 Admitted.
 (*
         apply Run.Equal.
