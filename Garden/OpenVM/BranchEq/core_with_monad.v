@@ -378,16 +378,13 @@ Proof.
             (Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
       )).
       eapply Run.Let with (P1 :=
-        if is_valid then sum = 1 else True
+        if is_valid then BinOp.add (Z.b2z cmp_eq) sum = 1 else True
       ).
       { unfold assert_one, when, sum.
-        unfold BinOp.add, BinOp.sub, BinOp.mul. simpl.
-        admit.
-      }
-      { admit.
-      }
-      { admit. 
-      }
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        repeat destruct Array.to_limbs.
+        simpl.
+        (* TODO: tackle with equations... *)
     }
 Admitted.
 (*
