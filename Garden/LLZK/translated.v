@@ -5,6 +5,10 @@ Module Module_Line_3.
   Module NoConstraints.
     Inductive t : Set := Make.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : NoConstraints.t) (arg_fun_1 : Felt.t) : M.t unit :=
       M.Pure tt.
 
@@ -24,6 +28,12 @@ Module Module_Line_20.
       sum : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        sum := map_mod α.(sum);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : Adder.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(Adder.sum) in
       let* var_1 : Felt.t := global_add arg_fun_1 arg_fun_2 in
@@ -33,7 +43,7 @@ Module Module_Line_20.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder.t :=
       let* var_self : Adder.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.AssertEqual var_self.(Adder.sum) var_0 in
+      let* _ : unit := M.FieldWrite var_self.(Adder.sum) var_0 in
       M.Pure var_self.
   End Adder.
 End Module_Line_20.
@@ -48,6 +58,12 @@ Module Module_Line_52.
       sum : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        sum := map_mod α.(sum);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : Adder2.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(Adder2.sum) in
       let* var_1 : Felt.t := global_add arg_fun_1 arg_fun_2 in
@@ -58,7 +74,7 @@ Module Module_Line_52.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder2.t :=
       let* var_self : Adder2.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.AssertEqual var_self.(Adder2.sum) var_0 in
+      let* _ : unit := M.FieldWrite var_self.(Adder2.sum) var_0 in
       M.Pure var_self.
   End Adder2.
 End Module_Line_52.
@@ -67,11 +83,15 @@ Module Module_Line_85.
   Module ComponentB.
     Inductive t : Set := Make.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : ComponentB.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Array.t Felt.t [5]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : ComponentB.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Array.t Felt.t [5]%nat) : M.t unit :=
       let* _ : unit := M.AssertIn arg_fun_1 arg_fun_2 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Array.t Felt.t [5]) : M.t ComponentB.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Array.t Felt.t [5]%nat) : M.t ComponentB.t :=
       let* var_self : ComponentB.t := M.CreateStruct in
       M.Pure var_self.
   End ComponentB.
@@ -80,6 +100,10 @@ End Module_Line_85.
 Module Module_Line_105.
   Module EnsureZero.
     Inductive t : Set := Make.
+
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
 
     Definition constrain {p} `{Prime p} (arg_fun_0 : EnsureZero.t) (arg_fun_1 : Felt.t) : M.t unit :=
       let var_felt_const_0 : Felt.t := UnOp.from 0 in
@@ -93,6 +117,10 @@ Module Module_Line_105.
 
   Module EnsureBothZero.
     Inductive t : Set := Make.
+
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
 
     Definition constrain {p} `{Prime p} (arg_fun_0 : EnsureBothZero.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_felt_const_0 : Felt.t := UnOp.from 0 in
@@ -112,6 +140,12 @@ Module Module_Line_147.
       out : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        out := map_mod α.(out);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : Passthrough.t) (arg_fun_1 : Felt.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(Passthrough.out) in
       let* _ : unit := M.AssertEqual arg_fun_1 var_0 in
@@ -119,13 +153,19 @@ Module Module_Line_147.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t Passthrough.t :=
       let* var_self : Passthrough.t := M.CreateStruct in
-      let* _ : unit := M.AssertEqual var_self.(Passthrough.out) arg_fun_0 in
+      let* _ : unit := M.FieldWrite var_self.(Passthrough.out) arg_fun_0 in
       M.Pure var_self.
   End Passthrough.
 
   Module EnsureIsZero.
     Record t : Set := {
       p : Passthrough.t;
+    }.
+
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        p := map_mod α.(p);
+      |};
     }.
 
     Definition constrain {p} `{Prime p} (arg_fun_0 : EnsureIsZero.t) (arg_fun_1 : Felt.t) : M.t unit :=
@@ -139,7 +179,7 @@ Module Module_Line_147.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t EnsureIsZero.t :=
       let* var_self : EnsureIsZero.t := M.CreateStruct in
       let* var_0 : Passthrough.t := Passthrough.compute arg_fun_0 in
-      let* _ : unit := M.AssertEqual var_self.(EnsureIsZero.p) var_0 in
+      let* _ : unit := M.FieldWrite var_self.(EnsureIsZero.p) var_0 in
       M.Pure var_self.
   End EnsureIsZero.
 End Module_Line_147.
@@ -148,14 +188,18 @@ Module Module_Line_196.
   Module ArrayCheck.
     Inductive t : Set := Make.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayCheck.t) (arg_fun_1 : Array.t Felt.t [5]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayCheck.t) (arg_fun_1 : Array.t Felt.t [5]%nat) : M.t unit :=
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
-      let var_c3 : Index.t := 3 in
+      let var_c3 : Index.t := 3%nat in
       let var_0 : Felt.t := Array.read arg_fun_1 (var_c3, tt) in
       let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]) : M.t ArrayCheck.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]%nat) : M.t ArrayCheck.t :=
       let* var_self : ArrayCheck.t := M.CreateStruct in
       M.Pure var_self.
   End ArrayCheck.
@@ -165,10 +209,14 @@ Module Module_Line_219.
   Module ArrayForCheck.
     Inductive t : Set := Make.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayForCheck.t) (arg_fun_1 : Array.t Felt.t [5]) : M.t unit :=
-      let var_c0 : Index.t := 0 in
-      let var_c5 : Index.t := 5 in
-      let var_c1 : Index.t := 1 in
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayForCheck.t) (arg_fun_1 : Array.t Felt.t [5]%nat) : M.t unit :=
+      let var_c0 : Index.t := 0%nat in
+      let var_c5 : Index.t := 5%nat in
+      let var_c1 : Index.t := 1%nat in
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
       let* _ : unit := M.for_ var_c0 (* to *) var_c5 (* step *) var_c1 (fun (arg_for_226_7 : Index.t) =>
         let var_0 : Felt.t := Array.read arg_fun_1 (arg_for_226_7, tt) in
@@ -176,7 +224,7 @@ Module Module_Line_219.
         M.yield tt      ) in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]) : M.t ArrayForCheck.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]%nat) : M.t ArrayForCheck.t :=
       let* var_self : ArrayForCheck.t := M.CreateStruct in
       M.Pure var_self.
   End ArrayForCheck.
@@ -185,6 +233,10 @@ End Module_Line_219.
 Module Module_Line_246.
   Module ConstConstraints.
     Inductive t : Set := Make.
+
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
 
     Definition constrain {p} `{Prime p} (arg_fun_0 : ConstConstraints.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_felt_const_1 : Felt.t := UnOp.from 1 in
@@ -202,18 +254,22 @@ Module Module_Line_270.
   Module ArrayConstrain.
     Inductive t (A B : nat) : Set := Make.
 
-    Definition constrain {p} `{Prime p} {A B : nat} (arg_fun_0 : ArrayConstrain.t A B) (arg_fun_1 : Array.t Felt.t [3]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} {A B : nat} : MapMod (t A B) := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} {A B : nat} (arg_fun_0 : ArrayConstrain.t A B) (arg_fun_1 : Array.t Felt.t [3]%nat) : M.t unit :=
       let var_0 : Felt.t := UnOp.from (Z.of_nat A) in
       let var_1 : Felt.t := UnOp.from (Z.of_nat B) in
-      let var_c0 : Index.t := 0 in
-      let var_c2 : Index.t := 2 in
+      let var_c0 : Index.t := 0%nat in
+      let var_c2 : Index.t := 2%nat in
       let var_2 : Felt.t := Array.read arg_fun_1 (var_c0, tt) in
       let var_3 : Felt.t := Array.read arg_fun_1 (var_c2, tt) in
       let* _ : unit := M.AssertEqual var_2 var_0 in
       let* _ : unit := M.AssertEqual var_3 var_1 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} {A B : nat} (arg_fun_0 : Array.t Felt.t [3]) : M.t (ArrayConstrain.t A B) :=
+    Definition compute {p} `{Prime p} {A B : nat} (arg_fun_0 : Array.t Felt.t [3]%nat) : M.t (ArrayConstrain.t A B) :=
       let* var_self : ArrayConstrain.t A B := M.CreateStruct in
       M.Pure var_self.
   End ArrayConstrain.
@@ -224,18 +280,25 @@ Module Module_Line_270.
       check1 : ArrayConstrain.t 13 17;
     }.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : MatrixConstrain.t) (arg_fun_1 : Array.t Felt.t [2; 3]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        check0 := map_mod α.(check0);
+        check1 := map_mod α.(check1);
+      |};
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : MatrixConstrain.t) (arg_fun_1 : Array.t Felt.t [2; 3]%nat) : M.t unit :=
       let var_0 : ArrayConstrain.t 7 11 := arg_fun_0.(MatrixConstrain.check0) in
-      let var_c0 : Index.t := 0 in
-      let var_1 : Array.t Felt.t [3] := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
+      let var_c0 : Index.t := 0%nat in
+      let var_1 : Array.t Felt.t [3]%nat := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
       let* _ : unit := ArrayConstrain.constrain var_0 var_1 in
       let var_2 : ArrayConstrain.t 13 17 := arg_fun_0.(MatrixConstrain.check1) in
-      let var_c1 : Index.t := 1 in
-      let var_3 : Array.t Felt.t [3] := Array.extract (Ns := [_]) arg_fun_1 (var_c1, tt) in
+      let var_c1 : Index.t := 1%nat in
+      let var_3 : Array.t Felt.t [3]%nat := Array.extract (Ns := [_]) arg_fun_1 (var_c1, tt) in
       let* _ : unit := ArrayConstrain.constrain var_2 var_3 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [2; 3]) : M.t MatrixConstrain.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [2; 3]%nat) : M.t MatrixConstrain.t :=
       let* var_self : MatrixConstrain.t := M.CreateStruct in
       M.Pure var_self.
   End MatrixConstrain.
@@ -245,14 +308,18 @@ Module Module_Line_331.
   Module ArrayConstrain.
     Inductive t : Set := Make.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayConstrain.t) (arg_fun_1 : Array.t Felt.t [3]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : ArrayConstrain.t) (arg_fun_1 : Array.t Felt.t [3]%nat) : M.t unit :=
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
-      let var_c1 : Index.t := 1 in
+      let var_c1 : Index.t := 1%nat in
       let var_0 : Felt.t := Array.read arg_fun_1 (var_c1, tt) in
       let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [3]) : M.t ArrayConstrain.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [3]%nat) : M.t ArrayConstrain.t :=
       let* var_self : ArrayConstrain.t := M.CreateStruct in
       M.Pure var_self.
   End ArrayConstrain.
@@ -268,6 +335,18 @@ Module Module_Line_331.
       f : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        check := map_mod α.(check);
+        a := map_mod α.(a);
+        b := map_mod α.(b);
+        c := map_mod α.(c);
+        d := map_mod α.(d);
+        e := map_mod α.(e);
+        f := map_mod α.(f);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : MatrixConstrain.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(MatrixConstrain.a) in
       let var_1 : Felt.t := arg_fun_0.(MatrixConstrain.b) in
@@ -275,10 +354,10 @@ Module Module_Line_331.
       let var_3 : Felt.t := arg_fun_0.(MatrixConstrain.d) in
       let var_4 : Felt.t := arg_fun_0.(MatrixConstrain.e) in
       let var_5 : Felt.t := arg_fun_0.(MatrixConstrain.f) in
-      let var_array : Array.t Felt.t [2; 3] := Array.new [var_0; var_1; var_2; var_3; var_4; var_5] in
+      let var_array : Array.t Felt.t [2; 3]%nat := Array.new [var_0; var_1; var_2; var_3; var_4; var_5] in
       let var_6 : ArrayConstrain.t := arg_fun_0.(MatrixConstrain.check) in
-      let var_c0 : Index.t := 0 in
-      let var_7 : Array.t Felt.t [3] := Array.extract (Ns := [_]) var_array (var_c0, tt) in
+      let var_c0 : Index.t := 0%nat in
+      let var_7 : Array.t Felt.t [3]%nat := Array.extract (Ns := [_]) var_array (var_c0, tt) in
       let* _ : unit := ArrayConstrain.constrain var_6 var_7 in
       M.Pure tt.
 
@@ -292,14 +371,18 @@ Module Module_Line_392.
   Module UnknownArrayConstrain.
     Inductive t (N : nat) : Set := Make.
 
-    Definition constrain {p} `{Prime p} {N : nat} (arg_fun_0 : UnknownArrayConstrain.t N) (arg_fun_1 : Array.t Felt.t [N]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} {N : nat} : MapMod (t N) := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} {N : nat} (arg_fun_0 : UnknownArrayConstrain.t N) (arg_fun_1 : Array.t Felt.t [N]%nat) : M.t unit :=
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
-      let var_c1 : Index.t := 1 in
+      let var_c1 : Index.t := 1%nat in
       let var_0 : Felt.t := Array.read arg_fun_1 (var_c1, tt) in
       let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} {N : nat} (arg_fun_0 : Array.t Felt.t [N]) : M.t (UnknownArrayConstrain.t N) :=
+    Definition compute {p} `{Prime p} {N : nat} (arg_fun_0 : Array.t Felt.t [N]%nat) : M.t (UnknownArrayConstrain.t N) :=
       let* var_self : UnknownArrayConstrain.t N := M.CreateStruct in
       M.Pure var_self.
   End UnknownArrayConstrain.
@@ -309,14 +392,18 @@ Module Module_Line_415.
   Module UnknownArrayConstrain.
     Inductive t (N : nat) : Set := Make.
 
-    Definition constrain {p} `{Prime p} {N : nat} (arg_fun_0 : UnknownArrayConstrain.t N) (arg_fun_1 : Array.t Felt.t [N]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} {N : nat} : MapMod (t N) := {
+      map_mod α := α;
+    }.
+
+    Definition constrain {p} `{Prime p} {N : nat} (arg_fun_0 : UnknownArrayConstrain.t N) (arg_fun_1 : Array.t Felt.t [N]%nat) : M.t unit :=
       let var_felt_const_7 : Felt.t := UnOp.from 7 in
-      let var_c1 : Index.t := 1 in
+      let var_c1 : Index.t := 1%nat in
       let var_0 : Felt.t := Array.read arg_fun_1 (var_c1, tt) in
       let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} {N : nat} (arg_fun_0 : Array.t Felt.t [N]) : M.t (UnknownArrayConstrain.t N) :=
+    Definition compute {p} `{Prime p} {N : nat} (arg_fun_0 : Array.t Felt.t [N]%nat) : M.t (UnknownArrayConstrain.t N) :=
       let* var_self : UnknownArrayConstrain.t N := M.CreateStruct in
       M.Pure var_self.
   End UnknownArrayConstrain.
@@ -327,14 +414,20 @@ Module Module_Line_415.
     }.
     Arguments t : clear implicits.
 
-    Definition constrain {p} `{Prime p} {M N : nat} (arg_fun_0 : UnknownMatrixConstrain.t M N) (arg_fun_1 : Array.t Felt.t [M; N]) : M.t unit :=
+    Global Instance IsMapMop {ρ} `{Prime ρ} {M N : nat} : MapMod (t M N) := {
+      map_mod α := {|
+        check := map_mod α.(check);
+      |};
+    }.
+
+    Definition constrain {p} `{Prime p} {M N : nat} (arg_fun_0 : UnknownMatrixConstrain.t M N) (arg_fun_1 : Array.t Felt.t [M; N]%nat) : M.t unit :=
       let var_0 : UnknownArrayConstrain.t N := arg_fun_0.(UnknownMatrixConstrain.check) in
-      let var_c0 : Index.t := 0 in
-      let var_1 : Array.t Felt.t [N] := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
+      let var_c0 : Index.t := 0%nat in
+      let var_1 : Array.t Felt.t [N]%nat := Array.extract (Ns := [_]) arg_fun_1 (var_c0, tt) in
       let* _ : unit := UnknownArrayConstrain.constrain var_0 var_1 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} {M N : nat} (arg_fun_0 : Array.t Felt.t [M; N]) : M.t (UnknownMatrixConstrain.t M N) :=
+    Definition compute {p} `{Prime p} {M N : nat} (arg_fun_0 : Array.t Felt.t [M; N]%nat) : M.t (UnknownMatrixConstrain.t M N) :=
       let* var_self : UnknownMatrixConstrain.t M N := M.CreateStruct in
       M.Pure var_self.
   End UnknownMatrixConstrain.
@@ -369,6 +462,12 @@ Module Module_Line_642.
       sum : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        sum := map_mod α.(sum);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : ExternAdder.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(ExternAdder.sum) in
       let* var_1 : Felt.t := extern_add arg_fun_1 arg_fun_2 in
@@ -394,6 +493,12 @@ Module Module_Line_669.
       sum : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        sum := map_mod α.(sum);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : Adder2.t) (arg_fun_1 : Felt.t) (arg_fun_2 : Felt.t) : M.t unit :=
       let var_0 : Felt.t := arg_fun_0.(Adder2.sum) in
       let* var_1 : Felt.t := global_add arg_fun_1 arg_fun_2 in
@@ -405,7 +510,7 @@ Module Module_Line_669.
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) (arg_fun_1 : Felt.t) : M.t Adder2.t :=
       let* var_self : Adder2.t := M.CreateStruct in
       let* var_0 : Felt.t := global_add arg_fun_0 arg_fun_1 in
-      let* _ : unit := M.AssertEqual var_self.(Adder2.sum) var_0 in
+      let* _ : unit := M.FieldWrite var_self.(Adder2.sum) var_0 in
       M.Pure var_self.
   End Adder2.
 End Module_Line_669.
@@ -416,18 +521,30 @@ Module Module_Line_707.
       reg : Felt.t;
     }.
 
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        reg := map_mod α.(reg);
+      |};
+    }.
+
     Definition constrain {p} `{Prime p} (arg_fun_0 : Signal.t) (arg_fun_1 : Felt.t) : M.t unit :=
       M.Pure tt.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Felt.t) : M.t Signal.t :=
       let* var_self : Signal.t := M.CreateStruct in
-      let* _ : unit := M.AssertEqual var_self.(Signal.reg) arg_fun_0 in
+      let* _ : unit := M.FieldWrite var_self.(Signal.reg) arg_fun_0 in
       M.Pure var_self.
   End Signal.
 
   Module Component00.
     Record t : Set := {
       f : Signal.t;
+    }.
+
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        f := map_mod α.(f);
+      |};
     }.
 
     Definition constrain {p} `{Prime p} (arg_fun_0 : Component00.t) (arg_fun_1 : Signal.t) : M.t unit :=
@@ -437,23 +554,29 @@ Module Module_Line_707.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Signal.t) : M.t Component00.t :=
       let* var_self : Component00.t := M.CreateStruct in
-      let* _ : unit := M.AssertEqual var_self.(Component00.f) arg_fun_0 in
+      let* _ : unit := M.FieldWrite var_self.(Component00.f) arg_fun_0 in
       M.Pure var_self.
   End Component00.
 
   Module Component01.
     Record t : Set := {
-      f : Array.t Signal.t [2];
+      f : Array.t Signal.t [2]%nat;
     }.
 
-    Definition constrain {p} `{Prime p} (arg_fun_0 : Component01.t) (arg_fun_1 : Array.t Signal.t [2]) : M.t unit :=
-      let var_0 : Array.t Signal.t [2] := arg_fun_0.(Component01.f) in
+    Global Instance IsMapMop {ρ} `{Prime ρ} : MapMod t := {
+      map_mod α := {|
+        f := map_mod α.(f);
+      |};
+    }.
+
+    Definition constrain {p} `{Prime p} (arg_fun_0 : Component01.t) (arg_fun_1 : Array.t Signal.t [2]%nat) : M.t unit :=
+      let var_0 : Array.t Signal.t [2]%nat := arg_fun_0.(Component01.f) in
       let* _ : unit := M.AssertEqual var_0 arg_fun_1 in
       M.Pure tt.
 
-    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Signal.t [2]) : M.t Component01.t :=
+    Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Signal.t [2]%nat) : M.t Component01.t :=
       let* var_self : Component01.t := M.CreateStruct in
-      let* _ : unit := M.AssertEqual var_self.(Component01.f) arg_fun_0 in
+      let* _ : unit := M.FieldWrite var_self.(Component01.f) arg_fun_0 in
       M.Pure var_self.
   End Component01.
 End Module_Line_707.

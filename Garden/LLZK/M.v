@@ -16,7 +16,7 @@ Global Open Scope char_scope.
 Global Open Scope string_scope.
 Global Open Scope list_scope.
 Global Open Scope type_scope.
-(* Global Open Scope Z_scope. *)
+Global Open Scope Z_scope.
 Global Open Scope bool_scope.
 
 Export List.ListNotations.
@@ -76,7 +76,7 @@ Module Array.
         match Ns, indexes with
         | nil, _ => True
         | N :: Ns, (index, indexes) =>
-          index < N /\ t indexes
+          (index < N)%nat /\ t indexes
         end.
     End Valid.
 
@@ -125,6 +125,7 @@ Module M.
   | AssertEqual {A : Set} (x1 x2 : A) : t unit
   | AssertIn {A : Set} {Ns : list nat} (x : A) (array : Array.t A Ns) : t unit
   | CreateStruct {A : Set} : t A
+  | FieldWrite {A : Set} (field : A) (value : A) : t unit
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
 End M.
@@ -154,7 +155,26 @@ Definition for_step_one (start end_ : nat) (body : nat -> M.t unit) : M.t unit :
 Axiom for_step_one_eq : forall (start end_ : nat) (body : nat -> M.t unit),
   for_ start end_ 1 body = for_step_one start end_ body.
 
-Module Run.
+Module RunCompute.
+  Reserved Notation "{{ e 🔽 output }}".
+
+  Inductive t : forall {A : Set}, M.t A -> A -> Prop :=
+  | Pure {A : Set} (value : A) :
+    {{ M.Pure value 🔽 value }}
+  | CreateStruct {A : Set} (value : A) :
+    {{ M.CreateStruct 🔽 value }}
+  | FieldWrite {A : Set} (field : A) :
+    {{ M.FieldWrite field field 🔽 tt }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
+    {{ e 🔽 value }} ->
+    {{ k value 🔽 output }} ->
+    {{ M.Let e k 🔽 output }}
+
+  where "{{ e 🔽 output }}" := (t e output).
+End RunCompute.
+Export RunCompute.
+
+Module RunConstrain.
   Reserved Notation "{{ e 🔽 output , P }}".
 
   Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
@@ -166,8 +186,9 @@ Module Run.
     {{ M.AssertIn x array 🔽
       tt, exists indexes, Array.MultiIndex.Valid.t indexes /\ Array.read array indexes = x
     }}
-  | CreateStruct {A : Set} (struct_value : A) :
-    {{ M.CreateStruct 🔽 struct_value, True }}
+  | Compute {A : Set} (e : M.t A) (value : A) :
+    {{ e 🔽 value }} ->
+    {{ e 🔽 value, True }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> {{ k value 🔽 output, P2 }}) ->
@@ -182,5 +203,20 @@ Module Run.
     {{ e 🔽 value2, P }}
 
   where "{{ e 🔽 output , P }}" := (t e output P).
-End Run.
-Export Run.
+End RunConstrain.
+Export RunConstrain.
+
+Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
+  map_mod : A -> A;
+}.
+
+Global Instance MapMod_Felt {p} `{Prime p} : MapMod Felt.t := {
+  map_mod := UnOp.from;
+}.
+
+Global Instance MapMod_Array {p} `{Prime p} (A : Set) `{MapMod p A} (Ns : list nat) :
+    MapMod (Array.t A Ns) := {
+  map_mod x := {|
+    Array.get indexes := map_mod (x.(Array.get) indexes);
+  |};
+}.
