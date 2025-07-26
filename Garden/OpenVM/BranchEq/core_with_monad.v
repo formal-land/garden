@@ -369,7 +369,6 @@ Proof.
         }
       }
       intros H_a_b_eq.
-      (* let* _ := when is_valid (assert_one sum) in *)
       (* Enforced by our current definition on Input *)
       set (is_valid := true).
       set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
