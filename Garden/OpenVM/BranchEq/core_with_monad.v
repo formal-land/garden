@@ -393,7 +393,42 @@ Proof.
       intros H_valid_sum_1.
       eapply Run.Implies.
       {
-        (* apply Run.Pure. *)
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        unfold Output.to_adapter_air_context.
+        unfold Output.of_input. simpl.
+        rewrite -> foo_add.
+        (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
+        proving the final result matches *)
+        (* original code for AdapterAirContext.instruction field:
+        Some
+          ((from_pc +
+            (Z.b2z cmp_result * input.(Input.imm))
+            mod 23 +
+            not (Z.b2z cmp_result) *
+            core_air.(BranchEqualCoreAir.pc_step))
+           mod 23);
+        *)
+        (* simulated code as well as the goal:
+        1. where's the `from_pc`?
+        2. why we have a `add 4`? Is it exactly `from_pc`?
+        3. why we don't have `cmp_result`?
+        Some
+          match input.(Input.opcode) with
+          | BranchEqualOpcode.BEQ =>
+              if input.(Input.a) =? input.(Input.b)
+              then
+              input.(Input.to_pc) + input.(Input.imm)
+              else
+              input.(Input.to_pc) +
+              core_air.(BranchEqualCoreAir.pc_step)
+          | BranchEqualOpcode.BNE =>
+              if
+              negb (input.(Input.a) =? input.(Input.b))
+              then
+              input.(Input.to_pc) + input.(Input.imm)
+              else input.(Input.to_pc) + 4
+          end;
+        *)
         admit.
       }
       { admit.
