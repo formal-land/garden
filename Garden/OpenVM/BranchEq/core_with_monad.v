@@ -311,14 +311,6 @@ Proof.
     eapply Run.Let. { apply Run.AssertBool. }
     intros [cmp_result H_cmp_result_eq].
     rewrite H_cmp_result_eq.
-    (* 
-    let* cmp_eq : Z :=
-      M.pure (
-        BinOp.add
-          (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.opcode_beq_flag))
-          (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
-      ) in
-    *)
     set (cmp_eq :=
       match input.(Input.opcode) with
       | BranchEqualOpcode.BEQ => cmp_result
@@ -333,6 +325,7 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
+    (* NOTE: Is this necessary? Why is it used?... *)
     eapply Run.Implies. 
     {
       eapply Run.Let with
@@ -374,23 +367,6 @@ Proof.
       }
       intros H_a_b_eq.
       (* let* _ := when is_valid (assert_one sum) in *)
-
-      (* How are the variables defined? *)
-      (* 
-        Record t : Set := {
-          a : Z;
-          b : Z;
-          opcode : BranchEqualOpcode.t;
-          imm : Z;
-          to_pc : Z;
-        }.
-
-        let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
-          BinOp.mul (Array.get inv_marker i) (BinOp.sub (Array.get a i) (Array.get b i))
-        ) in
-        let sum := BinOp.add sum cmp_eq in
-        let* _ := when is_valid (assert_one sum) in
-      *)
       (* Enforced by our current definition on Input *)
       set (is_valid := true).
       (* TODO: add `cmp_eq`into the equation *)
