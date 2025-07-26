@@ -325,7 +325,6 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
-    (* NOTE: Is this necessary? Why is it used?... *)
     eapply Run.Implies. 
     {
       eapply Run.Let with
@@ -354,11 +353,13 @@ Proof.
             apply foo_eq_sub. }
         }
         (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
-        so we want to stub the proof with a `True`. This `True` should be obtained
-        by constructing a combination of trivial cases for all constructors appeared
-        in the part of the program. *)
+          so we want to stub the proof with a `True`. This `True` should be obtained
+          by constructing a combination of trivial cases for all constructors appeared
+          in the part of the program. 
+          Applying `Run.Implies` automatically generates such a case.
+        *)
         { 
-          eapply Run.Implies with (P1 := forall i, 0 <= i < NUM_LIMBS -> 0 = 0).
+          eapply Run.Implies.
           { apply Run.ForInZeroToN; intros.
             unfold assert_zero.
             apply Run.Equal. }
@@ -369,7 +370,6 @@ Proof.
       (* let* _ := when is_valid (assert_one sum) in *)
       (* Enforced by our current definition on Input *)
       set (is_valid := true).
-      (* TODO: add `cmp_eq`into the equation *)
       set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
         BinOp.mul 
           (Array.get_mod ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
@@ -384,6 +384,7 @@ Proof.
         unfold BinOp.add, BinOp.sub, BinOp.mul.
         repeat destruct Array.to_limbs.
         simpl.
+
         (* TODO: tackle with equations... *)
     }
 Admitted.
