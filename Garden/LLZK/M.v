@@ -187,7 +187,7 @@ Module RunConstrain.
   Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | AssertEqual (x1 x2 : Z) :
+  | AssertEqual {A : Set} (x1 x2 : A) :
     {{ M.AssertEqual x1 x2 🔽 tt, x1 = x2 }}
   | AssertIn {A : Set} {Ns : list nat} (x : A) (array : Array.t A Ns) :
     {{ M.AssertIn x array 🔽

@@ -518,13 +518,13 @@ Module Module_Line_270.
     Qed.
 
     Lemma compute_eq {p} `{Prime p} {A B : nat} (arr : Array.t Felt.t [3]%nat) :
-      {{ ArrayConstrain.compute arr 🔽
-        ArrayConstrain.Make A B
+      {{ ArrayConstrain.compute (A := A) (B := B) arr 🔽
+        ArrayConstrain.Make
       }}.
     Proof.
       unfold ArrayConstrain.compute.
       eapply RunCompute.Let. {
-        eapply RunCompute.CreateStruct with (value := ArrayConstrain.Make A B).
+        eapply RunCompute.CreateStruct with (value := ArrayConstrain.Make).
       }
       apply RunCompute.Pure.
     Qed.
@@ -561,16 +561,398 @@ Module Module_Line_270.
     Lemma compute_eq {p} `{Prime p} (arr : Array.t Felt.t [2; 3]%nat) :
       {{ MatrixConstrain.compute arr 🔽
         {|
-          MatrixConstrain.check0 := ArrayConstrain.Make 7 11;
-          MatrixConstrain.check1 := ArrayConstrain.Make 13 17;
+          MatrixConstrain.check0 := ArrayConstrain.Make;
+          MatrixConstrain.check1 := ArrayConstrain.Make;
         |}
       }}.
     Proof.
       unfold MatrixConstrain.compute.
       eapply RunCompute.Let. {
-        eapply RunCompute.CreateStruct with (value := {| MatrixConstrain.check0 := _; MatrixConstrain.check1 := _ |}).
+        eapply RunCompute.CreateStruct with (value := {|
+          MatrixConstrain.check0 := ArrayConstrain.Make;
+          MatrixConstrain.check1 := ArrayConstrain.Make;
+        |}).
       }
       apply RunCompute.Pure.
     Qed.
   End MatrixConstrain.
 End Module_Line_270.
+
+Module Module_Line_331.
+  Import Module_Line_331.
+
+  Module ArrayConstrain.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : ArrayConstrain.t)
+        (arr : Array.t Felt.t [3]%nat) :
+      let self := map_mod self in
+      {{ ArrayConstrain.constrain self arr 🔽
+        tt,
+        Array.read arr (1%nat, tt) = UnOp.from 7
+      }}.
+    Proof.
+      unfold ArrayConstrain.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (arr : Array.t Felt.t [3]%nat) :
+      {{ ArrayConstrain.compute arr 🔽
+        ArrayConstrain.Make
+      }}.
+    Proof.
+      unfold ArrayConstrain.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := ArrayConstrain.Make).
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End ArrayConstrain.
+End Module_Line_331.
+
+Module Module_Line_392.
+  Import Module_Line_392.
+
+  Module UnknownArrayConstrain.
+    Lemma constrain_implies {p} `{Prime p} {N : nat}
+        (self : UnknownArrayConstrain.t N)
+        (arr : Array.t Felt.t [N]%nat) :
+      let self := map_mod self in
+      {{ UnknownArrayConstrain.constrain self arr 🔽
+        tt,
+        Array.read arr (1%nat, tt) = UnOp.from 7
+      }}.
+    Proof.
+      unfold UnknownArrayConstrain.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} {N : nat} (arr : Array.t Felt.t [N]%nat) :
+      {{ UnknownArrayConstrain.compute (N := N) arr 🔽
+        UnknownArrayConstrain.Make
+      }}.
+    Proof.
+      unfold UnknownArrayConstrain.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := UnknownArrayConstrain.Make).
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End UnknownArrayConstrain.
+End Module_Line_392.
+
+Module Module_Line_415.
+  Import Module_Line_415.
+
+  Module UnknownArrayConstrain.
+    Lemma constrain_implies {p} `{Prime p} {N : nat}
+        (self : UnknownArrayConstrain.t N)
+        (arr : Array.t Felt.t [N]%nat) :
+      let self := map_mod self in
+      {{ UnknownArrayConstrain.constrain self arr 🔽
+        tt,
+        Array.read arr (1%nat, tt) = UnOp.from 7
+      }}.
+    Proof.
+      unfold UnknownArrayConstrain.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} {N : nat} (arr : Array.t Felt.t [N]%nat) :
+      {{ UnknownArrayConstrain.compute arr 🔽
+        UnknownArrayConstrain.Make
+      }}.
+    Proof.
+      unfold UnknownArrayConstrain.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := UnknownArrayConstrain.Make).
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End UnknownArrayConstrain.
+
+  Module UnknownMatrixConstrain.
+    Lemma constrain_implies {p} `{Prime p} {M N : nat}
+        (self : UnknownMatrixConstrain.t M N)
+        (arr : Array.t Felt.t [M; N]%nat) :
+      let self := map_mod self in
+      {{ UnknownMatrixConstrain.constrain self arr 🔽
+        tt,
+        Array.read (Array.extract (Ns := [_]) arr (0%nat, tt)) (1%nat, tt) = UnOp.from 7
+      }}.
+    Proof.
+      unfold UnknownMatrixConstrain.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply UnknownArrayConstrain.constrain_implies.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} {M N : nat} (arr : Array.t Felt.t [M; N]%nat) :
+      {{ UnknownMatrixConstrain.compute arr 🔽
+        {| UnknownMatrixConstrain.check := UnknownArrayConstrain.Make |}
+      }}.
+    Proof.
+      unfold UnknownMatrixConstrain.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| UnknownMatrixConstrain.check := UnknownArrayConstrain.Make |}).
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End UnknownMatrixConstrain.
+End Module_Line_415.
+
+Module Module_Line_642.
+  Import Module_Line_642.
+
+  Parameter extern_add_spec : Felt.t -> Felt.t -> Felt.t.
+
+  Lemma extern_add_eq {p} `{Prime p} (x y : Felt.t) :
+    let x := x mod p in
+    let y := y mod p in
+    {{ extern_add x y 🔽 extern_add_spec x y }}.
+  Admitted.
+
+  Module ExternAdder.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : ExternAdder.t)
+        (x y : Felt.t) :
+      let self := map_mod self in
+      let x := x mod p in
+      let y := y mod p in
+      {{ ExternAdder.constrain self x y 🔽
+        tt,
+        self.(ExternAdder.sum) = extern_add_spec x y
+      }}.
+    Proof.
+      unfold ExternAdder.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.Compute.
+          apply extern_add_eq.
+        }
+        intros _.
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (x y sum : Felt.t) :
+      let x := x mod p in
+      let y := y mod p in
+      let sum := sum mod p in
+      {{ ExternAdder.compute x y 🔽
+        {| ExternAdder.sum := sum |}
+      }}.
+    Proof.
+      unfold ExternAdder.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| ExternAdder.sum := _ |}).
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End ExternAdder.
+End Module_Line_642.
+
+Module Module_Line_669.
+  Import Module_Line_669.
+
+  Lemma global_add_eq {p} `{Prime p} (x y : Felt.t) :
+    {{ global_add x y 🔽 BinOp.add x y }}.
+  Proof.
+    unfold global_add.
+    apply RunCompute.Pure.
+  Qed.
+
+  Lemma irrelevant_eq {p} `{Prime p} :
+    {{ irrelevant 🔽 tt }}.
+  Admitted.
+
+  Module Adder2.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : Adder2.t)
+        (x y : Felt.t) :
+      let self := map_mod self in
+      {{ Adder2.constrain self x y 🔽
+        tt,
+        self.(Adder2.sum) =
+          let sum := BinOp.add x y in
+          BinOp.add sum sum
+      }}.
+    Proof.
+      unfold Adder2.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.Compute.
+          apply global_add_eq.
+        }
+        intros _.
+        eapply RunConstrain.Let. {
+          apply RunConstrain.Compute.
+          apply irrelevant_eq.
+        }
+        intros _.
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (x y : Felt.t) :
+      {{ Adder2.compute x y 🔽
+        {| Adder2.sum := BinOp.add x y |}
+      }}.
+    Proof.
+      unfold Adder2.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| Adder2.sum := _ |}).
+      }
+      eapply RunCompute.Let. {
+        apply global_add_eq.
+      }
+      eapply RunCompute.Let. {
+        apply RunCompute.FieldWrite.
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End Adder2.
+End Module_Line_669.
+
+Module Module_Line_707.
+  Import Module_Line_707.
+
+  Module Signal.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : Signal.t)
+        (x : Felt.t) :
+      let self := map_mod self in
+      {{ Signal.constrain self x 🔽
+        tt,
+        True
+      }}.
+    Proof.
+      unfold Signal.constrain.
+      apply RunConstrain.Pure.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (x : Felt.t) :
+      {{ Signal.compute x 🔽
+        {| Signal.reg := x |}
+      }}.
+    Proof.
+      unfold Signal.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| Signal.reg := _ |}).
+      }
+      eapply RunCompute.Let. {
+        apply RunCompute.FieldWrite.
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End Signal.
+
+  Module Component00.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : Component00.t)
+        (x : Signal.t) :
+      let self := map_mod self in
+      {{ Component00.constrain self x 🔽
+        tt,
+        self.(Component00.f) = x
+      }}.
+    Proof.
+      unfold Component00.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (x : Signal.t) :
+      {{ Component00.compute x 🔽
+        {| Component00.f := x |}
+      }}.
+    Proof.
+      unfold Component00.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| Component00.f := _ |}).
+      }
+      eapply RunCompute.Let. {
+        apply RunCompute.FieldWrite.
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End Component00.
+
+  Module Component01.
+    Lemma constrain_implies {p} `{Prime p}
+        (self : Component01.t)
+        (x : Array.t Signal.t [2]%nat) :
+      let self := map_mod self in
+      {{ Component01.constrain self x 🔽
+        tt,
+        self.(Component01.f) = x
+      }}.
+    Proof.
+      unfold Component01.constrain.
+      eapply RunConstrain.Implies. {
+        eapply RunConstrain.Let. {
+          apply RunConstrain.AssertEqual.
+        }
+        intros _.
+        apply RunConstrain.Pure.
+      }
+      easy.
+    Qed.
+
+    Lemma compute_eq {p} `{Prime p} (x : Array.t Signal.t [2]%nat) :
+      {{ Component01.compute x 🔽
+        {| Component01.f := x |}
+      }}.
+    Proof.
+      unfold Component01.compute.
+      eapply RunCompute.Let. {
+        eapply RunCompute.CreateStruct with (value := {| Component01.f := _ |}).
+      }
+      eapply RunCompute.Let. {
+        apply RunCompute.FieldWrite.
+      }
+      apply RunCompute.Pure.
+    Qed.
+  End Component01.
+End Module_Line_707.

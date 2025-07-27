@@ -253,7 +253,8 @@ End Module_Line_246.
 
 Module Module_Line_270.
   Module ArrayConstrain.
-    Inductive t (A B : nat) : Set := Make.
+    Inductive t {A B : nat} : Set := Make.
+    Arguments t : clear implicits.
 
     Global Instance IsMapMop {ρ} `{Prime ρ} {A B : nat} : MapMod (t A B) := {
       map_mod α := α;
@@ -370,7 +371,8 @@ End Module_Line_331.
 
 Module Module_Line_392.
   Module UnknownArrayConstrain.
-    Inductive t (N : nat) : Set := Make.
+    Inductive t {N : nat} : Set := Make.
+    Arguments t : clear implicits.
 
     Global Instance IsMapMop {ρ} `{Prime ρ} {N : nat} : MapMod (t N) := {
       map_mod α := α;
@@ -391,7 +393,8 @@ End Module_Line_392.
 
 Module Module_Line_415.
   Module UnknownArrayConstrain.
-    Inductive t (N : nat) : Set := Make.
+    Inductive t {N : nat} : Set := Make.
+    Arguments t : clear implicits.
 
     Global Instance IsMapMop {ρ} `{Prime ρ} {N : nat} : MapMod (t N) := {
       map_mod α := α;
