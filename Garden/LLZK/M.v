@@ -117,6 +117,13 @@ Module Array.
     {|
       get indexes' := array.(get) (MultiIndex.concat indexes indexes');
     |}.
+
+  Module IsIn.
+    Definition t {A : Set} {Ns : list nat} (x : A) (array : t A Ns) : Prop :=
+      exists indexes,
+        Array.MultiIndex.Valid.t indexes /\
+        Array.read array indexes = x.
+  End IsIn.
 End Array.
 
 Module M.

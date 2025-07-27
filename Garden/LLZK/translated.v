@@ -221,7 +221,8 @@ Module Module_Line_219.
       let* _ : unit := M.for_ var_c0 (* to *) var_c5 (* step *) var_c1 (fun (arg_for_226_7 : Index.t) =>
         let var_0 : Felt.t := Array.read arg_fun_1 (arg_for_226_7, tt) in
         let* _ : unit := M.AssertEqual var_0 var_felt_const_7 in
-        M.yield tt      ) in
+        M.yield tt
+      ) in
       M.Pure tt.
 
     Definition compute {p} `{Prime p} (arg_fun_0 : Array.t Felt.t [5]%nat) : M.t ArrayForCheck.t :=
