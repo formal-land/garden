@@ -228,11 +228,6 @@ Module Output.
     AdapterAirContext.instruction := output.(instruction);
   |}.
 
-  (**
-    - If opcode_beq_flag is true and a is equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
-    - If opcode_bne_flag is true and a is not equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
-  *)
-  Print not.
   Definition of_input 
     (* TODO: change to arbitary prime in the future *)
     (* {p} `{Prime p}  *)
@@ -241,8 +236,7 @@ Module Output.
     (extra : Input.Extra.t) (from_pc : Z) : t := {|
     to_pc :=
       let cmp_result := extra.(Input.Extra.cmp_result) in
-      ((from_pc 
-       + (cmp_result * input.(Input.imm)) mod 23
+      ((from_pc + (cmp_result * input.(Input.imm)) mod 23
        + (not cmp_result) * core_air.(BranchEqualCoreAir.pc_step)
        ) mod 23);
       (* match input.(Input.opcode) with
@@ -262,10 +256,11 @@ Module Output.
     instruction := {|
       ImmInstruction.is_valid := 1;
       ImmInstruction.opcode :=
-        core_air.(BranchEqualCoreAir.offset) + match input.(Input.opcode) with
+        ((match input.(Input.opcode) with
         | BranchEqualOpcode.BEQ => 0
         | BranchEqualOpcode.BNE => 1
-        end;
+        end) mod 23
+        + core_air.(BranchEqualCoreAir.offset)) mod 23;
       ImmInstruction.immediate := input.(Input.imm);
     |};
   |}.
@@ -401,51 +396,18 @@ Proof.
         { trivial. }
       }
       intros H_valid_sum_1.
-      eapply Run.Implies.
       {
         unfold BinOp.add, BinOp.sub, BinOp.mul.
-        unfold Output.to_adapter_air_context.
-        unfold Output.of_input. simpl.
-        rewrite -> foo_add.
-        rewrite -> H_cmp_result_eq.
-        (* destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl. *)
-        (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
-        proving the final result matches *)
-        (* original code for AdapterAirContext.instruction field:
-        Some
-          ((from_pc +
-            (Z.b2z cmp_result * input.(Input.imm))
-            mod 23 +
-            not (Z.b2z cmp_result) *
-            core_air.(BranchEqualCoreAir.pc_step))
-           mod 23);
-        *)
-        (* simulated code as well as the goal:
-        1. where's the `from_pc`?
-        2. why we have a `add 4`? Is it exactly `from_pc`?
-        3. why we don't have `cmp_result`?
-        Some
-          match input.(Input.opcode) with
-          | BranchEqualOpcode.BEQ =>
-              if input.(Input.a) =? input.(Input.b)
-              then
-              input.(Input.to_pc) + input.(Input.imm)
-              else
-              input.(Input.to_pc) +
-              core_air.(BranchEqualCoreAir.pc_step)
-          | BranchEqualOpcode.BNE =>
-              if
-              negb (input.(Input.a) =? input.(Input.b))
-              then
-              input.(Input.to_pc) + input.(Input.imm)
-              else input.(Input.to_pc) + 4
-          end;
-        *)
-        (* 
-        Several things gathered here:
-        1. ImmInstruction.opcode might need a `mod` operation
-        *)
-        admit.
+        unfold Output.to_adapter_air_context, Output.of_input.
+        rewrite -> foo_add, H_cmp_result_eq.
+        rewrite -> foo_mul_0.
+        rewrite -> Z.mul_1_r.
+        simpl.
+        rewrite -> foo_mod_mod.
+        apply Run.Pure.
+      }
+    }
+    intros.
       }
       { admit.
       }
