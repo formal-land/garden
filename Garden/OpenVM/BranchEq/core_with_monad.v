@@ -287,7 +287,6 @@ Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
   {{ eval core_air cols from_pc 🔽 output, True }}.
 Proof.
   cbn.
-  (* TODO: find the proposition P1 *)
   eapply Run.Implies. 
   {
     unfold eval; cbn.
@@ -332,7 +331,6 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
-    (* TODO: fine the proposition P2 such that P1 -> P2 -> True *)
     eapply Run.Implies. 
     {
       (* NOTE: here we specify a property to prove for the `Let` clause *)
@@ -409,10 +407,6 @@ Proof.
         apply Run.Pure.
       }
     }
-    (* NOTE: here is a weird relation that
-    P1 -> P2 -> True
-    and
-    H_all_asserts -> P2 *)
     intros H_all_asserts; simpl in H_all_asserts.
     (* Here is another way to fill in the `P2` that we have been delayed so far *)
     Unshelve. apply H_all_asserts.
