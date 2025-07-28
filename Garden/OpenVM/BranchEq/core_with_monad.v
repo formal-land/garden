@@ -287,7 +287,9 @@ Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
   {{ eval core_air cols from_pc 🔽 output, True }}.
 Proof.
   cbn.
-  eapply Run.Implies. {
+  (* TODO: find the proposition P1 *)
+  eapply Run.Implies. 
+  {
     unfold eval; cbn.
     eapply Run.Let with (value := 1) (P1 := True). {
       destruct input.(Input.opcode); cbn.
@@ -330,6 +332,7 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
+    (* TODO: fine the proposition P2 such that P1 -> P2 -> True *)
     eapply Run.Implies. 
     {
       (* NOTE: here we specify a property to prove for the `Let` clause *)
@@ -399,93 +402,20 @@ Proof.
       {
         unfold BinOp.add, BinOp.sub, BinOp.mul.
         unfold Output.to_adapter_air_context, Output.of_input.
-        rewrite -> foo_add, H_cmp_result_eq.
-        rewrite -> foo_mul_0.
+        rewrite -> foo_add, foo_mul_0, H_cmp_result_eq.
         rewrite -> Z.mul_1_r.
         simpl.
         rewrite -> foo_mod_mod.
         apply Run.Pure.
       }
     }
-    intros.
-      }
-      { admit.
-      }
-      
-Admitted.
-(*
-        apply Run.Equal.
-        eapply Run.Let. {
-          smpl run_auto.
-        }
-      }
-      { admit. }
-    }
-
-    eapply Run.Implies. {
-    eapply Run.Let with
-        (value := if cmp_eq then 1 else 0)
-        (P1 :=
-          if cmp_eq then
-            forall (i : nat),
-              (0 <= i < NUM_LIMBS)%nat ->
-              (Array.to_limbs (Z.of_nat NUM_LIMBS) input.(Input.a)).(Array.get) (Z.of_nat i) =
-              (Array.to_limbs (Z.of_nat NUM_LIMBS) input.(Input.b)).(Array.get) (Z.of_nat i)
-          else
-            False
-        ). {
-      destruct cmp_eq; cbn.
-      { rewrite Nat2Z.id.
-        induction NUM_LIMBS; cbn.
-        { admit. }
-        { eapply Run.Implies. {
-          eapply Run.Let. {
-            apply IHNUM_LIMBS.
-        }
-      admit. }
-      { admit. }
-    }
-    intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
-    intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
-    intros [].
-    eapply Run.Let. {
-        { repeat (
-            eapply Run.Let ||
-            eapply Run.AssertBool ||
-            apply Run.Pure
-          ).
-          unfold BinOp.add, BinOp.mul; cbn.
-          assert (H_1_eq : 1 mod p = 1) by admit.
-          repeat (rewrite H_1_eq; cbn).
-          apply Run.Pure.
-        }
-        reflexivity.
-        eapply Run.Replace; [apply Run.Pure |].
-        unfold BinOp.add, BinOp.mul.
-        cbn.
-        assert (H_1_eq : 1 mod p = 1) by admit.
-        repeat (rewrite H_1_eq; cbn).
-        reflexivity.
-      }
-      { repeat (
-          eapply Run.Let ||
-          eapply Run.Equal ||
-          apply Run.Pure
-        ).
-        eapply Run.Replace; [apply Run.Pure |].
-        unfold BinOp.add, BinOp.mul.
-        cbn.
-        assert (H_1_eq : 1 mod p = 1) by admit.
-        repeat (rewrite H_1_eq; cbn).
-        reflexivity.
-      }
-      unfold assert_bool.
+    (* NOTE: here is a weird relation that
+    P1 -> P2 -> True
+    and
+    H_all_asserts -> P2 *)
+    intros H_all_asserts; simpl in H_all_asserts.
+    (* Here is another way to fill in the `P2` that we have been delayed so far *)
+    Unshelve. apply H_all_asserts.
   }
+  tauto.
 Qed.
-*)
