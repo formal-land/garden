@@ -1,0 +1,85 @@
+;; Sanjay Adhith
+;; Time-stamp: <2025-07-29 02:23:27 adhithsanjay>
+
+;; Tests for keccak.scm
+
+(define (test-bit? candidate)
+  (and (let ([actual-result (candidate 0)]
+	     [expected-result #t])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 1)]
+	     [expected-result #t])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate "s")]
+	     [expected-result #f])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate (list 1 2 3))]
+	     [expected-result #f])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate '#(0 1 2))]
+	     [expected-result #f])
+	 (equal? actual-result expected-result))))
+
+(define (test-bit-xor candidate)
+  (and (let ([actual-result (candidate 0 0)]
+	     [expected-result 0])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 1 1)]
+	     [expected-result 0])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 0 1)]
+	     [expected-result 1])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 1 0)]
+	     [expected-result 1])
+	 (equal? actual-result expected-result))))
+
+(define (test-zero-string candidate)
+  (and (let ([actual-result (candidate 0)]
+	     [expected-result (make-vector 0 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 1)]
+	     [expected-result (make-vector 1 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 2)]
+	     [expected-result (make-vector 2 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 10)]
+	     [expected-result (make-vector 10 0)])
+	 (equal? actual-result expected-result))))
+       
+(define (test-zero-string candidate)
+  (and (let ([actual-result (candidate 0)]
+	     [expected-result (make-vector 0 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 1)]
+	     [expected-result (make-vector 1 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 2)]
+	     [expected-result (make-vector 2 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 10)]
+	     [expected-result (make-vector 10 0)])
+	 (equal? actual-result expected-result))))
+
+(define (test-ith candidate)
+  (and (let ([actual-result (candidate '#(1 0 1 0 0 0) 2)]
+	     [expected-result 1])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate '#(0 0 0 0) 2)]
+	     [expected-result 0])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate '#(0) 0)]
+	     [expected-result 0])
+	 (equal? actual-result expected-result))))
+
+(define (test-trunc candidate)
+  (and (let ([actual-result (candidate 2 '#(1 0 1 0 0))]
+	     [expected-result '#(1 0)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 3 '#(1 0 1 0 0))]
+	     [expected-result '#(1 0 1)])
+	 (equal? actual-result expected-result))
+       (let ([actual-result (candidate 3 '#(1 1 1 1 0))]
+	     [expected-result '#(1 1 1)])
+	 (equal? actual-result expected-result))))
