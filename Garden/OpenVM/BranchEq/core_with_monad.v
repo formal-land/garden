@@ -396,7 +396,8 @@ Proof.
       }
     }
     intros H_all_asserts; simpl in H_all_asserts.
-    (* Here is another way to fill in the `P2` that we have been delayed so far *)
+    (* Here is another way to fill in the `P2` that we have been delayed so far 
+    for the `eapply Run.Implies` in the mid of the proof*)
     Unshelve. apply H_all_asserts.
   }
   tauto.
