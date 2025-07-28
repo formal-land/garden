@@ -232,9 +232,20 @@ Module Output.
     - If opcode_beq_flag is true and a is equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
     - If opcode_bne_flag is true and a is not equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
   *)
-  Definition of_input (core_air : BranchEqualCoreAir.t) (input : Input.t) (from_pc : Z) : t := {|
+  Print not.
+  Definition of_input 
+    (* TODO: change to arbitary prime in the future *)
+    (* {p} `{Prime p}  *)
+    `{Prime 23}
+    (core_air : BranchEqualCoreAir.t) (input : Input.t) 
+    (extra : Input.Extra.t) (from_pc : Z) : t := {|
     to_pc :=
-      match input.(Input.opcode) with
+      let cmp_result := extra.(Input.Extra.cmp_result) in
+      ((from_pc 
+       + (cmp_result * input.(Input.imm)) mod 23
+       + (not cmp_result) * core_air.(BranchEqualCoreAir.pc_step)
+       ) mod 23);
+      (* match input.(Input.opcode) with
       | BranchEqualOpcode.BEQ =>
         if input.(Input.a) =? input.(Input.b) then
           from_pc + input.(Input.imm)
@@ -245,7 +256,7 @@ Module Output.
           from_pc + input.(Input.imm)
         else
           from_pc + 4
-      end;
+      end; *)
     reads := (input.(Input.a), input.(Input.b));
     writes := tt;
     instruction := {|
@@ -277,7 +288,7 @@ Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
     (from_pc : Z) :
   let cols : BranchEqualCoreCols.t NUM_LIMBS := Input.to_cols input extra in
   let output : AdapterAirContext.t NUM_LIMBS :=
-    Output.to_adapter_air_context (Output.of_input core_air input from_pc) in
+    Output.to_adapter_air_context (Output.of_input core_air input extra from_pc) in
   {{ eval core_air cols from_pc 🔽 output, True }}.
 Proof.
   cbn.
@@ -396,6 +407,7 @@ Proof.
         unfold Output.to_adapter_air_context.
         unfold Output.of_input. simpl.
         rewrite -> foo_add.
+        rewrite -> H_cmp_result_eq.
         (* destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl. *)
         (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
         proving the final result matches *)
