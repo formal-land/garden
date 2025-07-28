@@ -320,7 +320,7 @@ Proof.
     }
     intros [].
     (* NOTE: here we want to generalize the goal as a `P2` and leave it filled
-    after we finish all proofs inside. See the comments at the end of the hole 
+    after we finish all proofs inside. See the comments at the end of the whole 
     proof *)
     eapply Run.Implies. 
     {
