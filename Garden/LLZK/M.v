@@ -42,6 +42,8 @@ Module UnOp.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
     (-x) mod p.
 
+  Axiom inv : forall {p} `{Prime p} (x : Z), Z.
+
   Definition from {p} `{Prime p} (x : Z) : Z := 
     x mod p.
 End UnOp.
@@ -62,6 +64,25 @@ Module BinOp.
   Definition mod_ {p} `{Prime p} (x y : Z) : Z :=
     (x mod y) mod p.
 End BinOp.
+
+Module BoolCmp.
+  Inductive t : Set :=
+  | Eq : t
+  | Neq : t
+  | Lt : t
+  | Gt : t
+  | Leq : t
+  | Geq : t.
+End BoolCmp.
+
+Module Bool.
+  Axiom cmp : forall {p} `{Prime p} (cmp : BoolCmp.t) (x y : Z), bool.
+
+  Axiom and : forall (x y : bool), bool.
+  Axiom or : forall (x y : bool), bool.
+  Axiom xor : forall (x y : bool), bool.
+  Axiom not : forall (x : bool), bool.
+End Bool.
 
 Module Array.
   Module MultiIndex.
@@ -95,6 +116,13 @@ Module Array.
   }.
   Arguments t : clear implicits.
 
+  (** A special dimension that can be used to represent any dimension. This is only used in special
+      functions like logging. *)
+  Parameter dimension_any : nat.
+
+  (* TODO: remove *)
+  Parameter affine_map : nat.
+
   (** How to get an index into the flat list of values *)
   Fixpoint new_aux (Ns : list nat) (indexes : MultiIndex.t Ns) : nat :=
     match Ns, indexes with
@@ -106,6 +134,9 @@ Module Array.
     {|
       get indexes := List.nth (new_aux Ns indexes) l (UnOp.from 0);
     |}.
+
+  Definition len {A : Set} {Ns : list nat} (array : t A Ns) (index : Index.t) : Index.t :=
+    List.nth index Ns 0%nat.
 
   Definition read {A : Set} {Ns : list nat} (array : t A Ns) : MultiIndex.t Ns -> A :=
     array.(get).
@@ -131,7 +162,13 @@ Module M.
   | Pure {A : Set} (value : A) : t A
   | AssertEqual {A : Set} (x1 x2 : A) : t unit
   | AssertIn {A : Set} {Ns : list nat} (x : A) (array : Array.t A Ns) : t unit
+  | AssertBool (value : bool) : t unit
   | CreateStruct {A : Set} : t A
+  | ArrayWrite {A : Set} {Ns : list nat}
+      (array : Array.t A Ns)
+      (indexes : Array.MultiIndex.t Ns)
+      (value : A) :
+      t unit
   | FieldWrite {A : Set} (field : A) (value : A) : t unit
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
   .
@@ -170,6 +207,9 @@ Module RunCompute.
     {{ M.Pure value 🔽 value }}
   | CreateStruct {A : Set} (value : A) :
     {{ M.CreateStruct 🔽 value }}
+  | ArrayWrite {A : Set} {Ns : list nat} (array : Array.t A Ns) (indexes : Array.MultiIndex.t Ns) (value : A) :
+    Array.read array indexes = value ->
+    {{ M.ArrayWrite array indexes value 🔽 tt }}
   | FieldWrite {A : Set} (field : A) :
     {{ M.FieldWrite field field 🔽 tt }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
@@ -226,4 +266,36 @@ Global Instance MapMod_Array {p} `{Prime p} (A : Set) `{MapMod p A} (Ns : list n
   map_mod x := {|
     Array.get indexes := map_mod (x.(Array.get) indexes);
   |};
+}.
+
+Class CanCastToFelt {p : Z} `{Prime p} (A : Set) : Set := {
+  cast_to_felt : A -> Felt.t;
+}.
+
+Global Instance CanCastToFelt_Felt {p} `{Prime p} : CanCastToFelt Felt.t := {
+  cast_to_felt := id;
+}.
+
+Global Instance CanCastToFelt_Index {p} `{Prime p} : CanCastToFelt Index.t := {
+  cast_to_felt x := Z.of_nat x mod p;
+}.
+
+Global Instance CanCastToFelt_Bool {p} `{Prime p} : CanCastToFelt bool := {
+  cast_to_felt := Z.b2z;
+}.
+
+Class CanCastToIndex {p : Z} `{Prime p} (A : Set) : Set := {
+  cast_to_index : A -> Index.t;
+}.
+
+Global Instance CanCastToIndex_Felt {p} `{Prime p} : CanCastToIndex Felt.t := {
+  cast_to_index x := Z.to_nat (x mod p);
+}.
+
+Global Instance CanCastToIndex_Index {p} `{Prime p} : CanCastToIndex Index.t := {
+  cast_to_index := id;
+}.
+
+Global Instance CanCastToIndex_Bool {p} `{Prime p} : CanCastToIndex bool := {
+  cast_to_index b := if b then 1%nat else 0%nat;
 }.
