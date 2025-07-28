@@ -55,6 +55,7 @@ Axiom foo_sub_right : forall a b p, (a - b mod p) mod p = (a - b) mod p.
 Axiom foo_mul_left : forall a b p, ((a mod p) * b) mod p = (a * b) mod p.
 Axiom foo_mul_right : forall a b p, (a * (b mod p)) mod p = (a * b) mod p.
 Axiom foo_eq_sub : forall a b p, (a mod p - b mod p) mod p = 0 -> a mod p = b mod p.
+Axiom foo_mul_0 : forall a p, (a * 0) mod p = 0.
 
 Ltac bubble_mod_expr e :=
   match e with
