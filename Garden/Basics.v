@@ -62,3 +62,12 @@ Module Array.
       get index := f (x.(get) index)
     |}.
 End Array.
+
+Module PreConditions.
+  Definition range_check_16 (x : Z) : Prop :=
+    (0 <= x < 2 ^ 16)%Z.
+  
+  Definition range_check_32 (x : Z) : Prop :=
+    (0 <= x < 2 ^ 32)%Z.
+
+End PreConditions.
