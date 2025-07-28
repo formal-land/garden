@@ -239,18 +239,6 @@ Module Output.
       ((from_pc + (cmp_result * input.(Input.imm)) mod 23
        + (not cmp_result) * core_air.(BranchEqualCoreAir.pc_step)
        ) mod 23);
-      (* match input.(Input.opcode) with
-      | BranchEqualOpcode.BEQ =>
-        if input.(Input.a) =? input.(Input.b) then
-          from_pc + input.(Input.imm)
-        else
-        from_pc + core_air.(BranchEqualCoreAir.pc_step)
-      | BranchEqualOpcode.BNE =>
-        if negb (input.(Input.a) =? input.(Input.b)) then
-          from_pc + input.(Input.imm)
-        else
-          from_pc + 4
-      end; *)
     reads := (input.(Input.a), input.(Input.b));
     writes := tt;
     instruction := {|
