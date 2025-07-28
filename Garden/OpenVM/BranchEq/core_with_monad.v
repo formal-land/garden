@@ -381,9 +381,7 @@ Proof.
       ).
       { unfold assert_one, when, sum.
         unfold BinOp.add, BinOp.sub, BinOp.mul.
-        repeat destruct Array.to_limbs.
         eapply Run.Implies.
-        simpl.
         { apply Run.Equal. }
         { trivial. }
       }
@@ -398,10 +396,12 @@ Proof.
         apply Run.Pure.
       }
     }
-    intros H_all_asserts; simpl in H_all_asserts.
     (* Here we finally fill in the `P2` that have been delayed so far from 
     the `eapply Run.Implies` in the mid of the proof *)
-    Unshelve. apply H_all_asserts.
+    intros H_all_asserts.
+    Unshelve.
+    apply H_all_asserts.
   }
+  (* See how we automatically decide `P1` and we don't need to unshelve anything *)
   tauto.
 Qed.
