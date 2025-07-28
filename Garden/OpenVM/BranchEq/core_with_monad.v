@@ -319,6 +319,9 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
+    (* NOTE: here we want to generalize the goal as a `P2` and leave it filled
+    after we finish all proofs inside. See the comments at the end of the hole 
+    proof *)
     eapply Run.Implies. 
     {
       (* NOTE: here we specify a property to prove for the `Let` clause *)
@@ -396,8 +399,8 @@ Proof.
       }
     }
     intros H_all_asserts; simpl in H_all_asserts.
-    (* Here is another way to fill in the `P2` that we have been delayed so far 
-    for the `eapply Run.Implies` in the mid of the proof*)
+    (* Here we finally fill in the `P2` that have been delayed so far from 
+    the `eapply Run.Implies` in the mid of the proof *)
     Unshelve. apply H_all_asserts.
   }
   tauto.
