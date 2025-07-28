@@ -177,7 +177,7 @@ Module Input.
     b : Z;
     opcode : BranchEqualOpcode.t;
     imm : Z;
-    to_pc : Z;
+    (* to_pc : Z; *)
   }.
 
   Module Extra.
@@ -187,7 +187,7 @@ Module Input.
     }.
   End Extra.
 
-  Definition to_cols {NUM_LIMBS : Z} (input : t) (extra : Extra.t) :
+  Definition to_cols {NUM_LIMBS : Z} (input : t) (extra : Extra.t):
     BranchEqualCoreCols.t NUM_LIMBS :=
   {|
     BranchEqualCoreCols.a := Array.to_limbs NUM_LIMBS input.(a);
@@ -229,22 +229,22 @@ Module Output.
   |}.
 
   (**
-    - If opcode_beq_flag is true and a is equal to b, then to_pc == pc + imm, otherwise to_pc == pc + 4
-    - If opcode_bne_flag is true and a is not equal to b, then to_pc == pc + imm, otherwise to_pc == pc + 4
+    - If opcode_beq_flag is true and a is equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
+    - If opcode_bne_flag is true and a is not equal to b, then to_pc == from_pc + imm, otherwise to_pc == from_pc + 4
   *)
-  Definition of_input (core_air : BranchEqualCoreAir.t) (input : Input.t) : t := {|
+  Definition of_input (core_air : BranchEqualCoreAir.t) (input : Input.t) (from_pc : Z) : t := {|
     to_pc :=
       match input.(Input.opcode) with
       | BranchEqualOpcode.BEQ =>
         if input.(Input.a) =? input.(Input.b) then
-          input.(Input.to_pc) + input.(Input.imm)
+          from_pc + input.(Input.imm)
         else
-        input.(Input.to_pc) + core_air.(BranchEqualCoreAir.pc_step)
+        from_pc + core_air.(BranchEqualCoreAir.pc_step)
       | BranchEqualOpcode.BNE =>
         if negb (input.(Input.a) =? input.(Input.b)) then
-          input.(Input.to_pc) + input.(Input.imm)
+          from_pc + input.(Input.imm)
         else
-          input.(Input.to_pc) + 4
+          from_pc + 4
       end;
     reads := (input.(Input.a), input.(Input.b));
     writes := tt;
@@ -270,7 +270,6 @@ Axiom assert_bool_one :
   {{ M.AssertBool 1 🔽 tt, True }}.
 Smpl Add apply assert_bool_one : run_auto.
 
-
 Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
     (core_air : BranchEqualCoreAir.t)
     (input : Input.t)
@@ -278,7 +277,7 @@ Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
     (from_pc : Z) :
   let cols : BranchEqualCoreCols.t NUM_LIMBS := Input.to_cols input extra in
   let output : AdapterAirContext.t NUM_LIMBS :=
-    Output.to_adapter_air_context (Output.of_input core_air input) in
+    Output.to_adapter_air_context (Output.of_input core_air input from_pc) in
   {{ eval core_air cols from_pc 🔽 output, True }}.
 Proof.
   cbn.
@@ -327,6 +326,7 @@ Proof.
     intros [].
     eapply Run.Implies. 
     {
+      (* NOTE: here we specify a property to prove for the `Let` clause *)
       eapply Run.Let with
         (P1 :=
           if cmp_eq then
@@ -356,7 +356,7 @@ Proof.
           so we want to stub the proof with a `True`. This `True` should be obtained
           by constructing a combination of trivial cases for all constructors appeared
           in the part of the program. 
-          Applying `Run.Implies` automatically allows the constructors being used to 
+          Applying `Run.Implies` allows the constructors being used to automatically
           generate such a case.
         *)
         { 
@@ -396,7 +396,7 @@ Proof.
         unfold Output.to_adapter_air_context.
         unfold Output.of_input. simpl.
         rewrite -> foo_add.
-        destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl.
+        (* destruct (input.(Input.a) =? input.(Input.b)), (input.(Input.opcode)); simpl. *)
         (* Seems that we are soon reaching the end of the proof? The proof goal stucks at
         proving the final result matches *)
         (* original code for AdapterAirContext.instruction field:
