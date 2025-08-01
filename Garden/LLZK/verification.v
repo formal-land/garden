@@ -30,7 +30,7 @@ Module Module_Line_20.
   Import Module_Line_20.
 
   Lemma global_add_eq {p} `{Prime p} (x y : Felt.t) :
-    {{ global_add x y 🔽 ((x + y) mod p)%Z, True }}.
+    {{ global_add x y 🔽 (x + y) mod p, True }}.
   Proof.
     unfold global_add.
     apply Run.Pure.
