@@ -1,7 +1,7 @@
 (** In this file, we analyse a short example of circuit with a loop, taken from OpenVM. Not that
     this example is not used as it is in the OpenVM code, we take the code to make a self-contained
     example. *)
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 
 (*
   Pseudo Rust code:

@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
@@ -120,7 +120,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     M.pure (
       BinOp.add
         (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.opcode_beq_flag))
-        (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
+        (BinOp.mul (M.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
     ) in
 
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
@@ -153,7 +153,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
         from_pc
         (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.imm))
       )
-      (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) self.(BranchEqualCoreAir.pc_step))
+      (BinOp.mul (M.not local.(BranchEqualCoreCols.cmp_result)) self.(BranchEqualCoreAir.pc_step))
     in
 
   M.pure {|
