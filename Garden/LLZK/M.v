@@ -199,29 +199,7 @@ Definition for_step_one (start end_ : nat) (body : nat -> M.t unit) : M.t unit :
 Axiom for_step_one_eq : forall (start end_ : nat) (body : nat -> M.t unit),
   for_ start end_ 1 body = for_step_one start end_ body.
 
-Module RunCompute.
-  Reserved Notation "{{ e 🔽 output }}".
-
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop :=
-  | Pure {A : Set} (value : A) :
-    {{ M.Pure value 🔽 value }}
-  | CreateStruct {A : Set} (value : A) :
-    {{ M.CreateStruct 🔽 value }}
-  | ArrayWrite {A : Set} {Ns : list nat} (array : Array.t A Ns) (indexes : Array.MultiIndex.t Ns) (value : A) :
-    Array.read array indexes = value ->
-    {{ M.ArrayWrite array indexes value 🔽 tt }}
-  | FieldWrite {A : Set} (field : A) :
-    {{ M.FieldWrite field field 🔽 tt }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) :
-    {{ e 🔽 value }} ->
-    {{ k value 🔽 output }} ->
-    {{ M.Let e k 🔽 output }}
-
-  where "{{ e 🔽 output }}" := (t e output).
-End RunCompute.
-Export RunCompute.
-
-Module RunConstrain.
+Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
 
   Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
@@ -233,9 +211,13 @@ Module RunConstrain.
     {{ M.AssertIn x array 🔽
       tt, exists indexes, Array.MultiIndex.Valid.t indexes /\ Array.read array indexes = x
     }}
-  | Compute {A : Set} (e : M.t A) (value : A) :
-    {{ e 🔽 value }} ->
-    {{ e 🔽 value, True }}
+  | CreateStruct {A : Set} (value : A) :
+    {{ M.CreateStruct 🔽 value, True }}
+  | ArrayWrite {A : Set} {Ns : list nat} (array : Array.t A Ns) (indexes : Array.MultiIndex.t Ns) (value : A) :
+    Array.read array indexes = value ->
+    {{ M.ArrayWrite array indexes value 🔽 tt, True }}
+  | FieldWrite {A : Set} (field : A) :
+    {{ M.FieldWrite field field 🔽 tt, True }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> {{ k value 🔽 output, P2 }}) ->
@@ -250,8 +232,8 @@ Module RunConstrain.
     {{ e 🔽 value2, P }}
 
   where "{{ e 🔽 output , P }}" := (t e output P).
-End RunConstrain.
-Export RunConstrain.
+End Run.
+Export Run.
 
 Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
   map_mod : A -> A;
