@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 
@@ -33,10 +33,10 @@ Definition eval_round_flags {p} `{Prime p}
     M.equal (local.(KeccakCols.step_flags).(Array.get) 0) 1
   ) in
   let* _ := when_bool is_first_row (
-    M.zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
+    M.assert_zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
   ) in
   let* _ := when_bool is_transition (
-    M.zeros (N := NUM_ROUNDS) {|
+    M.assert_zeros (N := NUM_ROUNDS) {|
       Array.get i :=
         BinOp.sub (local.(KeccakCols.step_flags).(Array.get) i)
         (next.(KeccakCols.step_flags).(Array.get) ((i + 1) mod NUM_ROUNDS))
@@ -59,7 +59,7 @@ Module Spec.
         apply Run.Pure ||
         (eapply Run.Let; [|intro]) ||
         apply Run.Equal ||
-        apply Run.Zeros ||
+        apply Run.AssertZeros ||
         cbn
       ).
     }

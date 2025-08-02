@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MOld.
 Require Import Garden.Plonky3.UtilOld.
 Require Import Garden.Plonky3.blake3.columnsOld.
 Require Import Garden.Plonky3.blake3.constantsOld.
@@ -669,7 +669,7 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
           let* out_bit := [[ Array.get (| out_bits, j |) ]] in
           let* left_bit := [[ Array.get (| left_bits, j |) ]] in
           let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          let* left_xor_right := [[ MOld.xor (| left_bit, right_bit |) ]] in
           [[ M.equal (| out_bit, left_xor_right |) ]]
         )
       in
@@ -698,7 +698,7 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
           let* out_bit := [[ Array.get (| out_bits, j |) ]] in
           let* left_bit := [[ Array.get (| left_bits, j |) ]] in
           let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          let* left_xor_right := [[ MOld.xor (| left_bit, right_bit |) ]] in
           [[ M.equal (| out_bit, left_xor_right |) ]]
         )
       in
@@ -727,7 +727,7 @@ Definition eval (local : Blake3Cols.t Z) : M.t unit :=
           let* out_bit := [[ Array.get (| out_bits, j |) ]] in
           let* left_bit := [[ Array.get (| left_bits, j |) ]] in
           let* right_bit := [[ Array.get (| right_bits, j |) ]] in
-          let* left_xor_right := [[ M.xor (| left_bit, right_bit |) ]] in
+          let* left_xor_right := [[ MOld.xor (| left_bit, right_bit |) ]] in
           [[ M.equal (| out_bit, left_xor_right |) ]]
         )
       in

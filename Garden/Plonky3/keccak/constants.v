@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 
 (* pub const NUM_ROUNDS: usize = 24; *)
 Definition NUM_ROUNDS : Z := 24.

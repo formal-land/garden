@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.Util.
 Require Import Garden.Plonky3.blake3.columns.
 Require Import Garden.Plonky3.blake3.constants.

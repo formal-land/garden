@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MOld.
 
 (*
 
@@ -86,7 +86,7 @@ Definition xor_32_shift
     Array.from_fn (N := 16) (| fun i => 
       let* elem := [[ Array.get (| b, i |) ]] in
       let* c_elem := [[ Array.get (| c, (32 + i - shift) mod 32 |) ]] in
-      [[ M.xor (| elem, c_elem |) ]]
+      [[ MOld.xor (| elem, c_elem |) ]]
     |)
 
   ]] in
@@ -103,7 +103,7 @@ Definition xor_32_shift
     Array.from_fn (N := 16) (| fun i => 
       let* elem := [[ Array.get (| b, i + 16 |) ]] in
       let* c_elem := [[ Array.get (| c, (32 + (i + 16) - shift) mod 32 |) ]] in
-      [[ M.xor (| elem, c_elem |) ]]
+      [[ MOld.xor (| elem, c_elem |) ]]
     |)
   ]] in
   (* let sum_16_32: AB::Expr = pack_bits_le(xor_shift_c_16_32); *)
@@ -359,5 +359,3 @@ Definition add2
   let constraints : Array.t Z 2 := {| Array.value := [ constraint1; constraint2 ] |} in
 
   [[ assert_zeros (| constraints |) ]]. 
-
-  
