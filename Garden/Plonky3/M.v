@@ -5,6 +5,7 @@ Require Export RecordUpdate.
 
 Require Export Lia.
 From Hammer Require Export Tactics.
+Require Export smpl.Smpl.
 
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
@@ -20,48 +21,82 @@ Global Open Scope bool_scope.
 
 Export List.ListNotations.
 
-Module UnOp.
-  Inductive t : Set -> Set -> Set :=
-  | Opp    : t Z Z
-  .
+(** We will need later to make the field reasoning. For now we axiomatize it. *)
+Parameter IsPrime : Z -> Prop.
 
-  Definition eval (p : Z) {A B : Set} (op : t A B) : A -> B :=
-    match op in t A B return A -> B with
-    | Opp => fun x => (-x) mod p
-    end.
+Class Prime (p : Z) : Prop := {
+  is_prime : IsPrime p;
+}.
+
+Module Array.
+  Record t {A : Set} {N : Z} : Set := {
+    get : Z -> A;
+  }.
+  Arguments t : clear implicits.
+
+  Definition slice_from {A : Set} {N : Z} (x : t A N) (start : Z) : t A (N - start) :=
+    {|
+      get index := x.(get) (start + index)
+    |}.
+  
+  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count := 
+    {|
+      get := x.(get)
+    |}.
+
+  Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
+    x.(get) i mod p.
+
+  Definition placeholder {A : Set} {N : Z} (x : A) : t A N :=
+    {|
+      get index := x
+    |}.
+
+  Definition map {A B : Set} {N : Z} (x : t A N) (f : A -> B) : t B N := 
+    {|
+      get index := f (x.(get) index)
+    |}.
+End Array.
+
+Module UnOp.
+  Definition opp {p} `{Prime p} (x : Z) : Z :=
+    (-x) mod p.
+
+  Definition from {p} `{Prime p} (x : Z) : Z := 
+    x mod p.
 End UnOp.
 
 Module BinOp.
-  Inductive t : Set -> Set -> Set -> Set :=
-  | Add : t Z Z Z
-  | Sub : t Z Z Z
-  | Mul : t Z Z Z
-  | Div : t Z Z Z
-  | Mod : t Z Z Z
-  .
+  Definition add {p} `{Prime p} (x y : Z) : Z :=
+    (x + y) mod p.
 
-  Definition eval (p : Z) {A B C : Set} (op : t A B C) : A -> B -> C :=
-    match op in t A B C return A -> B -> C with
-    | Add => fun x y => (x + y) mod p
-    | Sub => fun x y => (x - y) mod p
-    | Mul => fun x y => (x * y) mod p
-    | Div => fun x y => (x / y) mod p
-    | Mod => fun x y => (x mod y) mod p
-    end.
+  Definition sub {p} `{Prime p} (x y : Z) : Z :=
+    (x - y) mod p.
+
+  Definition mul {p} `{Prime p} (x y : Z) : Z :=
+    (x * y) mod p.
+
+  Definition div {p} `{Prime p} (x y : Z) : Z :=
+    (x / y) mod p.
+
+  Definition mod_ {p} `{Prime p} (x y : Z) : Z :=
+    (x mod y) mod p.
 End BinOp.
 
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
-  | UnOp {A B : Set} (op : UnOp.t A B) (x : A) : t B
-  | BinOp {A B C : Set} (op : BinOp.t A B C) (x1 : A) (x2 : B) : t C
   | Equal (x1 x2 : Z) : t unit
-  | Unwrap {A : Set} (value : option A) : t A
+  | AssertBool (x : Z) : t unit
+  | AssertZeros {N : Z} (array : Array.t Z N) : t unit
+  | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
+  | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
+  | Impossible {A : Set} (message : string) : t A
   .
 
   (** This is a marker that we remove with the following tactic. *)
@@ -109,26 +144,32 @@ Module M.
       end
     end.
 
-  Definition opp (x : Z) : t Z :=
-    UnOp UnOp.Opp x.
-
-  Definition add (x y : Z) : t Z :=
-    BinOp BinOp.Add x y.
-
-  Definition sub (x y : Z) : t Z :=
-    BinOp BinOp.Sub x y.
-
-  Definition mul (x y : Z) : t Z :=
-    BinOp BinOp.Mul x y.
-
-  Definition div (x y : Z) : t Z :=
-    BinOp BinOp.Div x y.
-
-  Definition mod_ (x y : Z) : t Z :=
-    BinOp BinOp.Mod x y.
+  Definition pure {A : Set} (x : A) : t A :=
+    Pure x.
 
   Definition equal (x y : Z) : t unit :=
     Equal x y.
+
+  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
+    AssertZeros array.
+
+  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
+    ForInZeroToN N f.
+  
+  (* helper: acting on all elements in an array *)
+  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
+    for_in_zero_to_n N (fun i => f (Array.get x i)).
+
+  (* helper: acting on all elements in an array, but returning a sum *)    
+
+  Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
+    match N with
+    | O => 0
+    | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
+    end.
+
+  Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
+    sum_for_in_zero_to_n_aux (Z.to_nat N) f.
 
   Definition call {A : Set} (e : t A) : t A :=
     Call e.
@@ -137,18 +178,6 @@ Module M.
     match e, k with
     | Pure x, k => k x
     | e, k => Let e k
-    end.
-
-  (** Evaluate only the primitive operations and keep everything else. *)
-  Fixpoint eval (p : Z) {A : Set} (e : t A) : t A :=
-    match e in t A return t A with
-    | Pure x => Pure x
-    | UnOp op x => Pure (UnOp.eval p op x)
-    | BinOp op x y => Pure (BinOp.eval p op x y)
-    | Equal x y => Equal x y
-    | Unwrap value => Unwrap value
-    | Call e => Call (eval p e)
-    | Let e k => collapsing_let (eval p e) (fun x => eval p (k x))
     end.
 End M.
 
@@ -179,217 +208,124 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | Unwrap {A : Set} (value : A) :
-    {{ M.Unwrap (Some value) 🔽 value, True }}
+  | AssertBool (x : Z) :
+    {{ M.AssertBool x 🔽 tt, exists (b : bool), x = Z.b2z b }}
+  | AssertZeros {N : Z} (array : Array.t Z N) :
+    {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
+  | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
+    (forall i, 0 <= i < N ->
+      {{ f i 🔽 tt, P i }}
+    ) ->
+    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }}
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
   | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
-    {{ k value 🔽 output, P2 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
     {{ M.Let e k 🔽 output, P1 /\ P2 }}
-  | Equiv {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
-    (P1 <-> P2) ->
+    (P1 -> P2) ->
     {{ e 🔽 value, P2 }}
   | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
     {{ e 🔽 value1, P }} ->
     value1 = value2 ->
     {{ e 🔽 value2, P }}
+
   where "{{ e 🔽 output , P }}" := (t e output P).
+
+  Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
+    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
+      tt, forall i, 0 <= i < N -> f i = g i
+    }}.
+  Proof.
+  Admitted.
 End Run.
 Export Run.
 
-(** We will need later to make the field reasoning. For now we axiomatize it. *)
-Parameter IsPrime : Z -> Prop.
-
-Module Examples.
-  (** Here we see the use of the monadic notations defined above. *)
-  Definition zero_or_one (x : Z) : M.t unit :=
-    let* square_x := [[
-      M.mul (| x, x |)
-    ]] in
-    M.equal x square_x.
-  Opaque zero_or_one.
-
-  Lemma zero_or_one_correct (p : Z) (x : Z) :
-    IsPrime p ->
-    {{ M.eval p (zero_or_one x) 🔽 tt, x = 0 \/ x = 1 }}.
-  Proof.
-    intros.
-    with_strategy transparent [zero_or_one] unfold zero_or_one.
-    cbn.
-    eapply Run.Equiv. {
-      apply Run.Equal.
-    }
-    (* This property should be handled automatically by some field reasoning tactic. *)
-    admit.
-  Admitted.
-
-  (** A function with an arbitrary number of constraints. *)
-  Fixpoint all_zero_or_one (l : list Z) : M.t unit :=
-    match l with
-    | [] => M.Pure tt
-    | x :: l' =>
-      let* _ := M.call (zero_or_one x) in
-      all_zero_or_one l'
-    end.
-  Opaque all_zero_or_one.
-
-  Lemma all_zero_or_one_correct (p : Z) (l : list Z) :
-    IsPrime p ->
-    {{ M.eval p (all_zero_or_one l) 🔽 tt, List.Forall (fun x => x = 0 \/ x = 1) l }}.
-  Proof.
-    intros.
-    with_strategy transparent [all_zero_or_one] unfold all_zero_or_one.
-    induction l; cbn.
-    { eapply Run.Equiv. {
-        apply Run.Pure.
-      }
-      easy.
-    }
-    { eapply Run.Equiv. {
-        eapply Run.Let. {
-          apply Run.Call.
-          now apply zero_or_one_correct.
-        }
-        apply IHl.
-      }
-      sauto lq: on.
-    }
-  Qed.
-
-  (** One more example to show the use of the monadic notations without naming intermediate results. *)
-  Definition cube (x : Z) : M.t Z :=
-    [[
-      M.mul (|M.mul (| x, x |), x |)
-    ]].
-  Opaque cube.
-
-  Ltac show_equality_modulo :=
-    repeat (
-      (
-        (
-          apply Zplus_eqm ||
-          apply Zmult_eqm ||
-          apply Zopp_eqm
-        );
-        unfold eqm
-      ) ||
-      rewrite Zmod_eqm ||
-      reflexivity
-    ).
-
-  Lemma cube_correct (p : Z) (x : Z) :
-    IsPrime p ->
-    {{ M.eval p (cube x) 🔽 (x * x * x) mod p, True }}.
-  Proof.
-    intros.
-    with_strategy transparent [cube] unfold cube.
-    cbn.
-    eapply Run.Equiv. {
-      eapply Run.Replace. {
-        apply Run.Pure.
-      }
-      show_equality_modulo.
-    }
-    tauto.
-  Qed.
-End Examples.
-
 (** ** Primitives we also have in the library *)
 
-Module Array.
-  Record t {A : Set} {N : Z} : Set := {
-    value : list A;
+Module Pair.
+  Record t {A B : Set} : Set := {
+    x : A;
+    xs : B;
   }.
   Arguments t : clear implicits.
-
-  Module Valid.
-    Record t {A : Set} {N : Z} (P : A -> Prop) (x : t A N) : Prop := {
-      length : Z.of_nat (List.length x.(value)) = N;
-      elements : List.Forall P x.(value);
-    }.
-  End Valid.
-
-  Definition get {A : Set} {N : Z} (x : t A N) (index : Z) : M.t A :=
-    M.Unwrap (List.nth_error x.(value) (Z.to_nat index)).
-
-  Definition slice_from {A : Set} {N : Z} (x : t A N) (start : Z) : t A (N - start) :=
-    {| Array.value := List.skipn (Z.to_nat start) x.(value) |}.
-
-  Definition from_fn {A : Set} {N : Z} (f : Z -> M.t A) : M.t (t A N) :=
-    let fix aux (index : nat) : M.t (list A) :=
-      match index with
-      | O => M.Pure []
-      | S index' =>
-        let* xs := aux index' in
-        let* x := f (Z.of_nat index') in
-        M.Pure (x :: xs)
-      end in
-    let* xs := aux (Z.to_nat N) in
-    M.Pure {| Array.value := List.rev xs |}.
-End Array.
+End Pair.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
   M.equal x 0.
 
-(* fn assert_zeros<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
-Definition assert_zeros {N : Z} (l : Array.t Z N) : M.t unit :=
-  let fix aux (l : list Z) : M.t unit :=
-    match l with
-    | [] => M.Pure tt
-    | x :: l' =>
-      let* _ := assert_zero x in
-      aux l'
-    end in
-  aux l.(Array.value).
-
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_one (x : Z) : M.t unit :=
-  M.equal x 1.
+Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
+  M.equal x (1 mod p).
 
 (* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_bool (x : Z) : M.t unit :=
-  [[ M.equal (| x, M.mul (| x, x |) |) ]].
+Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
+  M.AssertBool x.
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
-Definition assert_bools {N : Z} (l : Array.t Z N) : M.t unit :=
-  let fix aux (l : list Z) : M.t unit :=
+Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
+  M.assert_zeros (N := N) {|
+    Array.get i :=
+      let x := l.(Array.get) i in
+      BinOp.sub (BinOp.mul x x) x
+  |}.
+
+Definition when (condition : Z) (e : M.t unit) : M.t unit :=
+  if condition =? 0 then
+    M.pure tt
+  else
+    e.
+
+Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
+  if condition then
+    e
+  else
+    M.pure tt.
+
+Definition not {p} `{Prime p} (x : Z) : Z :=
+  BinOp.sub 1 x.
+
+Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
+
+Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z.
+
+Definition double {p} `{Prime p} (x : Z) : Z :=
+  BinOp.mul x 2.
+
+Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+
+Module List.
+  Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
     match l with
-    | [] => M.Pure tt
-    | x :: l' =>
-      let* _ := assert_bool x in
-      aux l'
-    end in
-  aux l.(Array.value).
+    | nil => M.pure acc
+    | cons x xs =>
+      let* acc := f acc x in
+      fold_left f acc xs
+    end.
 
-Definition when (condition : bool) (e : M.t unit) : M.t unit :=
-  if condition then e else M.Pure tt.
+  Fixpoint fold_right {A B : Set} (f : B -> A -> M.t A) (l : list B) (acc : A) : M.t A :=
+    match l with
+    | nil => M.pure acc
+    | cons x xs =>
+      let* acc := fold_right f xs acc in
+      f x acc
+    end.
+End List.
 
-Fixpoint for_in {A : Set} (l : list A) (f : A -> M.t unit) : M.t unit :=
-  match l with
-  | [] => M.Pure tt
-  | x :: l' =>
-    let* _ := f x in
-    for_in l' f
-  end.
+Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
+  map_mod : A -> A;
+}.
 
-Definition for_in_zero_to_n (n : Z) (f : Z -> M.t unit) : M.t unit :=
-  for_in (List.map Z.of_nat (List.seq 0 (Z.to_nat n))) f.
+Global Instance MapMod_Felt {p} `{Prime p} : MapMod Z := {
+  map_mod := UnOp.from;
+}.
 
-Fixpoint fold {Acc Element : Set} (acc : Acc) (l : list Element) (f : Acc -> Element -> M.t Acc) :
-    M.t Acc :=
-  match l with
-  | [] => M.Pure acc
-  | x :: l' =>
-    let* acc' := f acc x in
-    fold acc' l' f
-  end.
-
-Definition double (x : Z) : M.t Z :=
-  [[ M.mul (| 2, x |) ]].
-
-Parameter xor  : Z -> Z -> M.t Z.
-Parameter xor3 : Z -> Z -> Z -> M.t Z.
+Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
+    MapMod (Array.t A N) :=
+{
+  map_mod x := Array.map x map_mod;
+}.

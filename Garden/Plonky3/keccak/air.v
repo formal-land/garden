@@ -1,4 +1,4 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 Require Import Garden.Plonky3.keccak.round_flags.
@@ -44,7 +44,7 @@ Definition eval
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
       when_bool is_first_step (
-        M.zeros (N := U64_LIMBS) {|
+        M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
               (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
@@ -69,7 +69,7 @@ Definition eval
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
       when_bool (is_not_final_step && is_transition) (
-        M.zeros (N := U64_LIMBS) {|
+        M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
               (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
@@ -105,7 +105,7 @@ Definition eval
   let* _ :=
     M.for_in_zero_to_n 5 (fun x =>
       let* _ := assert_bools (local.(KeccakCols.c).(Array.get) x) in
-      M.zeros (N := 64) {|
+      M.assert_zeros (N := 64) {|
         Array.get z :=
           let xor :=
             xor3
@@ -156,7 +156,7 @@ Definition eval
 
       let* _ := assert_bools ((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x) in
 
-      M.zeros (N := U64_LIMBS) {|
+      M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
             let l : list Z :=
@@ -184,7 +184,7 @@ Definition eval
   let* _ :=
     M.for_in_zero_to_n 5 (fun x =>
       let four : Z := 4 in
-      M.zeros (N := 64) {|
+      M.assert_zeros (N := 64) {|
         Array.get z :=
           let sum : Z :=
             Lists.List.fold_left (fun acc y =>
@@ -227,7 +227,7 @@ Definition eval
           xor
             andn
             (Impl_KeccakCols.b local x y z) in
-      M.zeros (N := U64_LIMBS) {|
+      M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
             let l : list Z :=
@@ -256,7 +256,7 @@ Definition eval
   *)
   let* _ := assert_bools local.(KeccakCols.a_prime_prime_0_0_bits) in
   let* _ :=
-    M.zeros (N := U64_LIMBS) {|
+    M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_0_0_limb : Z :=
           let l : list Z :=
@@ -304,7 +304,7 @@ Definition eval
   }));
   *)
   let* _ :=
-    M.zeros (N := U64_LIMBS) {|
+    M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_prime_0_0_limb : Z :=
           let l : list Z :=
@@ -335,7 +335,7 @@ Definition eval
     M.for_in_zero_to_n 5 (fun y =>
       when_bool is_transition (
       when_bool is_not_final_step (
-        M.zeros (N := U64_LIMBS) {|
+        M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
             BinOp.sub
               (Impl_KeccakCols.a_prime_prime_prime local y x limb)

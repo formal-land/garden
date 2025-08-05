@@ -1,4 +1,5 @@
-Require Import Garden.Plonky3.MLessEffects.
+Require Import Garden.Plonky3.M.
+Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
 pub struct ImmInstruction<T> {
@@ -119,7 +120,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     M.pure (
       BinOp.add
         (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.opcode_beq_flag))
-        (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
+        (BinOp.mul (M.not local.(BranchEqualCoreCols.cmp_result)) local.(BranchEqualCoreCols.opcode_bne_flag))
     ) in
 
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
@@ -152,7 +153,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
         from_pc
         (BinOp.mul local.(BranchEqualCoreCols.cmp_result) local.(BranchEqualCoreCols.imm))
       )
-      (BinOp.mul (MLessEffects.not local.(BranchEqualCoreCols.cmp_result)) self.(BranchEqualCoreAir.pc_step))
+      (BinOp.mul (M.not local.(BranchEqualCoreCols.cmp_result)) self.(BranchEqualCoreAir.pc_step))
     in
 
   M.pure {|
@@ -176,7 +177,7 @@ Module Input.
     b : Z;
     opcode : BranchEqualOpcode.t;
     imm : Z;
-    to_pc : Z;
+    (* to_pc : Z; *)
   }.
 
   Module Extra.
@@ -186,7 +187,7 @@ Module Input.
     }.
   End Extra.
 
-  Definition to_cols {NUM_LIMBS : Z} (input : t) (extra : Extra.t) :
+  Definition to_cols {NUM_LIMBS : Z} (input : t) (extra : Extra.t):
     BranchEqualCoreCols.t NUM_LIMBS :=
   {|
     BranchEqualCoreCols.a := Array.to_limbs NUM_LIMBS input.(a);
@@ -227,33 +228,27 @@ Module Output.
     AdapterAirContext.instruction := output.(instruction);
   |}.
 
-  (**
-    - If opcode_beq_flag is true and a is equal to b, then to_pc == pc + imm, otherwise to_pc == pc + 4
-    - If opcode_bne_flag is true and a is not equal to b, then to_pc == pc + imm, otherwise to_pc == pc + 4
-  *)
-  Definition of_input (core_air : BranchEqualCoreAir.t) (input : Input.t) : t := {|
+  Definition of_input 
+    (* TODO: change to arbitary prime in the future *)
+    (* {p} `{Prime p}  *)
+    `{Prime 23}
+    (core_air : BranchEqualCoreAir.t) (input : Input.t) 
+    (extra : Input.Extra.t) (from_pc : Z) : t := {|
     to_pc :=
-      match input.(Input.opcode) with
-      | BranchEqualOpcode.BEQ =>
-        if input.(Input.a) =? input.(Input.b) then
-          input.(Input.to_pc) + input.(Input.imm)
-        else
-        input.(Input.to_pc) + core_air.(BranchEqualCoreAir.pc_step)
-      | BranchEqualOpcode.BNE =>
-        if negb (input.(Input.a) =? input.(Input.b)) then
-          input.(Input.to_pc) + input.(Input.imm)
-        else
-          input.(Input.to_pc) + 4
-      end;
+      let cmp_result := extra.(Input.Extra.cmp_result) in
+      ((from_pc + (cmp_result * input.(Input.imm)) mod 23
+       + (not cmp_result) * core_air.(BranchEqualCoreAir.pc_step)
+       ) mod 23);
     reads := (input.(Input.a), input.(Input.b));
     writes := tt;
     instruction := {|
       ImmInstruction.is_valid := 1;
       ImmInstruction.opcode :=
-        core_air.(BranchEqualCoreAir.offset) + match input.(Input.opcode) with
+        ((match input.(Input.opcode) with
         | BranchEqualOpcode.BEQ => 0
         | BranchEqualOpcode.BNE => 1
-        end;
+        end) mod 23
+        + core_air.(BranchEqualCoreAir.offset)) mod 23;
       ImmInstruction.immediate := input.(Input.imm);
     |};
   |}.
@@ -269,7 +264,6 @@ Axiom assert_bool_one :
   {{ M.AssertBool 1 🔽 tt, True }}.
 Smpl Add apply assert_bool_one : run_auto.
 
-
 Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
     (core_air : BranchEqualCoreAir.t)
     (input : Input.t)
@@ -277,11 +271,12 @@ Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
     (from_pc : Z) :
   let cols : BranchEqualCoreCols.t NUM_LIMBS := Input.to_cols input extra in
   let output : AdapterAirContext.t NUM_LIMBS :=
-    Output.to_adapter_air_context (Output.of_input core_air input) in
+    Output.to_adapter_air_context (Output.of_input core_air input extra from_pc) in
   {{ eval core_air cols from_pc 🔽 output, True }}.
 Proof.
   cbn.
-  eapply Run.Implies. {
+  eapply Run.Implies. 
+  {
     unfold eval; cbn.
     eapply Run.Let with (value := 1) (P1 := True). {
       destruct input.(Input.opcode); cbn.
@@ -305,13 +300,9 @@ Proof.
       }
     }
     intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
+    eapply Run.Let. { smpl run_auto. }
     intros [].
-    eapply Run.Let. {
-      apply Run.AssertBool.
-    }
+    eapply Run.Let. { apply Run.AssertBool. }
     intros [cmp_result H_cmp_result_eq].
     rewrite H_cmp_result_eq.
     set (cmp_eq :=
@@ -328,93 +319,89 @@ Proof.
       destruct input.(Input.opcode), cmp_result; apply Run.Pure.
     }
     intros [].
-    eapply Run.Implies. {
-    eapply Run.Let with
-      (P1 :=
-        if cmp_eq then
-          forall i, 0 <= i < NUM_LIMBS ->
-          (Array.to_limbs NUM_LIMBS input.(Input.a)).(Array.get) i =
-          (Array.to_limbs NUM_LIMBS input.(Input.b)).(Array.get) i
-        else
-          True
-      ). {
-      destruct cmp_eq; cbn.
-      { apply Run.ForInZeroToN; intros.
-        unfold assert_zero.
-Admitted.
-(*
-        apply Run.Equal.
-        eapply Run.Let. {
-          smpl run_auto.
-        }
-      }
-      { admit. }
-    }
-
-    eapply Run.Implies. {
-    eapply Run.Let with
-        (value := if cmp_eq then 1 else 0)
+    (* NOTE: here we want to generalize the goal as a `P2` and leave it filled
+    after we finish all proofs inside. See the comments at the end of the whole 
+    proof *)
+    eapply Run.Implies. 
+    {
+      (* NOTE: here we specify a property to prove for the `Let` clause *)
+      eapply Run.Let with
         (P1 :=
           if cmp_eq then
-            forall (i : nat),
-              (0 <= i < NUM_LIMBS)%nat ->
-              (Array.to_limbs (Z.of_nat NUM_LIMBS) input.(Input.a)).(Array.get) (Z.of_nat i) =
-              (Array.to_limbs (Z.of_nat NUM_LIMBS) input.(Input.b)).(Array.get) (Z.of_nat i)
+            forall i, 0 <= i < NUM_LIMBS ->
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i =
+              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i
           else
-            False
-        ). {
-      destruct cmp_eq; cbn.
-      { rewrite Nat2Z.id.
-        induction NUM_LIMBS; cbn.
-        { admit. }
-        { eapply Run.Implies. {
-          eapply Run.Let. {
-            apply IHNUM_LIMBS.
-        }
-      admit. }
-      { admit. }
-    }
-    intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
-    intros [].
-    eapply Run.Let. {
-      smpl run_auto.
-    }
-    intros [].
-    eapply Run.Let. {
-        { repeat (
-            eapply Run.Let ||
-            eapply Run.AssertBool ||
-            apply Run.Pure
+            True
+        ). 
+      { 
+        destruct cmp_eq; cbn.
+        { 
+          apply Run.ForInZeroToN; intros.
+          unfold assert_zero.
+          repeat destruct Array.to_limbs. 
+          eapply Run.Implies with (P1 := 
+            (BinOp.mul 1 (BinOp.sub (get i) (get0 i))) = 0
           ).
-          unfold BinOp.add, BinOp.mul; cbn.
-          assert (H_1_eq : 1 mod p = 1) by admit.
-          repeat (rewrite H_1_eq; cbn).
-          apply Run.Pure.
+          { apply Run.Equal. }
+          { unfold BinOp.mul, BinOp.sub.
+            rewrite -> Z.mul_1_l.
+            rewrite -> foo_mod_mod.
+            rewrite <- foo_sub.
+            apply foo_eq_sub. }
         }
-        reflexivity.
-        eapply Run.Replace; [apply Run.Pure |].
-        unfold BinOp.add, BinOp.mul.
-        cbn.
-        assert (H_1_eq : 1 mod p = 1) by admit.
-        repeat (rewrite H_1_eq; cbn).
-        reflexivity.
+        (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
+          so we want to stub the proof with a `True`. This `True` should be obtained
+          by constructing a combination of trivial cases for all constructors appeared
+          in the part of the program. 
+          Applying `Run.Implies` allows the constructors being used to automatically
+          generate such a case.
+        *)
+        { 
+          eapply Run.Implies.
+          (* Using the constructors *)
+          { apply Run.ForInZeroToN; intros.
+            apply Run.Equal. }
+          (* The generated case *)
+          { trivial. } 
+        }
       }
-      { repeat (
-          eapply Run.Let ||
-          eapply Run.Equal ||
-          apply Run.Pure
-        ).
-        eapply Run.Replace; [apply Run.Pure |].
-        unfold BinOp.add, BinOp.mul.
-        cbn.
-        assert (H_1_eq : 1 mod p = 1) by admit.
-        repeat (rewrite H_1_eq; cbn).
-        reflexivity.
+      intros H_a_b_eq.
+      (* Enforced by our current definition on Input *)
+      set (is_valid := true).
+      set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
+        BinOp.mul 
+          (Array.get ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
+          (BinOp.sub 
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
+            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
+      )).
+      eapply Run.Let with (P1 :=
+        if is_valid then BinOp.add sum (Z.b2z cmp_eq) = 1 else True
+      ).
+      { unfold assert_one, when, sum.
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        eapply Run.Implies.
+        { apply Run.Equal. }
+        { trivial. }
       }
-      unfold assert_bool.
+      intros H_valid_sum_1.
+      {
+        unfold BinOp.add, BinOp.sub, BinOp.mul.
+        unfold Output.to_adapter_air_context, Output.of_input.
+        rewrite -> foo_add, foo_mul_0, H_cmp_result_eq.
+        rewrite -> Z.mul_1_r.
+        simpl.
+        rewrite -> foo_mod_mod.
+        apply Run.Pure.
+      }
+    }
+    (* Here we finally fill in the `P2` that have been delayed so far from 
+    the `eapply Run.Implies` in the mid of the proof *)
+    intros H_all_asserts.
+    Unshelve.
+    apply H_all_asserts.
   }
+  (* See how we automatically decide `P1` and we don't need to unshelve anything *)
+  tauto.
 Qed.
-*)
