@@ -342,4 +342,13 @@ Module Limbs.
           BinOp.add (BinOp.mul 2 acc) (a.(Array.get) z)
         ) l 0
     |}.
+
+  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
+      (a : Array.t Z NB_LIMBS)
+      (bit : Z) :
+      bool :=
+    let limb := bit / BITS_PER_LIMB in
+    let bit_in_limb := bit mod BITS_PER_LIMB in
+    let limb_value := a.(Array.get) limb in
+    Z.testbit limb_value bit_in_limb.
 End Limbs.

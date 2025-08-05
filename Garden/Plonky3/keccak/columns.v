@@ -31,16 +31,16 @@ Module KeccakCols.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod KeccakCols.t := {
     map_mod x := {|
-      KeccakCols.step_flags := x.(KeccakCols.step_flags);
-      KeccakCols.export := x.(KeccakCols.export);
-      KeccakCols.preimage := x.(KeccakCols.preimage);
-      KeccakCols.a := x.(KeccakCols.a);
-      KeccakCols.c := x.(KeccakCols.c);
-      KeccakCols.c_prime := x.(KeccakCols.c_prime);
-      KeccakCols.a_prime := x.(KeccakCols.a_prime);
-      KeccakCols.a_prime_prime := x.(KeccakCols.a_prime_prime);
-      KeccakCols.a_prime_prime_0_0_bits := x.(KeccakCols.a_prime_prime_0_0_bits);
-      KeccakCols.a_prime_prime_prime_0_0_limbs := x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
+      KeccakCols.step_flags := M.map_mod x.(KeccakCols.step_flags);
+      KeccakCols.export := M.map_mod x.(KeccakCols.export);
+      KeccakCols.preimage := M.map_mod x.(KeccakCols.preimage);
+      KeccakCols.a := M.map_mod x.(KeccakCols.a);
+      KeccakCols.c := M.map_mod x.(KeccakCols.c);
+      KeccakCols.c_prime := M.map_mod x.(KeccakCols.c_prime);
+      KeccakCols.a_prime := M.map_mod x.(KeccakCols.a_prime);
+      KeccakCols.a_prime_prime := M.map_mod x.(KeccakCols.a_prime_prime);
+      KeccakCols.a_prime_prime_0_0_bits := M.map_mod x.(KeccakCols.a_prime_prime_0_0_bits);
+      KeccakCols.a_prime_prime_prime_0_0_limbs := M.map_mod x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
     |};
   }.
 End KeccakCols.

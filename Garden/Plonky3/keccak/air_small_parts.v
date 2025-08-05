@@ -120,7 +120,9 @@ Proof.
   hauto l: on drew: off.
 Qed.
 
-(* builder.assert_bool(local.export); *)
+(*
+  builder.assert_bool(local.export);
+*)
 Definition eval_assert_export_bool {p} `{Prime p}
     (local : KeccakCols.t) :
     M.t unit :=
@@ -275,18 +277,20 @@ Qed.
       }
   }
 *)
+Definition get_big_assert_a_a_prime_c_c_prime {p} `{Prime p}
+    (local : KeccakCols.t) (y x : Z)
+    (z : Z) :
+    Z :=
+  xor3
+    (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z)
+    ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
+    ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z).
+
 Definition eval_assert_a_a_prime_c_c_prime {p} `{Prime p}
     (local : KeccakCols.t) :
     M.t unit :=
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      let get_bit (z : Z) : Z :=
-        xor3
-          (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z)
-          ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
-          ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z)
-      in
-
       let* _ := M.assert_bools ((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x) in
 
       M.assert_zeros (N := U64_LIMBS) {|
@@ -300,7 +304,7 @@ Definition eval_assert_a_a_prime_c_c_prime {p} `{Prime p}
               ) in
             Lists.List.fold_left (fun acc (z : nat) =>
               let z : Z := Z.of_nat z in
-              BinOp.add (BinOp.mul 2 acc) (get_bit z)
+              BinOp.add (BinOp.mul 2 acc) (get_big_assert_a_a_prime_c_c_prime local y x z)
             ) l 0 in
           BinOp.sub
             computed_limb
@@ -308,7 +312,7 @@ Definition eval_assert_a_a_prime_c_c_prime {p} `{Prime p}
       |}
     )).
 
-Definition eval_assert_a_a_prime_c_c_prime_implies_a_prime_bools {p} `{Prime p}
+Lemma eval_assert_a_a_prime_c_c_prime_implies_a_prime_bools {p} `{Prime p}
     (local : KeccakCols.t) :
     let local := M.map_mod local in
     {{ eval_assert_a_a_prime_c_c_prime local 🔽
@@ -341,10 +345,7 @@ Lemma eval_assert_a_a_prime_c_c_prime_implies_a_a_prime_c_c_prime {p} `{Prime p}
       Limbs.of_bools U64_LIMBS BITS_PER_LIMB
         {|
           Array.get z :=
-            M.xor3
-              (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z)
-              ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
-              ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z);
+            get_big_assert_a_a_prime_c_c_prime local y x z;
         |} in
     forall (limb : Z),
     0 <= limb < U64_LIMBS ->
@@ -429,17 +430,21 @@ Admitted.
       }
   }
 *)
+Definition get_big_assert_a_prime_prime {p} `{Prime p}
+    (local : KeccakCols.t) (y x : Z)
+    (z : Z) :
+    Z :=
+  let andn :=
+    M.andn
+      (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
+      (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
+  M.xor andn (Impl_KeccakCols.b local x y z).
+
 Definition eval_assert_a_prime_prime {p} `{Prime p}
     (local : KeccakCols.t) :
     M.t unit :=
   M.for_in_zero_to_n 5 (fun y =>
   M.for_in_zero_to_n 5 (fun x =>
-    let get_bit (z : Z) : Z :=
-      let andn :=
-        M.andn
-          (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
-          (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
-      M.xor andn (Impl_KeccakCols.b local x y z) in
     M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_limb : Z :=
@@ -451,7 +456,7 @@ Definition eval_assert_a_prime_prime {p} `{Prime p}
             ) in
           Lists.List.fold_left (fun acc (z : nat) =>
             let z : Z := Z.of_nat z in
-            BinOp.add (BinOp.mul 2 acc) (get_bit z)
+            BinOp.add (BinOp.mul 2 acc) (get_big_assert_a_prime_prime local y x z)
           ) l 0 in
         BinOp.sub
           computed_limb
@@ -471,11 +476,7 @@ Lemma eval_assert_a_prime_prime_implies {p} `{Prime p}
       Limbs.of_bools U64_LIMBS BITS_PER_LIMB
         {|
           Array.get z :=
-            let andn :=
-              M.andn
-                (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
-                (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
-            M.xor andn (Impl_KeccakCols.b local x y z);
+            get_big_assert_a_prime_prime local y x z;
         |} in
     forall (limb : Z),
     0 <= limb < U64_LIMBS ->
@@ -541,7 +542,7 @@ Definition eval_assert_a_prime_prime_0_0_limbs {p} `{Prime p}
             ) in
         Lists.List.fold_left (fun acc (z : nat) =>
           let z : Z := Z.of_nat z in
-          BinOp.add (BinOp.mul 2 acc) (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) z)
+          BinOp.add (BinOp.mul 2 acc) (local.(KeccakCols.a_prime_prime_0_0_bits).(Array.get) z)
         ) l 0 in
       BinOp.sub
         computed_a_prime_prime_0_0_limb
