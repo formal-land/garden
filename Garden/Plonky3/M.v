@@ -38,7 +38,7 @@ Module Array.
     {|
       get index := x.(get) (start + index)
     |}.
-  
+
   Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count := 
     {|
       get := x.(get)
@@ -155,7 +155,7 @@ Module M.
 
   Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
     ForInZeroToN N f.
-  
+
   (* helper: acting on all elements in an array *)
   Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
     for_in_zero_to_n N (fun i => f (Array.get x i)).
@@ -210,6 +210,10 @@ Module Run.
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
     {{ M.AssertBool x 🔽 tt, exists (b : bool), x = Z.b2z b }}
+  | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
+      tt, forall i, 0 <= i < N -> f i = g i
+    }}
   | AssertZeros {N : Z} (array : Array.t Z N) :
     {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
   | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
@@ -234,13 +238,6 @@ Module Run.
     {{ e 🔽 value2, P }}
 
   where "{{ e 🔽 output , P }}" := (t e output P).
-
-  Lemma AssertZerosFromFnSub {p} `{Prime p} (N : Z) (f g : Z -> Z) :
-    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
-    }}.
-  Proof.
-  Admitted.
 End Run.
 Export Run.
 
@@ -268,11 +265,9 @@ Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
-  M.assert_zeros (N := N) {|
-    Array.get i :=
-      let x := l.(Array.get) i in
-      BinOp.sub (BinOp.mul x x) x
-  |}.
+  M.for_in_zero_to_n N (fun i =>
+    M.assert_bool (l.(Array.get) i)
+  ).
 
 Definition when (condition : Z) (e : M.t unit) : M.t unit :=
   if condition =? 0 then
@@ -329,3 +324,22 @@ Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
 {
   map_mod x := Array.map x map_mod;
 }.
+
+Module Limbs.
+  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
+      Array.t Z NB_LIMBS :=
+    {|
+      Array.get limb :=
+        let l : list nat :=
+          List.rev (
+            List.seq
+              (Z.to_nat (limb * BITS_PER_LIMB))%Z
+              (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
+          ) in
+        Lists.List.fold_left (fun acc (z : nat) =>
+          let z : Z := Z.of_nat z in
+          BinOp.add (BinOp.mul 2 acc) (a.(Array.get) z)
+        ) l 0
+    |}.
+End Limbs.
