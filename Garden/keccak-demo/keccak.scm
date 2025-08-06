@@ -1,5 +1,5 @@
 ;; Formal Land
-;; Time-stamp: <2025-08-06 20:20:31 adhithsanjay>
+;; Time-stamp: <2025-08-06 20:29:49 adhithsanjay>
 
 ;; This is an implementation of the Keccak algorithm
 ;; as specified in:
@@ -95,7 +95,8 @@
 	 (errorf 'y "not a vector y")]
 	[(not (= (len x) (len y)))
 	 (errorf '"x and y" "not strings of equal length")]
-	[(vector-map bit-xor x y)]))
+	[else
+	 (vector-map bit-xor x y)]))
 
 (unless (test-string-XOR string-XOR)
   (errorf 'string-XOR "string-XOR has an error"))
@@ -108,7 +109,8 @@
 	 (errorf 'x "not a vector x")]
 	[(not (vector? y))
 	 (errorf 'y "not a vector y")]
-	[(list->vector
+	[else
+	 (list->vector
 	  (append (vector->list x) (vector->list y)))]))
 
 (unless (test-string-concat string-concat)
@@ -142,9 +144,12 @@
 ;; that 2^y = x.
 
 (define (log_2 x)
-  (cond [(not (and (number? x) (> 0)))
+  (cond [(not (and (number? x) (> x 0)))
 	 (errorf 'x "not a positive number x")]
 	[(/ (log x) (log 2))]))
+
+(unless (test-log_2 log_2)
+  (errorf 'log_2 "log_2 has an error"))
 
 ;; For real numbers x and y, min(x, y) is the minimum of x and y. For
 ;; example, min(9, 33) = 9.

@@ -1,5 +1,5 @@
 ;; Sanjay Adhith
-;; Time-stamp: <2025-08-06 20:22:51 adhithsanjay>
+;; Time-stamp: <2025-08-06 20:30:44 adhithsanjay>
 
 ;; Tests for keccak.scm
 
@@ -48,20 +48,6 @@
 	     [expected-result (make-vector 10 0)])
 	 (equal? actual-result expected-result))))
        
-(define (test-zero-string candidate)
-  (and (let ([actual-result (candidate 0)]
-	     [expected-result (make-vector 0 0)])
-	 (equal? actual-result expected-result))
-       (let ([actual-result (candidate 1)]
-	     [expected-result (make-vector 1 0)])
-	 (equal? actual-result expected-result))
-       (let ([actual-result (candidate 2)]
-	     [expected-result (make-vector 2 0)])
-	 (equal? actual-result expected-result))
-       (let ([actual-result (candidate 10)]
-	     [expected-result (make-vector 10 0)])
-	 (equal? actual-result expected-result))))
-
 (define (test-len candidate)
   (and (let ([actual-result (candidate '#(1 0 1 0 0 0))]
 	     [expected-result 6])
