@@ -199,6 +199,17 @@ Notation "[[ e ]]" :=
   (* (M.Pure e) *)
   (only parsing).
 
+Module IsBool.
+  Definition t (x : Z) : Prop :=
+    x = Z.b2z (Z.odd x).
+End IsBool.
+
+Lemma odd_b2z_eq (b : bool) :
+  Z.odd (Z.b2z b) = b.
+Proof.
+  destruct b; cbn; reflexivity.
+Qed.
+
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
@@ -209,7 +220,7 @@ Module Run.
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
-    {{ M.AssertBool x 🔽 tt, x = Z.b2z (Z.odd x) }}
+    {{ M.AssertBool x 🔽 tt, IsBool.t x }}
   | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
     {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt, forall i, 0 <= i < N -> f i = g i
@@ -302,6 +313,17 @@ Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 Axiom xor_eq : forall {p} `{Prime p} (x y : bool),
   xor (Z.b2z x) (Z.b2z y) = Z.b2z (xorb x y).
 
+Lemma xor_is_bool {p} `{Prime p} (x y : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t (xor x y).
+Proof.
+  intros -> ->.
+  rewrite xor_eq.
+  unfold IsBool.t.
+  now rewrite odd_b2z_eq.
+Qed.
+
 Definition xor3 {p} `{Prime p} (x y z : Z) : Z :=
   xor (xor x y) z.
 
@@ -311,6 +333,16 @@ Proof.
   intros.
   unfold xor3.
   now repeat rewrite xor_eq.
+Qed.
+
+Lemma xor3_is_bool {p} `{Prime p} (x y z : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t z ->
+  IsBool.t (xor3 x y z).
+Proof.
+  intros.
+  now repeat apply xor_is_bool.
 Qed.
 
 Definition double {p} `{Prime p} (x : Z) : Z :=
@@ -383,7 +415,7 @@ Module Limbs.
       (H_bools :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        a.(Array.get) z = Z.b2z (Z.odd (a.(Array.get) z))
+        IsBool.t (a.(Array.get) z)
       ) :
     get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
     Z.odd (a.(Array.get) bit).
@@ -395,7 +427,7 @@ Module Limbs.
       (H_bools :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        a_bools.(Array.get) z = Z.b2z (Z.odd (a_bools.(Array.get) z))
+        IsBool.t (a_bools.(Array.get) z)
       )
       (H_limbs :
         forall (limb : Z),

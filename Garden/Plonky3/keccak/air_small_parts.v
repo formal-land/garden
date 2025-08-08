@@ -31,9 +31,9 @@ Module preimage_a.
   Lemma implies {p} `{Prime p} (local : KeccakCols.t) :
       let local := M.map_mod local in
       let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
-      first_step <> 0 ->
       {{ eval local 🔽
         tt,
+        first_step <> 0 ->
         forall (y x limb : Z),
         0 <= y < 5 ->
         0 <= x < 5 ->
@@ -42,19 +42,19 @@ Module preimage_a.
         KeccakCols.get_a local x y limb
       }}.
   Proof.
-    intros * H_not_first_step.
-    eapply Run.Implies. {
-      eapply Run.ForInZeroToN. {
-        intros.
-        eapply Run.ForInZeroToN. {
-          intros.
-          unfold M.when.
-          destruct (_ =? 0) eqn:H_first_step_eq; [lia|].
-          apply Run.AssertZerosFromFnSub.
-        }
+    intros.
+    unfold eval, M.when.
+    destruct (_ =? 0) eqn:?.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
       }
+      lia.
     }
-    hauto l: on drew: off.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
+      }
+      hauto l: on.
+    }
   Qed.
 End preimage_a.
 
@@ -96,9 +96,9 @@ Module preimage_next_preimage.
       let next := M.map_mod next in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
       let not_final_step := BinOp.sub 1 final_step in
-      not_final_step <> 0 ->
       {{ eval local next true 🔽
         tt,
+        not_final_step <> 0 ->
         forall (y x limb : Z),
         0 <= y < 5 ->
         0 <= x < 5 ->
@@ -107,20 +107,20 @@ Module preimage_next_preimage.
         KeccakCols.get_preimage next x y limb
       }}.
   Proof.
-    intros * H_not_final_step.
-    eapply Run.Implies. {
-      eapply Run.ForInZeroToN. {
-        intros.
-        eapply Run.ForInZeroToN. {
-          intros.
-          unfold M.when.
-          unfold not_final_step, final_step in *.
-          destruct (_ =? 0) eqn:H_not_final_step_eq; [lia|].
-          apply Run.AssertZerosFromFnSub.
-        }
+    intros.
+    unfold eval, M.when.
+    unfold not_final_step, final_step in *.
+    destruct (_ =? 0) eqn:?.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
       }
+      lia.
     }
-    hauto l: on drew: off.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
+      }
+      hauto l: on.
+    }
   Qed.
 End preimage_next_preimage.
 
@@ -139,8 +139,7 @@ Module export_bool.
     {{
       eval local 🔽
       tt,
-      local.(KeccakCols.export) =
-      Z.b2z (Z.odd local.(KeccakCols.export))
+      IsBool.t local.(KeccakCols.export)
     }}.
   Proof.
     intros.
@@ -168,21 +167,26 @@ Module export_zero.
       let local := M.map_mod local in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
       let not_final_step := BinOp.sub 1 final_step in
-      not_final_step <> 0 ->
       {{ eval local 🔽
         tt,
+        not_final_step <> 0 ->
         local.(KeccakCols.export) = 0
       }}.
   Proof.
     intros.
-    unfold eval.
-    eapply Run.Implies. {
-      unfold M.when.
-      unfold not_final_step, final_step in *.
-      destruct (_ =? 0) eqn:H_not_final_step_eq; [lia|].
-      apply Run.Equal.
+    unfold eval, M.when.
+    unfold not_final_step, final_step in *.
+    destruct (_ =? 0) eqn:?.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
+      }
+      lia.
     }
-    easy.
+    { eapply Run.Implies. {
+        repeat (econstructor || intros).
+      }
+      tauto.
+    }
   Qed.
 End export_zero.
 
@@ -249,7 +253,7 @@ Module c_c_prime.
     eapply Run.Implies. {
       repeat (econstructor || intros).
     }
-    hauto l: on.
+    sauto lq: on rew: off.
   Qed.
 End c_c_prime.
 

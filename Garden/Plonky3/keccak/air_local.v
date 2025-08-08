@@ -142,33 +142,38 @@ Proof.
     lia.
 Qed.
 
-Lemma odd_b2z_eq (b : bool) :
-  Z.odd (Z.b2z b) = b.
-Proof.
-  destruct b; cbn; reflexivity.
-Qed.
+Module Pre.
+  Record t (local : KeccakCols.t) : Prop := {
+    a_bools (x y z : Z) :
+      0 <= x < 5 ->
+      0 <= y < 5 ->
+      0 <= z < 64 ->
+      IsBool.t (KeccakCols.get_a local x y z)
+  }.
+End Pre.
 
-Lemma eval_local_implies {p} `{Prime p} (local : KeccakCols.t) :
-  let local := M.map_mod local in
+Lemma eval_local_implies {p} `{Prime p} (local' : KeccakCols.t) :
+  let local := M.map_mod local' in
+  Pre.t local ->
   {{ eval_local local 🔽
     tt,
     FirstRowsFrom_a.From.t local
   }}.
 Proof.
-  intros *.
+  intros * [].
   unfold eval_local.
-  eapply Run.LetAccumulate with (P1 := True). {
-    admit.
+  eapply Run.LetAccumulate. {
+    apply preimage_a.implies.
   }
-  intros [].
-  eapply Run.LetAccumulate with (P1 := True). {
-    admit.
+  intros H_eval_assert_preimage_a.
+  eapply Run.LetAccumulate. {
+    apply export_bool.implies.
   }
-  intros [].
-  eapply Run.LetAccumulate with (P1 := True). {
-    admit.
+  intros H_eval_assert_export_bool.
+  eapply Run.LetAccumulate. {
+    apply export_zero.implies.
   }
-  intros [].
+  intros H_eval_assert_export_zero.
   eapply Run.LetAccumulate. {
     apply c_c_prime.implies.
   }
@@ -201,6 +206,16 @@ Proof.
     apply Run.Pure.
   }
   intros [].
+  assert (c_prime_bools :
+    forall x z,
+    0 <= x < 5 ->
+    0 <= z < 64 ->
+    IsBool.t (KeccakCols.get_c_prime local x z)
+  ). {
+    intros.
+    rewrite c_c_prime_eq by lia.
+    apply M.xor3_is_bool; apply c_bools; lia.
+  }
   constructor; intros.
   { unfold KeccakCols.Bool.get_c, KeccakCols.Bool.get_c_prime.
     rewrite c_c_prime_eq by lia.
@@ -218,11 +233,18 @@ Proof.
     2: {
       intros.
       unfold a_a_prime_c_c_prime.get_bit.
-      admit.
+      apply M.xor3_is_bool; cbn in *.
+      { apply a_prime_bools; lia. }
+      { apply c_bools; lia. }
+      { apply c_prime_bools; lia. }
     }
     unfold a_a_prime_c_c_prime.get_bit.
-    cbn.
-    admit.
+    cbn - [local].
+    rewrite <- odd_b2z_eq; f_equal.
+    rewrite <- M.xor3_eq; f_equal.
+    { apply a_prime_bools; lia. }
+    { apply c_bools; lia. }
+    { apply c_prime_bools; lia. }
   }
   { apply xor_sum_diff_eq.
     admit.
