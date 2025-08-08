@@ -31,18 +31,50 @@ Module KeccakCols.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod KeccakCols.t := {
     map_mod x := {|
-      KeccakCols.step_flags := x.(KeccakCols.step_flags);
-      KeccakCols.export := x.(KeccakCols.export);
-      KeccakCols.preimage := x.(KeccakCols.preimage);
-      KeccakCols.a := x.(KeccakCols.a);
-      KeccakCols.c := x.(KeccakCols.c);
-      KeccakCols.c_prime := x.(KeccakCols.c_prime);
-      KeccakCols.a_prime := x.(KeccakCols.a_prime);
-      KeccakCols.a_prime_prime := x.(KeccakCols.a_prime_prime);
-      KeccakCols.a_prime_prime_0_0_bits := x.(KeccakCols.a_prime_prime_0_0_bits);
-      KeccakCols.a_prime_prime_prime_0_0_limbs := x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
+      KeccakCols.step_flags := M.map_mod x.(KeccakCols.step_flags);
+      KeccakCols.export := M.map_mod x.(KeccakCols.export);
+      KeccakCols.preimage := M.map_mod x.(KeccakCols.preimage);
+      KeccakCols.a := M.map_mod x.(KeccakCols.a);
+      KeccakCols.c := M.map_mod x.(KeccakCols.c);
+      KeccakCols.c_prime := M.map_mod x.(KeccakCols.c_prime);
+      KeccakCols.a_prime := M.map_mod x.(KeccakCols.a_prime);
+      KeccakCols.a_prime_prime := M.map_mod x.(KeccakCols.a_prime_prime);
+      KeccakCols.a_prime_prime_0_0_bits := M.map_mod x.(KeccakCols.a_prime_prime_0_0_bits);
+      KeccakCols.a_prime_prime_prime_0_0_limbs := M.map_mod x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
     |};
   }.
+
+  Definition get_preimage (local : KeccakCols.t) (x y limb : Z) : Z :=
+    ((local.(KeccakCols.preimage).(Array.get) y).(Array.get) x).(Array.get) limb.
+
+  Definition get_a (local : KeccakCols.t) (x y limb : Z) : Z :=
+    ((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb.
+
+  Definition get_c (local : KeccakCols.t) (x z : Z) : Z :=
+    ((local.(KeccakCols.c).(Array.get) x).(Array.get) z).
+
+  Definition get_c_prime (local : KeccakCols.t) (x z : Z) : Z :=
+    ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z).
+
+  Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : Z :=
+    (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z).
+
+  Definition get_a_prime_prime (local : KeccakCols.t) (x y limb : Z) : Z :=
+    ((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb.
+
+  Module Bool.
+    Definition get_a (local : KeccakCols.t) (x y z : Z) : bool :=
+      Limbs.get_bit BITS_PER_LIMB ((local.(KeccakCols.a).(Array.get) y).(Array.get) x) z.
+
+    Definition get_c (local : KeccakCols.t) (x z : Z) : bool :=
+      Z.odd ((get_c local x z)).
+
+    Definition get_c_prime (local : KeccakCols.t) (x z : Z) : bool :=
+      Z.odd ((get_c_prime local x z)).
+
+    Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : bool :=
+      Z.odd ((get_a_prime local x y z)).
+  End Bool.
 End KeccakCols.
 
 Module Impl_KeccakCols.

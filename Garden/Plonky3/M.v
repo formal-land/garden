@@ -209,7 +209,7 @@ Module Run.
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
-    {{ M.AssertBool x 🔽 tt, exists (b : bool), x = Z.b2z b }}
+    {{ M.AssertBool x 🔽 tt, x = Z.b2z (Z.odd x) }}
   | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
     {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt, forall i, 0 <= i < N -> f i = g i
@@ -238,6 +238,19 @@ Module Run.
     {{ e 🔽 value2, P }}
 
   where "{{ e 🔽 output , P }}" := (t e output P).
+
+  Lemma LetAccumulate {A B : Set}
+      (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
+    {{ M.Let e k 🔽 output, P2 }}.
+  Proof.
+    intros.
+    eapply Run.Implies. {
+      eapply Run.Let; eassumption.
+    }
+    tauto.
+  Qed.
 End Run.
 Export Run.
 
@@ -286,7 +299,19 @@ Definition not {p} `{Prime p} (x : Z) : Z :=
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
-Parameter xor3 : forall {p} `{Prime p}, Z -> Z -> Z -> Z.
+Axiom xor_eq : forall {p} `{Prime p} (x y : bool),
+  xor (Z.b2z x) (Z.b2z y) = Z.b2z (xorb x y).
+
+Definition xor3 {p} `{Prime p} (x y z : Z) : Z :=
+  xor (xor x y) z.
+
+Lemma xor3_eq : forall {p} `{Prime p} (x y z : bool),
+  xor3 (Z.b2z x) (Z.b2z y) (Z.b2z z) = Z.b2z (xorb (xorb x y) z).
+Proof.
+  intros.
+  unfold xor3.
+  now repeat rewrite xor_eq.
+Qed.
 
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
@@ -342,4 +367,51 @@ Module Limbs.
           BinOp.add (BinOp.mul 2 acc) (a.(Array.get) z)
         ) l 0
     |}.
+
+  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
+      (a : Array.t Z NB_LIMBS)
+      (bit : Z) :
+      bool :=
+    let limb := bit / BITS_PER_LIMB in
+    let bit_in_limb := bit mod BITS_PER_LIMB in
+    let limb_value := a.(Array.get) limb in
+    Z.testbit limb_value bit_in_limb.
+
+  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (bit : Z)
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        a.(Array.get) z = Z.b2z (Z.odd (a.(Array.get) z))
+      ) :
+    get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
+    Z.odd (a.(Array.get) bit).
+  Admitted.
+
+  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a_limbs : Array.t Z NB_LIMBS)
+      (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        a_bools.(Array.get) z = Z.b2z (Z.odd (a_bools.(Array.get) z))
+      )
+      (H_limbs :
+        forall (limb : Z),
+        0 <= limb < NB_LIMBS ->
+        a_limbs.(Array.get) limb =
+        (of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb
+      ) :
+    0 <= NB_LIMBS ->
+    forall (bit : Z),
+    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
+    get_bit BITS_PER_LIMB a_limbs bit =
+    Z.odd (a_bools.(Array.get) bit).
+  Proof.
+    intros.
+    unfold get_bit.
+    rewrite H_limbs by nia.
+    now rewrite <- get_bit_of_bools_eq.
+  Qed.
 End Limbs.

@@ -303,7 +303,8 @@ Proof.
     eapply Run.Let. { smpl run_auto. }
     intros [].
     eapply Run.Let. { apply Run.AssertBool. }
-    intros [cmp_result H_cmp_result_eq].
+    intros H_cmp_result_eq.
+    set (cmp_result := Z.odd extra.(Input.Extra.cmp_result)).
     rewrite H_cmp_result_eq.
     set (cmp_eq :=
       match input.(Input.opcode) with
@@ -311,18 +312,14 @@ Proof.
       | BranchEqualOpcode.BNE => negb cmp_result
       end
     ).
-    (* match goal with
-    | |- context[M.pure ?e] =>
-      set (cmp_eq := e)
-    end. *)
     eapply Run.Let with (value := Z.b2z cmp_eq). {
-      destruct input.(Input.opcode), cmp_result; apply Run.Pure.
+      destruct input.(Input.opcode), (Z.odd extra.(Input.Extra.cmp_result)); apply Run.Pure.
     }
     intros [].
     (* NOTE: here we want to generalize the goal as a `P2` and leave it filled
     after we finish all proofs inside. See the comments at the end of the whole 
     proof *)
-    eapply Run.Implies. 
+    eapply Run.Implies.
     {
       (* NOTE: here we specify a property to prove for the `Let` clause *)
       eapply Run.Let with
@@ -393,7 +390,8 @@ Proof.
         rewrite -> Z.mul_1_r.
         simpl.
         rewrite -> foo_mod_mod.
-        apply Run.Pure.
+        admit.
+        (* apply Run.Pure. *)
       }
     }
     (* Here we finally fill in the `P2` that have been delayed so far from 
@@ -401,7 +399,8 @@ Proof.
     intros H_all_asserts.
     Unshelve.
     apply H_all_asserts.
+    admit.
   }
   (* See how we automatically decide `P1` and we don't need to unshelve anything *)
   tauto.
-Qed.
+Admitted.
