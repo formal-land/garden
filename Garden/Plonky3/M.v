@@ -76,6 +76,10 @@ Module BinOp.
   Definition mul {p} `{Prime p} (x y : Z) : Z :=
     (x * y) mod p.
 
+  Axiom mul_zero_implies_zero : forall {p} `{Prime p} (x y : Z),
+    BinOp.mul x y = 0 <->
+    UnOp.from x = 0 \/ UnOp.from y = 0.
+
   Definition div {p} `{Prime p} (x y : Z) : Z :=
     (x / y) mod p.
 

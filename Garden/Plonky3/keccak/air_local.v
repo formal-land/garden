@@ -114,19 +114,35 @@ Module FirstRowsFrom_a.
 End FirstRowsFrom_a.
 
 (** Lemma to show that the calculation with the [diff] is actually a calculation of XOR. *)
-Lemma xor_sum_diff_eq (local : KeccakCols.t) (x z : Z)
-  (H_sum_diff :
-    let diff :=
-      Lists.List.fold_left Z.add [
-        Z.b2z (KeccakCols.Bool.get_a_prime local x 0 z);
-        Z.b2z (KeccakCols.Bool.get_a_prime local x 1 z);
-        Z.b2z (KeccakCols.Bool.get_a_prime local x 2 z);
-        Z.b2z (KeccakCols.Bool.get_a_prime local x 3 z);
-        Z.b2z (KeccakCols.Bool.get_a_prime local x 4 z)
-      ] 0 -
-      Z.b2z (KeccakCols.Bool.get_c_prime local x z) in
-    diff = 0 \/ diff = 2 \/ diff = 4
-  ) :
+Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z : Z)
+    (H_a_prime_bools :
+      forall x y z,
+        0 <= x < 5 ->
+        0 <= y < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_a_prime local x y z)
+    )
+    (H_c_prime_bools :
+      forall x z,
+        0 <= x < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_c_prime local x z)
+    )
+    (H_sum_diff :
+      let diff :=
+        let sum :=
+          Lists.List.fold_left BinOp.add [
+            KeccakCols.get_a_prime local x 0 z;
+            KeccakCols.get_a_prime local x 1 z;
+            KeccakCols.get_a_prime local x 2 z;
+            KeccakCols.get_a_prime local x 3 z;
+            KeccakCols.get_a_prime local x 4 z
+          ] 0 in
+        BinOp.sub sum (KeccakCols.get_c_prime local x z) in
+      BinOp.mul diff (BinOp.mul (BinOp.sub diff 2) (BinOp.sub diff 4)) = 0
+    ) :
+  0 <= x < 5 ->
+  0 <= z < 64 ->
   KeccakCols.Bool.get_c_prime local x z =
   xorbs [
     KeccakCols.Bool.get_a_prime local x 0 z;
@@ -136,10 +152,51 @@ Lemma xor_sum_diff_eq (local : KeccakCols.t) (x z : Z)
     KeccakCols.Bool.get_a_prime local x 4 z
   ].
 Proof.
-  destruct (KeccakCols.Bool.get_c_prime _);
-    repeat destruct (KeccakCols.Bool.get_a_prime _);
-    cbn in *;
-    lia.
+  intros.
+  rewrite BinOp.mul_zero_implies_zero in H_sum_diff.
+  assert (from_mul : forall a b, UnOp.from (BinOp.mul a b) = BinOp.mul a b). {
+    intros.
+    unfold UnOp.from, BinOp.mul.
+    apply Z.mod_small; lia.
+  }
+  rewrite from_mul in H_sum_diff.
+  rewrite BinOp.mul_zero_implies_zero in H_sum_diff.
+  clear from_mul.
+  assert (H_q_minus_1 : forall n, -p < n < 0 -> p + n = n mod p). {
+    intros.
+    apply Z.mod_unique with (q := -1); lia.
+  }
+  assert (H_q_0 : forall n, 0 <= n < p -> n = n mod p). {
+    intros.
+    apply Z.mod_unique with (q := 0); lia.
+  }
+  unfold KeccakCols.Bool.get_a_prime in *.
+  unfold KeccakCols.Bool.get_c_prime in *.
+  do 6 (
+    (
+      (rewrite H_a_prime_bools in H_sum_diff by lia) ||
+      (rewrite H_c_prime_bools in H_sum_diff by lia)
+    );
+    destruct (Z.odd _)
+  ).
+  all: cbn in *; try reflexivity.
+  all: unfold UnOp.from, BinOp.add, BinOp.sub in *; cbn in *.
+  all: repeat (
+    cbn in * ||
+    (rewrite Z.mod_small with (a := 1) in * by lia) ||
+    (rewrite Z.mod_small with (a := 2) in * by lia) ||
+    (rewrite Z.mod_small with (a := 3) in * by lia) ||
+    (rewrite Z.mod_small with (a := 4) in * by lia) ||
+    (rewrite Z.mod_small with (a := 5) in * by lia)
+  ).
+  all: try lia.
+  all:
+    repeat match goal with
+    | H_sum_diff : context [Z.modulo ?n ?p] |- _ =>
+      (rewrite <- (H_q_minus_1 n) in H_sum_diff by lia) ||
+      (rewrite <- (H_q_0 n) in H_sum_diff by lia)
+    end.
+  all: lia.
 Qed.
 
 Module Pre.
@@ -152,7 +209,7 @@ Module Pre.
   }.
 End Pre.
 
-Lemma eval_local_implies {p} `{Prime p} (local' : KeccakCols.t) :
+Lemma eval_local_implies {p} `{Prime p} (H_p : 6 <= p) (local' : KeccakCols.t) :
   let local := M.map_mod local' in
   Pre.t local ->
   {{ eval_local local 🔽
@@ -246,7 +303,7 @@ Proof.
     { apply c_bools; lia. }
     { apply c_prime_bools; lia. }
   }
-  { apply xor_sum_diff_eq.
-    admit.
+  { apply xor_sum_diff_eq; trivial.
+    apply H_eval_assert_a_prime_c_prime; lia.
   }
-Admitted.
+Qed.
