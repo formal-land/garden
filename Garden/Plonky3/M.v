@@ -29,30 +29,30 @@ Class Prime (p : Z) : Prop := {
 }.
 
 Module Array.
-  Record t {A : Set} {N : Z} : Set := {
-    get : Z -> A;
+  Record t {A : Set} {N : nat} : Set := {
+    get : nat -> A;
   }.
   Arguments t : clear implicits.
 
-  Definition slice_from {A : Set} {N : Z} (x : t A N) (start : Z) : t A (N - start) :=
+  Definition slice_from {A : Set} {N : nat} (x : t A N) (start : nat) : t A (N - start) :=
     {|
       get index := x.(get) (start + index)
     |}.
 
-  Definition slice_first {A : Set} {N : Z} (x : t A N) (count : Z) : t A count := 
+  Definition slice_first {A : Set} {N : nat} (x : t A N) (count : nat) : t A count := 
     {|
       get := x.(get)
     |}.
 
-  Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
+  Definition get_mod {p} `{Prime p} {N : nat} (x : t Z N) (i : nat) : Z :=
     x.(get) i mod p.
 
-  Definition placeholder {A : Set} {N : Z} (x : A) : t A N :=
+  Definition placeholder {A : Set} {N : nat} (x : A) : t A N :=
     {|
       get index := x
     |}.
 
-  Definition map {A B : Set} {N : Z} (x : t A N) (f : A -> B) : t B N := 
+  Definition map {A B : Set} {N : nat} (x : t A N) (f : A -> B) : t B N := 
     {|
       get index := f (x.(get) index)
     |}.
@@ -89,9 +89,9 @@ Module M.
   | Pure {A : Set} (value : A) : t A
   | Equal (x1 x2 : Z) : t unit
   | AssertBool (x : Z) : t unit
-  | AssertZeros {N : Z} (array : Array.t Z N) : t unit
-  | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
-  | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
+  | AssertZeros {N : nat} (array : Array.t Z N) : t unit
+  | ForInZeroToN (N : nat) (f : nat -> t unit) : t unit
+  | SumForInZeroToN (N : nat) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -150,14 +150,14 @@ Module M.
   Definition equal (x y : Z) : t unit :=
     Equal x y.
 
-  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
+  Definition assert_zeros {N : nat} (array : Array.t Z N) : t unit :=
     AssertZeros array.
 
-  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
+  Definition for_in_zero_to_n (N : nat) (f : nat -> t unit) : t unit :=
     ForInZeroToN N f.
 
   (* helper: acting on all elements in an array *)
-  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
+  Definition for_each {A : Set} {N : nat} (f : A -> t unit) (x : Array.t A N) : t unit :=
     for_in_zero_to_n N (fun i => f (Array.get x i)).
 
   (* helper: acting on all elements in an array, but returning a sum *)    
@@ -210,17 +210,25 @@ Module Run.
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
     {{ M.AssertBool x 🔽 tt, x = Z.b2z (Z.odd x) }}
-  | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+  | AssertZerosFromFnSub {p} `{Prime p} {N : nat} (f g : nat -> Z) :
     {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
+      tt,
+      forall (i : nat),
+      (i < N)%nat ->
+      f i = g i
     }}
-  | AssertZeros {N : Z} (array : Array.t Z N) :
-    {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
-  | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
-    (forall i, 0 <= i < N ->
+  | AssertZeros {N : nat} (array : Array.t Z N) :
+    {{ M.AssertZeros array 🔽
+      tt,
+      forall (i : nat),
+      (i < N)%nat ->
+      array.(Array.get) i = 0
+    }}
+  | ForInZeroToN (N : nat) (f : nat -> M.t unit) (P : nat -> Prop) :
+    (forall (i : nat), (i < N)%nat ->
       {{ f i 🔽 tt, P i }}
     ) ->
-    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }}
+    {{ M.ForInZeroToN N f 🔽 tt, forall (i : nat), (i < N)%nat -> P i }}
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -277,7 +285,7 @@ Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
   M.AssertBool x.
 
 (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
-Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
+Definition assert_bools {p} `{Prime p} {N : nat} (l : Array.t Z N) : M.t unit :=
   M.for_in_zero_to_n N (fun i =>
     M.assert_bool (l.(Array.get) i)
   ).
@@ -344,14 +352,14 @@ Global Instance MapMod_Felt {p} `{Prime p} : MapMod Z := {
   map_mod := UnOp.from;
 }.
 
-Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
+Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : nat) `{MapMod p A} :
     MapMod (Array.t A N) :=
 {
   map_mod x := Array.map x map_mod;
 }.
 
 Module Limbs.
-  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : nat)
       (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
       Array.t Z NB_LIMBS :=
     {|
@@ -359,59 +367,57 @@ Module Limbs.
         let l : list nat :=
           List.rev (
             List.seq
-              (Z.to_nat (limb * BITS_PER_LIMB))%Z
-              (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
+              (limb * BITS_PER_LIMB)
+              (limb * BITS_PER_LIMB + BITS_PER_LIMB)
           ) in
         Lists.List.fold_left (fun acc (z : nat) =>
-          let z : Z := Z.of_nat z in
           BinOp.add (BinOp.mul 2 acc) (a.(Array.get) z)
         ) l 0
     |}.
 
-  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
+  Definition get_bit {NB_LIMBS : nat} (BITS_PER_LIMB : nat)
       (a : Array.t Z NB_LIMBS)
-      (bit : Z) :
+      (bit : nat) :
       bool :=
-    let limb := bit / BITS_PER_LIMB in
-    let bit_in_limb := bit mod BITS_PER_LIMB in
+    let limb := (bit / BITS_PER_LIMB)%nat in
+    let bit_in_limb := (bit mod BITS_PER_LIMB)%nat in
     let limb_value := a.(Array.get) limb in
-    Z.testbit limb_value bit_in_limb.
+    Z.testbit limb_value (Z.of_nat bit_in_limb).
 
-  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : nat)
       (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (bit : Z)
+      (bit : nat)
       (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        forall (z : nat),
+        (z < NB_LIMBS * BITS_PER_LIMB)%nat ->
         a.(Array.get) z = Z.b2z (Z.odd (a.(Array.get) z))
       ) :
     get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
     Z.odd (a.(Array.get) bit).
   Admitted.
 
-  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : nat)
       (a_limbs : Array.t Z NB_LIMBS)
       (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
       (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        forall (z : nat),
+        (z < NB_LIMBS * BITS_PER_LIMB)%nat ->
         a_bools.(Array.get) z = Z.b2z (Z.odd (a_bools.(Array.get) z))
       )
       (H_limbs :
-        forall (limb : Z),
-        0 <= limb < NB_LIMBS ->
+        forall (limb : nat),
+        (limb < NB_LIMBS)%nat ->
         a_limbs.(Array.get) limb =
         (of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb
       ) :
-    0 <= NB_LIMBS ->
-    forall (bit : Z),
-    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
+    forall (bit : nat),
+    (bit < NB_LIMBS * BITS_PER_LIMB)%nat ->
     get_bit BITS_PER_LIMB a_limbs bit =
     Z.odd (a_bools.(Array.get) bit).
   Proof.
     intros.
     unfold get_bit.
-    rewrite H_limbs by nia.
+    rewrite H_limbs by (apply Nat.Div0.div_lt_upper_bound; lia).
     now rewrite <- get_bit_of_bools_eq.
   Qed.
 End Limbs.
