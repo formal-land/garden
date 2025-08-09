@@ -76,10 +76,6 @@ Module BinOp.
   Definition mul {p} `{Prime p} (x y : Z) : Z :=
     (x * y) mod p.
 
-  Axiom mul_zero_implies_zero : forall {p} `{Prime p} (x y : Z),
-    BinOp.mul x y = 0 <->
-    UnOp.from x = 0 \/ UnOp.from y = 0.
-
   Definition div {p} `{Prime p} (x y : Z) : Z :=
     (x / y) mod p.
 
@@ -451,3 +447,52 @@ Module Limbs.
     now rewrite <- get_bit_of_bools_eq.
   Qed.
 End Limbs.
+
+Ltac show_equality_modulo :=
+  unfold
+    UnOp.from,
+    BinOp.add,
+    BinOp.sub,
+    BinOp.mul,
+    BinOp.div,
+    BinOp.mod_;
+  repeat (
+    (
+      (
+        apply Zplus_eqm ||
+        apply Zmult_eqm ||
+        apply Zopp_eqm
+      );
+      unfold eqm
+    ) ||
+    rewrite Zmod_eqm ||
+    reflexivity
+  ).
+
+Axiom mul_zero_implies_zero : forall {p} `{Prime p} (x y : Z),
+  BinOp.mul x y = 0 <->
+  UnOp.from x = 0 \/ UnOp.from y = 0.
+
+Lemma mul_zero_implies_zero_3 {p} `{Prime p} (x y z : Z) :
+  BinOp.mul (BinOp.mul x y) z = 0 <->
+  UnOp.from x = 0 \/ UnOp.from y = 0 \/ UnOp.from z = 0.
+Proof.
+  rewrite mul_zero_implies_zero.
+  replace (UnOp.from _) with (BinOp.mul x y) by show_equality_modulo.
+  rewrite mul_zero_implies_zero.
+  tauto.
+Qed.
+
+(** This lemma is often useful when the value we are comparing to zero is small and known. *)
+Lemma is_zero_small {p} `{Prime p} (x : Z) :
+  -p < x < p ->
+  UnOp.from x = 0 <->
+  x = 0.
+Proof.
+  intros.
+  unfold UnOp.from.
+  split; intros; [|now subst].
+  assert (-p < x < 0 \/ 0 <= x < p) as [] by lia.
+  { rewrite <- (Z.mod_unique x p (-1) (p + x)) in *; lia. }
+  { rewrite <- (Z.mod_unique x p 0 x) in *; lia. }
+Qed.

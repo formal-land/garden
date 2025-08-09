@@ -387,7 +387,7 @@ Module a_prime_c_prime.
             )
             (List.map Z.of_nat (List.seq 0 5)) 0 in
           let diff := BinOp.sub sum (Array.get (Array.get local.(KeccakCols.c_prime) x) z) in
-          BinOp.mul diff (BinOp.mul (BinOp.sub diff 2) (BinOp.sub diff four))
+          BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff four)
         |}
       ).
 
@@ -409,7 +409,7 @@ Module a_prime_c_prime.
               KeccakCols.get_a_prime local x 4 z
             ] 0 in
           BinOp.sub sum (KeccakCols.get_c_prime local x z) in
-        BinOp.mul diff (BinOp.mul (BinOp.sub diff 2) (BinOp.sub diff 4)) =
+        BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) =
         0
       }}.
   Proof.
