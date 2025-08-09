@@ -238,6 +238,64 @@ Proof.
   destruct_all bool; cbn in *; destruct H_sum_diff_bis as [|[|] ]; congruence.
 Qed.
 
+Definition p_goldilocks : Z :=
+  2^64 - 2^32 + 1.
+
+(** As an experiment, we do the same proof as above but using an explicit value for the prime. The
+    proof both happens to be faster and much simpler to write. *)
+Lemma xor_sum_diff_eq_goldilocks `{Prime p_goldilocks} (local : KeccakCols.t) (x z : Z)
+    (H_a_prime_bools :
+      forall x y z,
+        0 <= x < 5 ->
+        0 <= y < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_a_prime local x y z)
+    )
+    (H_c_prime_bools :
+      forall x z,
+        0 <= x < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_c_prime local x z)
+    )
+    (H_sum_diff :
+      let diff :=
+        let sum :=
+          Lists.List.fold_left BinOp.add [
+            KeccakCols.get_a_prime local x 0 z;
+            KeccakCols.get_a_prime local x 1 z;
+            KeccakCols.get_a_prime local x 2 z;
+            KeccakCols.get_a_prime local x 3 z;
+            KeccakCols.get_a_prime local x 4 z
+          ] 0 in
+        BinOp.sub sum (KeccakCols.get_c_prime local x z) in
+      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
+    ) :
+  0 <= x < 5 ->
+  0 <= z < 64 ->
+  KeccakCols.Bool.get_c_prime local x z =
+  xorbs [
+    KeccakCols.Bool.get_a_prime local x 0 z;
+    KeccakCols.Bool.get_a_prime local x 1 z;
+    KeccakCols.Bool.get_a_prime local x 2 z;
+    KeccakCols.Bool.get_a_prime local x 3 z;
+    KeccakCols.Bool.get_a_prime local x 4 z
+  ].
+Proof.
+  intros.
+  unfold KeccakCols.Bool.get_a_prime, KeccakCols.Bool.get_c_prime.
+  repeat (
+    (
+      (rewrite H_a_prime_bools in H_sum_diff by lia) ||
+      (rewrite H_c_prime_bools in H_sum_diff by lia)
+    );
+    let b := fresh "b" in
+    set (b := Z.odd _) in H_sum_diff;
+    fold b;
+    clearbody b
+  ).
+  destruct_all bool; cbv in H_sum_diff; cbv; congruence.
+Qed.
+
 Module Pre.
   Record t (local : KeccakCols.t) : Prop := {
     a_bools (x y z : Z) :
