@@ -113,6 +113,75 @@ Module FirstRowsFrom_a.
   Qed.
 End FirstRowsFrom_a.
 
+Lemma sum_eq {p} `{Prime p}
+    (b0 b1 b2 b3 b4 : bool) :
+    Lists.List.fold_left BinOp.add [
+      Z.b2z b0;
+      Z.b2z b1;
+      Z.b2z b2;
+      Z.b2z b3;
+      Z.b2z b4
+    ] 0 =
+    Lists.List.fold_left Z.add [
+      Z.b2z b0;
+      Z.b2z b1;
+      Z.b2z b2;
+      Z.b2z b3;
+      Z.b2z b4
+    ] 0 mod p.
+Proof.
+  cbn; unfold UnOp.from, BinOp.add.
+  show_equality_modulo.
+Qed.
+
+Lemma mul_diff_or_eq {p} `{Prime p} (H_p : 6 <= p)
+    (b0 b1 b2 b3 b4 b : bool)
+    (H_sum_diff :
+      let diff :=
+        let sum :=
+          Lists.List.fold_left BinOp.add [
+            Z.b2z b0;
+            Z.b2z b1;
+            Z.b2z b2;
+            Z.b2z b3;
+            Z.b2z b4
+          ] 0 in
+        BinOp.sub sum (Z.b2z b) in
+      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
+    ) :
+  let sum :=
+    Lists.List.fold_left Z.add [
+      Z.b2z b0;
+      Z.b2z b1;
+      Z.b2z b2;
+      Z.b2z b3;
+      Z.b2z b4
+    ] 0 in
+  let diff :=
+    sum - Z.b2z b in
+  diff = 0 \/ diff - 2 = 0 \/ diff - 4 = 0.
+Proof.
+  intros.
+  rewrite sum_eq in H_sum_diff.
+  fold sum in H_sum_diff.
+  rewrite M.mul_zero_implies_zero_3 in H_sum_diff.
+  cbn -[sum] in H_sum_diff.
+  replace (UnOp.from (BinOp.sub _ _))
+    with (UnOp.from (sum - Z.b2z b))
+    in H_sum_diff
+    by show_equality_modulo.
+  replace (UnOp.from (BinOp.sub _ _))
+    with (UnOp.from (sum - Z.b2z b - 2))
+    in H_sum_diff
+    by show_equality_modulo.
+  replace (UnOp.from (BinOp.sub _ _))
+    with (UnOp.from (sum - Z.b2z b - 4))
+    in H_sum_diff
+    by show_equality_modulo.
+  repeat (rewrite M.is_zero_small in H_sum_diff by (destruct_all bool; cbn in *; lia)).
+  trivial.
+Qed.
+
 (** Lemma to show that the calculation with the [diff] is actually a calculation of XOR. *)
 Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z : Z)
     (H_a_prime_bools :
@@ -139,7 +208,7 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
             KeccakCols.get_a_prime local x 4 z
           ] 0 in
         BinOp.sub sum (KeccakCols.get_c_prime local x z) in
-      BinOp.mul diff (BinOp.mul (BinOp.sub diff 2) (BinOp.sub diff 4)) = 0
+      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
     ) :
   0 <= x < 5 ->
   0 <= z < 64 ->
@@ -153,50 +222,20 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
   ].
 Proof.
   intros.
-  rewrite BinOp.mul_zero_implies_zero in H_sum_diff.
-  assert (from_mul : forall a b, UnOp.from (BinOp.mul a b) = BinOp.mul a b). {
-    intros.
-    unfold UnOp.from, BinOp.mul.
-    apply Z.mod_small; lia.
-  }
-  rewrite from_mul in H_sum_diff.
-  rewrite BinOp.mul_zero_implies_zero in H_sum_diff.
-  clear from_mul.
-  assert (H_q_minus_1 : forall n, -p < n < 0 -> p + n = n mod p). {
-    intros.
-    apply Z.mod_unique with (q := -1); lia.
-  }
-  assert (H_q_0 : forall n, 0 <= n < p -> n = n mod p). {
-    intros.
-    apply Z.mod_unique with (q := 0); lia.
-  }
-  unfold KeccakCols.Bool.get_a_prime in *.
-  unfold KeccakCols.Bool.get_c_prime in *.
-  do 6 (
+  unfold KeccakCols.Bool.get_a_prime, KeccakCols.Bool.get_c_prime.
+  repeat (
     (
       (rewrite H_a_prime_bools in H_sum_diff by lia) ||
       (rewrite H_c_prime_bools in H_sum_diff by lia)
     );
-    destruct (Z.odd _)
+    let b := fresh "b" in
+    set (b := Z.odd _) in H_sum_diff;
+    fold b;
+    clearbody b
   ).
-  all: cbn in *; try reflexivity.
-  all: unfold UnOp.from, BinOp.add, BinOp.sub in *; cbn in *.
-  all: repeat (
-    cbn in * ||
-    (rewrite Z.mod_small with (a := 1) in * by lia) ||
-    (rewrite Z.mod_small with (a := 2) in * by lia) ||
-    (rewrite Z.mod_small with (a := 3) in * by lia) ||
-    (rewrite Z.mod_small with (a := 4) in * by lia) ||
-    (rewrite Z.mod_small with (a := 5) in * by lia)
-  ).
-  all: try lia.
-  all:
-    repeat match goal with
-    | H_sum_diff : context [Z.modulo ?n ?p] |- _ =>
-      (rewrite <- (H_q_minus_1 n) in H_sum_diff by lia) ||
-      (rewrite <- (H_q_0 n) in H_sum_diff by lia)
-    end.
-  all: lia.
+  epose proof (mul_diff_or_eq H_p _ _ _ _ _ _ H_sum_diff) as H_sum_diff_bis.
+  clear H_sum_diff.
+  destruct_all bool; cbn in *; destruct H_sum_diff_bis as [|[|] ]; congruence.
 Qed.
 
 Module Pre.
