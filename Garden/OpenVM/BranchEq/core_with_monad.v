@@ -76,6 +76,18 @@ Module BranchEqualCoreCols.
     diff_inv_marker : Array.t Z NUM_LIMBS;
   }.
   Arguments t : clear implicits.
+
+  Global Instance map_mod {p} `{Prime p} {NUM_LIMBS : Z} : MapMod (t NUM_LIMBS) := {
+    map_mod := fun x => {|
+      BranchEqualCoreCols.a := M.map_mod x.(BranchEqualCoreCols.a);
+      BranchEqualCoreCols.b := M.map_mod x.(BranchEqualCoreCols.b);
+      BranchEqualCoreCols.cmp_result := M.map_mod x.(BranchEqualCoreCols.cmp_result);
+      BranchEqualCoreCols.imm := M.map_mod x.(BranchEqualCoreCols.imm);
+      BranchEqualCoreCols.opcode_beq_flag := M.map_mod x.(BranchEqualCoreCols.opcode_beq_flag);
+      BranchEqualCoreCols.opcode_bne_flag := M.map_mod x.(BranchEqualCoreCols.opcode_bne_flag);
+      BranchEqualCoreCols.diff_inv_marker := M.map_mod x.(BranchEqualCoreCols.diff_inv_marker);
+    |};
+  }.
 End BranchEqualCoreCols.
 
 (*
@@ -85,14 +97,15 @@ pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
 }
 *)
 Module BranchEqualCoreAir.
-  Record t : Set := {
+  Record t {NUM_LIMBS : Z} : Set := {
     offset : Z;
     pc_step : Z;
   }.
+  Arguments t : clear implicits.
 End BranchEqualCoreAir.
 
 Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
-    (self : BranchEqualCoreAir.t)
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local : BranchEqualCoreCols.t NUM_LIMBS)
     (from_pc : Z) :
     M.t (AdapterAirContext.t NUM_LIMBS) :=
@@ -104,13 +117,13 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
   let* is_valid : Z :=
     List.fold_left
       (fun acc flag =>
-        let* _ := assert_bool flag in
+        let* _ := M.assert_bool flag in
         M.pure (BinOp.add acc flag)
       )
       Z.zero
       flags in
-  let* _ := assert_bool is_valid in
-  let* _ := assert_bool local.(BranchEqualCoreCols.cmp_result) in
+  let* _ := M.assert_bool is_valid in
+  let* _ := M.assert_bool local.(BranchEqualCoreCols.cmp_result) in
 
   let a : Array.t Z NUM_LIMBS := local.(BranchEqualCoreCols.a) in
   let b : Array.t Z NUM_LIMBS := local.(BranchEqualCoreCols.b) in
@@ -124,13 +137,13 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     ) in
 
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
-    assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get a i) (Array.get b i)))
+    M.assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get a i) (Array.get b i)))
   ) in
   let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
     BinOp.mul (Array.get inv_marker i) (BinOp.sub (Array.get a i) (Array.get b i))
   ) in
   let sum := BinOp.add sum cmp_eq in
-  let* _ := when is_valid (assert_one sum) in
+  let* _ := M.when is_valid (M.assert_one sum) in
 
   let flags_with_opcode_integer : list (Z * Z) :=
     [
@@ -167,240 +180,156 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     |};
   |}.
 
-Module Array.
-  Parameter to_limbs : forall (NUM_LIMBS value : Z), Array.t Z NUM_LIMBS.
-End Array.
+Definition goldilocks_prime : Z :=
+  2^64 - 2^32 + 1.
 
-Module Input.
-  Record t : Set := {
-    a : Z;
-    b : Z;
-    opcode : BranchEqualOpcode.t;
-    imm : Z;
-    (* to_pc : Z; *)
-  }.
-
-  Module Extra.
-    Record t : Set := {
-      cmp_result : Z;
-      diff_inv_marker : Z;
-    }.
-  End Extra.
-
-  Definition to_cols {NUM_LIMBS : Z} (input : t) (extra : Extra.t):
-    BranchEqualCoreCols.t NUM_LIMBS :=
-  {|
-    BranchEqualCoreCols.a := Array.to_limbs NUM_LIMBS input.(a);
-    BranchEqualCoreCols.b := Array.to_limbs NUM_LIMBS input.(b);
-    BranchEqualCoreCols.cmp_result := extra.(Extra.cmp_result);
-    BranchEqualCoreCols.imm := input.(imm);
-    BranchEqualCoreCols.opcode_beq_flag :=
-      match input.(opcode) with
-      | BranchEqualOpcode.BEQ => 1
-      | BranchEqualOpcode.BNE => 0
-      end;
-    BranchEqualCoreCols.opcode_bne_flag :=
-      match input.(opcode) with
-      | BranchEqualOpcode.BEQ => 0
-      | BranchEqualOpcode.BNE => 1
-      end;
-    BranchEqualCoreCols.diff_inv_marker :=
-      Array.to_limbs NUM_LIMBS extra.(Extra.diff_inv_marker);
-  |}.
-End Input.
-
-Module Output.
-  Record t : Set := {
-    to_pc : Z;
-    reads : Z * Z;
-    writes : unit;
-    instruction : ImmInstruction.t;
-  }.
-
-  Definition to_adapter_air_context {NUM_LIMBS : Z} (output : t) :
-    AdapterAirContext.t NUM_LIMBS :=
-  {|
-    AdapterAirContext.to_pc := Some output.(to_pc);
-    AdapterAirContext.reads :=
-      let '(a, b) := output.(reads) in
-      (Array.to_limbs NUM_LIMBS a, Array.to_limbs NUM_LIMBS b);
-    AdapterAirContext.writes := output.(writes);
-    AdapterAirContext.instruction := output.(instruction);
-  |}.
-
-  Definition of_input 
-    (* TODO: change to arbitary prime in the future *)
-    (* {p} `{Prime p}  *)
-    `{Prime 23}
-    (core_air : BranchEqualCoreAir.t) (input : Input.t) 
-    (extra : Input.Extra.t) (from_pc : Z) : t := {|
-    to_pc :=
-      let cmp_result := extra.(Input.Extra.cmp_result) in
-      ((from_pc + (cmp_result * input.(Input.imm)) mod 23
-       + (not cmp_result) * core_air.(BranchEqualCoreAir.pc_step)
-       ) mod 23);
-    reads := (input.(Input.a), input.(Input.b));
-    writes := tt;
-    instruction := {|
-      ImmInstruction.is_valid := 1;
-      ImmInstruction.opcode :=
-        ((match input.(Input.opcode) with
+Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
+    (local' : BranchEqualCoreCols.t NUM_LIMBS)
+    (from_pc' : Z)
+    (branch_equal_opcode : BranchEqualOpcode.t) :
+  let local :=
+    M.map_mod local'
+      <| BranchEqualCoreCols.opcode_beq_flag :=
+          match branch_equal_opcode with
+          | BranchEqualOpcode.BEQ => 1
+          | BranchEqualOpcode.BNE => 0
+          end
+      |>
+      <| BranchEqualCoreCols.opcode_bne_flag :=
+        match branch_equal_opcode with
         | BranchEqualOpcode.BEQ => 0
         | BranchEqualOpcode.BNE => 1
-        end) mod 23
-        + core_air.(BranchEqualCoreAir.offset)) mod 23;
-      ImmInstruction.immediate := input.(Input.imm);
-    |};
-  |}.
-End Output.
-
-Smpl Create run_auto.
-
-Axiom assert_bool_zero :
-  {{ M.AssertBool 0 🔽 tt, True }}.
-Smpl Add apply assert_bool_zero : run_auto.
-
-Axiom assert_bool_one :
-  {{ M.AssertBool 1 🔽 tt, True }}.
-Smpl Add apply assert_bool_one : run_auto.
-
-Lemma eval_is_valid `{Prime 23} {NUM_LIMBS : Z}
-    (core_air : BranchEqualCoreAir.t)
-    (input : Input.t)
-    (extra : Input.Extra.t)
-    (from_pc : Z) :
-  let cols : BranchEqualCoreCols.t NUM_LIMBS := Input.to_cols input extra in
-  let output : AdapterAirContext.t NUM_LIMBS :=
-    Output.to_adapter_air_context (Output.of_input core_air input extra from_pc) in
-  {{ eval core_air cols from_pc 🔽 output, True }}.
-Proof.
-  cbn.
-  eapply Run.Implies. 
-  {
-    unfold eval; cbn.
-    eapply Run.Let with (value := 1) (P1 := True). {
-      destruct input.(Input.opcode); cbn.
-      { eapply Run.Implies. {
-          repeat (
-            (eapply Run.Let; [|intro]) ||
-            smpl run_auto ||
-            apply Run.Pure
-          ).
-        }
-        tauto.
-      }
-      { eapply Run.Implies. {
-          repeat (
-            (eapply Run.Let; [|intro]) ||
-            smpl run_auto ||
-            apply Run.Pure
-          ).
-        }
-        tauto.
-      }
-    }
-    intros [].
-    eapply Run.Let. { smpl run_auto. }
-    intros [].
-    eapply Run.Let. { apply Run.AssertBool. }
-    intros H_cmp_result_eq.
-    set (cmp_result := Z.odd extra.(Input.Extra.cmp_result)).
-    rewrite H_cmp_result_eq.
-    set (cmp_eq :=
-      match input.(Input.opcode) with
-      | BranchEqualOpcode.BEQ => cmp_result
-      | BranchEqualOpcode.BNE => negb cmp_result
-      end
-    ).
-    eapply Run.Let with (value := Z.b2z cmp_eq). {
-      destruct input.(Input.opcode), (Z.odd extra.(Input.Extra.cmp_result)); apply Run.Pure.
-    }
-    intros [].
-    (* NOTE: here we want to generalize the goal as a `P2` and leave it filled
-    after we finish all proofs inside. See the comments at the end of the whole 
-    proof *)
-    eapply Run.Implies.
-    {
-      (* NOTE: here we specify a property to prove for the `Let` clause *)
-      eapply Run.Let with
-        (P1 :=
-          if cmp_eq then
-            forall i, 0 <= i < NUM_LIMBS ->
-              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.a)) i =
-              Array.get_mod (Array.to_limbs NUM_LIMBS input.(Input.b)) i
+        end
+      |> in
+  let from_pc := M.map_mod from_pc' in
+  let expected_cmp_result : bool :=
+    match branch_equal_opcode with
+    | BranchEqualOpcode.BEQ =>
+      if Array.Eq.dec local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b) then
+        true
+      else
+        false
+    | BranchEqualOpcode.BNE =>
+      if Array.Eq.dec local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b) then
+        false
+      else
+        true
+    end in
+  {{ eval self local from_pc 🔽
+    {|
+      AdapterAirContext.to_pc :=
+        Some (BinOp.add from_pc (
+          if expected_cmp_result then
+            local.(BranchEqualCoreCols.imm)
           else
-            True
-        ). 
-      { 
-        destruct cmp_eq; cbn.
-        { 
-          apply Run.ForInZeroToN; intros.
-          unfold assert_zero.
-          repeat destruct Array.to_limbs. 
-          eapply Run.Implies with (P1 := 
-            (BinOp.mul 1 (BinOp.sub (get i) (get0 i))) = 0
-          ).
-          { apply Run.Equal. }
-          { unfold BinOp.mul, BinOp.sub.
-            rewrite -> Z.mul_1_l.
-            rewrite -> foo_mod_mod.
-            rewrite <- foo_sub.
-            apply foo_eq_sub. }
-        }
-        (* NOTE: `else` case for `cmp_eq`. We don't want to prove anything here,
-          so we want to stub the proof with a `True`. This `True` should be obtained
-          by constructing a combination of trivial cases for all constructors appeared
-          in the part of the program. 
-          Applying `Run.Implies` allows the constructors being used to automatically
-          generate such a case.
-        *)
-        { 
-          eapply Run.Implies.
-          (* Using the constructors *)
-          { apply Run.ForInZeroToN; intros.
-            apply Run.Equal. }
-          (* The generated case *)
-          { trivial. } 
-        }
-      }
-      intros H_a_b_eq.
-      (* Enforced by our current definition on Input *)
-      set (is_valid := true).
-      set (sum := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
-        BinOp.mul 
-          (Array.get ((Array.to_limbs NUM_LIMBS extra.(Input.Extra.diff_inv_marker))) i) 
-          (BinOp.sub 
-            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.a)) i)
-            (Array.get (Array.to_limbs NUM_LIMBS input.(Input.b)) i))
-      )).
-      eapply Run.Let with (P1 :=
-        if is_valid then BinOp.add sum (Z.b2z cmp_eq) = 1 else True
-      ).
-      { unfold assert_one, when, sum.
-        unfold BinOp.add, BinOp.sub, BinOp.mul.
-        eapply Run.Implies.
-        { apply Run.Equal. }
-        { trivial. }
-      }
-      intros H_valid_sum_1.
-      {
-        unfold BinOp.add, BinOp.sub, BinOp.mul.
-        unfold Output.to_adapter_air_context, Output.of_input.
-        rewrite -> foo_add, foo_mul_0, H_cmp_result_eq.
-        rewrite -> Z.mul_1_r.
-        simpl.
-        rewrite -> foo_mod_mod.
-        admit.
-        (* apply Run.Pure. *)
-      }
-    }
-    (* Here we finally fill in the `P2` that have been delayed so far from 
-    the `eapply Run.Implies` in the mid of the proof *)
-    intros H_all_asserts.
-    Unshelve.
-    apply H_all_asserts.
-    admit.
+            self.(BranchEqualCoreAir.pc_step)
+        ));
+      AdapterAirContext.reads := (local.(BranchEqualCoreCols.a), local.(BranchEqualCoreCols.b));
+      AdapterAirContext.writes := tt;
+      AdapterAirContext.instruction := {|
+        ImmInstruction.is_valid := 1;
+        ImmInstruction.opcode :=
+          BinOp.add local.(BranchEqualCoreCols.opcode_bne_flag) self.(BranchEqualCoreAir.offset);
+        ImmInstruction.immediate := local.(BranchEqualCoreCols.imm)
+      |};
+    |},
+    local.(BranchEqualCoreCols.cmp_result) = Z.b2z expected_cmp_result
+  }}.
+Proof.
+  intros.
+  unfold eval.
+  eapply Run.LetAccumulate with (value := 1) (P1 := True). {
+    destruct branch_equal_opcode; cbn;
+      eapply Run.Implies; repeat econstructor.
   }
-  (* See how we automatically decide `P1` and we don't need to unshelve anything *)
+  intros _.
+  eapply Run.LetAccumulate. {
+    constructor.
+  }
+  intros _.
+  eapply Run.LetAccumulate. {
+    constructor.
+  }
+  intros H_cmp_result.
+  set (cmp_eq :=
+    match branch_equal_opcode with
+    | BranchEqualOpcode.BEQ => Z.odd local.(BranchEqualCoreCols.cmp_result)
+    | BranchEqualOpcode.BNE => negb (Z.odd local.(BranchEqualCoreCols.cmp_result))
+    end
+  ).
+  eapply Run.LetAccumulate with (value := Z.b2z cmp_eq) (P1 := True). {
+    rewrite H_cmp_result.
+    destruct
+      (Z.odd local.(BranchEqualCoreCols.cmp_result)),
+      branch_equal_opcode;
+      apply Run.Pure.
+  }
+  intros _.
+  eapply Run.LetAccumulate with (P1 :=
+    if cmp_eq then
+      Array.Eq.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b)
+    else
+      True
+  ). {
+    eapply Run.Implies. {
+      repeat constructor.
+    }
+    intros H_for.
+    unfold Array.Eq.t.
+    destruct cmp_eq; cbn; [|trivial].
+    intros i H_i.
+    pose proof (H_for i H_i) as H_for_i.
+    rewrite <- M.sub_zero_equiv.
+    autorewrite with field_rewrite in H_for_i.
+    rewrite <- H_for_i.
+    cbn; unfold UnOp.from; show_equality_modulo.
+  }
+  intros H_a_b_eq.
+  eapply Run.LetAccumulate with (P1 :=
+    if cmp_eq then
+      True
+    else
+      ~ (Array.Eq.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b))
+  ). {
+    eapply Run.Implies. {
+      repeat constructor.
+    }
+    intros H_sum.
+    unfold Array.Eq.t.
+    destruct cmp_eq; cbn; [trivial|].
+    intro.
+    set (sum_for := M.sum_for_in_zero_to_n _ _) in H_sum.
+    replace sum_for with 0 in H_sum. 2: {
+      symmetry.
+      apply M.sum_for_in_zero_to_n_zeros_eq.
+      intros.
+      replace (BinOp.sub _ _) with 0. 2: {
+        symmetry.
+        rewrite M.sub_zero_equiv.
+        sauto lq: on rew: off.
+      }
+      now autorewrite with field_rewrite.
+    }
+    easy.
+  }
+  intros H_a_b_neq.
+  cbn - [local from_pc].
+  autorewrite with field_rewrite.
+  assert (local.(BranchEqualCoreCols.cmp_result) = Z.b2z expected_cmp_result) as H_cmp_result_eq. {
+    rewrite H_cmp_result; f_equal.
+    unfold expected_cmp_result, cmp_eq in *.
+    destruct branch_equal_opcode, Array.Eq.dec, (Z.odd local.(BranchEqualCoreCols.cmp_result));
+      unfold negb in *;
+      tauto.
+  }
+  eapply Run.Implies. {
+    eapply Run.Replace. {
+      apply Run.Pure.
+    }
+    f_equal.
+    rewrite H_cmp_result_eq.
+    now destruct expected_cmp_result; autorewrite with field_rewrite.
+  }
   tauto.
-Admitted.
+Qed.
