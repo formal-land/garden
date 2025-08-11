@@ -56,6 +56,13 @@ Module Array.
     {|
       get index := f (x.(get) index)
     |}.
+
+  Module Eq.
+    Definition t {A : Set} {N : Z} (x y : t A N) : Prop :=
+      forall (i : Z), 0 <= i < N -> x.(get) i = y.(get) i.
+
+    Axiom dec : forall {A : Set} {N : Z} (x y : Array.t A N), {t x y} + {~ t x y}.
+  End Eq.
 End Array.
 
 Module UnOp.
@@ -160,7 +167,7 @@ Module M.
   Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
     for_in_zero_to_n N (fun i => f (Array.get x i)).
 
-  (* helper: acting on all elements in an array, but returning a sum *)    
+  (* helper: acting on all elements in an array, but returning a sum *)
 
   Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
     match N with
@@ -199,6 +206,17 @@ Notation "[[ e ]]" :=
   (* (M.Pure e) *)
   (only parsing).
 
+Module IsBool.
+  Definition t (x : Z) : Prop :=
+    x = Z.b2z (Z.odd x).
+End IsBool.
+
+Lemma odd_b2z_eq (b : bool) :
+  Z.odd (Z.b2z b) = b.
+Proof.
+  destruct b; cbn; reflexivity.
+Qed.
+
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
@@ -209,7 +227,7 @@ Module Run.
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
   | AssertBool (x : Z) :
-    {{ M.AssertBool x 🔽 tt, x = Z.b2z (Z.odd x) }}
+    {{ M.AssertBool x 🔽 tt, IsBool.t x }}
   | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
     {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt, forall i, 0 <= i < N -> f i = g i
@@ -302,6 +320,17 @@ Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 Axiom xor_eq : forall {p} `{Prime p} (x y : bool),
   xor (Z.b2z x) (Z.b2z y) = Z.b2z (xorb x y).
 
+Lemma xor_is_bool {p} `{Prime p} (x y : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t (xor x y).
+Proof.
+  intros -> ->.
+  rewrite xor_eq.
+  unfold IsBool.t.
+  now rewrite odd_b2z_eq.
+Qed.
+
 Definition xor3 {p} `{Prime p} (x y z : Z) : Z :=
   xor (xor x y) z.
 
@@ -311,6 +340,16 @@ Proof.
   intros.
   unfold xor3.
   now repeat rewrite xor_eq.
+Qed.
+
+Lemma xor3_is_bool {p} `{Prime p} (x y z : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t z ->
+  IsBool.t (xor3 x y z).
+Proof.
+  intros.
+  now repeat apply xor_is_bool.
 Qed.
 
 Definition double {p} `{Prime p} (x : Z) : Z :=
@@ -383,7 +422,7 @@ Module Limbs.
       (H_bools :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        a.(Array.get) z = Z.b2z (Z.odd (a.(Array.get) z))
+        IsBool.t (a.(Array.get) z)
       ) :
     get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
     Z.odd (a.(Array.get) bit).
@@ -395,7 +434,7 @@ Module Limbs.
       (H_bools :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        a_bools.(Array.get) z = Z.b2z (Z.odd (a_bools.(Array.get) z))
+        IsBool.t (a_bools.(Array.get) z)
       )
       (H_limbs :
         forall (limb : Z),
@@ -415,3 +454,210 @@ Module Limbs.
     now rewrite <- get_bit_of_bools_eq.
   Qed.
 End Limbs.
+
+Ltac show_equality_modulo :=
+  unfold
+    UnOp.from,
+    BinOp.add,
+    BinOp.sub,
+    BinOp.mul,
+    BinOp.div,
+    BinOp.mod_;
+  repeat (
+    (
+      (
+        apply Zplus_eqm ||
+        apply Zmult_eqm ||
+        apply Zopp_eqm
+      );
+      unfold eqm
+    ) ||
+    rewrite Zmod_eqm ||
+    reflexivity
+  ).
+
+Axiom mul_zero_implies_zero : forall {p} `{Prime p} (x y : Z),
+  BinOp.mul x y = 0 <->
+  UnOp.from x = 0 \/ UnOp.from y = 0.
+
+Lemma mul_zero_implies_zero_3 {p} `{Prime p} (x y z : Z) :
+  BinOp.mul (BinOp.mul x y) z = 0 <->
+  UnOp.from x = 0 \/ UnOp.from y = 0 \/ UnOp.from z = 0.
+Proof.
+  rewrite mul_zero_implies_zero.
+  replace (UnOp.from _) with (BinOp.mul x y) by show_equality_modulo.
+  rewrite mul_zero_implies_zero.
+  tauto.
+Qed.
+
+(** This lemma is often useful when the value we are comparing to zero is small and known. *)
+Lemma is_zero_small {p} `{Prime p} (x : Z) :
+  -p < x < p ->
+  UnOp.from x = 0 <->
+  x = 0.
+Proof.
+  intros.
+  unfold UnOp.from.
+  split; intros; [|now subst].
+  assert (-p < x < 0 \/ 0 <= x < p) as [] by lia.
+  { rewrite <- (Z.mod_unique x p (-1) (p + x)) in *; lia. }
+  { rewrite <- (Z.mod_unique x p 0 x) in *; lia. }
+Qed.
+
+(* TODO: prove with Coqtail *)
+Lemma sub_zero_equiv {p} `{Prime p} (x y : Z) :
+  BinOp.sub x y = 0 <->
+  UnOp.from x = UnOp.from y.
+Proof.
+Admitted.
+
+Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
+    (H_body : forall (i : Z), 0 <= i < N -> f i = 0) :
+  M.sum_for_in_zero_to_n N f = 0.
+Proof.
+Admitted.
+
+(** Rewrite rules for field operations. *)
+Module FieldRewrite.
+  Lemma from_zero {p} `{Prime p} : UnOp.from 0 = 0.
+  Proof.
+    reflexivity.
+  Qed.
+  Global Hint Rewrite @from_zero : field_rewrite.
+
+  Lemma from_one {p} `{Prime p} : UnOp.from 1 = 1.
+  Proof.
+  Admitted.
+  Global Hint Rewrite @from_one : field_rewrite.
+
+  Lemma from_from {p} `{Prime p} (x : Z) :
+    UnOp.from (UnOp.from x) = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @from_from : field_rewrite.
+
+  Lemma from_add {p} `{Prime p} (x y : Z) :
+    UnOp.from (BinOp.add x y) = BinOp.add x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @from_add : field_rewrite.
+
+  Lemma add_from_left {p} `{Prime p} (x y : Z) :
+    BinOp.add (UnOp.from x) y = BinOp.add x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @add_from_left : field_rewrite.
+
+  Lemma add_from_right {p} `{Prime p} (x y : Z) :
+    BinOp.add x (UnOp.from y) = BinOp.add x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @add_from_right : field_rewrite.
+
+  Lemma sub_from_left {p} `{Prime p} (x y : Z) :
+    BinOp.sub (UnOp.from x) y = BinOp.sub x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @sub_from_left : field_rewrite.
+
+  Lemma sub_from_right {p} `{Prime p} (x y : Z) :
+    BinOp.sub x (UnOp.from y) = BinOp.sub x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @sub_from_right : field_rewrite.
+
+  Lemma mul_from_left {p} `{Prime p} (x y : Z) :
+    BinOp.mul (UnOp.from x) y = BinOp.mul x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @mul_from_left : field_rewrite.
+
+  Lemma mul_from_right {p} `{Prime p} (x y : Z) :
+    BinOp.mul x (UnOp.from y) = BinOp.mul x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @mul_from_right : field_rewrite.
+
+  Lemma from_sub {p} `{Prime p} (x y : Z) :
+    UnOp.from (BinOp.sub x y) = BinOp.sub x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @from_sub : field_rewrite.
+
+  Lemma from_mul {p} `{Prime p} (x y : Z) :
+    UnOp.from (BinOp.mul x y) = BinOp.mul x y.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @from_mul : field_rewrite.
+
+  Lemma add_zero_left {p} `{Prime p} (x : Z) :
+    BinOp.add 0 x = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @add_zero_left : field_rewrite.
+
+  Lemma add_zero_right {p} `{Prime p} (x : Z) :
+    BinOp.add x 0 = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+    f_equal; lia.
+  Qed.
+  Global Hint Rewrite @add_zero_right : field_rewrite.
+
+  Lemma sub_zero_left {p} `{Prime p} (x : Z) :
+    BinOp.sub 0 x = UnOp.from (-x).
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @sub_zero_left : field_rewrite.
+
+  Lemma sub_zero_right {p} `{Prime p} (x : Z) :
+    BinOp.sub x 0 = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+    f_equal; lia.
+  Qed.
+  Global Hint Rewrite @sub_zero_right : field_rewrite.
+
+  Lemma mul_zero_left {p} `{Prime p} (x : Z) :
+    BinOp.mul 0 x = 0.
+  Proof.
+    show_equality_modulo.
+  Qed.
+  Global Hint Rewrite @mul_zero_left : field_rewrite.
+
+  Lemma mul_zero_right {p} `{Prime p} (x : Z) :
+    BinOp.mul x 0 = 0.
+  Proof.
+    show_equality_modulo.
+    now replace (x * 0) with 0 by lia.
+  Qed.
+  Global Hint Rewrite @mul_zero_right : field_rewrite.
+
+  Lemma mul_one_left {p} `{Prime p} (x : Z) :
+    BinOp.mul 1 x = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+    now replace (1 * x) with x by lia.
+  Qed.
+  Global Hint Rewrite @mul_one_left : field_rewrite.
+
+  Lemma mul_one_right {p} `{Prime p} (x : Z) :
+    BinOp.mul x 1 = UnOp.from x.
+  Proof.
+    show_equality_modulo.
+    now replace (x * 1) with x by lia.
+  Qed.
+  Global Hint Rewrite @mul_one_right : field_rewrite.
+End FieldRewrite.
