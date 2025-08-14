@@ -168,12 +168,21 @@ Module Add2Proof.
           (* should be lia *)
           admit.
         }
+        unfold pack_16_limbs;
+        fold a0 a1 b0 b1;
+        unfold unpack_16_limbs.
         (* i = 0*)
         {
+          rewrite Hi0.
+          fold res0.
+          simpl.
           admit.
         }
         (* i = 1 *)
         {
+          rewrite Hi1.
+          fold res1.
+          simpl.
           admit.
         }
       }
