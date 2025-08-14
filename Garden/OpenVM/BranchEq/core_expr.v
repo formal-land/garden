@@ -17,6 +17,15 @@ Module ImmInstruction.
   Arguments t : clear implicits.
 End ImmInstruction.
 
+Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; "ImmInstruction:"; ToRocq.endl;
+      ToRocq.to_rocq self.(ImmInstruction.is_valid) (indent + 2);
+      ToRocq.to_rocq self.(ImmInstruction.opcode) (indent + 2);
+      ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 2)
+    ];
+}.
+
 (*
 pub struct AdapterAirContext<T, I: VmAdapterInterface<T>> {
   pub to_pc: Option<T>,
@@ -30,14 +39,33 @@ Module AdapterAirContext.
   Record t {NUM_LIMBS : Z} {T : Set} : Set := {
     to_pc : option T;
     (* I::Reads: From<[[AB::Expr; NUM_LIMBS]; 2]>, *)
-    reads : Array.t T NUM_LIMBS * Array.t T NUM_LIMBS;
+    reads : list (Array.t T NUM_LIMBS);
     (* I::Writes: Default, *)
-    writes : unit;
+    writes : list (Array.t T NUM_LIMBS);
     (* I::ProcessedInstruction: From<ImmInstruction<AB::Expr>>, *)
     instruction : ImmInstruction.t T;
   }.
   Arguments t : clear implicits.
 End AdapterAirContext.
+
+Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
+    ToRocq.C (AdapterAirContext.t NUM_LIMBS Expr.t) := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; "AdapterAirContext:"; ToRocq.endl;
+      ToRocq.cats [ToRocq.indent (indent + 2); "to_pc:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.to_pc) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "reads:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.reads) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "writes:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.writes) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "instruction:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.instruction) (indent + 4)
+      ]
+    ];
+}.
 
 (* TODO: from `instructions.rs`, move there *)
 (*
@@ -143,12 +171,11 @@ Definition eval {NUM_LIMBS : Z}
         let i := Z.of_nat i in
         Expr.Add sum
           (Expr.Mul
-            (Expr.Var (Array.get inv_marker i))
-            (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i))))
+            (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i)))
+            (Expr.Var (Array.get inv_marker i)))
       )
       (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
-      Expr.ZERO in
-  let sum : Expr.t := Expr.Add sum cmp_eq in
+      cmp_eq in
   let builder := Builder.assert_zero builder (Expr.Mul is_valid (Expr.assert_one sum)) in
 
   let flags_with_opcode_integer : list (Var.t * Z) :=
@@ -181,8 +208,8 @@ Definition eval {NUM_LIMBS : Z}
   (
     {|
       AdapterAirContext.to_pc := Some to_pc;
-      AdapterAirContext.reads := (Array.map a Expr.Var, Array.map b Expr.Var);
-      AdapterAirContext.writes := tt;
+      AdapterAirContext.reads := [Array.map a Expr.Var; Array.map b Expr.Var];
+      AdapterAirContext.writes := [];
       AdapterAirContext.instruction := {|
         ImmInstruction.is_valid := is_valid;
         ImmInstruction.opcode := expected_opcode;
@@ -191,3 +218,27 @@ Definition eval {NUM_LIMBS : Z}
     |},
     builder
   ).
+
+Definition print_branch_eq {NUM_LIMBS : Z} :
+    string :=
+  let air := {|
+    BranchEqualCoreAir.offset := 12;
+    BranchEqualCoreAir.pc_step := 23;
+  |} in
+  let builder := Builder.new in
+  let local : BranchEqualCoreCols.t NUM_LIMBS Var.t := {|
+    BranchEqualCoreCols.a := {| Array.get := fun i => Var.make (i + 0) |};
+    BranchEqualCoreCols.b := {| Array.get := fun i => Var.make (i + NUM_LIMBS) |};
+    BranchEqualCoreCols.cmp_result := Var.make (2 * NUM_LIMBS);
+    BranchEqualCoreCols.imm := Var.make (2 * NUM_LIMBS + 1);
+    BranchEqualCoreCols.opcode_beq_flag := Var.make (2 * NUM_LIMBS + 2);
+    BranchEqualCoreCols.opcode_bne_flag := Var.make (2 * NUM_LIMBS + 3);
+    BranchEqualCoreCols.diff_inv_marker := {| Array.get := fun i => Var.make (i + 2 * NUM_LIMBS + 4) |};
+  |} in
+  let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
+  let '(result, builder) := eval air builder local from_pc in
+  PrimString.cat
+    (ToRocq.to_rocq builder 0)
+    (ToRocq.to_rocq result 0).
+
+Compute print_branch_eq (NUM_LIMBS := 4).

@@ -57,6 +57,9 @@ Module Array.
       get index := f (x.(get) index)
     |}.
 
+  Definition to_list {A : Set} {N : Z} (x : t A N) : list A :=
+    List.map (fun i => x.(get) (Z.of_nat i)) (Lists.List.seq 0 (Z.to_nat N)).
+
   Module Eq.
     Definition t {A : Set} {N : Z} (x y : t A N) : Prop :=
       forall (i : Z), 0 <= i < N -> x.(get) i = y.(get) i.
