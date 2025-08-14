@@ -1,5 +1,4 @@
 Require Import Garden.Plonky3.M.
-Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
 pub struct ImmInstruction<T> {
