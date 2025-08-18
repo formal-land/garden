@@ -260,6 +260,9 @@ Definition not {p} `{Prime p} (x : Z) : Z :=
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
 
+Axiom from_xor_eq : forall {p} `{Prime p} (x y : Z),
+  UnOp.from (xor x y) = xor x y.
+
 Axiom xor_eq : forall {p} `{Prime p} (x y : bool),
   xor (Z.b2z x) (Z.b2z y) = Z.b2z (xorb x y).
 
@@ -350,6 +353,19 @@ Module Limbs.
         ) l 0
     |}.
 
+  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t (a.(Array.get) z)
+      )
+      (limb : Z) :
+    0 <= limb < NB_LIMBS ->
+    UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb) =
+    (of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb.
+  Admitted.
+
   Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
       (a : Array.t Z NB_LIMBS)
       (bit : Z) :
@@ -383,7 +399,7 @@ Module Limbs.
         forall (limb : Z),
         0 <= limb < NB_LIMBS ->
         a_limbs.(Array.get) limb =
-        (of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb
+        UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb)
       ) :
     0 <= NB_LIMBS ->
     forall (bit : Z),
@@ -394,7 +410,9 @@ Module Limbs.
     intros.
     unfold get_bit.
     rewrite H_limbs by nia.
-    now rewrite <- get_bit_of_bools_eq.
+    rewrite <- get_bit_of_bools_eq by assumption.
+    rewrite from_of_bools_eq; trivial.
+    nia.
   Qed.
 End Limbs.
 
@@ -603,6 +621,13 @@ Module FieldRewrite.
     now replace (x * 1) with x by lia.
   Qed.
   Global Hint Rewrite @mul_one_right : field_rewrite.
+
+  (** It applies the rewrite even under binders, for the goal and all the hypothesis. *)
+  Ltac run :=
+    try rewrite_db field_rewrite;
+    repeat match goal with
+    | H : _ |- _ => rewrite_db field_rewrite in H
+    end.
 End FieldRewrite.
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
@@ -614,10 +639,6 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
-    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
-    }}
   | AssertZeros {N : Z} (array : Array.t Z N) :
     {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
   | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
@@ -662,6 +683,23 @@ Module Run.
     }
   Qed.
 
+  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
+      tt,
+      forall (i : Z),
+      0 <= i < N ->
+      UnOp.from (f i) = UnOp.from (g i)
+    }}.
+  Proof.
+    intros.
+    eapply Run.Implies. {
+      eapply Run.AssertZeros.
+    }
+    cbn; intros H_zeros i H_i.
+    apply sub_zero_equiv.
+    now apply H_zeros.
+  Qed.
+
   Lemma LetAccumulate {A B : Set}
       (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
@@ -686,7 +724,10 @@ Module Run.
     (apply Run.Equal) ||
     (apply Run.Call) ||
     (eapply Run.Let) ||
-    intros.
+    match goal with
+    | |- True -> _ => intros _
+    | _ => intros
+    end.
 
   Ltac iterate :=
     repeat iterate_step.
