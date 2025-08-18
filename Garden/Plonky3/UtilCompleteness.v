@@ -323,43 +323,44 @@ End Add2Proof.
 
 
 (*
-# Proof Sketches for `add2`
+Updated New Proof:
 
-We will begin with one of the most fundamental ideas: `add2`.
 
-## Inputs and Preconditions
+Given the definitions:
+```
+- (d1) acc_16 = a[0] - b[0] - c[0] (mod p)
+- (d2) acc_32 = a[1] - b[1] - c[1] (mod p)
+- (d3) acc    = acc_16 + acc_32 * 2 ^ 16 (mod p)
+```
+The prover generates the following two constraints:
+(A) acc_16 * (acc_16 + 2 ^ 16) = 0 (mod p)
+(B) acc * (acc + (2 ^ 32) mod p) = 0 (mod p)
 
-- `p`: the prime characteristic of our finite field, such that
-	- `IsPrime p` (referred to as `hp`)
-    - `p > 2 ^ 17` (otherwise `panic`)
-- `a b c`: our inputs given as `2, 16` bit limbs (e.g. `a = a[0] + 2^16 a[1]`)
-	- each `16` bit limb has been range checked to ensure it contains a value in `[0, 2^16)`.
+precondition:
+(Hp)    p > 2 ^ 17
+(Hlimb) 0 <= a_i, b_i < 2 ^ 16
 
-## In-House Definitions
-- `acc_16 = a[0] - b[0] - c[0] (mod p)`.   (d1)
-- `acc_32 = a[1] - b[1] - c[1] (mod p)`.    (d2)
-- `acc  = acc_16 + 2 ^ 16 * acc_32 (mod p)` (d3)
+following the guides in the comments:
 
-## Desired Output
+let 
+(d4) acc_16_r = a[0] - b[0] - c[0] (without mod)
+(d5) acc_32_r = a[1] - b[1] - c[1]
+(d6) acc_r    = a    - b    - c    (without mod)
+              = acc_16_r + 2 ^ 16 * acc_32_r
 
-The desired property `a = b + c (mod 2 ^ 32)`, which is to say, `a[0] + 2 ^ 16 a[1] = (b[0] + c[0] + 2 ^ 16 b[1] + 2 ^ 16 c[1]) mod (2 ^ 32)`
+(r1) - 2 ^ 17 + 2 < acc_16_r <= 2 ^ 16 - 1
+(r2) - 2 ^ 33 + 2 < acc_r    <= 2 ^ 32 - 1
 
-Will hold if and only if the following conditions are satisfied: (they are the constraints that will be generated and checked by Plonky3)
-- A. `acc_16 * (acc_16 + 2 ^ 16) = 0 (mod p)`.
-- B. `acc * (acc + 2 ^ 32) = 0 (mod p)`.        
+(0) acc_16 = 0 (mod p) \/ (acc_16 + 2 ^ 16) = 0 (mod p) from (A)
+(1) acc_16_r = 0 \/ acc_16_r = - 2 ^ 16 from (0) and (Hp)
+(2) acc_16_r = 0 (mod 2 ^ 16) from (1)
+(3) acc = 0 (mod p) \/ (acc + (2 ^ 32) mod p) = 0 (mod p) from (B)
+(4) acc = 0 (mod p) \/ acc = - 2 ^ 32 (mod p) from (3)
+(5) acc_r = 0 (mod 2 ^ 16) from (2), (d6) and arithmetics
+(6) acc = acc_r mod p
+(7) acc_r = 0 (mod p) \/ acc_r = - 2 ^ 32 (mod p) from (4) and (7)
+(8) acc_r = 0 (mod 2 ^ 16 * p) \/ acc_r = - 2 ^ 32 (mod 2 ^ 16 * p) from (crt), (5), (7)
+(9) acc_r = 0 \/ acc_r = - 2 ^ 32 from (8), (hp) and (r2).
+(10) a = b + c (mod 2 ^ 32)
 
-## The proof:
-0. `acc_16 = 0 (mod p) \/ acc_16 = -2 ^ 16 (mod p)` from (A)
-1. `acc_16 = 0 \/ acc_16 = -2 ^ 16` from `hp`, and (0).
-2. `acc_16 = 0 (mod 2 ^ 16)` from (1)
-3. `acc  = 0 (mod 2 ^ 16)` from (d3), (2), and `hp`
-4. `acc  = 0 (mod P) \/ acc = -2^32 (mod P)` from (B)
-5. `acc  = 0 (mod 2 ^ 16 * P) \/ acc = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html]
-6. `acc = a - b - c` (definition)
-7. No overflow can occur on `acc mod 2^16 P` as `2^16 P > 2^33` and `a, b, c < 2^32`, by (5) and (6)
-8. Hence `acc = 0 \/ acc = -2^32` from (5) and (7)
-9. `acc = 0 (mod 2 ^ 32)` from (8) and definition of `mod`
-10. `a - b - c = 0 (mod 2 ^ 32)` from definition of `acc`.
 *)
-
-
