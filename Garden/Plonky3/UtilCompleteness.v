@@ -1,5 +1,6 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.Util.
+Require Import Coq.omega.PreOmega.
 
 (* TODO: these are to be declared as shared constants / methods, copied from blake3/constants.v *)
 Definition BITS_PER_LIMB : Z := 16.
@@ -77,7 +78,8 @@ Module Add2Proof.
         unfold two_16.
         unfold UnOp.from.
         (* given Hp, this should be obvious. *)
-        admit.
+        (* try to use the newly defined `mod_when_smaller` in M.v *)
+        rewrite mod_when_smaller; [reflexivity | lia].
       }
 
       rewrite H_two_16 in H2.

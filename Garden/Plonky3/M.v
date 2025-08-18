@@ -28,6 +28,8 @@ Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
 
+Axiom prime_range : forall {p} `{Prime p}, p > 1.
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -496,6 +498,12 @@ Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
   M.sum_for_in_zero_to_n N f = 0.
 Proof.
 Admitted.
+
+Lemma mod_when_smaller {p} `{Prime p} (x : Z) (Hx : 0 <= x < p) :
+  x mod p = x.
+Proof.
+  apply Zmod_small; auto.
+Qed.
 
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
