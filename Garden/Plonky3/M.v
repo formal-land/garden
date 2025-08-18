@@ -52,7 +52,7 @@ Module Array.
       get index := x
     |}.
 
-  Definition map {A B : Set} {N : Z} (x : t A N) (f : A -> B) : t B N := 
+  Definition map {A B : Set} {N : Z} (f : A -> B) (x : t A N) : t B N := 
     {|
       get index := f (x.(get) index)
     |}.
@@ -340,7 +340,7 @@ Global Instance MapMod_Felt {p} `{Prime p} : MapMod Z := {
 Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
     MapMod (Array.t A N) :=
 {
-  map_mod x := Array.map x map_mod;
+  map_mod := Array.map map_mod;
 }.
 
 Module Limbs.

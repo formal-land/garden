@@ -1,21 +1,6 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.MExpr.
-
-(*
-pub struct ImmInstruction<T> {
-    pub is_valid: T,
-    pub opcode: T,
-    pub immediate: T,
-}
-*)
-Module ImmInstruction.
-  Record t {T : Set} : Set := {
-    is_valid : T;
-    opcode : T;
-    immediate : T;
-  }.
-  Arguments t : clear implicits.
-End ImmInstruction.
+Require Import Garden.OpenVM.BranchEq.core_with_monad.
 
 Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
   to_rocq self indent :=
@@ -25,28 +10,6 @@ Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
       ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 2)
     ];
 }.
-
-(*
-pub struct AdapterAirContext<T, I: VmAdapterInterface<T>> {
-  pub to_pc: Option<T>,
-  pub reads: I::Reads,
-  pub writes: I::Writes,
-  pub instruction: I::ProcessedInstruction,
-}
-*)
-(* TODO: move it to another file, as this is actually related to `integration_api.rs` *)
-Module AdapterAirContext.
-  Record t {NUM_LIMBS : Z} {T : Set} : Set := {
-    to_pc : option T;
-    (* I::Reads: From<[[AB::Expr; NUM_LIMBS]; 2]>, *)
-    reads : list (Array.t T NUM_LIMBS);
-    (* I::Writes: Default, *)
-    writes : list (Array.t T NUM_LIMBS);
-    (* I::ProcessedInstruction: From<ImmInstruction<AB::Expr>>, *)
-    instruction : ImmInstruction.t T;
-  }.
-  Arguments t : clear implicits.
-End AdapterAirContext.
 
 Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
     ToRocq.C (AdapterAirContext.t NUM_LIMBS Expr.t) := {
@@ -66,19 +29,6 @@ Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
       ]
     ];
 }.
-
-(* TODO: from `instructions.rs`, move there *)
-(*
-pub enum BranchEqualOpcode {
-    BEQ,
-    BNE,
-}
-*)
-Module BranchEqualOpcode.
-  Inductive t : Set :=
-    | BEQ
-    | BNE.
-End BranchEqualOpcode.
 
 (*
 pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
@@ -208,7 +158,7 @@ Definition eval {NUM_LIMBS : Z}
   (
     {|
       AdapterAirContext.to_pc := Some to_pc;
-      AdapterAirContext.reads := [Array.map a Expr.Var; Array.map b Expr.Var];
+      AdapterAirContext.reads := [Array.map Expr.Var a; Array.map Expr.Var b];
       AdapterAirContext.writes := [];
       AdapterAirContext.instruction := {|
         ImmInstruction.is_valid := is_valid;
@@ -244,3 +194,30 @@ Definition print_branch_eq {NUM_LIMBS : Z} :
   ].
 
 Compute print_branch_eq (NUM_LIMBS := 4).
+
+Module RunWithoutImplies.
+  Reserved Notation "{{{ e 🔽 output , P }}}".
+
+  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
+  | Pure {A : Set} (value : A) :
+    {{{ M.Pure value 🔽 value, True }}}
+  | Equal (x1 x2 : Z) :
+    {{{ M.Equal x1 x2 🔽 tt, x1 = x2 }}}
+  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
+    {{{ e 🔽 value, P }}} ->
+    {{{ M.Call e 🔽 value, P }}}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{{ e 🔽 value, P1 }}} ->
+    (P1 -> {{{ k value 🔽 output, P2 }}}) ->
+    {{{ M.Let e k 🔽 output, P1 /\ P2 }}}
+
+  where "{{{ e 🔽 output , P }}}" := (t e output P).
+End RunWithoutImplies.
+
+(** We prove the equality of the [eval] definition above with the [eval] definition directly using
+    field elements. *)
+(* Lemma eq_eval_field {NUM_LIMBS : Z}
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
+    (builder : Builder.t)
+    (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
+    (from_pc : Var.t) *)

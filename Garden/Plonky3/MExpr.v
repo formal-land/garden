@@ -9,6 +9,9 @@ Module Field.
   Record t : Set := {
     value : Z;
   }.
+
+  Definition eval {p} `{Prime p} (self : t) : Z :=
+    UnOp.from self.(value).
 End Field.
 
 Module Var.
@@ -17,6 +20,14 @@ Module Var.
   }.
 
   Definition make := Build_t.
+
+  Module Env.
+    Definition t : Set :=
+      Z -> Z.
+  End Env.
+
+  Definition eval {p} `{Prime p} (env : Env.t) (self : t) : Z :=
+    UnOp.from (env self.(index)).
 End Var.
 
 Module Expr.
@@ -30,6 +41,27 @@ Module Expr.
   | Sub (x y : t)
   | Neg (x : t)
   | Mul (x y : t).
+
+  Module Env.
+    Record t : Set := {
+      is_first_row : bool;
+      is_last_row : bool;
+      is_transition : bool;
+    }.
+  End Env.
+
+  Fixpoint eval {p} `{Prime p} (expr_env : Env.t) (var_env : Var.Env.t) (self : t) : Z :=
+    match self with
+    | Var var => Var.eval var_env var
+    | IsFirstRow => Z.b2z expr_env.(Env.is_first_row)
+    | IsLastRow => Z.b2z expr_env.(Env.is_last_row)
+    | IsTransition => Z.b2z expr_env.(Env.is_transition)
+    | Constant value => Field.eval value
+    | Add x y => BinOp.add (eval expr_env var_env x) (eval expr_env var_env y)
+    | Sub x y => BinOp.sub (eval expr_env var_env x) (eval expr_env var_env y)
+    | Neg x => UnOp.opp (eval expr_env var_env x)
+    | Mul x y => BinOp.mul (eval expr_env var_env x) (eval expr_env var_env y)
+    end.
 
   Definition var (index : Z) : t :=
     Var {| Var.index := index |}.
@@ -49,6 +81,9 @@ Module Builder.
   Record t : Set := {
     constraints : list Expr.t;
   }.
+
+  Definition eval {p} `{Prime p} (expr_env : Expr.Env.t) (var_env : Var.Env.t) (self : t) : Prop :=
+    Lists.List.fold_left (fun acc e => acc /\ Expr.eval expr_env var_env e = 0) self.(constraints) True.
 
   Definition new : t :=
     {| constraints := [] |}.

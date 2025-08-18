@@ -8,11 +8,18 @@ pub struct ImmInstruction<T> {
 }
 *)
 Module ImmInstruction.
-  Record t : Set := {
-    is_valid : Z;
-    opcode : Z;
-    immediate : Z;
+  Record t {T : Set} : Set := {
+    is_valid : T;
+    opcode : T;
+    immediate : T;
   }.
+  Arguments t : clear implicits.
+
+  Definition map {T1 T2 : Set} (f : T1 -> T2) (self : t T1) : t T2 := {|
+    ImmInstruction.is_valid := f self.(ImmInstruction.is_valid);
+    ImmInstruction.opcode := f self.(ImmInstruction.opcode);
+    ImmInstruction.immediate := f self.(ImmInstruction.immediate);
+  |}.
 End ImmInstruction.
 
 (*
@@ -25,16 +32,25 @@ pub struct AdapterAirContext<T, I: VmAdapterInterface<T>> {
 *)
 (* TODO: move it to another file, as this is actually related to `integration_api.rs` *)
 Module AdapterAirContext.
-  Record t {NUM_LIMBS : Z}: Set := {
-    to_pc : option Z;
+  Record t {NUM_LIMBS : Z} {T : Set} : Set := {
+    to_pc : option T;
     (* I::Reads: From<[[AB::Expr; NUM_LIMBS]; 2]>, *)
-    reads : Array.t Z NUM_LIMBS * Array.t Z NUM_LIMBS;
+    reads : list (Array.t T NUM_LIMBS);
     (* I::Writes: Default, *)
-    writes : unit;
+    writes : list (Array.t T NUM_LIMBS);
     (* I::ProcessedInstruction: From<ImmInstruction<AB::Expr>>, *)
-    instruction : ImmInstruction.t;
+    instruction : ImmInstruction.t T;
   }.
   Arguments t : clear implicits.
+
+  Definition map {NUM_LIMBS : Z} {T1 T2 : Set} (f : T1 -> T2) (self : t NUM_LIMBS T1) :
+      t NUM_LIMBS T2 :=
+  {|
+    AdapterAirContext.to_pc := option_map f self.(AdapterAirContext.to_pc);
+    AdapterAirContext.reads := List.map (Array.map f) self.(AdapterAirContext.reads);
+    AdapterAirContext.writes := List.map (Array.map f) self.(AdapterAirContext.writes);
+    AdapterAirContext.instruction := ImmInstruction.map f self.(AdapterAirContext.instruction);
+  |}.
 End AdapterAirContext.
 
 (* TODO: from `instructions.rs`, move there *)
@@ -65,27 +81,31 @@ pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
 }
 *)
 Module BranchEqualCoreCols.
-  Record t {NUM_LIMBS : Z} : Set := {
-    a : Array.t Z NUM_LIMBS;
-    b : Array.t Z NUM_LIMBS;
-    cmp_result : Z;
-    imm : Z;
-    opcode_beq_flag : Z;
-    opcode_bne_flag : Z;
-    diff_inv_marker : Array.t Z NUM_LIMBS;
+  Record t {NUM_LIMBS : Z} {T : Set} : Set := {
+    a : Array.t T NUM_LIMBS;
+    b : Array.t T NUM_LIMBS;
+    cmp_result : T;
+    imm : T;
+    opcode_beq_flag : T;
+    opcode_bne_flag : T;
+    diff_inv_marker : Array.t T NUM_LIMBS;
   }.
   Arguments t : clear implicits.
 
-  Global Instance map_mod {p} `{Prime p} {NUM_LIMBS : Z} : MapMod (t NUM_LIMBS) := {
-    map_mod := fun x => {|
-      BranchEqualCoreCols.a := M.map_mod x.(BranchEqualCoreCols.a);
-      BranchEqualCoreCols.b := M.map_mod x.(BranchEqualCoreCols.b);
-      BranchEqualCoreCols.cmp_result := M.map_mod x.(BranchEqualCoreCols.cmp_result);
-      BranchEqualCoreCols.imm := M.map_mod x.(BranchEqualCoreCols.imm);
-      BranchEqualCoreCols.opcode_beq_flag := M.map_mod x.(BranchEqualCoreCols.opcode_beq_flag);
-      BranchEqualCoreCols.opcode_bne_flag := M.map_mod x.(BranchEqualCoreCols.opcode_bne_flag);
-      BranchEqualCoreCols.diff_inv_marker := M.map_mod x.(BranchEqualCoreCols.diff_inv_marker);
-    |};
+  Definition map {NUM_LIMBS : Z} {T1 T2 : Set} (f : T1 -> T2) (self : t NUM_LIMBS T1) :
+      t NUM_LIMBS T2 :=
+  {|
+    BranchEqualCoreCols.a := Array.map f self.(BranchEqualCoreCols.a);
+    BranchEqualCoreCols.b := Array.map f self.(BranchEqualCoreCols.b);
+    BranchEqualCoreCols.cmp_result := f self.(BranchEqualCoreCols.cmp_result);
+    BranchEqualCoreCols.imm := f self.(BranchEqualCoreCols.imm);
+    BranchEqualCoreCols.opcode_beq_flag := f self.(BranchEqualCoreCols.opcode_beq_flag);
+    BranchEqualCoreCols.opcode_bne_flag := f self.(BranchEqualCoreCols.opcode_bne_flag);
+    BranchEqualCoreCols.diff_inv_marker := Array.map f self.(BranchEqualCoreCols.diff_inv_marker);
+  |}.
+
+  Global Instance map_mod {p} `{Prime p} {NUM_LIMBS : Z} : MapMod (t NUM_LIMBS Z) := {
+    map_mod := BranchEqualCoreCols.map map_mod;
   }.
 End BranchEqualCoreCols.
 
@@ -105,9 +125,9 @@ End BranchEqualCoreAir.
 
 Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
-    (local : BranchEqualCoreCols.t NUM_LIMBS)
+    (local : BranchEqualCoreCols.t NUM_LIMBS Z)
     (from_pc : Z) :
-    M.t (AdapterAirContext.t NUM_LIMBS) :=
+    M.t (AdapterAirContext.t NUM_LIMBS Z) :=
   let flags : list Z := [
     local.(BranchEqualCoreCols.opcode_beq_flag);
     local.(BranchEqualCoreCols.opcode_bne_flag)
@@ -170,8 +190,8 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
 
   M.pure {|
     AdapterAirContext.to_pc := Some to_pc;
-    AdapterAirContext.reads := (a, b);
-    AdapterAirContext.writes := tt;
+    AdapterAirContext.reads := [a; b];
+    AdapterAirContext.writes := [];
     AdapterAirContext.instruction := {|
       ImmInstruction.is_valid := is_valid;
       ImmInstruction.opcode := expected_opcode;
@@ -184,7 +204,7 @@ Definition goldilocks_prime : Z :=
 
 Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
-    (local' : BranchEqualCoreCols.t NUM_LIMBS)
+    (local' : BranchEqualCoreCols.t NUM_LIMBS Z)
     (from_pc' : Z)
     (branch_equal_opcode : BranchEqualOpcode.t) :
   let local :=
@@ -224,8 +244,8 @@ Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
           else
             self.(BranchEqualCoreAir.pc_step)
         ));
-      AdapterAirContext.reads := (local.(BranchEqualCoreCols.a), local.(BranchEqualCoreCols.b));
-      AdapterAirContext.writes := tt;
+      AdapterAirContext.reads := [local.(BranchEqualCoreCols.a); local.(BranchEqualCoreCols.b)];
+      AdapterAirContext.writes := [];
       AdapterAirContext.instruction := {|
         ImmInstruction.is_valid := 1;
         ImmInstruction.opcode :=
