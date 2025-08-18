@@ -107,7 +107,22 @@ Module Add2Proof.
 
       assert (H1' : acc_16 = 0 \/ (acc_16 + 2 ^ 16) = 0).
       {
-        admit.
+        destruct H2 as [H2a | H2b].
+        (* case 1: acc_16 = 0  (mod p) *)
+        {
+          left.
+          unfold UnOp.from in H2a.
+          rewrite mod_when_smaller in H2a; [|lia].
+          auto.
+        }
+        (* case 2 : acc_16 + 2 ^ 16 = 0 (mod p) *)
+        {
+          right.
+          rewrite FieldRewrite.from_add in H2b.
+          unfold BinOp.add in H2b.
+          rewrite mod_when_smaller in H2b; [|lia].
+          auto.
+        }
       }
 
       (* 2. `acc_16 = 0 (mod 2 ^ 16)` from (1) *)
@@ -120,6 +135,8 @@ Module Add2Proof.
       assert (H3' : acc mod (2 ^ 16) = 0).
       {
         unfold acc.
+        unfold BinOp.add.
+        unfold BinOp.mul.
         admit.
       }
 
@@ -215,9 +232,9 @@ We will begin with one of the most fundamental ideas: `add2`.
 	- each `16` bit limb has been range checked to ensure it contains a value in `[0, 2^16)`.
 
 ## In-House Definitions
-- `acc_16 = a[0] - b[0] - c[0] (mod p)` (d1)
-- `acc_32 = a[1] - b[1] - c[1] (mod p)` (d2)
-- `acc = acc_16 + 2 ^ 16 * acc_32 (mod p)` (d3)
+- `acc_16 = a[0] - b[0] - c[0] (mod p)`.   (d1)
+- `acc' = acc_16 + 2 ^ 16 * acc_32`.            (d2)
+- `acc  = acc_16 + 2 ^ 16 * acc_32 (mod p) = acc' mod p` (d3)
 
 ## Desired Output
 
@@ -229,15 +246,15 @@ Will hold if and only if the following conditions are satisfied: (they are the c
 
 ## The proof:
 0. `acc_16 = 0 (mod p) \/ acc_16 = -2 ^ 16 (mod p)` from (A)
-1. `acc_16 = 0 \/ acc_16 = -2 ^ 16` from (A), `hp`, and (0).
+1. `acc_16 = 0 \/ acc_16 = -2 ^ 16` from `hp`, and (0).
 2. `acc_16 = 0 (mod 2 ^ 16)` from (1)
-3. `acc = 0 (mod 2 ^ 16)` from (d3), (2), and `hp`
-4. `acc = 0 (mod P) \/ acc = -2^32 (mod P)` from (B)
-5. `acc = 0 (mod 2 ^ 16 * P) \/ acc = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html]
-6. `acc = a - b - c` (definition)
-7. No overflow can occur on `acc mod 2^16 P` as `2^16 P > 2^33` and `a, b, c < 2^32`, by (5) and (6)
-8. Hence `acc = 0 \/ acc = -2^32` from (5) and (7)
-9. `acc = 0 (mod 2 ^ 32)` from (8) and definition of `mod`
-10. `a - b - c = 0 (mod 2 ^ 32)` from definition of `acc`.
+3. `acc'  = 0 (mod 2 ^ 16)` from (d3), (2), and `hp`
+4. `acc'  = 0 (mod P) \/ acc' = -2^32 (mod P)` from (B)
+5. `acc' = 0 (mod 2 ^ 16 * P) \/ acc' = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html]
+6. `acc' = a - b - c` (definition)
+7. No overflow can occur on `acc' mod 2^16 P` as `2^16 P > 2^33` and `a, b, c < 2^32`, by (5) and (6)
+8. Hence `acc' = 0 \/ acc' = -2^32` from (5) and (7)
+9. `acc' = 0 (mod 2 ^ 32)` from (8) and definition of `mod`
+10. `a - b - c = 0 (mod 2 ^ 32)` from definition of `acc'`.
 *)
 
