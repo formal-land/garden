@@ -241,19 +241,21 @@ Module c_c_prime.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
-      {{ eval local 🔽
-        tt,
-        Valid.t local
-      }}.
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Valid.t local
+    }}.
   Proof.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.iterate.
     }
-    sauto lq: on rew: off.
+    cbn; intros; constructor; cbn; intros.
+    { hauto l: on. }
+    { sauto lq: on rew: off. }
   Qed.
 End c_c_prime.
 
@@ -338,8 +340,8 @@ Module a_a_prime_c_c_prime.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      (local' : KeccakCols.t) :
+      let local := M.map_mod local' in
     {{ eval local 🔽
       tt,
       Valid.t local
@@ -348,7 +350,7 @@ Module a_a_prime_c_c_prime.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.iterate.
     }
     unfold Limbs.of_bools; cbn.
     intros; constructor; intros.
@@ -522,7 +524,7 @@ Module a_prime_prime_0_0_bits_bools.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.iterate.
     }
     sfirstorder.
   Qed.

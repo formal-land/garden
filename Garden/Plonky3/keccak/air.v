@@ -79,7 +79,7 @@ Definition eval
     )) in
 
   (* builder.assert_bool(local.export); *)
-  let* _ := assert_bool local.(KeccakCols.export) in
+  let* _ := M.assert_bool local.(KeccakCols.export) in
 
   (*
   builder
