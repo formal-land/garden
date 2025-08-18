@@ -237,8 +237,10 @@ Definition print_branch_eq {NUM_LIMBS : Z} :
   |} in
   let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
   let '(result, builder) := eval air builder local from_pc in
-  PrimString.cat
-    (ToRocq.to_rocq builder 0)
-    (ToRocq.to_rocq result 0).
+  ToRocq.cats [
+    ToRocq.endl;
+    ToRocq.to_rocq builder 0;
+    ToRocq.to_rocq result 0
+  ].
 
 Compute print_branch_eq (NUM_LIMBS := 4).
