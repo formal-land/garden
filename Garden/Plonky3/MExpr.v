@@ -43,15 +43,6 @@ Module Expr.
 
   Definition not (e : t) : t :=
     Sub ONE e.
-
-  Definition assert_zero (e : t) : t :=
-    e.
-
-  Definition assert_one (e : t) : t :=
-    Sub e ONE.
-
-  Definition assert_bool (e : t) : t :=
-    Mul e (Sub e ONE).
 End Expr.
 
 Module Builder.
@@ -63,13 +54,21 @@ Module Builder.
     {| constraints := [] |}.
 
   Definition assert_zero (builder : t) (e : Expr.t) : t :=
-    {| constraints := Expr.assert_zero e :: builder.(constraints) |}.
+    {| constraints := e :: builder.(constraints) |}.
 
   Definition assert_one (builder : t) (e : Expr.t) : t :=
-    assert_zero builder (Expr.assert_one e).
+    assert_zero builder (Expr.Sub e Expr.ONE).
 
   Definition assert_bool (builder : t) (e : Expr.t) : t :=
-    assert_zero builder (Expr.assert_bool e).
+    assert_zero builder (Expr.Mul e (Expr.Sub e Expr.ONE)).
+
+  Definition when (builder : t) (condition : Expr.t) (body : Builder.t -> Builder.t) : t :=
+    let new_builder := body new in
+    {|
+      constraints :=
+        List.map (fun e => Expr.Mul condition e) new_builder.(constraints) ++
+        builder.(constraints)
+    |}.
 End Builder.
 
 Module ToRocq.

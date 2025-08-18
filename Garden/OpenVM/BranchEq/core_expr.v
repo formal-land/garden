@@ -176,7 +176,7 @@ Definition eval {NUM_LIMBS : Z}
       )
       (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
       cmp_eq in
-  let builder := Builder.assert_zero builder (Expr.Mul is_valid (Expr.assert_one sum)) in
+  let builder := Builder.when builder is_valid (fun builder => Builder.assert_one builder sum) in
 
   let flags_with_opcode_integer : list (Var.t * Z) :=
     [
