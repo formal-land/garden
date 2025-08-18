@@ -435,7 +435,19 @@ Module Limbs.
     rewrite from_of_bools_eq; trivial.
     nia.
   Qed.
+
 End Limbs.
+
+Module ArrayLimbs.
+  Definition double_val_array (val1 val2 : Z) : Array.t Z 2 :=
+    {| Array.get i := 
+        if i =? 0 then val1
+        else if i =? 1 then val2
+        else 0 (* Default case, should not happen *)
+    |}.
+  
+  
+End ArrayLimbs.
 
 Ltac show_equality_modulo :=
   unfold
@@ -499,11 +511,6 @@ Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
 Proof.
 Admitted.
 
-Lemma mod_when_smaller {p} `{Prime p} (x : Z) (Hx : 0 <= x < p) :
-  x mod p = x.
-Proof.
-  apply Zmod_small; auto.
-Qed.
 
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
@@ -826,3 +833,37 @@ Module Run.
     repeat run_step.
 End Run.
 Export Run.
+
+
+(* Utilities used for modulo arithmetics *)
+Lemma mod_when_smaller {p} `{Prime p} (x : Z) (Hx : 0 <= x < p) :
+  x mod p = x.
+Proof.
+  apply Zmod_small; auto.
+Qed.
+
+(* https://math.stackexchange.com/questions/2542245/how-to-prove-chinese-remainder-theorem-by-coq *)
+Lemma chinese_remainder: forall n p a b : Z,
+    n <> 0 ->
+    p <> 0 ->
+    Znumtheory.rel_prime n p ->
+    exists x:Z, (x mod n = a mod n) /\ (x mod p = b mod p). 
+Proof.
+  intros n p a b npos ppos coprime. 
+  destruct (Znumtheory.rel_prime_bezout _ _ coprime) as [u v H0].
+  exists (a * v * p + b * u * n). split.
+  - rewrite Z.mod_add. 2: exact npos.
+    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
+    assert ((u * n + v * p) mod n = 1 mod n) as H.
+    rewrite H0. reflexivity.
+    rewrite Z.add_comm, Z.mod_add in H. rewrite H.
+    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
+    reflexivity. exact npos.
+  - rewrite Z.add_comm, Z.mod_add. 2: exact ppos.
+    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
+    assert ((u * n + v * p) mod p = 1 mod p) as H.
+    rewrite H0. reflexivity.
+    rewrite Z.mod_add in H. rewrite H.
+    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
+    reflexivity. exact ppos.  
+Qed.
