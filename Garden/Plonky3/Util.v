@@ -105,8 +105,8 @@ Definition xor_32_shift {p} `{Prime p}
   let sum_16_32 := pack_bits_le_array xor_shift_c_16_32 in
 
   (* builder.assert_zeros([a[0] - sum_0_16, a[1] - sum_16_32]); *)
-  let* zero_1 := assert_zero (BinOp.sub (Array.get a 0) sum_0_16) in
-  let* zero_2 := assert_zero (BinOp.sub (Array.get a 1) sum_16_32) in
+  let* zero_1 := M.assert_zero (BinOp.sub (Array.get a 0) sum_0_16) in
+  let* zero_2 := M.assert_zero (BinOp.sub (Array.get a 1) sum_16_32) in
   M.Pure tt.
 
 
@@ -186,8 +186,8 @@ Definition add2 {p} `{Prime p}
         acc_16.clone() * (acc_16 + AB::Expr::from_prime_subfield(two_16)),
     ]); 
     *)
-    let* _ := assert_zero (BinOp.mul acc (BinOp.add acc two_32)) in
-    let* _ := assert_zero (BinOp.mul acc_16 (BinOp.add acc_16 two_16)) in
+    let* _ := M.assert_zero (BinOp.mul acc (BinOp.add acc two_32)) in
+    let* _ := M.assert_zero (BinOp.mul acc_16 (BinOp.add acc_16 two_16)) in
     M.Pure tt.
 
 (*
@@ -262,13 +262,12 @@ Definition add3 {p} `{Prime p}
             * (acc_16 + AB::Expr::from_prime_subfield(two_16.double())),
     ]);
     *)
-    let* _ := assert_zero 
+    let* _ := M.assert_zero 
       (BinOp.mul 
         (BinOp.mul acc (BinOp.add acc two_32))
         (BinOp.add acc (double two_32))) in
-    let* _ := assert_zero 
+    let* _ := M.assert_zero 
       (BinOp.mul 
         (BinOp.mul acc_16 (BinOp.add acc_16 two_16))
         (BinOp.add acc_16 (double two_16))) in
     M.Pure tt.
-

@@ -87,7 +87,7 @@ Definition eval
     .assert_zero(local.export);
   *)
   let* _ := when_bool is_not_final_step (
-    assert_zero local.(KeccakCols.export)
+    M.assert_zero local.(KeccakCols.export)
   ) in
 
   (*

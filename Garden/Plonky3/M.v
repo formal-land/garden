@@ -95,7 +95,6 @@ Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | Equal (x1 x2 : Z) : t unit
-  | AssertZeros {N : Z} (array : Array.t Z N) : t unit
   | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
   | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
@@ -156,14 +155,18 @@ Module M.
   Definition equal (x y : Z) : t unit :=
     Equal x y.
 
+  (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
+  Definition assert_zero (x : Z) : M.t unit :=
+    M.equal x 0.
+
   Definition assert_bool {p} `{Prime p} (x : Z) : t unit :=
     equal (BinOp.mul x (BinOp.sub x 1)) 0.
 
-  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
-    AssertZeros array.
-
   Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
     ForInZeroToN N f.
+
+  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
+    for_in_zero_to_n N (fun i => assert_zero (array.(Array.get) i)).
 
   (* helper: acting on all elements in an array *)
   Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
@@ -228,10 +231,6 @@ Module Pair.
   }.
   Arguments t : clear implicits.
 End Pair.
-
-(* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_zero (x : Z) : M.t unit :=
-  M.equal x 0.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
@@ -639,8 +638,6 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | AssertZeros {N : Z} (array : Array.t Z N) :
-    {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
   | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
     (forall i, 0 <= i < N ->
       {{ f i 🔽 tt, P i }}
@@ -683,8 +680,20 @@ Module Run.
     }
   Qed.
 
+  Lemma AssertZeros {N : Z} (array : Array.t Z N) :
+    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}.
+  Proof.
+    eapply Run.Implies. {
+      unfold M.assert_zeros.
+      apply ForInZeroToN.
+      intros.
+      apply Equal.
+    }
+    trivial.
+  Qed.
+
   Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
-    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
+    {{ M.assert_zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt,
       forall (i : Z),
       0 <= i < N ->
