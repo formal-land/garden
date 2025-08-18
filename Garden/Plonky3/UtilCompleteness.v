@@ -82,6 +82,18 @@ Module Add2Proof.
         rewrite mod_when_smaller; [reflexivity | lia].
       }
 
+      assert (H_two_32 : two_32 = UnOp.from (2 ^ 32)). {
+        unfold two_32.
+        unfold UnOp.from.
+        (* given Hp, this should be obvious. *)
+        (* try to use the newly defined `mod_when_smaller` in M.v *)
+        rewrite mod_when_smaller; [reflexivity | lia].
+      }
+
+      (* Now we have acc_16, acc_32, and acc in terms of a0, a1, b0, b1, res0, res1 *)
+
+      (* We will now prove the properties of acc_16 and acc_32 *)
+
       rewrite H_two_16 in H2.
 
       assert (Hacc_16 : 0 <= acc_16 < 2 ^ 16). {
@@ -131,27 +143,119 @@ Module Add2Proof.
         lia.
       }
 
-      (* 3. `acc = 0 (mod 2 ^ 16)` from (d3), (2), and `hp` *)
-      assert (H3' : acc mod (2 ^ 16) = 0).
+      set (acc_raw := acc_16 + 2 ^ 16 * acc_32).
+
+      assert (Hacc : acc = UnOp.from acc_raw).
       {
         unfold acc.
+        unfold acc_raw.
         unfold BinOp.add.
         unfold BinOp.mul.
-        admit.
+        unfold UnOp.from.
+        replace (Z.pow_pos 2 16) with (2 ^ 16) by reflexivity.
+
+        rewrite Zplus_mod_idemp_r.
+        rewrite Z.mul_comm.
+        reflexivity.
+      }
+
+      
+
+      (* 3. `acc = 0 (mod 2 ^ 16)` from (d3), (2), and `hp` *)
+      assert (H3' : acc_raw mod (2 ^ 16) = 0).
+      {
+        unfold acc_raw.
+        lia.
       }
 
 
       (* 4. `acc = 0 (mod P) \/ acc = -2^32 (mod P)` from (B) *)
       assert (H4' : acc mod p = 0 \/ (acc + two_32) mod p = 0).
       {
+        rewrite <- (Zmod_mod (acc + two_32)).
+        unfold BinOp.add in H1.
+        auto.
+      }
+
+      assert (H4'' : acc_raw mod p = 0 \/ (acc_raw + 2 ^ 32) mod p = 0).
+      {
+        rewrite Hacc in H4'.
+        unfold UnOp.from in H4'.
+        rewrite Zmod_mod in H4'.
+        rewrite Zplus_mod_idemp_l in H4'.
+        destruct H4' as [H4a | H4b].
+        (* case 1: acc mod p = 0 *)
+        {
+          left.
+          auto.
+        }
+        (* case 2: acc + two_32 mod p = 0 *)
+        {
+          right.
+          rewrite H_two_32 in H4b.
+          unfold UnOp.from in H4b.
+          rewrite Zplus_mod_idemp_r in H4b.
+          auto.
+        }
+      }
+
+      assert (Hp_coprime : Znumtheory.rel_prime (2 ^ 16) p).
+      {
+        (* Consider integrating some definitions from Znumtheory. *)
+        (* Idea: Prime p, and p > 2 : p and any exponential of 2 should be coprime. *)
         admit.
       }
 
       (* 5. `acc = 0 (mod 2 ^ 16 * P) \/ acc = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html] *)
-      assert (H5' : acc mod (2 ^ 16 * p) = 0 \/ (acc + two_32) mod (2 ^ 16 * p) = 0).
+      assert (H5'' : acc_raw mod (2 ^ 16 * p) = 0 \/ (acc_raw + two_32) mod (2 ^ 16 * p) = 0).
       { 
-        unfold acc.
-        admit.
+        assert (Hp0 : p <> 0).
+        {
+          lia.
+        }
+        assert (H216 : 2 ^ 16 <> 0).
+        {
+          lia.
+        }
+        destruct H4' as [H4a | H4b].
+        (* case 1: acc_raw mod p = 0 *)
+        {
+          left.
+          assert (H4a' : acc_raw mod p = 0).
+          {
+            rewrite Hacc in H4a.
+            unfold UnOp.from in H4a.
+            rewrite Zmod_mod in H4a.
+            auto.
+          }
+          assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p acc_raw 0 H216 Hp0 Hp_coprime H3' H4a').
+          auto.     
+        }
+        (* case 2: acc_raw + two_32 mod p = 0 *)
+        {
+          right.
+          assert (Hacc_raw_2_32 : (acc_raw + 2 ^ 32) mod 2 ^ 16 = 0).
+          {
+            admit.
+          }
+          assert (H4b' : (acc_raw + two_32) mod p = 0).
+          {
+            rewrite Hacc in H4b.
+            unfold UnOp.from in H4b.
+            rewrite Zplus_mod_idemp_l in H4b.
+            auto.
+          }
+          (* 
+          Idea: 
+          (acc_raw + two_32) mod (2 ^ 16 * p)
+          = acc_raw mod (2 ^ 16 * p) + two_32 mod (2 ^ 16 * p)
+          Given p > 2 ^ 17, 2 ^ 16 p > 2^32
+          so two_32 mod (2 ^ 16 * p) = two_32
+          *)
+          (* assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p (acc_raw + 2 ^ 32) 0 H216 Hp0 Hp_coprime Hacc_raw_2_32 H4b).
+          rewrite <- Hcrt. *)
+          admit.
+        }
       }
 
       (* 6. `acc = result - a - b` (definition) *)
@@ -233,8 +337,8 @@ We will begin with one of the most fundamental ideas: `add2`.
 
 ## In-House Definitions
 - `acc_16 = a[0] - b[0] - c[0] (mod p)`.   (d1)
-- `acc' = acc_16 + 2 ^ 16 * acc_32`.            (d2)
-- `acc  = acc_16 + 2 ^ 16 * acc_32 (mod p) = acc' mod p` (d3)
+- `acc_32 = a[1] - b[1] - c[1] (mod p)`.    (d2)
+- `acc  = acc_16 + 2 ^ 16 * acc_32 (mod p)` (d3)
 
 ## Desired Output
 
@@ -248,13 +352,14 @@ Will hold if and only if the following conditions are satisfied: (they are the c
 0. `acc_16 = 0 (mod p) \/ acc_16 = -2 ^ 16 (mod p)` from (A)
 1. `acc_16 = 0 \/ acc_16 = -2 ^ 16` from `hp`, and (0).
 2. `acc_16 = 0 (mod 2 ^ 16)` from (1)
-3. `acc'  = 0 (mod 2 ^ 16)` from (d3), (2), and `hp`
-4. `acc'  = 0 (mod P) \/ acc' = -2^32 (mod P)` from (B)
-5. `acc' = 0 (mod 2 ^ 16 * P) \/ acc' = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html]
-6. `acc' = a - b - c` (definition)
-7. No overflow can occur on `acc' mod 2^16 P` as `2^16 P > 2^33` and `a, b, c < 2^32`, by (5) and (6)
-8. Hence `acc' = 0 \/ acc' = -2^32` from (5) and (7)
-9. `acc' = 0 (mod 2 ^ 32)` from (8) and definition of `mod`
-10. `a - b - c = 0 (mod 2 ^ 32)` from definition of `acc'`.
+3. `acc  = 0 (mod 2 ^ 16)` from (d3), (2), and `hp`
+4. `acc  = 0 (mod P) \/ acc = -2^32 (mod P)` from (B)
+5. `acc  = 0 (mod 2 ^ 16 * P) \/ acc = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html]
+6. `acc = a - b - c` (definition)
+7. No overflow can occur on `acc mod 2^16 P` as `2^16 P > 2^33` and `a, b, c < 2^32`, by (5) and (6)
+8. Hence `acc = 0 \/ acc = -2^32` from (5) and (7)
+9. `acc = 0 (mod 2 ^ 32)` from (8) and definition of `mod`
+10. `a - b - c = 0 (mod 2 ^ 32)` from definition of `acc`.
 *)
+
 

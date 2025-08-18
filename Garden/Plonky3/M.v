@@ -30,6 +30,7 @@ Class Prime (p : Z) : Prop := {
 
 Axiom prime_range : forall {p} `{Prime p}, p > 1.
 
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -824,8 +825,8 @@ Proof.
   apply Zmod_small; auto.
 Qed.
 
-(* https://math.stackexchange.com/questions/2542245/how-to-prove-chinese-remainder-theorem-by-coq *)
-Lemma chinese_remainder: forall n p a b : Z,
+(* possible referencehttps://math.stackexchange.com/questions/2542245/how-to-prove-chinese-remainder-theorem-by-coq *)
+Lemma chinese_remainder_simpler: forall n p a b : Z,
     n <> 0 ->
     p <> 0 ->
     Znumtheory.rel_prime n p ->
@@ -849,3 +850,13 @@ Proof.
     rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
     reflexivity. exact ppos.  
 Qed.
+
+(** Binary Chinese Remainder Theorem: if p, q are coprime, then the equation system 
+    "x mod p = a /\ x mod q = b" has a unique solution modulo p * q *)
+Axiom binary_chinese_remainder_alt : forall (p q x t : Z),
+  p <> 0 ->
+  q <> 0 ->
+  Znumtheory.rel_prime p q ->
+  x mod p = t mod p ->
+  x mod q = t mod q ->
+  x mod (p * q) = t mod (p * q).
