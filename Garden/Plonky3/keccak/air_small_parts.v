@@ -46,12 +46,12 @@ Module preimage_a.
     unfold eval, M.when.
     destruct (_ =? 0) eqn:?.
     { eapply Run.Implies. {
-        Run.iterate.
+        Run.run.
       }
       lia.
     }
     { eapply Run.Implies. {
-        Run.iterate.
+        Run.run.
       }
       cbn.
       rewrite_db field_rewrite.
@@ -114,12 +114,12 @@ Module preimage_next_preimage.
     unfold not_final_step, final_step in *.
     destruct (_ =? 0) eqn:?.
     { eapply Run.Implies. {
-        Run.iterate.
+        Run.run.
       }
       lia.
     }
     { eapply Run.Implies. {
-        Run.iterate.
+        Run.run.
       }
       cbn.
       rewrite_db field_rewrite.
@@ -255,7 +255,7 @@ Module c_c_prime.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     cbn; rewrite_db field_rewrite.
     unfold M.xor3; setoid_rewrite M.from_xor_eq.
@@ -356,7 +356,7 @@ Module a_a_prime_c_c_prime.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     unfold Limbs.of_bools; cbn; rewrite_db field_rewrite.
     intros; constructor; intros.
@@ -423,7 +423,7 @@ Module a_prime_c_prime.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
     sauto.
   Qed.
@@ -502,7 +502,7 @@ Module a_prime_prime.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     cbn; rewrite_db field_rewrite.
     hauto q: on.
@@ -531,7 +531,7 @@ Module a_prime_prime_0_0_bits_bools.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     sfirstorder.
   Qed.
@@ -586,7 +586,7 @@ Module a_prime_prime_0_0_limbs.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     cbn.
     hauto l: on.
@@ -669,7 +669,7 @@ Module a_prime_prime_prime_0_0_limbs.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     hauto l: on.
   Qed.
@@ -735,6 +735,7 @@ Module a_prime_prime_prime_next_a.
           cbn.
           unfold M.when.
           repeat unfold final_step, not_final_step, NUM_ROUNDS in *; cbn in *.
+          autorewrite with field_rewrite in *.
           destruct (_ =? 0) eqn:H_final_step_eq; [lia |].
           eapply Run.AssertZerosFromFnSub.
         }

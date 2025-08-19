@@ -55,13 +55,7 @@ Module Spec.
     }}.
   Proof.
     eapply Run.Implies. {
-      progress repeat (
-        apply Run.Pure ||
-        (eapply Run.Let; [|intro]) ||
-        apply Run.Equal ||
-        apply Run.AssertZeros ||
-        cbn
-      ).
+      Run.run.
     }
     with_strategy opaque [Z.add] cbn.
     intros.
@@ -92,7 +86,7 @@ Module Spec.
     }}.
   Proof.
     eapply Run.Implies. {
-      Run.iterate.
+      Run.run.
     }
     hauto q: on db: field_rewrite.
   Qed.

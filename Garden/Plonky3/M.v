@@ -95,8 +95,6 @@ Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | Equal (x1 x2 : Z) : t unit
-  | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
-  | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -148,49 +146,6 @@ Module M.
       | _ => exact (Pure e)
       end
     end.
-
-  Definition pure {A : Set} (x : A) : t A :=
-    Pure x.
-
-  Definition equal (x y : Z) : t unit :=
-    Equal x y.
-
-  (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-  Definition assert_zero (x : Z) : M.t unit :=
-    M.equal x 0.
-
-  Definition assert_bool {p} `{Prime p} (x : Z) : t unit :=
-    equal (BinOp.mul x (BinOp.sub x 1)) 0.
-
-  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
-    ForInZeroToN N f.
-
-  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
-    for_in_zero_to_n N (fun i => assert_zero (array.(Array.get) i)).
-
-  (* helper: acting on all elements in an array *)
-  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
-    for_in_zero_to_n N (fun i => f (Array.get x i)).
-
-  (* helper: acting on all elements in an array, but returning a sum *)
-
-  Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
-    match N with
-    | O => 0
-    | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
-    end.
-
-  Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
-    sum_for_in_zero_to_n_aux (Z.to_nat N) f.
-
-  Definition call {A : Set} (e : t A) : t A :=
-    Call e.
-
-  Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
-    match e, k with
-    | Pure x, k => k x
-    | e, k => Let e k
-    end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
@@ -210,6 +165,57 @@ Notation "[[ e ]]" :=
   (* Use the version below for debugging and show errors that are made obscure by the tactic *)
   (* (M.Pure e) *)
   (only parsing).
+
+Definition pure {A : Set} (x : A) : M.t A :=
+  M.Pure x.
+
+Definition equal (x y : Z) : M.t unit :=
+  M.Equal x y.
+
+(* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
+Definition assert_zero (x : Z) : M.t unit :=
+  equal x 0.
+
+Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
+  equal (BinOp.mul x (BinOp.sub x 1)) 0.
+
+Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> M.t unit) : M.t unit :=
+  match N with
+  | O => pure tt
+  | S N =>
+    let* _ := for_in_zero_to_n_aux N f in
+    f (Z.of_nat N)
+  end.
+
+Definition for_in_zero_to_n (N : Z) (f : Z -> M.t unit) : M.t unit :=
+  for_in_zero_to_n_aux (Z.to_nat N) f.
+
+Definition assert_zeros {N : Z} (array : Array.t Z N) : M.t unit :=
+  for_in_zero_to_n N (fun i => assert_zero (array.(Array.get) i)).
+
+(* helper: acting on all elements in an array *)
+Definition for_each {A : Set} {N : Z} (f : A -> M.t unit) (x : Array.t A N) : M.t unit :=
+  for_in_zero_to_n N (fun i => f (Array.get x i)).
+
+(* helper: acting on all elements in an array, but returning a sum *)
+
+Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
+  match N with
+  | O => 0
+  | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
+  end.
+
+Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
+  sum_for_in_zero_to_n_aux (Z.to_nat N) f.
+
+Definition call {A : Set} (e : M.t A) : M.t A :=
+  M.Call e.
+
+Definition collapsing_let {A B : Set} (e : M.t A) (k : A -> M.t B) : M.t B :=
+  match e, k with
+  | M.Pure x, k => k x
+  | e, k => M.Let e k
+  end.
 
 Module IsBool.
   Definition t (x : Z) : Prop :=
@@ -638,11 +644,6 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | Equal (x1 x2 : Z) :
     {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
-    (forall i, 0 <= i < N ->
-      {{ f i 🔽 tt, P i }}
-    ) ->
-    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }}
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -679,6 +680,63 @@ Module Run.
       now autorewrite with field_rewrite.
     }
   Qed.
+
+  Lemma ForInZeroToN_nat {N : nat} (f : Z -> M.t unit) (P : Z -> Prop) :
+    (forall i, 0 <= i < Z.of_nat N ->
+      {{ f i 🔽 tt, P i }}
+    ) ->
+    {{ M.for_in_zero_to_n (Z.of_nat N) f 🔽 tt, forall i, 0 <= i < Z.of_nat N -> P i }}.
+  Proof.
+    intros H_body.
+    unfold M.for_in_zero_to_n.
+    replace (Z.to_nat (Z.of_nat N)) with N by lia.
+    induction N; cbn in *.
+    { eapply Run.Implies. {
+        apply Run.Pure.
+      }
+      lia.
+    }
+    { eapply Run.Implies. {
+        eapply Run.Let. {
+          apply IHN.
+          intros i H_i.
+          apply H_body.
+          lia.
+        }
+        intros _.
+        apply H_body.
+        lia.
+      }
+      intros.
+      assert (i < Z.of_nat N \/ i = Z.of_nat N) as [H_i | H_i] by lia;
+        hauto lq: on.
+    }
+  Qed.
+
+  Lemma ForInZeroToN {N : Z} (f : Z -> M.t unit) (P : Z -> Prop) :
+    (forall i, 0 <= i < N ->
+      {{ f i 🔽 tt, P i }}
+    ) ->
+    {{ M.for_in_zero_to_n N f 🔽 tt, forall i, 0 <= i < N -> P i }}.
+  Proof.
+    intros H_body.
+    assert (N < 0 \/ N = Z.of_nat (Z.to_nat N)) as [H_N | H_N] by lia.
+    { unfold M.for_in_zero_to_n.
+      replace (Z.to_nat N) with 0%nat by lia.
+      cbn.
+      eapply Run.Implies. {
+        apply Run.Pure.
+      }
+      lia.
+    }
+    { rewrite H_N.
+      apply ForInZeroToN_nat.
+      hauto q: on.
+    }
+  Qed.
+
+  (** To avoid unrolling this definition, as you should better go through the lemma above. *)
+  Global Opaque M.for_in_zero_to_n.
 
   Lemma AssertZeros {N : Z} (array : Array.t Z N) :
     {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}.
@@ -724,7 +782,7 @@ Module Run.
 
   (** Here we will automatically apply the most appropriate [Run.t] lemma, as some operators are
       better handled as whole primitives. *)
-  Ltac iterate_step :=
+  Ltac run_step :=
     (apply AssertBool) ||
     (apply AssertZerosFromFnSub) ||
     (apply AssertZeros) ||
@@ -738,7 +796,7 @@ Module Run.
     | _ => intros
     end.
 
-  Ltac iterate :=
-    repeat iterate_step.
+  Ltac run :=
+    repeat run_step.
 End Run.
 Export Run.

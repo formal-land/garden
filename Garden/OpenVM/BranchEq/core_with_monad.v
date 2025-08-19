@@ -272,7 +272,7 @@ Proof.
       True
   ). {
     eapply Run.Implies. {
-      repeat constructor.
+      Run.run.
     }
     intros H_for.
     unfold Array.Eq.t.
