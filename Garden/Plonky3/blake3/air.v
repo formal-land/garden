@@ -257,12 +257,12 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
           .chain(initial_row_3.iter())
           .for_each(|elem| elem.iter().for_each(|&bool| builder.assert_bool(bool)));
   *)
-  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) local.(Blake3Cols.inputs) in
+  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) local.(Blake3Cols.inputs) in
   let chaining_values_0 := Array.get local.(Blake3Cols.chaining_values) 0 in
-  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) chaining_values_0 in
+  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) chaining_values_0 in
   let chaining_values_1 := Array.get local.(Blake3Cols.chaining_values) 1 in
-  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) chaining_values_1 in
-  
+  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) chaining_values_1 in
+
   (*
   local.chaining_values[0]
     .iter()
@@ -295,7 +295,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         builder.assert_eq(row_elem[1], AB::Expr::from_u16(constant[1]));
     });
   *)
-  
+
   let* _ := M.for_in_zero_to_n 4 (fun i => 
     let row_elem := Array.get (local.(Blake3Cols.initial_row2)) i in
     let constant := Array.get IV i in
@@ -304,7 +304,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     let* _ := M.equal (Array.get row_elem 1) (UnOp.from (Array.get constant 1)) in
     M.Pure tt
   ) in
-  
+
   (*
       let mut m_values: [[AB::Expr; 2]; 16] = local.inputs.map(|bits| {
         [
@@ -318,7 +318,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     let bits_high := Array.slice_from bits BITS_PER_LIMB in
     double_val (pack_bits_le_array bits_low) (pack_bits_le_array bits_high)
   ) in
-  
+
   (*
     let initial_state = Blake3State {
         row0: local.initial_row0,
@@ -426,7 +426,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   *)
   let full_round_6 := Array.get local.(Blake3Cols.full_rounds) 6 in
   let* _ := verify_round full_round_5.(FullRound.state_output) full_round_6 m_values in
-  
+
   (*
   local
     .final_round_helpers
@@ -462,9 +462,9 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   *)
   (* final_round_helpers *)
   let* _ := 
-    M.for_each (M.for_each (fun x => assert_bool x)) local.(Blake3Cols.final_round_helpers) in
+    M.for_each (M.for_each (fun x => M.assert_bool x)) local.(Blake3Cols.final_round_helpers) in
   (* outputs[0] *)
-  let* _ := M.for_each (M.for_each (fun x => assert_bool x)) (Array.get local.(Blake3Cols.outputs) 0) in    
+  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) (Array.get local.(Blake3Cols.outputs) 0) in    
   
   (*
     // Finally we check the xor by xor'ing the output with final_round_helpers, packing the bits
@@ -502,7 +502,6 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   }
   *)
 
-        
   let* _ := M.for_in_zero_to_n 4 (fun i => 
     let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 1) i in
     let left_bits := Array.get full_round_6.(FullRound.state_output).(Blake3State.row1) i in
@@ -518,7 +517,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     in
     M.Pure tt
   ) in
-     
+
   (*
     for (out_bits, left_bits, right_bits) in izip!(
         local.outputs[2],
@@ -545,7 +544,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     in
     M.Pure tt
   ) in
-   
+
   (*
     for (out_bits, left_bits, right_bits) in izip!(
         local.outputs[3],
@@ -555,7 +554,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         for (out_bit, left_bit, right_bit) in izip!(out_bits, left_bits, right_bits) {
             builder.assert_eq(out_bit, left_bit.into().xor(&right_bit.into()));
         }
-    }  
+    }
   *)
   let* _ := M.for_in_zero_to_n 4 (fun i => 
     let out_bits := Array.get (Array.get local.(Blake3Cols.outputs) 3) i in

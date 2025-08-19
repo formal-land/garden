@@ -18,13 +18,13 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     (cmp_eq : Z) :
     M.t unit :=
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
-    assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get_mod a i) (Array.get_mod b i)))
+    M.assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get_mod a i) (Array.get_mod b i)))
   ) in
   let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
     BinOp.mul (Array.get_mod inv_marker i) (BinOp.sub (Array.get_mod a i) (Array.get_mod b i))
   ) in
   let sum := BinOp.add sum cmp_eq in
-  assert_one sum.
+  M.assert_one sum.
 
 Module Limbs.
   Parameter to_Z : forall {p} `{Prime p} {NUM_LIMBS : Z}, Array.t Z NUM_LIMBS -> Z.

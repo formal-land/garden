@@ -1,5 +1,4 @@
 Require Import Garden.Plonky3.M.
-Require Import Garden.OpenVM.EqualityCheck.example.
 
 (*
 pub struct ImmInstruction<T> {
@@ -248,8 +247,8 @@ Proof.
     constructor.
   }
   intros _.
-  eapply Run.LetAccumulate. {
-    constructor.
+  eapply Run.LetAccumulate with (P1 := IsBool.t local.(BranchEqualCoreCols.cmp_result)). {
+    apply Run.AssertBool.
   }
   intros H_cmp_result.
   set (cmp_eq :=
@@ -273,7 +272,7 @@ Proof.
       True
   ). {
     eapply Run.Implies. {
-      repeat constructor.
+      Run.run.
     }
     intros H_for.
     unfold Array.Eq.t.

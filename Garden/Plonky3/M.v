@@ -95,10 +95,6 @@ Module M.
   Inductive t : Set -> Set :=
   | Pure {A : Set} (value : A) : t A
   | Equal (x1 x2 : Z) : t unit
-  | AssertBool (x : Z) : t unit
-  | AssertZeros {N : Z} (array : Array.t Z N) : t unit
-  | ForInZeroToN (N : Z) (f : Z -> t unit) : t unit
-  | SumForInZeroToN (N : Z) (f : Z -> Z) : t Z
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
@@ -150,42 +146,6 @@ Module M.
       | _ => exact (Pure e)
       end
     end.
-
-  Definition pure {A : Set} (x : A) : t A :=
-    Pure x.
-
-  Definition equal (x y : Z) : t unit :=
-    Equal x y.
-
-  Definition assert_zeros {N : Z} (array : Array.t Z N) : t unit :=
-    AssertZeros array.
-
-  Definition for_in_zero_to_n (N : Z) (f : Z -> t unit) : t unit :=
-    ForInZeroToN N f.
-
-  (* helper: acting on all elements in an array *)
-  Definition for_each {A : Set} {N : Z} (f : A -> t unit) (x : Array.t A N) : t unit :=
-    for_in_zero_to_n N (fun i => f (Array.get x i)).
-
-  (* helper: acting on all elements in an array, but returning a sum *)
-
-  Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
-    match N with
-    | O => 0
-    | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
-    end.
-
-  Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
-    sum_for_in_zero_to_n_aux (Z.to_nat N) f.
-
-  Definition call {A : Set} (e : t A) : t A :=
-    Call e.
-
-  Definition collapsing_let {A B : Set} (e : t A) (k : A -> t B) : t B :=
-    match e, k with
-    | Pure x, k => k x
-    | e, k => Let e k
-    end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
@@ -206,6 +166,57 @@ Notation "[[ e ]]" :=
   (* (M.Pure e) *)
   (only parsing).
 
+Definition pure {A : Set} (x : A) : M.t A :=
+  M.Pure x.
+
+Definition equal (x y : Z) : M.t unit :=
+  M.Equal x y.
+
+(* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
+Definition assert_zero (x : Z) : M.t unit :=
+  equal x 0.
+
+Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
+  equal (BinOp.mul x (BinOp.sub x 1)) 0.
+
+Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> M.t unit) : M.t unit :=
+  match N with
+  | O => pure tt
+  | S N =>
+    let* _ := for_in_zero_to_n_aux N f in
+    f (Z.of_nat N)
+  end.
+
+Definition for_in_zero_to_n (N : Z) (f : Z -> M.t unit) : M.t unit :=
+  for_in_zero_to_n_aux (Z.to_nat N) f.
+
+Definition assert_zeros {N : Z} (array : Array.t Z N) : M.t unit :=
+  for_in_zero_to_n N (fun i => assert_zero (array.(Array.get) i)).
+
+(* helper: acting on all elements in an array *)
+Definition for_each {A : Set} {N : Z} (f : A -> M.t unit) (x : Array.t A N) : M.t unit :=
+  for_in_zero_to_n N (fun i => f (Array.get x i)).
+
+(* helper: acting on all elements in an array, but returning a sum *)
+
+Fixpoint sum_for_in_zero_to_n_aux {p} `{Prime p} (N : nat) (f : Z -> Z) : Z :=
+  match N with
+  | O => 0
+  | S N => BinOp.add (sum_for_in_zero_to_n_aux N f) (f (Z.of_nat N))
+  end.
+
+Definition sum_for_in_zero_to_n {p} `{Prime p} (N : Z) (f : Z -> Z) : Z :=
+  sum_for_in_zero_to_n_aux (Z.to_nat N) f.
+
+Definition call {A : Set} (e : M.t A) : M.t A :=
+  M.Call e.
+
+Definition collapsing_let {A B : Set} (e : M.t A) (k : A -> M.t B) : M.t B :=
+  match e, k with
+  | M.Pure x, k => k x
+  | e, k => M.Let e k
+  end.
+
 Module IsBool.
   Definition t (x : Z) : Prop :=
     x = Z.b2z (Z.odd x).
@@ -217,61 +228,6 @@ Proof.
   destruct b; cbn; reflexivity.
 Qed.
 
-(** Rules to check if the contraints are what we expect, typically a unique possible value. *)
-Module Run.
-  Reserved Notation "{{ e 🔽 output , P }}".
-
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
-    {{ M.Pure value 🔽 value, True }}
-  | Equal (x1 x2 : Z) :
-    {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
-  | AssertBool (x : Z) :
-    {{ M.AssertBool x 🔽 tt, IsBool.t x }}
-  | AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
-    {{ M.AssertZeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
-      tt, forall i, 0 <= i < N -> f i = g i
-    }}
-  | AssertZeros {N : Z} (array : Array.t Z N) :
-    {{ M.AssertZeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}
-  | ForInZeroToN (N : Z) (f : Z -> M.t unit) (P : Z -> Prop) :
-    (forall i, 0 <= i < N ->
-      {{ f i 🔽 tt, P i }}
-    ) ->
-    {{ M.ForInZeroToN N f 🔽 tt, forall i, 0 <= i < N -> P i }}
-  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
-    {{ e 🔽 value, P }} ->
-    {{ M.Call e 🔽 value, P }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    (P1 -> {{ k value 🔽 output, P2 }}) ->
-    {{ M.Let e k 🔽 output, P1 /\ P2 }}
-  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    (P1 -> P2) ->
-    {{ e 🔽 value, P2 }}
-  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
-    {{ e 🔽 value1, P }} ->
-    value1 = value2 ->
-    {{ e 🔽 value2, P }}
-
-  where "{{ e 🔽 output , P }}" := (t e output P).
-
-  Lemma LetAccumulate {A B : Set}
-      (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{ e 🔽 value, P1 }} ->
-    (P1 -> {{ k value 🔽 output, P2 }}) ->
-    {{ M.Let e k 🔽 output, P2 }}.
-  Proof.
-    intros.
-    eapply Run.Implies. {
-      eapply Run.Let; eassumption.
-    }
-    tauto.
-  Qed.
-End Run.
-Export Run.
-
 (** ** Primitives we also have in the library *)
 
 Module Pair.
@@ -282,19 +238,11 @@ Module Pair.
   Arguments t : clear implicits.
 End Pair.
 
-(* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_zero (x : Z) : M.t unit :=
-  M.equal x 0.
-
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
   M.equal x (1 mod p).
 
-(* fn assert_bool<I: Into<Self::Expr>>(&mut self, x: I) *)
-Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  M.AssertBool x.
-
-(* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
+  (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
   M.for_in_zero_to_n N (fun i =>
     M.assert_bool (l.(Array.get) i)
@@ -316,6 +264,9 @@ Definition not {p} `{Prime p} (x : Z) : Z :=
   BinOp.sub 1 x.
 
 Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
+
+Axiom from_xor_eq : forall {p} `{Prime p} (x y : Z),
+  UnOp.from (xor x y) = xor x y.
 
 Axiom xor_eq : forall {p} `{Prime p} (x y : bool),
   xor (Z.b2z x) (Z.b2z y) = Z.b2z (xorb x y).
@@ -407,6 +358,19 @@ Module Limbs.
         ) l 0
     |}.
 
+  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t (a.(Array.get) z)
+      )
+      (limb : Z) :
+    0 <= limb < NB_LIMBS ->
+    UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb) =
+    (of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb.
+  Admitted.
+
   Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
       (a : Array.t Z NB_LIMBS)
       (bit : Z) :
@@ -440,7 +404,7 @@ Module Limbs.
         forall (limb : Z),
         0 <= limb < NB_LIMBS ->
         a_limbs.(Array.get) limb =
-        (of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb
+        UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb)
       ) :
     0 <= NB_LIMBS ->
     forall (bit : Z),
@@ -451,7 +415,9 @@ Module Limbs.
     intros.
     unfold get_bit.
     rewrite H_limbs by nia.
-    now rewrite <- get_bit_of_bools_eq.
+    rewrite <- get_bit_of_bools_eq by assumption.
+    rewrite from_of_bools_eq; trivial.
+    nia.
   Qed.
 End Limbs.
 
@@ -660,4 +626,177 @@ Module FieldRewrite.
     now replace (x * 1) with x by lia.
   Qed.
   Global Hint Rewrite @mul_one_right : field_rewrite.
+
+  (** It applies the rewrite even under binders, for the goal and all the hypothesis. *)
+  Ltac run :=
+    try rewrite_db field_rewrite;
+    repeat match goal with
+    | H : _ |- _ => rewrite_db field_rewrite in H
+    end.
 End FieldRewrite.
+
+(** Rules to check if the contraints are what we expect, typically a unique possible value. *)
+Module Run.
+  Reserved Notation "{{ e 🔽 output , P }}".
+
+  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
+  | Pure {A : Set} (value : A) :
+    {{ M.Pure value 🔽 value, True }}
+  | Equal (x1 x2 : Z) :
+    {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
+  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
+    {{ e 🔽 value, P }} ->
+    {{ M.Call e 🔽 value, P }}
+  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
+    {{ M.Let e k 🔽 output, P1 /\ P2 }}
+  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> P2) ->
+    {{ e 🔽 value, P2 }}
+  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+    {{ e 🔽 value1, P }} ->
+    value1 = value2 ->
+    {{ e 🔽 value2, P }}
+
+  where "{{ e 🔽 output , P }}" := (t e output P).
+
+  Lemma AssertBool {p} `{Prime p} (x' : Z) :
+    let x := UnOp.from x' in
+    {{ M.assert_bool x 🔽 tt, IsBool.t x }}.
+  Proof.
+    eapply Run.Implies. {
+      constructor.
+    }
+    intros H_mul.
+    rewrite mul_zero_implies_zero in H_mul; destruct H_mul as [H_mul|H_mul].
+    { autorewrite with field_rewrite in H_mul.
+      hauto lq: on.
+    }
+    { autorewrite with field_rewrite in H_mul.
+      rewrite sub_zero_equiv in H_mul.
+      rewrite H_mul.
+      now autorewrite with field_rewrite.
+    }
+  Qed.
+
+  Lemma ForInZeroToN_nat {N : nat} (f : Z -> M.t unit) (P : Z -> Prop) :
+    (forall i, 0 <= i < Z.of_nat N ->
+      {{ f i 🔽 tt, P i }}
+    ) ->
+    {{ M.for_in_zero_to_n (Z.of_nat N) f 🔽 tt, forall i, 0 <= i < Z.of_nat N -> P i }}.
+  Proof.
+    intros H_body.
+    unfold M.for_in_zero_to_n.
+    replace (Z.to_nat (Z.of_nat N)) with N by lia.
+    induction N; cbn in *.
+    { eapply Run.Implies. {
+        apply Run.Pure.
+      }
+      lia.
+    }
+    { eapply Run.Implies. {
+        eapply Run.Let. {
+          apply IHN.
+          intros i H_i.
+          apply H_body.
+          lia.
+        }
+        intros _.
+        apply H_body.
+        lia.
+      }
+      intros.
+      assert (i < Z.of_nat N \/ i = Z.of_nat N) as [H_i | H_i] by lia;
+        hauto lq: on.
+    }
+  Qed.
+
+  Lemma ForInZeroToN {N : Z} (f : Z -> M.t unit) (P : Z -> Prop) :
+    (forall i, 0 <= i < N ->
+      {{ f i 🔽 tt, P i }}
+    ) ->
+    {{ M.for_in_zero_to_n N f 🔽 tt, forall i, 0 <= i < N -> P i }}.
+  Proof.
+    intros H_body.
+    assert (N < 0 \/ N = Z.of_nat (Z.to_nat N)) as [H_N | H_N] by lia.
+    { unfold M.for_in_zero_to_n.
+      replace (Z.to_nat N) with 0%nat by lia.
+      cbn.
+      eapply Run.Implies. {
+        apply Run.Pure.
+      }
+      lia.
+    }
+    { rewrite H_N.
+      apply ForInZeroToN_nat.
+      hauto q: on.
+    }
+  Qed.
+
+  (** To avoid unrolling this definition, as you should better go through the lemma above. *)
+  Global Opaque M.for_in_zero_to_n.
+
+  Lemma AssertZeros {N : Z} (array : Array.t Z N) :
+    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}.
+  Proof.
+    eapply Run.Implies. {
+      unfold M.assert_zeros.
+      apply ForInZeroToN.
+      intros.
+      apply Equal.
+    }
+    trivial.
+  Qed.
+
+  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+    {{ M.assert_zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
+      tt,
+      forall (i : Z),
+      0 <= i < N ->
+      UnOp.from (f i) = UnOp.from (g i)
+    }}.
+  Proof.
+    intros.
+    eapply Run.Implies. {
+      eapply Run.AssertZeros.
+    }
+    cbn; intros H_zeros i H_i.
+    apply sub_zero_equiv.
+    now apply H_zeros.
+  Qed.
+
+  Lemma LetAccumulate {A B : Set}
+      (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+    {{ e 🔽 value, P1 }} ->
+    (P1 -> {{ k value 🔽 output, P2 }}) ->
+    {{ M.Let e k 🔽 output, P2 }}.
+  Proof.
+    intros.
+    eapply Run.Implies. {
+      eapply Run.Let; eassumption.
+    }
+    tauto.
+  Qed.
+
+  (** Here we will automatically apply the most appropriate [Run.t] lemma, as some operators are
+      better handled as whole primitives. *)
+  Ltac run_step :=
+    (apply AssertBool) ||
+    (apply AssertZerosFromFnSub) ||
+    (apply AssertZeros) ||
+    (eapply Run.ForInZeroToN) ||
+    (apply Run.Pure) ||
+    (apply Run.Equal) ||
+    (apply Run.Call) ||
+    (eapply Run.Let) ||
+    match goal with
+    | |- True -> _ => intros _
+    | _ => intros
+    end.
+
+  Ltac run :=
+    repeat run_step.
+End Run.
+Export Run.

@@ -55,13 +55,7 @@ Module Spec.
     }}.
   Proof.
     eapply Run.Implies. {
-      progress repeat (
-        apply Run.Pure ||
-        (eapply Run.Let; [|intro]) ||
-        apply Run.Equal ||
-        apply Run.AssertZeros ||
-        cbn
-      ).
+      Run.run.
     }
     with_strategy opaque [Z.add] cbn.
     intros.
@@ -81,7 +75,9 @@ Module Spec.
   Qed.
 
   Lemma spec_transition {p} `{Prime p}
-      (local next : KeccakCols.t) :
+      (local' next' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    let next := M.map_mod next' in
     {{ eval_round_flags false true local next 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->
@@ -90,14 +86,8 @@ Module Spec.
     }}.
   Proof.
     eapply Run.Implies. {
-      progress repeat (
-        apply Run.Pure ||
-        (eapply Run.Let; [|intro]) ||
-        apply Run.Equal ||
-        apply Run.AssertZerosFromFnSub ||
-        cbn
-      ).
+      Run.run.
     }
-    easy.
+    hauto q: on db: field_rewrite.
   Qed.
 End Spec.

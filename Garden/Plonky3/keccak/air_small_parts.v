@@ -28,8 +28,8 @@ Module preimage_a.
       )
     )).
 
-  Lemma implies {p} `{Prime p} (local : KeccakCols.t) :
-      let local := M.map_mod local in
+  Lemma implies {p} `{Prime p} (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
       let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
       {{ eval local 🔽
         tt,
@@ -46,13 +46,15 @@ Module preimage_a.
     unfold eval, M.when.
     destruct (_ =? 0) eqn:?.
     { eapply Run.Implies. {
-        repeat (econstructor || intros).
+        Run.run.
       }
       lia.
     }
     { eapply Run.Implies. {
-        repeat (econstructor || intros).
+        Run.run.
       }
+      cbn.
+      rewrite_db field_rewrite.
       hauto l: on.
     }
   Qed.
@@ -112,13 +114,15 @@ Module preimage_next_preimage.
     unfold not_final_step, final_step in *.
     destruct (_ =? 0) eqn:?.
     { eapply Run.Implies. {
-        repeat (econstructor || intros).
+        Run.run.
       }
       lia.
     }
     { eapply Run.Implies. {
-        repeat (econstructor || intros).
+        Run.run.
       }
+      cbn.
+      rewrite_db field_rewrite.
       hauto l: on.
     }
   Qed.
@@ -241,19 +245,23 @@ Module c_c_prime.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
-      {{ eval local 🔽
-        tt,
-        Valid.t local
-      }}.
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Valid.t local
+    }}.
   Proof.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
-    sauto lq: on rew: off.
+    cbn; rewrite_db field_rewrite.
+    unfold M.xor3; setoid_rewrite M.from_xor_eq.
+    intros; constructor; cbn; intros.
+    { hauto l: on. }
+    { sauto lq: on rew: off. }
   Qed.
 End c_c_prime.
 
@@ -333,13 +341,13 @@ Module a_a_prime_c_c_prime.
         let a' : Array.t Z U64_LIMBS :=
           Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_bit local y x z; |} in
         KeccakCols.get_a local x y limb =
-        a'.(Array.get) limb
+        UnOp.from (a'.(Array.get) limb)
     }.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      (local' : KeccakCols.t) :
+      let local := M.map_mod local' in
     {{ eval local 🔽
       tt,
       Valid.t local
@@ -348,9 +356,9 @@ Module a_a_prime_c_c_prime.
     intros.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
-    unfold Limbs.of_bools; cbn.
+    unfold Limbs.of_bools; cbn; rewrite_db field_rewrite.
     intros; constructor; intros.
     { unfold KeccakCols.Bool.get_a_prime; cbn.
       hauto lq: on rew: off.
@@ -415,7 +423,7 @@ Module a_prime_c_prime.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
     sauto.
   Qed.
@@ -489,13 +497,14 @@ Module a_prime_prime.
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       KeccakCols.get_a_prime_prime local x y limb =
-      a_prime_prime'.(Array.get) limb
+      UnOp.from (a_prime_prime'.(Array.get) limb)
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
+    cbn; rewrite_db field_rewrite.
     hauto q: on.
   Qed.
 End a_prime_prime.
@@ -522,7 +531,7 @@ Module a_prime_prime_0_0_bits_bools.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
     sfirstorder.
   Qed.
@@ -571,14 +580,15 @@ Module a_prime_prime_0_0_limbs.
           local.(KeccakCols.a_prime_prime_0_0_bits) in
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      ((local.(KeccakCols.a_prime_prime).(Array.get) 0).(Array.get) 0).(Array.get) limb =
-      a_prime_prime_0_0'.(Array.get) limb
+      UnOp.from (((local.(KeccakCols.a_prime_prime).(Array.get) 0).(Array.get) 0).(Array.get) limb) =
+      UnOp.from (a_prime_prime_0_0'.(Array.get) limb)
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
+    cbn.
     hauto l: on.
   Qed.
 End a_prime_prime_0_0_limbs.
@@ -653,13 +663,13 @@ Module a_prime_prime_prime_0_0_limbs.
           |} in
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      Array.get local.(KeccakCols.a_prime_prime_prime_0_0_limbs) limb =
-      a_prime_prime_prime_0_0_limb'.(Array.get) limb
+      UnOp.from (Array.get local.(KeccakCols.a_prime_prime_prime_0_0_limbs) limb) =
+      UnOp.from (a_prime_prime_prime_0_0_limb'.(Array.get) limb)
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
-      repeat (econstructor || intros).
+      Run.run.
     }
     hauto l: on.
   Qed.
@@ -711,8 +721,8 @@ Module a_prime_prime_prime_next_a.
       0 <= x < 5 ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      Impl_KeccakCols.a_prime_prime_prime local y x limb =
-      Array.get (Array.get (Array.get next.(KeccakCols.a) y) x) limb
+      UnOp.from (Impl_KeccakCols.a_prime_prime_prime local y x limb) =
+      UnOp.from (((next.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb)
     }}.
   Proof.
     intros * H_not_final_step.
@@ -725,11 +735,12 @@ Module a_prime_prime_prime_next_a.
           cbn.
           unfold M.when.
           repeat unfold final_step, not_final_step, NUM_ROUNDS in *; cbn in *.
+          autorewrite with field_rewrite in *.
           destruct (_ =? 0) eqn:H_final_step_eq; [lia |].
           eapply Run.AssertZerosFromFnSub.
         }
       }
     }
-    sfirstorder.
+    hauto lq: on rew: off.
   Qed.
 End a_prime_prime_prime_next_a.
