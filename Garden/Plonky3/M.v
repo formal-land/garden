@@ -817,9 +817,10 @@ Module Run.
 End Run.
 Export Run.
 
+(* could be later moved together to a single module doing modulo arithmetics. *)
 
 (* Utilities used for modulo arithmetics *)
-Lemma mod_when_smaller {p} `{Prime p} (x : Z) (Hx : 0 <= x < p) :
+Lemma mod_when_smaller {p : Z} (x : Z) (Hx : 0 <= x < p) :
   x mod p = x.
 Proof.
   apply Zmod_small; auto.
