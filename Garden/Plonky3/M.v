@@ -102,7 +102,6 @@ Module M.
       function and what is being called, to better compose reasoning. *)
   | Call {A : Set} (e : t A) : t A
   | Let {A B : Set} (e : t A) (k : A -> t B) : t B
-  | Impossible {A : Set} (message : string) : t A
   .
 
   (** This is a marker that we remove with the following tactic. *)

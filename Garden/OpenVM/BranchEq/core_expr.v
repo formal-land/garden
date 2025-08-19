@@ -73,25 +73,24 @@ End BranchEqualCoreAir.
 
 Definition eval {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
-    (builder : Builder.t)
     (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
     (from_pc : Var.t) :
-    AdapterAirContext.t NUM_LIMBS Expr.t * Builder.t :=
+    MExpr.t (AdapterAirContext.t NUM_LIMBS Expr.t) :=
   let flags : list Var.t := [
     local.(BranchEqualCoreCols.opcode_beq_flag);
     local.(BranchEqualCoreCols.opcode_bne_flag)
   ] in
 
-  let '(is_valid, builder) :=
-    Lists.List.fold_left
-      (fun '(acc, builder) flag =>
-        let builder := Builder.assert_bool builder (Expr.Var flag) in
-        (Expr.Add acc (Expr.Var flag), builder)
+  let! is_valid :=
+    MExpr.List.fold_left
+      (fun acc flag =>
+        let! _ := MExpr.assert_bool (Expr.Var flag) in
+        MExpr.pure (Expr.Add acc (Expr.Var flag))
       )
-      flags
-      (Expr.ZERO, builder) in
-  let builder := Builder.assert_bool builder is_valid in
-  let builder := Builder.assert_bool builder (Expr.Var local.(BranchEqualCoreCols.cmp_result)) in
+      Expr.ZERO
+      flags in
+  let! _ := MExpr.assert_bool is_valid in
+  let! _ := MExpr.assert_bool (Expr.Var local.(BranchEqualCoreCols.cmp_result)) in
 
   let a : Array.t Var.t NUM_LIMBS := local.(BranchEqualCoreCols.a) in
   let b : Array.t Var.t NUM_LIMBS := local.(BranchEqualCoreCols.b) in
@@ -106,15 +105,15 @@ Definition eval {NUM_LIMBS : Z}
         (Expr.not (Expr.Var local.(BranchEqualCoreCols.cmp_result)))
         (Expr.Var local.(BranchEqualCoreCols.opcode_bne_flag))) in
 
-  let builder :=
-    Lists.List.fold_left
-      (fun builder (i : nat) =>
+  let! _ :=
+    MExpr.List.fold_left
+      (fun acc i =>
         let i := Z.of_nat i in
-        Builder.assert_zero builder
+        MExpr.assert_zero
           (Expr.Mul cmp_eq (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i))))
       )
-      (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
-      builder in
+      tt
+      (Lists.List.seq 0 (Z.to_nat NUM_LIMBS)) in
   let sum : Expr.t :=
     Lists.List.fold_left
       (fun sum (i : nat) =>
@@ -126,7 +125,7 @@ Definition eval {NUM_LIMBS : Z}
       )
       (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
       cmp_eq in
-  let builder := Builder.when builder is_valid (fun builder => Builder.assert_one builder sum) in
+  let! _ := MExpr.when is_valid (MExpr.assert_one sum) in
 
   let flags_with_opcode_integer : list (Var.t * Z) :=
     [
@@ -155,27 +154,22 @@ Definition eval {NUM_LIMBS : Z}
         (Expr.constant self.(BranchEqualCoreAir.pc_step)))
     in
 
-  (
-    {|
-      AdapterAirContext.to_pc := Some to_pc;
-      AdapterAirContext.reads := [Array.map Expr.Var a; Array.map Expr.Var b];
-      AdapterAirContext.writes := [];
-      AdapterAirContext.instruction := {|
-        ImmInstruction.is_valid := is_valid;
-        ImmInstruction.opcode := expected_opcode;
-        ImmInstruction.immediate := Expr.Var local.(BranchEqualCoreCols.imm);
-      |};
-    |},
-    builder
-  ).
+  MExpr.pure {|
+    AdapterAirContext.to_pc := Some to_pc;
+    AdapterAirContext.reads := [Array.map Expr.Var a; Array.map Expr.Var b];
+    AdapterAirContext.writes := [];
+    AdapterAirContext.instruction := {|
+      ImmInstruction.is_valid := is_valid;
+      ImmInstruction.opcode := expected_opcode;
+      ImmInstruction.immediate := Expr.Var local.(BranchEqualCoreCols.imm);
+    |};
+  |}.
 
-Definition print_branch_eq {NUM_LIMBS : Z} :
-    string :=
+Definition print_branch_eq {NUM_LIMBS : Z} : string :=
   let air := {|
     BranchEqualCoreAir.offset := 12;
     BranchEqualCoreAir.pc_step := 23;
   |} in
-  let builder := Builder.new in
   let local : BranchEqualCoreCols.t NUM_LIMBS Var.t := {|
     BranchEqualCoreCols.a := {| Array.get := fun i => Var.make (i + 0) |};
     BranchEqualCoreCols.b := {| Array.get := fun i => Var.make (i + NUM_LIMBS) |};
@@ -186,11 +180,9 @@ Definition print_branch_eq {NUM_LIMBS : Z} :
     BranchEqualCoreCols.diff_inv_marker := {| Array.get := fun i => Var.make (i + 2 * NUM_LIMBS + 4) |};
   |} in
   let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
-  let '(result, builder) := eval air builder local from_pc in
   ToRocq.cats [
     ToRocq.endl;
-    ToRocq.to_rocq builder 0;
-    ToRocq.to_rocq result 0
+    ToRocq.to_rocq (eval air local from_pc) 0
   ].
 
 Compute print_branch_eq (NUM_LIMBS := 4).
@@ -213,7 +205,7 @@ Module RunWithoutImplies.
 
   where "{{{ e 🔽 output , P }}}" := (t e output P).
 End RunWithoutImplies.
-
+ 
 (** We prove the equality of the [eval] definition above with the [eval] definition directly using
     field elements. *)
 (* Lemma eq_eval_field {NUM_LIMBS : Z}

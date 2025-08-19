@@ -77,35 +77,6 @@ Module Expr.
     Sub ONE e.
 End Expr.
 
-Module Builder.
-  Record t : Set := {
-    constraints : list Expr.t;
-  }.
-
-  Definition eval {p} `{Prime p} (expr_env : Expr.Env.t) (var_env : Var.Env.t) (self : t) : Prop :=
-    Lists.List.fold_left (fun acc e => acc /\ Expr.eval expr_env var_env e = 0) self.(constraints) True.
-
-  Definition new : t :=
-    {| constraints := [] |}.
-
-  Definition assert_zero (builder : t) (e : Expr.t) : t :=
-    {| constraints := e :: builder.(constraints) |}.
-
-  Definition assert_one (builder : t) (e : Expr.t) : t :=
-    assert_zero builder (Expr.Sub e Expr.ONE).
-
-  Definition assert_bool (builder : t) (e : Expr.t) : t :=
-    assert_zero builder (Expr.Mul e (Expr.Sub e Expr.ONE)).
-
-  Definition when (builder : t) (condition : Expr.t) (body : Builder.t -> Builder.t) : t :=
-    let new_builder := body new in
-    {|
-      constraints :=
-        List.map (fun e => Expr.Mul condition e) new_builder.(constraints) ++
-        builder.(constraints)
-    |}.
-End Builder.
-
 Module ToRocq.
   Class C (T : Set) : Set := {
     to_rocq (value : T) (indent : Z) : string;
@@ -220,14 +191,72 @@ Global Instance ArrayIsToRocq {T : Set} {C : ToRocq.C T} {N : Z} : ToRocq.C (Arr
     ToRocq.to_rocq (Array.to_list self) indent
 }.
 
-Global Instance BuilderIsToRocq : ToRocq.C Builder.t := {
-  to_rocq builder indent :=
+Module MExpr.
+  Inductive t : Set -> Set :=
+  | Pure {A : Set} (value : A) : t A
+  | AssertZero (expr : Expr.t) : t unit
+  (** This constructor does nothing, but helps to delimit what is inside the current the current
+      function and what is being called, to better compose reasoning. *)
+  | Call {A : Set} (e : t A) : t A
+  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
+  .
+
+  Fixpoint flatten {A : Set} (self : t A) : A * list Expr.t :=
+    match self with
+    | Pure value => (value, [])
+    | AssertZero expr => (tt, [expr])
+    | Call e => flatten e
+    | Let e k =>
+      let '(value_e, constraints_e) := flatten e in
+      let '(value_k, constraints_k) := flatten (k value_e) in
+      (value_k, constraints_k ++ constraints_e)
+    end.
+End MExpr.
+
+Notation "'let!' x ':=' e 'in' k" :=
+  (MExpr.Let e (fun x => k))
+  (at level 200, x pattern, e at level 200, k at level 200).
+
+Global Instance MExprIsToRocq {A : Set} {C : ToRocq.C A} : ToRocq.C (MExpr.t A) := {
+  to_rocq self indent :=
+    let '(result, constraints) := MExpr.flatten self in
     ToRocq.cats (
       [ToRocq.indent indent; "Builder:"; ToRocq.endl] ++
       List.map (fun item =>
         ToRocq.cats [ToRocq.indent (indent + 2); "AssertZero:"; ToRocq.endl;
           ToRocq.to_rocq item (indent + 4)
         ]
-      ) (List.rev builder.(Builder.constraints))
+      ) (List.rev constraints) ++
+      [ToRocq.to_rocq result indent]
     );
 }.
+
+Definition pure {A : Set} (value : A) : MExpr.t A :=
+  MExpr.Pure value.
+
+Fixpoint when {A : Set} (condition : Expr.t) (body : MExpr.t A) : MExpr.t A :=
+  match body with
+  | MExpr.Pure value => MExpr.Pure value
+  | MExpr.AssertZero expr => MExpr.AssertZero (Expr.Mul condition expr)
+  | MExpr.Call e => MExpr.Call (when condition e)
+  | MExpr.Let e k => MExpr.Let (when condition e) (fun x => when condition (k x))
+  end.
+
+Definition assert_zero (e : Expr.t) : MExpr.t unit :=
+  MExpr.AssertZero e.
+
+Definition assert_one (e : Expr.t) : MExpr.t unit :=
+  MExpr.AssertZero (Expr.Sub e Expr.ONE).
+
+Definition assert_bool (e : Expr.t) : MExpr.t unit :=
+  MExpr.AssertZero (Expr.Mul e (Expr.Sub e Expr.ONE)).
+
+Module List.
+  Fixpoint fold_left {A B : Set} (f : A -> B -> MExpr.t A) (acc : A) (l : list B) : MExpr.t A :=
+    match l with
+    | [] => pure acc
+    | x :: xs =>
+      let! acc := f acc x in
+      fold_left f acc xs
+    end.
+End List.
