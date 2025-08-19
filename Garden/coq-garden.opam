@@ -18,7 +18,8 @@ depends: [
   "coq-coqutil" {>= "0.0.5"}
   "coq-hammer"
   "coq-mathcomp-algebra"
-  "coq-smpl"
+  "coq-smpl",
+  "coq-coqtail"
 ]
 build: [
   [make]
