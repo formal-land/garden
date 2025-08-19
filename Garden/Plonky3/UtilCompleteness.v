@@ -361,6 +361,7 @@ let
 (7) acc_r = 0 (mod p) \/ acc_r = - 2 ^ 32 (mod p) from (4) and (7)
 (8) acc_r = 0 (mod 2 ^ 16 * p) \/ acc_r = - 2 ^ 32 (mod 2 ^ 16 * p) from (crt), (5), (7)
 (9) acc_r = 0 \/ acc_r = - 2 ^ 32 from (8), (hp) and (r2).
-(10) a = b + c (mod 2 ^ 32)
-
+(10) a - b - c = 0 \/ a - b - c = - 2 ^ 32
+(11) a = b + c \/ a = b + c + 2 ^ 32
+(12) a = b + c (mod 2 ^ 32)
 *)
