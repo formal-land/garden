@@ -1,6 +1,7 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.Util.
 Require Import Coq.omega.PreOmega.
+Require Import Coqtail.Arith.Zeqm.
 
 (* TODO: these are to be declared as shared constants / methods, copied from blake3/constants.v *)
 Definition BITS_PER_LIMB : Z := 16.
@@ -8,29 +9,21 @@ Definition U32_LIMBS : Z := 32 / BITS_PER_LIMB.
 
 Definition double_val (val1 val2 : Z) : Array.t Z 2 :=
   {| Array.get i := 
-        match i with
-        | 0 => val1
-        | 1 => val2
-        | _ => 0 (* Default case, should not happen *)
-        end
+       if i =? 0 then val1
+       else if i =? 1 then val2
+       else 0 (* Default case, should not happen *)
   |}.
 
 Definition pack_16_limbs (bits : Array.t Z U32_LIMBS) : Z :=
     bits.(Array.get) 0 + bits.(Array.get) 1 * (2 ^ BITS_PER_LIMB).
 
-Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS :=
-  {| Array.get i := 
-        match i with
-        | 0 => value mod (2 ^ BITS_PER_LIMB)
-        | 1 => value / (2 ^ BITS_PER_LIMB)
-        | _ => 0 (* Default case, should not happen *)
-        end
-  |}.
+Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS := 
+  double_val (value mod (2 ^ BITS_PER_LIMB)) (value / (2 ^ BITS_PER_LIMB)).
 
 
 Module Add2Proof.
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
-        unpack_16_limbs (BinOp.add (pack_16_limbs a) (pack_16_limbs b)).
+        unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
     
     Lemma implies {p} `{Prime p} (result a b : Array.t Z U32_LIMBS) :
       (* let result := M.map_mod result in
@@ -63,6 +56,12 @@ Module Add2Proof.
       intros H2.
       fold a0 a1 b0 b1 res0 res1 in H2.
 
+      (* precondition gives: p and 2 ^ 16 are relatively coprime. *)
+      
+      assert (Hp_coprime : Znumtheory.rel_prime (2 ^ 16) p).
+      {
+        admit.
+      }
       
       (* d1 *)
       set (acc_16 := BinOp.sub (BinOp.sub res0 a0) b0) in H1, H2.
@@ -96,186 +95,264 @@ Module Add2Proof.
 
       rewrite H_two_16 in H2.
 
-      assert (Hacc_16 : 0 <= acc_16 < 2 ^ 16). {
+      (* We will now define acc_16_r, acc_32_r, and acc_r *)
+
+      (* (d4) acc_16_r = a[0] - b[0] - c[0] (without mod) *)
+      set (acc_16_r := res0 - a0 - b0).
+
+      (* (d5) acc_32_r = a[1] - b[1] - c[1] *)
+      set (acc_32_r := res1 - a1 - b1).
+
+      (* (d6) acc_r    = a - b - c    (without mod) = acc_16_r + 2 ^ 16 * acc_32_r *)
+      set (acc_r := acc_16_r + 2 ^ 16 * acc_32_r).      
+
+      assert (Hacc_16_r : - 2 ^ 17 + 2 <= acc_16_r <= 2 ^ 16 - 1). {
         admit.
       }
 
-      assert (Hacc_32 : 0 <= acc_32 < 2 ^ 16). {
+      assert (Hacc_32_r : - 2 ^ 17 + 2 <= acc_32_r <= 2 ^ 16 - 1). {
         admit.
       }
+
+      assert (Hacc_r : - 2 ^ 33 + 2 <= acc_r <= 2 ^ 32 - 1).
+      {
+        unfold acc_r.
+        lia.
+      }
+
+      (* Now we have acc_16_r, acc_32_r, and acc_r in the range [-2^16 + 2, 2^16 - 1] and [-2^32 + 2, 2^32 - 1] respectively *)
+
+      (* We will now define acc_16 and acc_32 in terms of acc_16_r and acc_32_r *)
+
+      assert (Hacc_16 : acc_16 = UnOp.from acc_16_r).
+      {
+        unfold acc_16.
+        unfold acc_16_r.
+        show_equality_modulo.
+      }
+
+      assert (Hacc_32 : acc_32 = UnOp.from acc_32_r).
+      {
+        unfold acc_32.
+        unfold acc_32_r.
+        show_equality_modulo.
+      }
+
+      (* Now we have acc_16 and acc_32 in the range [0, 2^16) *)
+
+      (* We will now rewrite the constraints H1 and H2 to use these definitions *)
+
+      (* (A) acc_16 * (acc_16 + 2 ^ 16) = 0 (mod p) *)
+      (* (B) acc * (acc + (2 ^ 32) mod p) = 0 (mod p) *)
+
 
       (* Now we have acc_16 and acc_32 in the range [0, 2^16) *)
       (* We can now rewrite H1 and H2 to use these definitions *)
 
       rewrite mul_zero_implies_zero in H1, H2.
 
-      (* now we want to remove the UnOp.from in H1. *)
-      
-      unfold UnOp.from in H1.
-
-      (* given p > 131072 = 2 ^17, and acc_16 < 2 ^ 16, this should be obvious. *)
-
-      (* 1. `acc_16 = 0 \/ acc_16 = -2 ^ 16` from (A), `hp`, and (0). *)
-
-      assert (H1' : acc_16 = 0 \/ (acc_16 + 2 ^ 16) = 0).
+      (* (0) acc_16 = 0 (mod p) \/ (acc_16 + 2 ^ 16) = 0 (mod p) from (A) *)
+      assert (H0' : UnOp.from acc_16 = 0 \/ BinOp.add acc_16 (2 ^ 16) = 0).
       {
-        destruct H2 as [H2a | H2b].
-        (* case 1: acc_16 = 0  (mod p) *)
+        rewrite FieldRewrite.from_add in H2.
+        assumption.
+      }
+      (* (1) acc_16_r = 0 \/ acc_16_r = - 2 ^ 16 from (0) and (Hp) *)
+      assert (H1' : acc_16_r = 0 \/ acc_16_r + 2 ^ 16 = 0).
+      {
+        rewrite Hacc_16 in H0'.
+        rewrite FieldRewrite.from_from in H0'.
+        rewrite FieldRewrite.add_from_left in H0'.
+        unfold UnOp.from in H0'.
+        unfold BinOp.add in H0'.
+        destruct H0' as [H0a | H0b].
+        (* acc_16_r mod p = 0. *)
         {
           left.
-          unfold UnOp.from in H2a.
-          rewrite mod_when_smaller in H2a; [|lia].
-          auto.
+          rewrite mod_when_smaller in H0a; [auto | admit].
         }
-        (* case 2 : acc_16 + 2 ^ 16 = 0 (mod p) *)
+        (* (acc_16_r + 2 ^ 16) mod p = 0 *)
         {
           right.
-          rewrite FieldRewrite.from_add in H2b.
-          unfold BinOp.add in H2b.
-          rewrite mod_when_smaller in H2b; [|lia].
-          auto.
+          rewrite mod_when_smaller in H0b; [auto | admit].
         }
       }
-
-      (* 2. `acc_16 = 0 (mod 2 ^ 16)` from (1) *)
-      assert (H2' : acc_16 mod (2 ^ 16) = 0).
+      (* (2) acc_16_r = 0 (mod 2 ^ 16) from (1) *)
+      assert (H2' : acc_16_r mod (2 ^ 16) = 0).
       {
         lia.
       }
 
-      set (acc_raw := acc_16 + 2 ^ 16 * acc_32).
+      (* Now we have acc_16_r = 0 (mod 2 ^ 16) *)
 
-      assert (Hacc : acc = UnOp.from acc_raw).
+      (* We will now prove the properties of acc *)
+      (* (3) acc = 0 (mod p) \/ (acc + (2 ^ 32) mod p) = 0 (mod p) from (B) *)
+      (* (4) acc = 0 (mod p) \/ acc = - 2 ^ 32 (mod p) from (3) *)
+      assert (H4' : UnOp.from acc = 0 \/ BinOp.add acc (2 ^ 32) = 0).
+      {
+        rewrite FieldRewrite.from_add in H1.
+        rewrite H_two_32 in H1.
+        rewrite FieldRewrite.add_from_right in H1.
+        assumption.
+      }
+      
+      (* (5) acc_r = 0 (mod 2 ^ 16) from (2), (d6) and arithmetics *)
+      assert (H5' : acc_r mod (2 ^ 16) = 0).
+      {
+        unfold acc_r.
+        lia.
+      }
+      (* (6) acc = acc_r mod p *)
+      assert (H6' : acc = UnOp.from acc_r).
       {
         unfold acc.
-        unfold acc_raw.
+        unfold acc_r.
+        rewrite Hacc_32.
+        rewrite FieldRewrite.mul_from_left.
+        rewrite Hacc_16.
+        rewrite FieldRewrite.add_from_left.
         unfold BinOp.add.
-        unfold BinOp.mul.
+        replace (Z.pow_pos 2  16) with (2 ^ 16) by lia.
         unfold UnOp.from.
-        replace (Z.pow_pos 2 16) with (2 ^ 16) by reflexivity.
-
-        rewrite Zplus_mod_idemp_r.
+        unfold BinOp.mul.
         rewrite Z.mul_comm.
-        reflexivity.
+        show_equality_modulo.
       }
-
+      (* (7) acc_r = 0 (mod p) \/ acc_r = - 2 ^ 32 (mod p) from (4) and (B) *)
+      assert (H7' : UnOp.from acc_r = 0 \/ BinOp.add acc_r (2 ^ 32) = 0).
+      {
+        rewrite H6' in H4'.
+        rewrite FieldRewrite.from_from in H4'.
+        rewrite FieldRewrite.add_from_left in H4'.
+        assumption.
+      }
+      (* (8) acc_r = 0 (mod 2 ^ 16 * p) \/ acc_r = - 2 ^ 32 (mod 2 ^ 16 * p) from (crt), (5), (7) *)
+      assert (H8' : acc_r mod (2 ^ 16 * p) = 0 \/ (acc_r + 2 ^ 32) mod (2 ^ 16 * p) = 0).
+      {
+        assert (Hp0 : p <> 0) by lia.
+        assert (H216 : 2 ^ 16 <> 0) by lia.
+        destruct H7' as [H7a | H7b].
+        (* acc_r mod p = 0. *)
+        {
+          left.
+          unfold UnOp.from in H7a.
+          apply (binary_chinese_remainder_alt (2 ^ 16) p acc_r 0 H216 Hp0 Hp_coprime H5' H7a).
+        }
+        (* (acc_r + 2 ^ 32) mod p = 0. *)
+        {
+          right.
+          unfold BinOp.add in H7b.
+          assert (H5'' : (acc_r + 2 ^ 32) mod (2 ^ 16) = 0).
+          {
+            rewrite <-Zplus_mod_idemp_r.
+            replace ((2 ^ 32) mod (2 ^ 16)) with 0 by lia.
+            rewrite Z.add_0_r.
+            assumption.
+          }
+          apply (binary_chinese_remainder_alt (2 ^ 16) p (acc_r + 2 ^ 32) 0 H216 Hp0 Hp_coprime H5'' H7b).
+        }
+      }
       
-
-      (* 3. `acc = 0 (mod 2 ^ 16)` from (d3), (2), and `hp` *)
-      assert (H3' : acc_raw mod (2 ^ 16) = 0).
+      (* (9) acc_r = 0 \/ acc_r = - 2 ^ 32 from (8), (hp) and (r2). *)
+      assert (H9' : acc_r = 0 \/ (acc_r + 2 ^ 32) = 0).
       {
-        unfold acc_raw.
-        lia.
-      }
-
-
-      (* 4. `acc = 0 (mod P) \/ acc = -2^32 (mod P)` from (B) *)
-      assert (H4' : acc mod p = 0 \/ (acc + two_32) mod p = 0).
-      {
-        rewrite <- (Zmod_mod (acc + two_32)).
-        unfold BinOp.add in H1.
-        auto.
-      }
-
-      assert (H4'' : acc_raw mod p = 0 \/ (acc_raw + 2 ^ 32) mod p = 0).
-      {
-        rewrite Hacc in H4'.
-        unfold UnOp.from in H4'.
-        rewrite Zmod_mod in H4'.
-        rewrite Zplus_mod_idemp_l in H4'.
-        destruct H4' as [H4a | H4b].
-        (* case 1: acc mod p = 0 *)
-        {
-          left.
-          auto.
-        }
-        (* case 2: acc + two_32 mod p = 0 *)
-        {
-          right.
-          rewrite H_two_32 in H4b.
-          unfold UnOp.from in H4b.
-          rewrite Zplus_mod_idemp_r in H4b.
-          auto.
-        }
-      }
-
-      assert (Hp_coprime : Znumtheory.rel_prime (2 ^ 16) p).
-      {
-        (* Consider integrating some definitions from Znumtheory. *)
-        (* Idea: Prime p, and p > 2 : p and any exponential of 2 should be coprime. *)
-        admit.
-      }
-
-      (* 5. `acc = 0 (mod 2 ^ 16 * P) \/ acc = -2^32 (mod 2 ^ 16 * P)` by `p` and 2 are coprime, Chinese Remainder Theorem, case analysis on (4), and arithmetics (for finding the remainder solution), for detailed method of finding the solution see (here)[https://crypto.stanford.edu/pbc/notes/numbertheory/crt.html] *)
-      assert (H5'' : acc_raw mod (2 ^ 16 * p) = 0 \/ (acc_raw + two_32) mod (2 ^ 16 * p) = 0).
-      { 
-        assert (Hp0 : p <> 0).
+        (*
+        2 ^ 16 p > 2 ^ 33
+        -k < arg_min < arg_max < k
+        then given k > 0, arg mod k = 0
+        arg = 0.
+        *)
+        assert (H2_16_p : 2 ^ 16 * p > 2 ^ 33).
         {
           lia.
         }
-        assert (H216 : 2 ^ 16 <> 0).
-        {
-          lia.
-        }
-        destruct H4' as [H4a | H4b].
-        (* case 1: acc_raw mod p = 0 *)
+
+        destruct H8' as [H8a | H8b].
+        (* acc_r mod 2 ^ 16  * p = 0. *)
         {
           left.
-          assert (H4a' : acc_raw mod p = 0).
-          {
-            rewrite Hacc in H4a.
-            unfold UnOp.from in H4a.
-            rewrite Zmod_mod in H4a.
-            auto.
-          }
-          assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p acc_raw 0 H216 Hp0 Hp_coprime H3' H4a').
-          auto.     
+          apply (mod_0_range (2 ^ 16 * p)); [lia | lia | auto].
         }
-        (* case 2: acc_raw + two_32 mod p = 0 *)
+        
+        (* (acc_r + 2 ^ 32) mod 2 ^ 16  * p = 0. *)
         {
           right.
-          assert (Hacc_raw_2_32 : (acc_raw + 2 ^ 32) mod 2 ^ 16 = 0).
-          {
-            admit.
-          }
-          assert (H4b' : (acc_raw + two_32) mod p = 0).
-          {
-            rewrite Hacc in H4b.
-            unfold UnOp.from in H4b.
-            rewrite Zplus_mod_idemp_l in H4b.
-            auto.
-          }
-          (* 
-          Idea: 
-          (acc_raw + two_32) mod (2 ^ 16 * p)
-          = acc_raw mod (2 ^ 16 * p) + two_32 mod (2 ^ 16 * p)
-          Given p > 2 ^ 17, 2 ^ 16 p > 2^32
-          so two_32 mod (2 ^ 16 * p) = two_32
-          *)
-          (* assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p (acc_raw + 2 ^ 32) 0 H216 Hp0 Hp_coprime Hacc_raw_2_32 H4b).
-          rewrite <- Hcrt. *)
+          apply (mod_0_range (2 ^ 16 * p)); [lia | lia | auto].
+        }
+
+      } 
+      (* Now we have acc_r = 0 \/ acc_r = - 2 ^ 32 *)
+
+      (* We can now conclude the proof *)
+
+      (* (10) a = b + c \/ a = b + c + 2 ^ 32 *)
+      (* (11) a = b + c (mod 2 ^ 32) *)
+      set (res_val := pack_16_limbs result).
+      set (a_val := pack_16_limbs a).
+      set (b_val := pack_16_limbs b).
+
+
+
+      unfold acc_r in H9'.
+      unfold acc_16_r, acc_32_r in H9'.
+
+      assert (H10' : res_val = a_val + b_val \/ res_val = a_val + b_val - 2 ^ 32).
+      {
+        unfold res_val, a_val, b_val.
+        unfold pack_16_limbs.
+        fold res0 res1 a0 a1 b0 b1.
+        unfold BITS_PER_LIMB.
+        destruct H9' as [H9a | H9b].
+        {
+          left.
+          lia.
+        }
+        {
+          right.
+          lia.
+        }
+      }
+
+      (* (11) res0 = a0 + b0 (mod 2 ^ 16) *)
+      assert (H11' : res0 mod (2 ^ 16) = (a0 + b0) mod (2 ^ 16)).
+      {
+        destruct H9' as [H9a | H9b].
+        {
+          apply (f_equal (fun x => x mod (2 ^ 16))) in H9a.
+          rewrite Z.mul_comm in H9a.
+          rewrite Z_mod_plus_full in H9a.
+          rewrite Zmod_0_l in H9a.
+          replace (res0 - a0 - b0) with (res0 - (a0 + b0)) in H9a by lia.
+          apply eqm_minus_0.
+          assumption.
+        }
+        {
+          apply (f_equal (fun x => x mod (2 ^ 16))) in H9b.
+          replace (2 ^ 32) with ((2 ^ 16) * 2 ^ 16) in H9b by lia.
+          rewrite Z.mul_comm in H9b.
+          rewrite Z_mod_plus_full in H9b.
+          rewrite Z_mod_plus_full in H9b.
+          rewrite Zmod_0_l in H9b.
+          replace (res0 - a0 - b0) with (res0 - (a0 + b0)) in H9b by lia.
+          apply eqm_minus_0.
+          assumption.
+        }
+      }
+
+      assert (Hres : res_val = (a_val + b_val) mod (2 ^ 32)).
+      {
+        destruct H10' as [H10a | H10b].
+        (* case 1: res_val = a_val + b_val *)
+        {
+          rewrite H10a.
+          admit.
+        }
+        (* case 2: res_val = a_val + b_val - 2 ^ 32 *)
+        {
+          rewrite H10b.
           admit.
         }
       }
-
-      (* 6. `acc = result - a - b` (definition) *)
-
-      (* 7. No overflow can occur on `acc mod 2^16 P` as `2^16 P > 2^33` and `result, a, b < 2^32`, by (5) and (6) *)
-
-      (* 8. Hence `acc = 0 \/ acc = -2^32` from (5) and (7) *)
-      assert (H8' : acc = 0 \/ (acc + 2 ^ 32) = 0).
-      {
-        unfold acc.
-        admit.
-      }
-
-      (* 9. `acc = 0 (mod 2 ^ 32)` from (8) and definition of `mod` *)
-      assert (H9' : acc mod (2 ^ 32) = 0).
-      {
-        admit.
-      }
-
-      (* 10. `result - a - b = 0 (mod 2 ^ 32)` from definition of `acc` *)
 
       (* helper *)
       assert (Htmp : Array.Eq.t (eval_add2 a b) result).
@@ -286,19 +363,28 @@ Module Add2Proof.
         unfold U32_LIMBS.
         unfold BITS_PER_LIMB.
         intros Hi.
+        unfold unpack_16_limbs; unfold double_val.
         assert (i = 0 \/ i = 1) as [Hi0 | Hi1].
         {
-          (* should be lia *)
           admit.
         }
-        unfold pack_16_limbs;
-        fold a0 a1 b0 b1;
-        unfold unpack_16_limbs.
         (* i = 0*)
         {
           rewrite Hi0.
           fold res0.
           simpl.
+          fold a_val b_val.
+          replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
+          replace (a0 + a1 * 2 ^ 16 + (b0 + b1 * 2 ^ 16)) with ((a0 + b0) + (a1 + b1) * (2 ^ 16)) by lia.
+
+          replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
+
+          rewrite <- Hres.
+
+          unfold res_val.
+
+          unfold pack_16_limbs.
+
           admit.
         }
         (* i = 1 *)
@@ -306,10 +392,13 @@ Module Add2Proof.
           rewrite Hi1.
           fold res1.
           simpl.
+          replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
+
+          fold a_val b_val.
+          
           admit.
         }
       }
-
 
       eapply Run.Implies. {
         repeat constructor.

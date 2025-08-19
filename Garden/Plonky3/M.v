@@ -860,3 +860,11 @@ Axiom binary_chinese_remainder_alt : forall (p q x t : Z),
   x mod p = t mod p ->
   x mod q = t mod q ->
   x mod (p * q) = t mod (p * q).
+
+Lemma mod_0_range (k : Z) (x : Z) :
+    k > 0 -> 
+    -k < x < k ->
+    x mod k = 0 ->
+    x = 0.
+Proof.
+Admitted.
