@@ -30,47 +30,6 @@ Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
     ];
 }.
 
-(*
-pub struct BranchEqualCoreCols<T, const NUM_LIMBS: usize> {
-  pub a: [T; NUM_LIMBS],
-  pub b: [T; NUM_LIMBS],
-
-  pub cmp_result: T,
-  pub imm: T,
-
-  pub opcode_beq_flag: T,
-  pub opcode_bne_flag: T,
-
-  pub diff_inv_marker: [T; NUM_LIMBS],
-}
-*)
-Module BranchEqualCoreCols.
-  Record t {NUM_LIMBS : Z} {T : Set} : Set := {
-    a : Array.t T NUM_LIMBS;
-    b : Array.t T NUM_LIMBS;
-    cmp_result : T;
-    imm : T;
-    opcode_beq_flag : T;
-    opcode_bne_flag : T;
-    diff_inv_marker : Array.t T NUM_LIMBS;
-  }.
-  Arguments t : clear implicits.
-End BranchEqualCoreCols.
-
-(*
-pub struct BranchEqualCoreAir<const NUM_LIMBS: usize> {
-  offset: usize,
-  pc_step: u32,
-}
-*)
-Module BranchEqualCoreAir.
-  Record t {NUM_LIMBS : Z} : Set := {
-    offset : Z;
-    pc_step : Z;
-  }.
-  Arguments t : clear implicits.
-End BranchEqualCoreAir.
-
 Definition eval {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
@@ -187,29 +146,23 @@ Definition print_branch_eq {NUM_LIMBS : Z} : string :=
 
 Compute print_branch_eq (NUM_LIMBS := 4).
 
-Module RunWithoutImplies.
-  Reserved Notation "{{{ e 🔽 output , P }}}".
-
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
-    {{{ M.Pure value 🔽 value, True }}}
-  | Equal (x1 x2 : Z) :
-    {{{ M.Equal x1 x2 🔽 tt, x1 = x2 }}}
-  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
-    {{{ e 🔽 value, P }}} ->
-    {{{ M.Call e 🔽 value, P }}}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
-    {{{ e 🔽 value, P1 }}} ->
-    (P1 -> {{{ k value 🔽 output, P2 }}}) ->
-    {{{ M.Let e k 🔽 output, P1 /\ P2 }}}
-
-  where "{{{ e 🔽 output , P }}}" := (t e output P).
-End RunWithoutImplies.
- 
 (** We prove the equality of the [eval] definition above with the [eval] definition directly using
     field elements. *)
-(* Lemma eq_eval_field {NUM_LIMBS : Z}
+Lemma eq_eval_field {p} `{Prime p} {NUM_LIMBS : Z}
+    (expr_env : Expr.Env.t)
+    (var_env : Var.Env.t)
     (self : BranchEqualCoreAir.t NUM_LIMBS)
-    (builder : Builder.t)
     (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
-    (from_pc : Var.t) *)
+    (from_pc : Var.t) :
+  MExpr.eval expr_env var_env (
+    MExpr.map (AdapterAirContext.map (Expr.eval expr_env var_env)) (
+      eval self local from_pc
+    )
+  ) =
+  core_with_monad.eval
+    self
+    (BranchEqualCoreCols.map (Var.eval var_env) local)
+    (Var.eval var_env from_pc).
+Proof.
+  (* This lemma is not actually correct as the intermediates [Let] do not have the same type *)
+Admitted.

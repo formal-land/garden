@@ -95,14 +95,18 @@ End BinOp.
 
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
-  Inductive t : Set -> Set :=
-  | Pure {A : Set} (value : A) : t A
-  | Equal (x1 x2 : Z) : t unit
+  Inductive t (A : Set) : Set :=
+  | Pure (value : A) : t A
+  | Equal (x1 x2 : Z) (value : A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
-  | Call {A : Set} (e : t A) : t A
-  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
+  | Call (e : t A) : t A
+  | Let {B : Set} (e : t B) (k : B -> t A) : t A
   .
+  Arguments Pure {_}.
+  Arguments Equal {_}.
+  Arguments Call {_}.
+  Arguments Let {_ _}.
 
   (** This is a marker that we remove with the following tactic. *)
   Axiom run : forall {A : Set}, t A -> A.
@@ -148,6 +152,14 @@ Module M.
       | _ => exact (Pure e)
       end
     end.
+
+  Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
+    match e with
+    | M.Pure x => M.Pure (f x)
+    | M.Equal x y value => M.Equal x y (f value)
+    | M.Call e => M.Call (map f e)
+    | M.Let e k => M.Let e (fun x => map f (k x))
+    end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
@@ -172,7 +184,7 @@ Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
 
 Definition equal (x y : Z) : M.t unit :=
-  M.Equal x y.
+  M.Equal x y tt.
 
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
@@ -644,8 +656,8 @@ Module Run.
   Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
   | Pure {A : Set} (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | Equal (x1 x2 : Z) :
-    {{ M.Equal x1 x2 🔽 tt, x1 = x2 }}
+  | Equal {A : Set} (x1 x2 : Z) (value : A) :
+    {{ M.Equal x1 x2 value 🔽 value, x1 = x2 }}
   | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}

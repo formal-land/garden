@@ -192,24 +192,50 @@ Global Instance ArrayIsToRocq {T : Set} {C : ToRocq.C T} {N : Z} : ToRocq.C (Arr
 }.
 
 Module MExpr.
-  Inductive t : Set -> Set :=
-  | Pure {A : Set} (value : A) : t A
-  | AssertZero (expr : Expr.t) : t unit
+  Inductive t (A : Set) : Set :=
+  | Pure (value : A) : t A
+  | AssertZero (expr : Expr.t) (value : A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
-  | Call {A : Set} (e : t A) : t A
-  | Let {A B : Set} (e : t A) (k : A -> t B) : t B
+  | Call (e : t A) : t A
+  | Let {B : Set} (e : t B) (k : B -> t A) : t A
   .
+  Arguments Pure {_}.
+  Arguments AssertZero {_}.
+  Arguments Call {_}.
+  Arguments Let {_ _}.
 
   Fixpoint flatten {A : Set} (self : t A) : A * list Expr.t :=
     match self with
     | Pure value => (value, [])
-    | AssertZero expr => (tt, [expr])
+    | AssertZero expr value => (value, [expr])
     | Call e => flatten e
     | Let e k =>
       let '(value_e, constraints_e) := flatten e in
       let '(value_k, constraints_k) := flatten (k value_e) in
       (value_k, constraints_k ++ constraints_e)
+    end.
+
+  Fixpoint eval {A : Set} {p} `{Prime p}
+      (expr_env : Expr.Env.t)
+      (var_env : Var.Env.t)
+      (self : t A) :
+      M.t A :=
+    match self with
+    | Pure value => M.pure value
+    | AssertZero expr value => M.Equal (Expr.eval expr_env var_env expr) 0 value
+    | Call e => M.Call (eval expr_env var_env e)
+    | Let e k =>
+      let* value_e := eval expr_env var_env e in
+      eval expr_env var_env (k value_e)
+    end.
+
+  Fixpoint map {A B : Set} (f : A -> B) (self : t A) : t B :=
+    match self with
+    | Pure value => Pure (f value)
+    | AssertZero expr value => AssertZero expr (f value)
+    | Call e => Call (map f e)
+    | Let e k => Let e (fun x => map f (k x))
     end.
 End MExpr.
 
@@ -237,19 +263,19 @@ Definition pure {A : Set} (value : A) : MExpr.t A :=
 Fixpoint when {A : Set} (condition : Expr.t) (body : MExpr.t A) : MExpr.t A :=
   match body with
   | MExpr.Pure value => MExpr.Pure value
-  | MExpr.AssertZero expr => MExpr.AssertZero (Expr.Mul condition expr)
+  | MExpr.AssertZero expr value => MExpr.AssertZero (Expr.Mul condition expr) value
   | MExpr.Call e => MExpr.Call (when condition e)
   | MExpr.Let e k => MExpr.Let (when condition e) (fun x => when condition (k x))
   end.
 
 Definition assert_zero (e : Expr.t) : MExpr.t unit :=
-  MExpr.AssertZero e.
+  MExpr.AssertZero e tt.
 
 Definition assert_one (e : Expr.t) : MExpr.t unit :=
-  MExpr.AssertZero (Expr.Sub e Expr.ONE).
+  assert_zero (Expr.Sub e Expr.ONE).
 
 Definition assert_bool (e : Expr.t) : MExpr.t unit :=
-  MExpr.AssertZero (Expr.Mul e (Expr.Sub e Expr.ONE)).
+  assert_zero (Expr.Mul e (Expr.Sub e Expr.ONE)).
 
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> MExpr.t A) (acc : A) (l : list B) : MExpr.t A :=
