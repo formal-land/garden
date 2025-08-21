@@ -22,6 +22,27 @@ Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS :=
 
 
 Module Add2Proof.
+
+    Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop := 
+      0 <= x.(Array.get) 0 < 2 ^ 16 /\ 0 <= x.(Array.get) 1 < 2 ^ 16.
+
+    Search "lt_le_iff".
+
+    
+    
+    Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
+    Proof.
+      split; intros H.
+      {
+        apply Z.lt_le_pred in H. 
+        auto.
+      }
+      {
+        lia.
+      }
+    Qed.
+
+
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
         unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
     
@@ -30,6 +51,9 @@ Module Add2Proof.
       let a := M.map_mod a in
       let b := M.map_mod b in *)
       p > 2 ^ 17 ->
+      range_check_32 result ->
+      range_check_32 a ->
+      range_check_32 b ->
       {{ add2 result a b 🔽
         tt,
         Array.Eq.t (eval_add2 a b) result
@@ -37,6 +61,7 @@ Module Add2Proof.
     Proof.
       cbn.
       intros Hp.
+      intros Hrc_res Hrc_a Hrc_b.
       cbn.
       eapply Run.LetAccumulate. {
         constructor.
@@ -169,12 +194,30 @@ Module Add2Proof.
         (* acc_16_r mod p = 0. *)
         {
           left.
-          rewrite mod_when_smaller in H0a; [auto | admit].
+          apply (mod_0_range p acc_16_r).
+          (* p > 0 *)
+          {
+            lia.
+          }
+          (* - p < acc_16_r < p *)
+          {
+            lia.
+          }
+          auto.
         }
         (* (acc_16_r + 2 ^ 16) mod p = 0 *)
         {
           right.
-          rewrite mod_when_smaller in H0b; [auto | admit].
+          apply (mod_0_range p (acc_16_r + 2 ^ 16)).
+          (* p > 0 *)
+          {
+            lia.
+          }
+          (* - p < acc_16_r < p *)
+          {
+            lia.
+          }
+          auto.
         }
       }
       (* (2) acc_16_r = 0 (mod 2 ^ 16) from (1) *)
@@ -341,16 +384,73 @@ Module Add2Proof.
 
       assert (Hres : res_val = (a_val + b_val) mod (2 ^ 32)).
       {
+        assert (Hres_val_range : 0 <= res_val < 2 ^ 32).
+        {
+          unfold res_val.
+          unfold pack_16_limbs.
+          unfold range_check_32 in Hrc_res.
+          unfold BITS_PER_LIMB.
+          fold res0 res1 in Hrc_res.
+          destruct Hrc_res as [Hrc0 Hrc1].
+          fold res0 res1.
+          split.
+          (* >= 0 *)
+          {
+            apply Z.add_nonneg_nonneg; [lia | apply Z.mul_nonneg_nonneg; lia].
+          }
+          (* < 2 ^ 32 *)
+          {
+            (*
+            res0 + res1 * 2 ^ 16 
+            <= 2 ^ 16 - 1 + (2 ^ 16 - 1) * 2 ^ 16
+            <= 2 ^ 16 * 2 ^ 16 - 1
+            <= 2 ^ 32 - 1
+            < 2 ^ 32
+            *)
+            apply int_upper.
+            assert (res0 <= Z.pow_pos 2 16 - 1).
+            { 
+              apply int_upper. 
+              exact (proj2 Hrc0). 
+            }
+            assert (res1 <= Z.pow_pos 2 16 - 1).
+            { 
+              apply int_upper. 
+              exact (proj2 Hrc1). 
+            }
+            assert (res0 + res1 * Z.pow_pos 2 16 <= 
+              (Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16 - 1) * Z.pow_pos 2 16).
+            {
+
+              admit.
+            }
+
+            (* replace (2 ^ 16) with (Z.pow_pos 2 16) in Hrc0 by lia.
+            replace (2 ^ 16) with (Z.pow_pos 2 16) in Hrc1 by lia.
+            replace (2 ^ 16) with (Z.pow_pos 2 16) by lia.
+            replace (2 ^ 32) with (Z.pow_pos 2 32) by lia.
+            replace (Z.pow_pos 2 32) with ((Z.pow_pos 2 16) * (Z.pow_pos 2 16)) by lia. *)
+
+            admit.
+          }
+        }
         destruct H10' as [H10a | H10b].
         (* case 1: res_val = a_val + b_val *)
         {
-          rewrite H10a.
-          admit.
+          rewrite <-H10a.
+          rewrite Zmod_small; auto.
         }
         (* case 2: res_val = a_val + b_val - 2 ^ 32 *)
         {
-          rewrite H10b.
-          admit.
+          assert (H10b' : res_val + 2 ^ 32 = a_val + b_val).
+          {
+            rewrite H10b.
+            ring.
+          }
+          rewrite <-H10b'.
+          replace (res_val + 2 ^ 32) with (res_val + 1 * 2 ^ 32) by ring.
+          rewrite Z_mod_plus; [|lia].
+          rewrite Zmod_small; auto.
         }
       }
 
@@ -366,7 +466,24 @@ Module Add2Proof.
         unfold unpack_16_limbs; unfold double_val.
         assert (i = 0 \/ i = 1) as [Hi0 | Hi1].
         {
-          admit.
+          destruct Hi as [Hi0  Hi1].
+          assert (i = 0 \/ i = 1 \/ i >= 2) as H_cases by lia.
+          destruct H_cases as [Hi_eq0 | Hi_ge1].
+          {
+            left. 
+            exact Hi_eq0.
+          }
+          {
+            destruct Hi_ge1 as [Hi_eq1 | Hi_ge2].
+            {
+              right.
+              exact Hi_eq1.
+            }
+            {
+              exfalso.
+              easy.
+            }
+          }
         }
         (* i = 0*)
         {
@@ -385,7 +502,17 @@ Module Add2Proof.
 
           unfold pack_16_limbs.
 
-          admit.
+          unfold BITS_PER_LIMB.
+
+          rewrite Z_mod_plus_full.
+
+          unfold res0.
+          
+          unfold range_check_32 in Hrc_res.
+          
+          apply Zmod_small.
+
+          apply Hrc_res.
         }
         (* i = 1 *)
         {
@@ -395,8 +522,28 @@ Module Add2Proof.
           replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
 
           fold a_val b_val.
+
+          replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
+
+          rewrite <-Hres.
+
+          unfold res_val.
+
+          unfold res1.
           
-          admit.
+          unfold pack_16_limbs.
+
+          unfold range_check_32 in Hrc_res.
+
+          unfold BITS_PER_LIMB.
+
+          rewrite Z_div_plus_full; [|lia].
+
+          cut (result.(Array.get) 0 / 2 ^ 16 = 0); [intros Hr; rewrite Hr; reflexivity |].
+
+          apply Zdiv_small.
+
+          apply Hrc_res.
         }
       }
 
