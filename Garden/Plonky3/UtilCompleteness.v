@@ -27,6 +27,18 @@ Admitted.
 Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop := 
   0 <= x.(Array.get) 0 < 2 ^ 16 /\ 0 <= x.(Array.get) 1 < 2 ^ 16.
 
+Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
+Proof.
+  split; intros H.
+  {
+    apply Z.lt_le_pred in H. 
+    auto.
+  }
+  {
+    lia.
+  }
+Qed.  
+
 
 (*
 Updated New Proof:
@@ -74,19 +86,6 @@ let
 
 Module Add2Proof.
     
-    Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
-    Proof.
-      split; intros H.
-      {
-        apply Z.lt_le_pred in H. 
-        auto.
-      }
-      {
-        lia.
-      }
-    Qed.
-
-
 
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
         unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
@@ -617,3 +616,6 @@ Module Add2Proof.
       easy.
     Qed.
 End Add2Proof.
+
+Module Add3Proof.
+End Add3Proof.
