@@ -27,6 +27,51 @@ Admitted.
 Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop := 
   0 <= x.(Array.get) 0 < 2 ^ 16 /\ 0 <= x.(Array.get) 1 < 2 ^ 16.
 
+
+(*
+Updated New Proof:
+
+
+Given the definitions:
+```
+- (d1) acc_16 = a[0] - b[0] - c[0] (mod p)
+- (d2) acc_32 = a[1] - b[1] - c[1] (mod p)
+- (d3) acc    = acc_16 + acc_32 * 2 ^ 16 (mod p)
+```
+The prover generates the following two constraints:
+(A) acc_16 * (acc_16 + 2 ^ 16) = 0 (mod p)
+(B) acc * (acc + (2 ^ 32) mod p) = 0 (mod p)
+
+precondition:
+(Hp)    p > 2 ^ 17
+(Hlimb) 0 <= a_i, b_i < 2 ^ 16
+
+following the guides in the comments:
+
+let 
+(d4) acc_16_r = a[0] - b[0] - c[0] (without mod)
+(d5) acc_32_r = a[1] - b[1] - c[1]
+(d6) acc_r    = a    - b    - c    (without mod)
+              = acc_16_r + 2 ^ 16 * acc_32_r
+
+(r1) - 2 ^ 17 + 2 < acc_16_r <= 2 ^ 16 - 1
+(r2) - 2 ^ 33 + 2 < acc_r    <= 2 ^ 32 - 1
+
+(0) acc_16 = 0 (mod p) \/ (acc_16 + 2 ^ 16) = 0 (mod p) from (A)
+(1) acc_16_r = 0 \/ acc_16_r = - 2 ^ 16 from (0) and (Hp)
+(2) acc_16_r = 0 (mod 2 ^ 16) from (1)
+(3) acc = 0 (mod p) \/ (acc + (2 ^ 32) mod p) = 0 (mod p) from (B)
+(4) acc = 0 (mod p) \/ acc = - 2 ^ 32 (mod p) from (3)
+(5) acc_r = 0 (mod 2 ^ 16) from (2), (d6) and arithmetics
+(6) acc = acc_r mod p
+(7) acc_r = 0 (mod p) \/ acc_r = - 2 ^ 32 (mod p) from (4) and (7)
+(8) acc_r = 0 (mod 2 ^ 16 * p) \/ acc_r = - 2 ^ 32 (mod 2 ^ 16 * p) from (crt), (5), (7)
+(9) acc_r = 0 \/ acc_r = - 2 ^ 32 from (8), (hp) and (r2).
+(10) a - b - c = 0 \/ a - b - c = - 2 ^ 32
+(11) a = b + c \/ a = b + c + 2 ^ 32
+(12) a = b + c (mod 2 ^ 32)
+*)  
+
 Module Add2Proof.
     
     Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
@@ -570,52 +615,5 @@ Module Add2Proof.
       }
 
       easy.
-      
     Qed.
 End Add2Proof.
-
-
-
-(*
-Updated New Proof:
-
-
-Given the definitions:
-```
-- (d1) acc_16 = a[0] - b[0] - c[0] (mod p)
-- (d2) acc_32 = a[1] - b[1] - c[1] (mod p)
-- (d3) acc    = acc_16 + acc_32 * 2 ^ 16 (mod p)
-```
-The prover generates the following two constraints:
-(A) acc_16 * (acc_16 + 2 ^ 16) = 0 (mod p)
-(B) acc * (acc + (2 ^ 32) mod p) = 0 (mod p)
-
-precondition:
-(Hp)    p > 2 ^ 17
-(Hlimb) 0 <= a_i, b_i < 2 ^ 16
-
-following the guides in the comments:
-
-let 
-(d4) acc_16_r = a[0] - b[0] - c[0] (without mod)
-(d5) acc_32_r = a[1] - b[1] - c[1]
-(d6) acc_r    = a    - b    - c    (without mod)
-              = acc_16_r + 2 ^ 16 * acc_32_r
-
-(r1) - 2 ^ 17 + 2 < acc_16_r <= 2 ^ 16 - 1
-(r2) - 2 ^ 33 + 2 < acc_r    <= 2 ^ 32 - 1
-
-(0) acc_16 = 0 (mod p) \/ (acc_16 + 2 ^ 16) = 0 (mod p) from (A)
-(1) acc_16_r = 0 \/ acc_16_r = - 2 ^ 16 from (0) and (Hp)
-(2) acc_16_r = 0 (mod 2 ^ 16) from (1)
-(3) acc = 0 (mod p) \/ (acc + (2 ^ 32) mod p) = 0 (mod p) from (B)
-(4) acc = 0 (mod p) \/ acc = - 2 ^ 32 (mod p) from (3)
-(5) acc_r = 0 (mod 2 ^ 16) from (2), (d6) and arithmetics
-(6) acc = acc_r mod p
-(7) acc_r = 0 (mod p) \/ acc_r = - 2 ^ 32 (mod p) from (4) and (7)
-(8) acc_r = 0 (mod 2 ^ 16 * p) \/ acc_r = - 2 ^ 32 (mod 2 ^ 16 * p) from (crt), (5), (7)
-(9) acc_r = 0 \/ acc_r = - 2 ^ 32 from (8), (hp) and (r2).
-(10) a - b - c = 0 \/ a - b - c = - 2 ^ 32
-(11) a = b + c \/ a = b + c + 2 ^ 32
-(12) a = b + c (mod 2 ^ 32)
-*)
