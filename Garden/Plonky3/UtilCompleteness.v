@@ -28,10 +28,6 @@ Module Add2Proof.
 
     Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop := 
       0 <= x.(Array.get) 0 < 2 ^ 16 /\ 0 <= x.(Array.get) 1 < 2 ^ 16.
-
-    Search "lt_le_iff".
-
-    
     
     Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
     Proof.
