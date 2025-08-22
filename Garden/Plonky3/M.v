@@ -665,6 +665,26 @@ Module FieldRewrite.
     end.
 End FieldRewrite.
 
+Module FieldEquiv.
+  Lemma add_equiv {p} `{Prime p} (x y : Z) :
+    BinOp.add x y = UnOp.from (x + y).
+  Proof.
+    show_equality_modulo.
+  Qed.
+
+  Lemma sub_equiv {p} `{Prime p} (x y : Z) :
+    BinOp.sub x y = UnOp.from (x - y).
+  Proof.
+    show_equality_modulo.
+  Qed.
+
+  Lemma mul_equiv {p} `{Prime p} (x y : Z) :
+    BinOp.mul x y = UnOp.from (x * y).
+  Proof.
+    show_equality_modulo.
+  Qed.
+End FieldEquiv.
+
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
