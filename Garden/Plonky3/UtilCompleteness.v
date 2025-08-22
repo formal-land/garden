@@ -20,6 +20,9 @@ Definition pack_16_limbs (bits : Array.t Z U32_LIMBS) : Z :=
 Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS := 
   double_val (value mod (2 ^ BITS_PER_LIMB)) (value / (2 ^ BITS_PER_LIMB)).
 
+Lemma large_prime_coprime_exp_of_2 {p} `{Prime p} : p > 2 -> Znumtheory.rel_prime (2 ^ 16) p.
+Proof.
+Admitted.
 
 Module Add2Proof.
 
@@ -41,6 +44,7 @@ Module Add2Proof.
         lia.
       }
     Qed.
+
 
 
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
@@ -75,6 +79,9 @@ Module Add2Proof.
       set (res0 := result.(Array.get) 0) in H1.
       set (res1 := result.(Array.get) 1) in H1.
 
+      unfold range_check_32 in Hrc_res, Hrc_a, Hrc_b.
+      fold a0 a1 b0 b1 res0 res1 in Hrc_res, Hrc_a, Hrc_b.
+
       eapply Run.LetAccumulate. {
         constructor.
       }
@@ -85,7 +92,8 @@ Module Add2Proof.
       
       assert (Hp_coprime : Znumtheory.rel_prime (2 ^ 16) p).
       {
-        admit.
+        apply large_prime_coprime_exp_of_2.
+        lia.
       }
       
       (* d1 *)
@@ -131,12 +139,15 @@ Module Add2Proof.
       (* (d6) acc_r    = a - b - c    (without mod) = acc_16_r + 2 ^ 16 * acc_32_r *)
       set (acc_r := acc_16_r + 2 ^ 16 * acc_32_r).      
 
-      assert (Hacc_16_r : - 2 ^ 17 + 2 <= acc_16_r <= 2 ^ 16 - 1). {
-        admit.
+      assert (Hacc_16_r : - 2 ^ 17 + 2 <= acc_16_r <= 2 ^ 16 - 1). 
+      {
+        unfold acc_16_r.
+        lia.
       }
 
       assert (Hacc_32_r : - 2 ^ 17 + 2 <= acc_32_r <= 2 ^ 16 - 1). {
-        admit.
+        unfold acc_32_r.
+        lia.
       }
 
       assert (Hacc_r : - 2 ^ 33 + 2 <= acc_r <= 2 ^ 32 - 1).
@@ -388,7 +399,6 @@ Module Add2Proof.
         {
           unfold res_val.
           unfold pack_16_limbs.
-          unfold range_check_32 in Hrc_res.
           unfold BITS_PER_LIMB.
           fold res0 res1 in Hrc_res.
           destruct Hrc_res as [Hrc0 Hrc1].
@@ -421,17 +431,31 @@ Module Add2Proof.
             assert (res0 + res1 * Z.pow_pos 2 16 <= 
               (Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16 - 1) * Z.pow_pos 2 16).
             {
-
-              admit.
+              apply Z.add_le_mono.
+              {
+                exact H0.
+              }
+              {
+                apply Z.mul_le_mono_nonneg_r.
+                {
+                  lia.
+                }
+                {
+                  exact H3.
+                }
+              }
             }
 
-            (* replace (2 ^ 16) with (Z.pow_pos 2 16) in Hrc0 by lia.
-            replace (2 ^ 16) with (Z.pow_pos 2 16) in Hrc1 by lia.
-            replace (2 ^ 16) with (Z.pow_pos 2 16) by lia.
-            replace (2 ^ 32) with (Z.pow_pos 2 32) by lia.
-            replace (Z.pow_pos 2 32) with ((Z.pow_pos 2 16) * (Z.pow_pos 2 16)) by lia. *)
+            assert ((Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16 - 1) * Z.pow_pos 2 16 = 
+              Z.pow_pos 2 16 * Z.pow_pos 2 16 - 1).
+            {
+              ring_simplify.
+              reflexivity.
+            }
 
-            admit.
+            rewrite H5 in H4.
+
+            exact H4.
           }
         }
         destruct H10' as [H10a | H10b].
@@ -508,8 +532,6 @@ Module Add2Proof.
 
           unfold res0.
           
-          unfold range_check_32 in Hrc_res.
-          
           apply Zmod_small.
 
           apply Hrc_res.
@@ -553,7 +575,7 @@ Module Add2Proof.
 
       easy.
       
-    Admitted.
+    Qed.
 End Add2Proof.
 
 
