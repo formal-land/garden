@@ -39,6 +39,52 @@ Proof.
   }
 Qed.  
 
+(* helper for add2 and add3 *)
+Module AddProofUtil.
+  Lemma array_index_range_U32 (i : Z) : 0 <= i < U32_LIMBS -> i = 0 \/ i = 1.
+  Proof.
+    intros Hi.
+    destruct Hi as [Hi0  Hi1].
+    assert (i = 0 \/ i = 1 \/ i >= 2) as H_cases by lia.
+    destruct H_cases as [Hi_eq0 | Hi_ge1].
+    {
+      left. 
+      exact Hi_eq0.
+    }
+    {
+      destruct Hi_ge1 as [Hi_eq1 | Hi_ge2].
+      {
+        right.
+        exact Hi_eq1.
+      }
+      {
+        exfalso.
+        easy.
+      }
+    }
+  Qed.
+
+  Lemma constant_unwrap {p} `{Prime p} (x : Z) : x > 0 -> p > x -> UnOp.from x = x.
+  Proof.
+    intros Hx Hp.
+    unfold UnOp.from.
+    apply Zmod_small.
+    lia.
+  Qed.
+
+  Lemma compound_range_check (x y a b c d p q : Z) :
+    a <= x <= b ->
+    c <= y <= d ->
+    p > 0 ->
+    q > 0 ->
+    p * a + q * c <= p * x + q * y <= p * b + q * d.
+  Proof.
+    intros Hx Hy Hp Hq.
+    nia.
+  Qed.
+
+End AddProofUtil.
+
 
 (*
 Updated New Proof:
@@ -147,19 +193,18 @@ Module Add2Proof.
       set (two_16 := UnOp.from (2 ^ 16)) in H2.
 
       assert (H_two_16 : two_16 = 2 ^ 16). {
-        unfold two_16.
-        unfold UnOp.from.
-        (* given Hp, this should be obvious. *)
-        (* try to use the newly defined `mod_when_smaller` in M.v *)
-        rewrite mod_when_smaller; [reflexivity | lia].
+        apply (AddProofUtil.constant_unwrap (2 ^ 16)); lia.
       }
 
       assert (H_two_32 : two_32 = UnOp.from (2 ^ 32)). {
         unfold two_32.
+        replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
+        unfold two_16 in H_two_16.
+        rewrite H_two_16.
+        unfold BinOp.mul.
+        replace (2 ^ 16 * 2 ^ 16) with (2 ^ 32) by lia.
         unfold UnOp.from.
-        (* given Hp, this should be obvious. *)
-        (* try to use the newly defined `mod_when_smaller` in M.v *)
-        rewrite mod_when_smaller; [reflexivity | lia].
+        auto.
       }
 
       (* Now we have acc_16, acc_32, and acc in terms of a0, a1, b0, b1, res0, res1 *)
@@ -528,27 +573,8 @@ Module Add2Proof.
         unfold BITS_PER_LIMB.
         intros Hi.
         unfold unpack_16_limbs; unfold double_val.
-        assert (i = 0 \/ i = 1) as [Hi0 | Hi1].
-        {
-          destruct Hi as [Hi0  Hi1].
-          assert (i = 0 \/ i = 1 \/ i >= 2) as H_cases by lia.
-          destruct H_cases as [Hi_eq0 | Hi_ge1].
-          {
-            left. 
-            exact Hi_eq0.
-          }
-          {
-            destruct Hi_ge1 as [Hi_eq1 | Hi_ge2].
-            {
-              right.
-              exact Hi_eq1.
-            }
-            {
-              exfalso.
-              easy.
-            }
-          }
-        }
+        apply (AddProofUtil.array_index_range_U32 i) in Hi.
+        destruct Hi as [Hi0 | Hi1].
         (* i = 0*)
         {
           rewrite Hi0.
@@ -618,4 +644,383 @@ Module Add2Proof.
 End Add2Proof.
 
 Module Add3Proof.
+    Definition eval_add3 {p} `{Prime p} (a b c : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
+      unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b) + (pack_16_limbs c)) mod 2 ^ 32).
+
+    Lemma implies {p} `{Prime p} (result a b c : Array.t Z U32_LIMBS) :
+      (* let result := M.map_mod result in
+      let a := M.map_mod a in
+      let b := M.map_mod b in *)
+      p > 3 * 2 ^ 17 ->
+      range_check_32 result ->
+      range_check_32 a ->
+      range_check_32 b ->
+      range_check_32 c ->
+      {{ add3 result a b c 🔽
+        tt,
+        Array.Eq.t (eval_add3 a b c) result
+      }}.
+    Proof.
+      intros Hp Hrc_res Hrc_a Hrc_b Hrc_c.
+      eapply Run.LetAccumulate. {
+        constructor.
+      }
+      intros HA.
+      
+      eapply Run.LetAccumulate. {
+        constructor.
+      }
+      intros HB.
+      set (a0 := a.(Array.get) 0) in HA, HB.
+      set (a1 := a.(Array.get) 1) in HA, HB.
+      set (b0 := b.(Array.get) 0) in HA, HB.
+      set (b1 := b.(Array.get) 1) in HA, HB.
+      set (c0 := c.(Array.get) 0) in HA, HB.
+      set (c1 := c.(Array.get) 1) in HA, HB.
+      set (res0 := result.(Array.get) 0) in HA, HB.
+      set (res1 := result.(Array.get) 1) in HA, HB.
+      
+      
+      set (acc_16 := BinOp.sub (BinOp.sub (BinOp.sub res0 a0) b0) c0) in HA, HB.
+      set (acc_32 := BinOp.sub (BinOp.sub (BinOp.sub res1 a1) b1) c1) in HA, HB.
+      set (acc := BinOp.add acc_16 (BinOp.mul acc_32 (2 ^ 16))) in HA.
+
+      unfold range_check_32 in Hrc_res, Hrc_a, Hrc_b, Hrc_c.
+
+      fold res0 res1 in Hrc_res.
+      fold a0 a1 in Hrc_a.
+      fold b0 b1 in Hrc_b.
+      fold c0 c1 in Hrc_c.
+
+      (* HA : acc * (acc + two_32) * (acc + 2 * two_32) = 0 *)
+      (* HB : acc_16 * (acc_16 + two_16) * (acc_16 + 2 * two_16) = 0 *)
+
+      set (acc_16_r := res0 - a0 - b0 - c0).
+      set (acc_32_r := res1 - a1 - b1 - c1).
+      set (acc_r := acc_16_r + 2 ^ 16 * acc_32_r).
+      
+      rewrite mul_zero_implies_zero_3 in HA, HB.
+      rewrite FieldRewrite.from_add in HA, HB.
+      rewrite FieldRewrite.from_add in HA, HB.
+      rewrite FieldRewrite.mul_from_left in HA.
+      rewrite FieldRewrite.mul_from_right in HA.
+      rewrite FieldRewrite.add_from_right in HB.
+      unfold BinOp.mul in HA.
+      unfold double in HA, HB.
+      replace (2 ^ 16 * 2 ^ 16) with (2 ^ 32) in HA by lia.
+      fold (UnOp.from (2 ^ 32)) in HA.
+      rewrite FieldRewrite.add_from_right in HA.
+      rewrite FieldRewrite.mul_from_left in HA, HB.
+      unfold BinOp.mul in HA, HB.
+      fold (UnOp.from (2 ^ 16 * 2)) in HB.
+      fold (UnOp.from (2 ^ 32 * 2)) in HA.
+      rewrite FieldRewrite.add_from_right in HA, HB.
+
+      assert (Hacc_16 : acc_16 = UnOp.from acc_16_r).
+      {
+        unfold acc_16.
+        unfold acc_16_r.
+        show_equality_modulo.
+      }
+
+      assert (Hacc_32 : acc_32 = UnOp.from acc_32_r).
+      {
+        unfold acc_32.
+        unfold acc_32_r.
+        show_equality_modulo.
+      }
+
+      assert (Hacc : acc = UnOp.from acc_r).
+      {
+        unfold acc.
+        unfold acc_r.
+        rewrite Hacc_32.
+        rewrite FieldRewrite.mul_from_left.
+        rewrite Hacc_16.
+        rewrite FieldRewrite.add_from_left.
+        unfold BinOp.add.
+        replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
+        unfold UnOp.from.
+        unfold BinOp.mul.
+        rewrite Z.mul_comm.
+        show_equality_modulo.
+      }
+
+      (* HA : acc mod p = 0 \/ (acc + 2 ^ 32) mod p = 0 \/ (acc + 2 * 2 ^ 32) mod p = 0 *)
+      (* HB : acc_16 mod p = 0 \/ (acc_16 + 2 ^ 16) mod p = 0 \/ (acc_16 + 2 * 2 ^ 16) mod p = 0 *)
+
+      (* H1' : acc_r = 0 \/ acc_r + 2 ^ 32 = 0 \/ acc_r + 2 * 2 ^ 32 = 0 (mod p). *)
+      assert (H1' : UnOp.from acc_r = 0 \/ BinOp.add acc_r (2 ^ 32) = 0 \/ BinOp.add acc_r (2 * 2 ^ 32) = 0).
+      {
+        rewrite Hacc in HA.
+        rewrite FieldRewrite.from_from in HA.
+        rewrite FieldRewrite.add_from_left in HA.
+        rewrite FieldRewrite.add_from_left in HA.
+        auto.
+      }
+
+      (* range check on `_r`s *)
+      assert (Hacc_16_r : - 3 * 2 ^ 17 + 3 <= acc_16_r <= 2 ^ 16 - 1). 
+      {
+        unfold acc_16_r.
+        lia.
+      }
+
+      assert (Hacc_32_r : - 3 * 2 ^ 17 + 3 <= acc_32_r <= 2 ^ 16 - 1). {
+        unfold acc_32_r.
+        lia.
+      }
+
+      assert (Hacc_r : - 3 * 2 ^ 33 + 3 <= acc_r <= 2 ^ 32 - 1).
+      {
+        unfold acc_r.
+        lia.
+      }
+
+      (* H2' : acc_16_r = 0 \/ acc_16_r = - 2 ^ 16 \/ acc_16_r = - 2 * 2 ^ 16 from (0) and (Hp) *)
+
+
+      (* H2' : acc_16_r = 0 \/ acc_16_r + 2 ^ 16 = 0 \/ acc_16_r + 2 * 2 ^ 16 = 0. *)
+      assert (H2' : acc_16_r = 0 \/ acc_16_r + 2 ^ 16 = 0 \/ acc_16_r + 2 * 2 ^ 16 = 0).
+      {
+        rewrite Hacc_16 in HB.
+        rewrite FieldRewrite.from_from in HB.
+        rewrite! FieldRewrite.add_from_left in HB.
+        rewrite! FieldEquiv.add_equiv in HB.
+        destruct HB as [HBa | HB'].
+        {
+          left.
+          unfold UnOp.from in HBa.
+          apply mod_0_range with (k := p).
+          - lia.
+          - lia.
+          - auto.
+        }
+        {
+          destruct HB' as [HBb | HBc].
+          {
+            right. left.
+            unfold UnOp.from in HBb.
+            apply mod_0_range with (k := p).
+            - lia.
+            - lia.
+            - auto.
+          }
+          {
+            right. right.
+            unfold UnOp.from in HBc.
+            apply mod_0_range with (k := p).
+            - lia.
+            - lia.
+            - auto.
+          }
+        }
+      }
+
+      (* H3' : acc_r = 0 (mod 2 ^ 16) *)
+      assert (H3' : acc_r mod (2 ^ 16) = 0).
+      {
+        unfold acc_r.
+        lia.
+      }
+
+      (* H4' : acc_r = 0 \/ acc_r + 2 ^ 32 = 0 \/ acc_r + 2 * 2 ^ 32 = 0 (mod 2 ^ 16 p) *)
+      assert (H4 : acc_r mod (2 ^ 16 * p) = 0 \/ (acc_r + 2 ^ 32) mod (2 ^ 16 * p) = 0 \/ (acc_r + 2 * 2 ^ 32) mod (2 ^ 16 * p) = 0).
+      {
+        assert (Hp_coprime : Znumtheory.rel_prime (2 ^ 16) p).
+        {
+          apply large_prime_coprime_exp_of_2.
+          lia.
+        }
+        assert (H216 : 2 ^ 16 <> 0) by lia.
+        assert (Hp_gt_0 : p <> 0) by lia.
+        destruct HA as [HAa | HA'].
+        {
+          left.
+          assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p acc_r ).
+          apply (Hcrt 0 H216 Hp_gt_0 Hp_coprime H3').
+          rewrite Hacc in HAa.
+          rewrite FieldRewrite.from_from in HAa.
+          apply HAa.
+        }
+        {
+          destruct HA' as [HAb | HAc].
+          {
+            right. left.
+            assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p (acc_r + 2 ^ 32)).
+            rewrite Hacc in HAb.
+            rewrite FieldRewrite.add_from_left in HAb.
+            replace (acc_r mod 2 ^ 16) with ((acc_r + 2 ^ 32) mod 2 ^ 16) in H3' by lia.
+            apply (Hcrt 0 H216 Hp_gt_0 Hp_coprime H3').
+            apply HAb.
+          }
+          {
+            right. right.
+            assert (Hcrt := binary_chinese_remainder_alt (2 ^ 16) p (acc_r + 2 * 2 ^ 32)).
+            rewrite Z.mul_comm in HAc.
+            replace (acc_r mod 2 ^ 16) with ((acc_r + 2 * 2 ^ 32) mod 2 ^ 16) in H3' by lia.
+            apply (Hcrt 0 H216 Hp_gt_0 Hp_coprime H3').
+            rewrite Hacc in HAc.
+            rewrite FieldRewrite.add_from_left in HAc.
+            apply HAc.
+          }
+        }
+      }
+
+      (* H5' : acc_r = 0 \/ acc_r + 2 ^ 32 = 0 \/ acc_r + 2 * 2 ^ 32 = 0. *)
+      assert (H5' : acc_r = 0 \/ acc_r + 2 ^ 32 = 0 \/ acc_r + 2 * 2 ^ 32 = 0).
+      {
+        assert (H2_16_p : 2 ^ 16 * p > 3 * 2 ^ 33).
+        {
+          lia.
+        }
+        destruct H4 as [H4a | H4''].
+        {
+          left.
+          apply (mod_0_range (2 ^ 16 * p)); [lia | lia | auto].
+        }
+        {
+          destruct H4'' as [H4b | H4c].
+          {
+            right. left.
+            apply (mod_0_range (2 ^ 16 * p)); [lia | lia | auto].
+          }
+          {
+            right. right.
+            apply (mod_0_range (2 ^ 16 * p)); [lia | lia | auto].
+          }
+        }
+      }
+
+      assert (Hsum_mod_32 : acc_r mod (2 ^ 32) = 0).
+      {
+        destruct H5' as [H5_1 | H5_res].
+        {
+          rewrite H5_1.
+          show_equality_modulo.
+        }
+        {
+          destruct H5_res as [H5_2 | H5_3].
+          {
+            replace (acc_r mod 2 ^ 32) with ((acc_r + 1 * 2 ^ 32) mod 2 ^ 32) by (apply Z_mod_plus_full).
+            replace (acc_r + 1 * 2 ^ 32) with (acc_r + 2 ^ 32) by lia.
+            rewrite H5_2.
+            show_equality_modulo.
+          }
+          {
+            replace (acc_r mod 2 ^ 32) with ((acc_r + 2 * 2 ^ 32) mod 2 ^ 32) by (apply Z_mod_plus_full).
+            rewrite H5_3.
+            show_equality_modulo.
+          }
+        }
+      }
+
+
+
+      (* desired properties *)
+      set (sum_abc := (a0 + a1 * Z.pow_pos 2 16 + (b0 + b1 * Z.pow_pos 2 16) + (c0 + c1 * Z.pow_pos 2 16)) mod Z.pow_pos 2 32).
+
+      assert (Hsum_eq_res : sum_abc = res0 + res1 * Z.pow_pos 2 16).
+      {
+        unfold acc_r in Hsum_mod_32.
+        unfold sum_abc.
+        replace (a0 + a1 * Z.pow_pos 2 16 + (b0 + b1 * Z.pow_pos 2 16) + (c0 + c1 * Z.pow_pos 2 16)) with ((a0 + b0 + c0) + (a1 + b1 + c1) * (Z.pow_pos 2 16)) by lia.
+        unfold acc_16_r, acc_32_r in Hsum_mod_32.
+        replace (res0 - a0 - b0 - c0 + 2 ^ 16 * (res1 - a1 - b1 - c1)) with (res0 - (a0 + b0 + c0) + 2 ^ 16 * (res1 - (a1 + b1 + c1))) in Hsum_mod_32 by lia.
+        set (sum_0 := a0 + b0 + c0).
+        set (sum_1 := a1 + b1 + c1).
+        fold sum_0 sum_1 in Hsum_mod_32.
+        replace (res0 - sum_0 + 2 ^ 16 * (res1 - sum_1)) with (res0 + 2 ^ 16 * res1 - (sum_0 + 2 ^ 16 * sum_1)) in Hsum_mod_32 by lia.
+        replace (2 ^ 16) with (Z.pow_pos 2 16) in Hsum_mod_32 by lia.
+        replace (Z.pow_pos 2 16 * sum_1) with (sum_1 * Z.pow_pos 2 16) in Hsum_mod_32 by lia.
+        replace (Z.pow_pos 2 16 * res1) with (res1 * Z.pow_pos 2 16) in Hsum_mod_32 by apply Z.mul_comm.
+        set (sum_val := sum_0 + sum_1 * (Z.pow_pos 2 16)).
+        set (res_val := res0 + res1 * Z.pow_pos 2 16).
+        fold sum_val in Hsum_mod_32.
+        fold res_val in Hsum_mod_32.
+        assert (Hrc_res_val : 0 <= res_val <= 2 ^ 32 - 1).
+        {
+          unfold res_val.
+          replace res0 with (1 * res0) by lia.
+          replace (res1 * Z.pow_pos 2 16) with (Z.pow_pos 2 16 * res1) by apply Z.mul_comm.
+          replace 0 with (1 * 0 + (Z.pow_pos 2 16) * 0) by lia.
+          replace (2 ^ 32 - 1) with (Z.pow_pos 2 32 - 1) by lia.
+          replace (Z.pow_pos 2 32 - 1) with (1 * (Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16) * (Z.pow_pos 2 16 - 1)) by lia.
+          apply (AddProofUtil.compound_range_check res0 res1 0 (Z.pow_pos 2 16 - 1) 0 (Z.pow_pos 2 16 - 1) 1 (Z.pow_pos 2 16)).
+          {
+            split; [| apply int_upper]; apply Hrc_res.
+          }
+          {
+            split; [| apply int_upper]; apply Hrc_res.
+          }
+          {
+            lia.
+          }
+          {
+            lia.
+          }
+        }
+
+        rewrite <-(Zmod_small res_val (Z.pow_pos 2 32)).
+        {
+          apply eqm_minus_0 in Hsum_mod_32.
+          auto.
+        }
+
+        {
+          replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
+          rewrite int_upper.
+          auto.
+        }
+      }
+
+      assert (Htmp : Array.Eq.t (eval_add3 a b c) result).
+      {
+        unfold Array.Eq.t.
+        unfold U32_LIMBS.
+        intros i Hi.
+        apply (AddProofUtil.array_index_range_U32 i) in Hi.
+        destruct Hi as [Hi0 | Hi1].
+        (* i = 0 *)
+        {
+          rewrite Hi0.
+          unfold eval_add3.
+          unfold unpack_16_limbs.
+          unfold pack_16_limbs.
+          fold res0 res1 a0 a1 b0 b1 c0 c1.
+          simpl.
+          unfold sum_abc in Hsum_eq_res.
+          rewrite Hsum_eq_res.
+          rewrite Z_mod_plus_full.
+          apply Zmod_small.
+          apply (proj1 Hrc_res).
+        }
+        (* i = 1 *)
+        {
+          rewrite Hi1.
+          unfold eval_add3.
+          unfold unpack_16_limbs.
+          unfold pack_16_limbs.
+          fold res0 res1 a0 a1 b0 b1 c0 c1.
+          simpl.
+          unfold sum_abc in Hsum_eq_res.
+          rewrite Hsum_eq_res.
+          rewrite Z_div_plus_full; [|lia].
+          assert (Hres0 : res0 / Z.pow_pos 2 16 = 0). {
+            apply Zdiv_small.
+            apply (proj1 Hrc_res).
+          }
+          rewrite Hres0.
+          auto.
+        }
+      }
+
+      eapply Run.Implies. {
+        repeat constructor.
+      }
+
+      easy.
+
+    Qed.  
+
 End Add3Proof.
