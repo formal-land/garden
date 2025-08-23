@@ -97,7 +97,7 @@ Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t (A : Set) : Set :=
   | Pure (value : A) : t A
-  | Equal (x1 x2 : Z) (value : A) : t A
+  | AssertZero (x : Z) (value : A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call (e : t A) : t A
@@ -105,7 +105,7 @@ Module M.
   | When (condition : Z) (e : t A) : t A
   .
   Arguments Pure {_}.
-  Arguments Equal {_}.
+  Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
   Arguments When {_}.
@@ -157,8 +157,8 @@ Module M.
 
   Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
     match e with
-    | M.Pure x => M.Pure (f x)
-    | M.Equal x y value => M.Equal x y (f value)
+    | M.Pure value => M.Pure (f value)
+    | M.AssertZero x value => M.AssertZero x (f value)
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
     | M.When condition e => M.When condition (map f e)
@@ -186,15 +186,12 @@ Notation "[[ e ]]" :=
 Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
 
-Definition equal (x y : Z) : M.t unit :=
-  M.Equal x y tt.
-
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
-  equal x 0.
+  M.AssertZero x tt.
 
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  equal (BinOp.mul x (BinOp.sub x 1)) 0.
+  M.AssertZero (BinOp.mul x (BinOp.sub x 1)) tt.
 
 Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> M.t unit) : M.t unit :=
   match N with
@@ -257,7 +254,10 @@ End Pair.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
-  M.equal x (1 mod p).
+  M.AssertZero (BinOp.sub x 1) tt.
+
+Definition assert_eq {p} `{Prime p} (x y : Z) : M.t unit :=
+  M.AssertZero (BinOp.sub x y) tt.
 
   (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
@@ -656,8 +656,8 @@ Module Run.
   Inductive t {A : Set} : M.t A -> A -> Prop -> Prop :=
   | Pure (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | Equal (x1 x2 : Z) (value : A) :
-    {{ M.Equal x1 x2 value 🔽 value, x1 = x2 }}
+  | AssertZero (x : Z) (value : A) :
+    {{ M.AssertZero x value 🔽 value, x = 0 }}
   | Call (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -762,7 +762,7 @@ Module Run.
       unfold M.assert_zeros.
       apply ForInZeroToN.
       intros.
-      apply Equal.
+      apply AssertZero.
     }
     trivial.
   Qed.
@@ -805,7 +805,7 @@ Module Run.
     (apply AssertZeros) ||
     (eapply Run.ForInZeroToN) ||
     (apply Run.Pure) ||
-    (apply Run.Equal) ||
+    (apply Run.AssertZero) ||
     (apply Run.Call) ||
     (eapply Run.Let) ||
     (apply Run.When) ||

@@ -316,7 +316,7 @@ Module MExpr.
     | AssertZero (expr : Expr.t) expr' (value : A1) value' :
       Eval.eval env expr = expr' ->
       Eval.eval env value = value' ->
-      t env (AssertZero expr value) (M.Equal expr' 0 value')
+      t env (AssertZero expr value) (M.AssertZero expr' value')
     | Call (e : MExpr.t A1) (e' : M.t A2) :
       t env e e' ->
       t env (MExpr.Call e) (M.Call e')
@@ -341,7 +341,7 @@ Module MExpr.
       M.t A :=
     match self with
     | Pure value => M.pure value
-    | AssertZero expr value => M.Equal (Eval.eval env expr) 0 value
+    | AssertZero expr value => M.AssertZero (Eval.eval env expr) value
     | Call e => M.Call (eval env e)
     | Let e k =>
       let* value_e := eval env e in

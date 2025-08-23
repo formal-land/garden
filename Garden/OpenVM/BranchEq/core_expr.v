@@ -35,6 +35,40 @@ Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
     ];
 }.
 
+Fixpoint sum_for_in_zero_to_n_starting_from_aux
+    (n : nat)
+    (f : Z -> Expr.t)
+    (start : Expr.t) :
+    Expr.t :=
+  match n with
+  | O => start
+  | S n => Expr.Add (sum_for_in_zero_to_n_starting_from_aux n f start) (f (Z.of_nat n))
+  end.
+
+Definition sum_for_in_zero_to_n_starting_from
+    (N : Z)
+    (f : Z -> Expr.t)
+    (start : Expr.t) :
+    Expr.t :=
+  sum_for_in_zero_to_n_starting_from_aux (Z.to_nat N) f start.
+
+Lemma sum_for_in_zero_to_n_starting_from_eq {p} `{Prime p}
+    (env : Env.t)
+    (N : Z)
+    (f : Z -> Expr.t) (f' : Z -> Z)
+    (start : Expr.t) (start' : Z)
+    (H_f : forall (i : Z),
+      Eval.eval env (f i) = f' i
+    )
+    (H_start : Eval.eval env start = start') :
+  Eval.eval env (sum_for_in_zero_to_n_starting_from N f start) =
+  core_with_monad.sum_for_in_zero_to_n_starting_from N f' start'.
+Proof.
+  unfold sum_for_in_zero_to_n_starting_from, core_with_monad.sum_for_in_zero_to_n_starting_from.
+  set (n := Z.to_nat N); clearbody n.
+  induction n; cbn; intros; scongruence.
+Qed.
+
 Definition eval {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
@@ -78,16 +112,11 @@ Definition eval {NUM_LIMBS : Z}
       )
     ) in
   let sum : Expr.t :=
-    Lists.List.fold_left
-      (fun sum (i : nat) =>
-        let i := Z.of_nat i in
-        Expr.Add sum
-          (Expr.Mul
-            (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i)))
-            (Expr.Var (Array.get inv_marker i)))
-      )
-      (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
-      cmp_eq in
+    sum_for_in_zero_to_n_starting_from NUM_LIMBS (fun i =>
+      Expr.Mul
+        (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i)))
+        (Expr.Var (Array.get inv_marker i))
+    ) cmp_eq in
   let! _ := MExpr.when is_valid (MExpr.assert_one sum) in
 
   let flags_with_opcode_integer : list (Var.t * Z) :=
@@ -152,7 +181,7 @@ Compute print_branch_eq (NUM_LIMBS := 4).
 
 (** We prove the equality of the [eval] definition above with the [eval] definition directly using
     field elements. *)
-Lemma eq_eval_field {p} `{Prime p} {NUM_LIMBS : Z}
+Lemma eval_eq {p} `{Prime p} {NUM_LIMBS : Z}
     (env : Env.t)
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
@@ -198,7 +227,10 @@ Proof.
   intros.
   econstructor. {
     econstructor; try reflexivity.
-    admit.
+    constructor; try reflexivity.
+    cbn; autorewrite with field_rewrite.
+    f_equal.
+    now apply sum_for_in_zero_to_n_starting_from_eq.
   }
   intros.
   constructor.
@@ -210,4 +242,4 @@ Proof.
   { unfold ImmInstruction.map; cbn; f_equal.
     now cbn; FieldRewrite.run.
   }
-Admitted.
+Qed.
