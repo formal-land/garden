@@ -214,6 +214,22 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     |};
   |}.
 
+Lemma sum_for_in_zero_to_n_starting_from_always_zero_eq {p} `{Prime p}
+    (N : Z) (f : Z -> Z) (start : Z)
+    (H_N : 0 <= N)
+    (H_f : forall i, 0 <= i < N -> f i = 0) :
+  sum_for_in_zero_to_n_starting_from N f (UnOp.from start) =
+  UnOp.from start.
+Proof.
+  unfold sum_for_in_zero_to_n_starting_from.
+  replace N with (Z.of_nat (Z.to_nat N)) in H_f by lia.
+  set (n := Z.to_nat N) in *; clearbody n.
+  set (n' := n) in H_f. assert (H_n' : (n <= n')%nat) by lia; clearbody n'.
+  induction n; cbn; intros; autorewrite with field_rewrite; trivial.
+  rewrite IHn, H_f by lia.
+  now autorewrite with field_rewrite.
+Qed.
+
 Definition goldilocks_prime : Z :=
   2^64 - 2^32 + 1.
 
@@ -221,7 +237,8 @@ Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local' : BranchEqualCoreCols.t NUM_LIMBS Z)
     (from_pc' : Z)
-    (branch_equal_opcode : BranchEqualOpcode.t) :
+    (branch_equal_opcode : BranchEqualOpcode.t)
+    (H_N : 0 <= NUM_LIMBS) :
   let local :=
     M.map_mod local'
       <| BranchEqualCoreCols.opcode_beq_flag :=
@@ -333,21 +350,19 @@ Proof.
     unfold Array.Eq.t.
     destruct cmp_eq; cbn; [trivial|].
     intro.
-Admitted.
-(*
-    set (sum_for := M.sum_for_in_zero_to_n _ _) in H_sum.
-    replace sum_for with 0 in H_sum. 2: {
+    replace (Z.b2z false) with (UnOp.from 0) in H_sum by reflexivity.
+    rewrite sum_for_in_zero_to_n_starting_from_always_zero_eq in H_sum;
+      try assumption;
+      cbn in H_sum;
+      [lia|].
+    intros.
+    replace (BinOp.sub _ _) with 0. 2: {
       symmetry.
-      apply M.sum_for_in_zero_to_n_zeros_eq.
-      intros.
-      replace (BinOp.sub _ _) with 0. 2: {
-        symmetry.
-        rewrite M.sub_zero_equiv.
-        sauto lq: on rew: off.
-      }
-      now autorewrite with field_rewrite.
+      rewrite M.sub_zero_equiv.
+      cbn; autorewrite with field_rewrite.
+      hauto l: on.
     }
-    hecrush.
+    reflexivity.
   }
   intros H_a_b_neq.
   cbn - [local from_pc].
@@ -369,4 +384,3 @@ Admitted.
   }
   tauto.
 Qed.
-*)
