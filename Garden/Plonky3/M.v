@@ -102,11 +102,13 @@ Module M.
       function and what is being called, to better compose reasoning. *)
   | Call (e : t A) : t A
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
+  | When (condition : Z) (e : t A) : t A
   .
   Arguments Pure {_}.
   Arguments Equal {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
+  Arguments When {_}.
 
   (** This is a marker that we remove with the following tactic. *)
   Axiom run : forall {A : Set}, t A -> A.
@@ -159,6 +161,7 @@ Module M.
     | M.Equal x y value => M.Equal x y (f value)
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
+    | M.When condition e => M.When condition (map f e)
     end.
 End M.
 
@@ -262,11 +265,8 @@ Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
     M.assert_bool (l.(Array.get) i)
   ).
 
-Definition when (condition : Z) (e : M.t unit) : M.t unit :=
-  if condition =? 0 then
-    M.pure tt
-  else
-    e.
+Definition when {p} `{Prime p} {A : Set} (condition : Z) (e : M.t A) : M.t A :=
+  M.When condition e.
 
 Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
   if condition then
@@ -653,23 +653,26 @@ End FieldRewrite.
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
 
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
+  Inductive t {A : Set} : M.t A -> A -> Prop -> Prop :=
+  | Pure (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | Equal {A : Set} (x1 x2 : Z) (value : A) :
+  | Equal (x1 x2 : Z) (value : A) :
     {{ M.Equal x1 x2 value 🔽 value, x1 = x2 }}
-  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
+  | Call (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+  | Let {B : Set} (e : M.t B) (k : B -> M.t A) (value : B) (output : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> {{ k value 🔽 output, P2 }}) ->
     {{ M.Let e k 🔽 output, P1 /\ P2 }}
-  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+  | When (condition : Z) (e : M.t A) (value : A) (P : Prop) :
+    (condition <> 0 -> {{ e 🔽 value, P }}) ->
+    {{ M.When condition e 🔽 value, condition <> 0 -> P }}
+  | Implies (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> P2) ->
     {{ e 🔽 value, P2 }}
-  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+  | Replace (e : M.t A) (value1 value2 : A) (P : Prop) :
     {{ e 🔽 value1, P }} ->
     value1 = value2 ->
     {{ e 🔽 value2, P }}
@@ -805,6 +808,7 @@ Module Run.
     (apply Run.Equal) ||
     (apply Run.Call) ||
     (eapply Run.Let) ||
+    (apply Run.When) ||
     match goal with
     | |- True -> _ => intros _
     | _ => intros

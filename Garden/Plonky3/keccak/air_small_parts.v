@@ -43,13 +43,7 @@ Module preimage_a.
       }}.
   Proof.
     intros.
-    unfold eval, M.when.
-    destruct (_ =? 0) eqn:?.
-    { eapply Run.Implies. {
-        Run.run.
-      }
-      lia.
-    }
+    unfold eval.
     { eapply Run.Implies. {
         Run.run.
       }
@@ -110,14 +104,8 @@ Module preimage_next_preimage.
       }}.
   Proof.
     intros.
-    unfold eval, M.when.
+    unfold eval.
     unfold not_final_step, final_step in *.
-    destruct (_ =? 0) eqn:?.
-    { eapply Run.Implies. {
-        Run.run.
-      }
-      lia.
-    }
     { eapply Run.Implies. {
         Run.run.
       }
@@ -178,16 +166,10 @@ Module export_zero.
       }}.
   Proof.
     intros.
-    unfold eval, M.when.
+    unfold eval.
     unfold not_final_step, final_step in *.
-    destruct (_ =? 0) eqn:?.
     { eapply Run.Implies. {
-        repeat (econstructor || intros).
-      }
-      lia.
-    }
-    { eapply Run.Implies. {
-        repeat (econstructor || intros).
+        Run.run.
       }
       tauto.
     }
@@ -728,18 +710,7 @@ Module a_prime_prime_prime_next_a.
     intros * H_not_final_step.
     unfold eval.
     eapply Run.Implies. {
-      eapply Run.ForInZeroToN. {
-        intros.
-        eapply Run.ForInZeroToN. {
-          intros.
-          cbn.
-          unfold M.when.
-          repeat unfold final_step, not_final_step, NUM_ROUNDS in *; cbn in *.
-          autorewrite with field_rewrite in *.
-          destruct (_ =? 0) eqn:H_final_step_eq; [lia |].
-          eapply Run.AssertZerosFromFnSub.
-        }
-      }
+      Run.run.
     }
     hauto lq: on rew: off.
   Qed.

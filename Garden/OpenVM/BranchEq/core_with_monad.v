@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MExpr.
 
 (*
 pub struct ImmInstruction<T> {
@@ -51,6 +52,11 @@ Module AdapterAirContext.
     AdapterAirContext.writes := List.map (Array.map f) self.(AdapterAirContext.writes);
     AdapterAirContext.instruction := ImmInstruction.map f self.(AdapterAirContext.instruction);
   |}.
+
+  Global Instance AdapterAirContextIsEval {NUM_LIMBS : Z} {T : Set} `{Eval.C T Z} :
+      Eval.C (t NUM_LIMBS T) (t NUM_LIMBS Z) := {
+    eval p _ env self := map (Eval.eval env) self;
+  }.
 End AdapterAirContext.
 
 (* TODO: from `instructions.rs`, move there *)
@@ -134,7 +140,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
   ] in
 
   let* is_valid : Z :=
-    List.fold_left
+    M.List.fold_left
       (fun acc flag =>
         let* _ := M.assert_bool flag in
         M.pure (BinOp.add acc flag)
@@ -330,7 +336,7 @@ Proof.
       }
       now autorewrite with field_rewrite.
     }
-    easy.
+    hecrush.
   }
   intros H_a_b_neq.
   cbn - [local from_pc].
