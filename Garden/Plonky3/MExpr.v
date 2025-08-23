@@ -12,6 +12,7 @@ Module Field.
 
   Definition eval {p} `{Prime p} (self : t) : Z :=
     UnOp.from self.(value).
+  Arguments eval {p} {_} _ /.
 End Field.
 
 Module Var.
@@ -28,6 +29,7 @@ Module Var.
 
   Definition eval {p} `{Prime p} (env : Env.t) (self : t) : Z :=
     UnOp.from (env self.(index)).
+  Arguments eval {p} {_} _ _ /.
 End Var.
 
 Module Expr.
@@ -97,6 +99,12 @@ Module ToRocq.
     | x :: xs => PrimString.cat x (cats xs)
     end.
 
+  Fixpoint separate (separator : string) (l : list string) : string :=
+    match l with
+    | [] => ""
+    | x :: xs => cats [x; separator; separate separator xs]
+    end.
+
   Definition endl : string :=
     "
 ".
@@ -133,7 +141,7 @@ End ToRocq.
 Fixpoint string_of_expr (expr : Expr.t) (indent : Z) : string :=
   match expr with
   | Expr.Var var =>
-    ToRocq.cats [ToRocq.indent indent; "Variable: "; ToRocq.of_Z var.(Var.index); ToRocq.endl]
+    ToRocq.cats [ToRocq.indent indent; "Variable: "; ToRocq.of_Z var.(Var.index)]
   | Expr.IsFirstRow =>
     ToRocq.cats [ToRocq.indent indent; "IsFirstRow"]
   | Expr.IsLastRow =>
@@ -141,15 +149,17 @@ Fixpoint string_of_expr (expr : Expr.t) (indent : Z) : string :=
   | Expr.IsTransition =>
     ToRocq.cats [ToRocq.indent indent; "IsTransition"]
   | Expr.Constant value =>
-    ToRocq.cats [ToRocq.indent indent; "Constant: "; ToRocq.of_Z value.(Field.value); ToRocq.endl]
+    ToRocq.cats [ToRocq.indent indent; "Constant: "; ToRocq.of_Z value.(Field.value)]
   | Expr.Add x y =>
     ToRocq.cats [ToRocq.indent indent; "Add:"; ToRocq.endl;
       string_of_expr x (indent + 2);
+      ToRocq.endl;
       string_of_expr y (indent + 2)
     ]
   | Expr.Sub x y =>
     ToRocq.cats [ToRocq.indent indent; "Sub:"; ToRocq.endl;
       string_of_expr x (indent + 2);
+      ToRocq.endl;
       string_of_expr y (indent + 2)
     ]
   | Expr.Neg x =>
@@ -159,6 +169,7 @@ Fixpoint string_of_expr (expr : Expr.t) (indent : Z) : string :=
   | Expr.Mul x y =>
     ToRocq.cats [ToRocq.indent indent; "Mul:"; ToRocq.endl;
       string_of_expr x (indent + 2);
+      ToRocq.endl;
       string_of_expr y (indent + 2)
     ]
   end.
@@ -181,8 +192,8 @@ Global Instance OptionIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (option T) 
 Global Instance ListIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (list T) := {
   to_rocq self indent :=
     ToRocq.cats (
-      [ToRocq.indent indent; "Array:"; ToRocq.endl] ++
-      List.map (fun item => ToRocq.to_rocq item (indent + 2)) self
+      [ToRocq.indent indent; "Array:"] ++
+      List.map (fun item => ToRocq.cats [ToRocq.endl; ToRocq.to_rocq item (indent + 2)]) self
     );
 }.
 
@@ -190,6 +201,79 @@ Global Instance ArrayIsToRocq {T : Set} {C : ToRocq.C T} {N : Z} : ToRocq.C (Arr
   to_rocq self indent :=
     ToRocq.to_rocq (Array.to_list self) indent
 }.
+
+Module Env.
+  Record t : Set := {
+    expr : Expr.Env.t;
+    var : Var.Env.t;
+  }.
+End Env.
+
+Module Eval.
+  Class C (T1 T2 : Set) : Set := {
+    eval {p} `{Prime p} (env : Env.t) (self : T1) : T2;
+  }.
+End Eval.
+
+Global Instance IdAsEval {T : Set} : Eval.C T T := {
+  eval p _ env self := self;
+}.
+
+Global Instance VarIsEval : Eval.C Var.t Z := {
+  eval p _ env self := Var.eval env.(Env.var) self;
+}.
+
+Global Instance ExprIsEval : Eval.C Expr.t Z := {
+  eval p _ env self := Expr.eval env.(Env.expr) env.(Env.var) self;
+}.
+
+Global Instance ArrayIsEval {T : Set} `{Eval.C T Z} {N : Z} :
+    Eval.C (Array.t T N) (Array.t Z N) := {
+  eval p _ env self := Array.map (Eval.eval env) self;
+}.
+
+(** What we are pretty-printing at the end *)
+Module Trace.
+  Inductive t : Set :=
+  | Pure
+  | AssertZero (expr : Expr.t) (rest : t)
+  | When (condition : Expr.t) (body : t) (rest : t).
+
+  Fixpoint to_rocq (self : t) (indent : Z) : string :=
+    match self with
+    | Pure => ToRocq.cats [ToRocq.indent indent; "Pure"]
+    | AssertZero expr rest =>
+      ToRocq.cats [
+        ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
+        ToRocq.to_rocq expr (indent + 2);
+        ToRocq.endl;
+        to_rocq rest indent 
+      ]
+    | When condition body rest =>
+      ToRocq.cats [ToRocq.indent indent; "When:"; ToRocq.endl;
+        ToRocq.cats [ToRocq.indent (indent + 2); "Condition:"; ToRocq.endl;
+          ToRocq.to_rocq condition (indent + 4)
+        ];
+        ToRocq.endl;
+        ToRocq.cats [ToRocq.indent (indent + 2); "Body:"; ToRocq.endl;
+          to_rocq body (indent + 4)
+        ];
+        ToRocq.endl;
+        to_rocq rest indent
+      ]
+  end.
+
+  Global Instance IsToRocq : ToRocq.C t := {
+    to_rocq := to_rocq;
+  }.
+
+  Fixpoint concat (self : t) (next : t) : t :=
+    match self with
+    | Pure => next
+    | AssertZero expr rest => AssertZero expr (concat rest next)
+    | When condition body rest => When condition body (concat rest next)
+    end.
+End Trace.
 
 Module MExpr.
   Inductive t (A : Set) : Set :=
@@ -199,35 +283,71 @@ Module MExpr.
       function and what is being called, to better compose reasoning. *)
   | Call (e : t A) : t A
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
+  (** We add this condition here as it helps to have a clear pretty-printing *)
+  | When (condition : Expr.t) (body : t A) : t A
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
+  Arguments When {_}.
 
-  Fixpoint flatten {A : Set} (self : t A) : A * list Expr.t :=
+  Fixpoint flatten {A : Set} (self : t A) : A * Trace.t :=
     match self with
-    | Pure value => (value, [])
-    | AssertZero expr value => (value, [expr])
+    | Pure value => (value, Trace.Pure)
+    | AssertZero expr value => (value, Trace.AssertZero expr Trace.Pure)
     | Call e => flatten e
     | Let e k =>
       let '(value_e, constraints_e) := flatten e in
       let '(value_k, constraints_k) := flatten (k value_e) in
-      (value_k, constraints_k ++ constraints_e)
+      (value_k, Trace.concat constraints_e constraints_k)
+    | When condition body =>
+      let '(value_body, constraints_body) := flatten body in
+      (value_body, Trace.When condition constraints_body Trace.Pure)
     end.
 
+  Module Eq.
+    (** Equality with the [M.t] monad. *)
+    Inductive t {A1 A2 : Set} `{Eval.C A1 A2} {p} `{Prime p} (env : Env.t) :
+      MExpr.t A1 -> M.t A2 -> Prop :=
+    | Pure (value : A1) value' :
+      Eval.eval env value = value' ->
+      t env (Pure value) (M.Pure value')
+    | AssertZero (expr : Expr.t) expr' (value : A1) value' :
+      Eval.eval env expr = expr' ->
+      Eval.eval env value = value' ->
+      t env (AssertZero expr value) (M.AssertZero expr' value')
+    | Call (e : MExpr.t A1) (e' : M.t A2) :
+      t env e e' ->
+      t env (MExpr.Call e) (M.Call e')
+    | Let {B1 B2 : Set} `{Eval.C B1 B2}
+        (e : MExpr.t B1) (k : B1 -> MExpr.t A1)
+        (e' : M.t B2) (k' : B2 -> M.t A2) :
+      t env e e' ->
+      (forall (value : B1),
+        t env (k value) (k' (Eval.eval env value))
+      ) ->
+      t env (MExpr.Let e k) (M.Let e' k')
+    | When (condition : Expr.t) condition' (body : MExpr.t A1) (body' : M.t A2) :
+      Eval.eval env condition = condition' ->
+      t env body body' ->
+      t env (MExpr.When condition body) (M.When condition' body')
+    .
+  End Eq.
+
   Fixpoint eval {A : Set} {p} `{Prime p}
-      (expr_env : Expr.Env.t)
-      (var_env : Var.Env.t)
+      (env : Env.t)
       (self : t A) :
       M.t A :=
     match self with
     | Pure value => M.pure value
-    | AssertZero expr value => M.Equal (Expr.eval expr_env var_env expr) 0 value
-    | Call e => M.Call (eval expr_env var_env e)
+    | AssertZero expr value => M.AssertZero (Eval.eval env expr) value
+    | Call e => M.Call (eval env e)
     | Let e k =>
-      let* value_e := eval expr_env var_env e in
-      eval expr_env var_env (k value_e)
+      let* value_e := eval env e in
+      eval env (k value_e)
+    | When condition body =>
+      M.when (Eval.eval env condition) (eval env body)
     end.
 
   Fixpoint map {A B : Set} (f : A -> B) (self : t A) : t B :=
@@ -236,6 +356,7 @@ Module MExpr.
     | AssertZero expr value => AssertZero expr (f value)
     | Call e => Call (map f e)
     | Let e k => Let e (fun x => map f (k x))
+    | When condition body => When condition (map f body)
     end.
 End MExpr.
 
@@ -245,28 +366,23 @@ Notation "'let!' x ':=' e 'in' k" :=
 
 Global Instance MExprIsToRocq {A : Set} {C : ToRocq.C A} : ToRocq.C (MExpr.t A) := {
   to_rocq self indent :=
-    let '(result, constraints) := MExpr.flatten self in
+    let '(result, trace) := MExpr.flatten self in
     ToRocq.cats (
-      [ToRocq.indent indent; "Builder:"; ToRocq.endl] ++
-      List.map (fun item =>
-        ToRocq.cats [ToRocq.indent (indent + 2); "AssertZero:"; ToRocq.endl;
-          ToRocq.to_rocq item (indent + 4)
-        ]
-      ) (List.rev constraints) ++
-      [ToRocq.to_rocq result indent]
+      [ToRocq.indent indent; "Trace 🐾"; ToRocq.endl;
+        ToRocq.to_rocq trace (indent + 2)
+      ] ++
+      [ToRocq.endl] ++
+      [ToRocq.indent indent; "Result 🛍️"; ToRocq.endl;
+        ToRocq.to_rocq result (indent + 2)
+      ]
     );
 }.
 
 Definition pure {A : Set} (value : A) : MExpr.t A :=
   MExpr.Pure value.
 
-Fixpoint when {A : Set} (condition : Expr.t) (body : MExpr.t A) : MExpr.t A :=
-  match body with
-  | MExpr.Pure value => MExpr.Pure value
-  | MExpr.AssertZero expr value => MExpr.AssertZero (Expr.Mul condition expr) value
-  | MExpr.Call e => MExpr.Call (when condition e)
-  | MExpr.Let e k => MExpr.Let (when condition e) (fun x => when condition (k x))
-  end.
+Definition when {A : Set} (condition : Expr.t) (body : MExpr.t A) : MExpr.t A :=
+  MExpr.When condition body.
 
 Definition assert_zero (e : Expr.t) : MExpr.t unit :=
   MExpr.AssertZero e tt.
@@ -277,6 +393,38 @@ Definition assert_one (e : Expr.t) : MExpr.t unit :=
 Definition assert_bool (e : Expr.t) : MExpr.t unit :=
   assert_zero (Expr.Mul e (Expr.Sub e Expr.ONE)).
 
+Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> MExpr.t unit) : MExpr.t unit :=
+  match N with
+  | O => pure tt
+  | S N =>
+    let! _ := for_in_zero_to_n_aux N f in
+    f (Z.of_nat N)
+  end.
+
+Definition for_in_zero_to_n (N : Z) (f : Z -> MExpr.t unit) : MExpr.t unit :=
+  for_in_zero_to_n_aux (Z.to_nat N) f.
+
+Lemma for_in_zero_to_n_eq {N : Z} {p} `{Prime p}
+    (env : Env.t)
+    (f : Z -> MExpr.t unit) (f' : Z -> M.t unit)
+    (H_f : forall (i : Z),
+      MExpr.Eq.t env (f i) (f' i)
+    ) :
+  MExpr.Eq.t env (MExpr.for_in_zero_to_n N f) (M.for_in_zero_to_n N f').
+Proof.
+  with_strategy transparent [M.for_in_zero_to_n]
+    unfold MExpr.for_in_zero_to_n, M.for_in_zero_to_n.
+  set (n := Z.to_nat N); clearbody n.
+  induction n; cbn; intros.
+  { now constructor. }
+  { econstructor. {
+      apply IHn.
+    }
+    intros.
+    apply H_f.
+  }
+Qed.
+
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> MExpr.t A) (acc : A) (l : list B) : MExpr.t A :=
     match l with
@@ -285,4 +433,31 @@ Module List.
       let! acc := f acc x in
       fold_left f acc xs
     end.
+
+  Module Eq.
+    Lemma fold_left_eq {A1 A2 B1 B2 : Set} `{Eval.C A1 A2} `{Eval.C B1 B2} {p} `{Prime p}
+        (env : Env.t)
+        (f : A1 -> B1 -> MExpr.t A1) (f' : A2 -> B2 -> M.t A2)
+        (acc : A1) acc' (l : list B1) l'
+        (H_f : forall (acc : A1) (a : B1),
+          MExpr.Eq.t env (f acc a) (f' (Eval.eval env acc) (Eval.eval env a))
+        )
+        (H_acc : Eval.eval env acc = acc')
+        (H_l : List.map (Eval.eval env) l = l') :
+      MExpr.Eq.t env
+        (MExpr.List.fold_left f acc l)
+        (M.List.fold_left f' acc' l').
+    Proof.
+      rewrite <- H_l, <- H_acc.
+      clear H_l H_acc.
+      revert acc.
+      induction l; cbn; intros.
+      { now constructor. }
+      { econstructor. {
+          apply H_f.
+        }
+        apply IHl.
+      }
+    Qed.
+  End Eq.
 End List.
