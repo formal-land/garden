@@ -18,6 +18,10 @@ MAKECOQ := +$(MAKE) -f CoqMakefile
 
 all: CoqMakefile
 	$(MAKECOQ) all
+	$(MAKE) snapshot
+
+snapshot:
+	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | head -n -2 > OpenVM/BranchEq/core_expr.snapshot
 
 clean-coq: CoqMakefile
 	$(MAKECOQ) clean

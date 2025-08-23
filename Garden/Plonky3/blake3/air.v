@@ -313,11 +313,11 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         ]
     });
   *) 
-  let m_values := Array.map local.(Blake3Cols.inputs) (fun bits =>
+  let m_values := Array.map (fun bits =>
     let bits_low := Array.slice_first bits BITS_PER_LIMB in
     let bits_high := Array.slice_from bits BITS_PER_LIMB in
     double_val (pack_bits_le_array bits_low) (pack_bits_le_array bits_high)
-  ) in
+  ) local.(Blake3Cols.inputs) in
 
   (*
     let initial_state = Blake3State {

@@ -1,0 +1,168 @@
+Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MExpr.
+Require Import Garden.OpenVM.BranchEq.core_with_monad.
+
+Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; "ImmInstruction:"; ToRocq.endl;
+      ToRocq.to_rocq self.(ImmInstruction.is_valid) (indent + 2);
+      ToRocq.to_rocq self.(ImmInstruction.opcode) (indent + 2);
+      ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 2)
+    ];
+}.
+
+Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
+    ToRocq.C (AdapterAirContext.t NUM_LIMBS Expr.t) := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; "AdapterAirContext:"; ToRocq.endl;
+      ToRocq.cats [ToRocq.indent (indent + 2); "to_pc:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.to_pc) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "reads:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.reads) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "writes:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.writes) (indent + 4)
+      ];
+      ToRocq.cats [ToRocq.indent (indent + 2); "instruction:"; ToRocq.endl;
+        ToRocq.to_rocq self.(AdapterAirContext.instruction) (indent + 4)
+      ]
+    ];
+}.
+
+Definition eval {NUM_LIMBS : Z}
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
+    (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
+    (from_pc : Var.t) :
+    MExpr.t (AdapterAirContext.t NUM_LIMBS Expr.t) :=
+  let flags : list Var.t := [
+    local.(BranchEqualCoreCols.opcode_beq_flag);
+    local.(BranchEqualCoreCols.opcode_bne_flag)
+  ] in
+
+  let! is_valid :=
+    MExpr.List.fold_left
+      (fun acc flag =>
+        let! _ := MExpr.assert_bool (Expr.Var flag) in
+        MExpr.pure (Expr.Add acc (Expr.Var flag))
+      )
+      Expr.ZERO
+      flags in
+  let! _ := MExpr.assert_bool is_valid in
+  let! _ := MExpr.assert_bool (Expr.Var local.(BranchEqualCoreCols.cmp_result)) in
+
+  let a : Array.t Var.t NUM_LIMBS := local.(BranchEqualCoreCols.a) in
+  let b : Array.t Var.t NUM_LIMBS := local.(BranchEqualCoreCols.b) in
+  let inv_marker : Array.t Var.t NUM_LIMBS := local.(BranchEqualCoreCols.diff_inv_marker) in
+
+  let cmp_eq : Expr.t :=
+    Expr.Add
+      (Expr.Mul
+        (Expr.Var local.(BranchEqualCoreCols.cmp_result))
+        (Expr.Var local.(BranchEqualCoreCols.opcode_beq_flag)))
+      (Expr.Mul
+        (Expr.not (Expr.Var local.(BranchEqualCoreCols.cmp_result)))
+        (Expr.Var local.(BranchEqualCoreCols.opcode_bne_flag))) in
+
+  let! _ :=
+    MExpr.List.fold_left
+      (fun acc i =>
+        let i := Z.of_nat i in
+        MExpr.assert_zero
+          (Expr.Mul cmp_eq (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i))))
+      )
+      tt
+      (Lists.List.seq 0 (Z.to_nat NUM_LIMBS)) in
+  let sum : Expr.t :=
+    Lists.List.fold_left
+      (fun sum (i : nat) =>
+        let i := Z.of_nat i in
+        Expr.Add sum
+          (Expr.Mul
+            (Expr.Sub (Expr.Var (Array.get a i)) (Expr.Var (Array.get b i)))
+            (Expr.Var (Array.get inv_marker i)))
+      )
+      (Lists.List.seq 0 (Z.to_nat NUM_LIMBS))
+      cmp_eq in
+  let! _ := MExpr.when is_valid (MExpr.assert_one sum) in
+
+  let flags_with_opcode_integer : list (Var.t * Z) :=
+    [
+      (local.(BranchEqualCoreCols.opcode_beq_flag), 0);
+      (local.(BranchEqualCoreCols.opcode_bne_flag), 1)
+    ] in
+  let expected_opcode : Expr.t :=
+    Lists.List.fold_left
+      (fun acc '(flag, opcode) =>
+        Expr.Add acc (Expr.Mul (Expr.Var flag) (Expr.constant opcode))
+      )
+      flags_with_opcode_integer
+      Expr.ZERO in
+  let expected_opcode : Expr.t :=
+    Expr.Add expected_opcode (Expr.constant self.(BranchEqualCoreAir.offset)) in
+
+  let to_pc : Expr.t :=
+    Expr.Add
+      (Expr.Add
+        (Expr.Var from_pc)
+        (Expr.Mul
+          (Expr.Var local.(BranchEqualCoreCols.cmp_result))
+          (Expr.Var local.(BranchEqualCoreCols.imm))))
+      (Expr.Mul
+        (Expr.not (Expr.Var local.(BranchEqualCoreCols.cmp_result)))
+        (Expr.constant self.(BranchEqualCoreAir.pc_step)))
+    in
+
+  MExpr.pure {|
+    AdapterAirContext.to_pc := Some to_pc;
+    AdapterAirContext.reads := [Array.map Expr.Var a; Array.map Expr.Var b];
+    AdapterAirContext.writes := [];
+    AdapterAirContext.instruction := {|
+      ImmInstruction.is_valid := is_valid;
+      ImmInstruction.opcode := expected_opcode;
+      ImmInstruction.immediate := Expr.Var local.(BranchEqualCoreCols.imm);
+    |};
+  |}.
+
+Definition print_branch_eq {NUM_LIMBS : Z} : string :=
+  let air := {|
+    BranchEqualCoreAir.offset := 12;
+    BranchEqualCoreAir.pc_step := 23;
+  |} in
+  let local : BranchEqualCoreCols.t NUM_LIMBS Var.t := {|
+    BranchEqualCoreCols.a := {| Array.get := fun i => Var.make (i + 0) |};
+    BranchEqualCoreCols.b := {| Array.get := fun i => Var.make (i + NUM_LIMBS) |};
+    BranchEqualCoreCols.cmp_result := Var.make (2 * NUM_LIMBS);
+    BranchEqualCoreCols.imm := Var.make (2 * NUM_LIMBS + 1);
+    BranchEqualCoreCols.opcode_beq_flag := Var.make (2 * NUM_LIMBS + 2);
+    BranchEqualCoreCols.opcode_bne_flag := Var.make (2 * NUM_LIMBS + 3);
+    BranchEqualCoreCols.diff_inv_marker := {| Array.get := fun i => Var.make (i + 2 * NUM_LIMBS + 4) |};
+  |} in
+  let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
+  ToRocq.cats [
+    ToRocq.endl;
+    ToRocq.to_rocq (eval air local from_pc) 0
+  ].
+
+Compute print_branch_eq (NUM_LIMBS := 4).
+
+(** We prove the equality of the [eval] definition above with the [eval] definition directly using
+    field elements. *)
+Lemma eq_eval_field {p} `{Prime p} {NUM_LIMBS : Z}
+    (expr_env : Expr.Env.t)
+    (var_env : Var.Env.t)
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
+    (local : BranchEqualCoreCols.t NUM_LIMBS Var.t)
+    (from_pc : Var.t) :
+  MExpr.eval expr_env var_env (
+    MExpr.map (AdapterAirContext.map (Expr.eval expr_env var_env)) (
+      eval self local from_pc
+    )
+  ) =
+  core_with_monad.eval
+    self
+    (BranchEqualCoreCols.map (Var.eval var_env) local)
+    (Var.eval var_env from_pc).
+Proof.
+  (* This lemma is not actually correct as the intermediates [Let] do not have the same type *)
+Admitted.
