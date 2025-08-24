@@ -77,6 +77,50 @@ Module Expr.
 
   Definition not (e : t) : t :=
     Sub ONE e.
+
+  (** We group additions and multiplications together, to operate on a list instead of on a couple
+      of values. The main idea is to simplify the pretty-printing. *)
+  Module Flat.
+    Inductive t : Set :=
+    | Var (var : Var.t)
+    | IsFirstRow
+    | IsLastRow
+    | IsTransition
+    | Constant (value : Field.t)
+    | Add (xs : list t)
+    | Sub (x y : t)
+    | Neg (x : t)
+    | Mul (xs : list t).
+
+    Fixpoint flatten (expr : Expr.t) : t :=
+      match expr with
+      | Expr.Var var => Var var
+      | Expr.IsFirstRow => IsFirstRow
+      | Expr.IsLastRow => IsLastRow
+      | Expr.IsTransition => IsTransition
+      | Expr.Constant value => Constant value
+      | Expr.Add x y =>
+        let x := flatten x in
+        let y := flatten y in
+        match x, y with
+        | Add xs, Add ys => Add (xs ++ ys)
+        | Add xs, y => Add (xs ++ [y])
+        | x, Add ys => Add (x :: ys)
+        | x, y => Add [x; y]
+        end
+      | Expr.Sub x y => Sub (flatten x) (flatten y)
+      | Expr.Neg x => Neg (flatten x)
+      | Expr.Mul x y =>
+        let x := flatten x in
+        let y := flatten y in
+        match x, y with
+        | Mul xs, Mul ys => Mul (xs ++ ys)
+        | Mul xs, y => Mul (xs ++ [y])
+        | x, Mul ys => Mul (x :: ys)
+        | x, y => Mul [x; y]
+        end
+      end.
+  End Flat.
 End Expr.
 
 Module ToRocq.
@@ -139,44 +183,42 @@ Module ToRocq.
     pstring_of_uint (Nat.to_uint (Z.to_nat z)).
 End ToRocq.
 
-Fixpoint string_of_expr (expr : Expr.t) (indent : Z) : string :=
+Fixpoint string_of_flat_expr (expr : Expr.Flat.t) (indent : Z) : string :=
   match expr with
-  | Expr.Var var =>
+  | Expr.Flat.Var var =>
     ToRocq.cats [ToRocq.indent indent; "Variable: "; ToRocq.of_Z var.(Var.index)]
-  | Expr.IsFirstRow =>
+  | Expr.Flat.IsFirstRow =>
     ToRocq.cats [ToRocq.indent indent; "IsFirstRow"]
-  | Expr.IsLastRow =>
+  | Expr.Flat.IsLastRow =>
     ToRocq.cats [ToRocq.indent indent; "IsLastRow"]
-  | Expr.IsTransition =>
+  | Expr.Flat.IsTransition =>
     ToRocq.cats [ToRocq.indent indent; "IsTransition"]
-  | Expr.Constant value =>
+  | Expr.Flat.Constant value =>
     ToRocq.cats [ToRocq.indent indent; "Constant: "; ToRocq.of_Z value.(Field.value)]
-  | Expr.Add x y =>
+  | Expr.Flat.Add xs =>
     ToRocq.cats [ToRocq.indent indent; "Add:"; ToRocq.endl;
-      string_of_expr x (indent + 2);
-      ToRocq.endl;
-      string_of_expr y (indent + 2)
+      ToRocq.separate ToRocq.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
     ]
-  | Expr.Sub x y =>
+  | Expr.Flat.Sub x y =>
     ToRocq.cats [ToRocq.indent indent; "Sub:"; ToRocq.endl;
-      string_of_expr x (indent + 2);
+      string_of_flat_expr x (indent + 2);
       ToRocq.endl;
-      string_of_expr y (indent + 2)
+      string_of_flat_expr y (indent + 2)
     ]
-  | Expr.Neg x =>
+  | Expr.Flat.Neg x =>
     ToRocq.cats [ToRocq.indent indent; "Neg:"; ToRocq.endl;
-      string_of_expr x (indent + 2)
+      string_of_flat_expr x (indent + 2)
     ]
-  | Expr.Mul x y =>
+  | Expr.Flat.Mul xs =>
     ToRocq.cats [ToRocq.indent indent; "Mul:"; ToRocq.endl;
-      string_of_expr x (indent + 2);
-      ToRocq.endl;
-      string_of_expr y (indent + 2)
+      ToRocq.separate ToRocq.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
     ]
   end.
 
 Global Instance ExprIsToRocq : ToRocq.C Expr.t := {
-  to_rocq := string_of_expr;
+  to_rocq self indent :=
+    let flat := Expr.Flat.flatten self in
+    string_of_flat_expr flat indent;
 }.
 
 Global Instance OptionIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (option T) := {
