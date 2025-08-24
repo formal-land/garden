@@ -87,52 +87,48 @@ Trace 🐾
       Sub:
         Variable: 3
         Variable: 7
-  When:
-    Condition:
+  AssertZero:
+    Mul:
       Add:
         Add:
           Constant: 0
           Variable: 10
         Variable: 11
-    Body:
-      AssertZero:
-        Sub:
+      Sub:
+        Add:
           Add:
             Add:
               Add:
                 Add:
-                  Add:
-                    Mul:
-                      Variable: 8
-                      Variable: 10
-                    Mul:
-                      Sub:
-                        Constant: 1
-                        Variable: 8
-                      Variable: 11
+                  Mul:
+                    Variable: 8
+                    Variable: 10
                   Mul:
                     Sub:
-                      Variable: 0
-                      Variable: 4
-                    Variable: 12
+                      Constant: 1
+                      Variable: 8
+                    Variable: 11
                 Mul:
                   Sub:
-                    Variable: 1
-                    Variable: 5
-                  Variable: 13
+                    Variable: 0
+                    Variable: 4
+                  Variable: 12
               Mul:
                 Sub:
-                  Variable: 2
-                  Variable: 6
-                Variable: 14
+                  Variable: 1
+                  Variable: 5
+                Variable: 13
             Mul:
               Sub:
-                Variable: 3
-                Variable: 7
-              Variable: 15
-          Constant: 1
-      Pure
-  Pure
+                Variable: 2
+                Variable: 6
+              Variable: 14
+          Mul:
+            Sub:
+              Variable: 3
+              Variable: 7
+            Variable: 15
+        Constant: 1
 Result 🛍️
   AdapterAirContext:
     to_pc:
@@ -164,19 +160,23 @@ Result 🛍️
       Array:
     instruction:
       ImmInstruction:
-        Add:
-          Add:
-            Constant: 0
-            Variable: 10
-          Variable: 11
-        Add:
+        is_valid:
           Add:
             Add:
               Constant: 0
-              Mul:
-                Variable: 10
+              Variable: 10
+            Variable: 11
+        opcode:
+          Add:
+            Add:
+              Add:
                 Constant: 0
-            Mul:
-              Variable: 11
-              Constant: 1
-          Constant: 12
+                Mul:
+                  Variable: 10
+                  Constant: 0
+              Mul:
+                Variable: 11
+                Constant: 1
+            Constant: 12
+        immediate:
+          Variable: 9

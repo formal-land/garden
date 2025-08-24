@@ -5,11 +5,12 @@ Require Import Garden.OpenVM.BranchEq.core_with_monad.
 Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
   to_rocq self indent :=
     ToRocq.cats [ToRocq.indent indent; "ImmInstruction:"; ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.is_valid) (indent + 2);
-      ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.opcode) (indent + 2);
-      ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 2)
+      ToRocq.indent (indent + 2); "is_valid:"; ToRocq.endl;
+      ToRocq.to_rocq self.(ImmInstruction.is_valid) (indent + 4); ToRocq.endl;
+      ToRocq.indent (indent + 2); "opcode:"; ToRocq.endl;
+      ToRocq.to_rocq self.(ImmInstruction.opcode) (indent + 4); ToRocq.endl;
+      ToRocq.indent (indent + 2); "immediate:"; ToRocq.endl;
+      ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 4)
     ];
 }.
 
@@ -174,7 +175,8 @@ Definition print_branch_eq {NUM_LIMBS : Z} : string :=
   let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
   ToRocq.cats [
     ToRocq.endl;
-    ToRocq.to_rocq (eval air local from_pc) 0
+    ToRocq.to_rocq (eval air local from_pc) 0;
+    ToRocq.endl
   ].
 
 Compute print_branch_eq (NUM_LIMBS := 4).

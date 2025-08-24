@@ -102,6 +102,7 @@ Module ToRocq.
   Fixpoint separate (separator : string) (l : list string) : string :=
     match l with
     | [] => ""
+    | [x] => x
     | x :: xs => cats [x; separator; separate separator xs]
     end.
 
@@ -239,6 +240,25 @@ Module Trace.
   | AssertZero (expr : Expr.t) (rest : t)
   | When (condition : Expr.t) (body : t) (rest : t).
 
+  Fixpoint concat (self : t) (next : t) : t :=
+    match self with
+    | Pure => next
+    | AssertZero expr rest => AssertZero expr (concat rest next)
+    | When condition body rest => When condition body (concat rest next)
+    end.
+
+  (** We flatten the [When] operator, as while it is useful on its own, it is hard to make it appear
+      explicitly on the Rust side without modifying Plonky3 itself. *)
+  Fixpoint flatten (self : t) : list Expr.t :=
+    match self with
+    | Pure => []
+    | AssertZero expr rest => expr :: flatten rest
+    | When condition body rest =>
+      let body := flatten body in
+      let rest := flatten rest in
+      (List.map (Expr.Mul condition) body) ++ rest
+    end.
+
   Fixpoint to_rocq (self : t) (indent : Z) : string :=
     match self with
     | Pure => ToRocq.cats [ToRocq.indent indent; "Pure"]
@@ -264,15 +284,16 @@ Module Trace.
   end.
 
   Global Instance IsToRocq : ToRocq.C t := {
-    to_rocq := to_rocq;
+    to_rocq self indent :=
+      let asserts := flatten self in
+      ToRocq.separate ToRocq.endl (
+        List.map (fun assert =>
+          ToRocq.cats [ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
+            ToRocq.to_rocq assert (indent + 2)
+          ]
+        ) asserts
+      );
   }.
-
-  Fixpoint concat (self : t) (next : t) : t :=
-    match self with
-    | Pure => next
-    | AssertZero expr rest => AssertZero expr (concat rest next)
-    | When condition body rest => When condition body (concat rest next)
-    end.
 End Trace.
 
 Module MExpr.
