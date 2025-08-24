@@ -281,8 +281,8 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
       let word := Array.get initial_row_0 i in
       let low_16 := pack_bits_le_array (Array.slice_first bits BITS_PER_LIMB) in
       let hi_16 := pack_bits_le_array (Array.slice_from bits BITS_PER_LIMB) in
-      let* _ := M.equal low_16 (Array.get word 0) in
-      let* _ := M.equal hi_16 (Array.get word 1) in
+      let* _ := M.assert_eq low_16 (Array.get word 0) in
+      let* _ := M.assert_eq hi_16 (Array.get word 1) in
       M.pure tt
     ) in
   (*
@@ -300,8 +300,8 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
     let row_elem := Array.get (local.(Blake3Cols.initial_row2)) i in
     let constant := Array.get IV i in
 
-    let* _ := M.equal (Array.get row_elem 0) (UnOp.from (Array.get constant 0)) in
-    let* _ := M.equal (Array.get row_elem 1) (UnOp.from (Array.get constant 1)) in
+    let* _ := M.assert_eq (Array.get row_elem 0) (UnOp.from (Array.get constant 0)) in
+    let* _ := M.assert_eq (Array.get row_elem 1) (UnOp.from (Array.get constant 1)) in
     M.Pure tt
   ) in
 
@@ -448,8 +448,8 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
       let low_16 := pack_bits_le_array (Array.slice_first bits BITS_PER_LIMB) in
       let hi_16 := pack_bits_le_array (Array.slice_from bits BITS_PER_LIMB) in
       (* Assert that the packed values match the corresponding word *)
-      let* _ := M.equal low_16 (Array.get word 0) in
-      let* _ := M.equal hi_16 (Array.get word 1) in
+      let* _ := M.assert_eq low_16 (Array.get word 0) in
+      let* _ := M.assert_eq hi_16 (Array.get word 1) in
       M.Pure tt
     ) in 
 
@@ -512,7 +512,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         let left_bit := Array.get left_bits j in
         let right_bit := Array.get right_bits j in
         let left_xor_right := xor left_bit right_bit in
-        M.equal out_bit left_xor_right
+        M.assert_eq out_bit left_xor_right
       )
     in
     M.Pure tt
@@ -539,7 +539,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         let left_bit := Array.get left_bits j in
         let right_bit := Array.get right_bits j in
         let left_xor_right := xor left_bit right_bit in
-        M.equal out_bit left_xor_right
+        M.assert_eq out_bit left_xor_right
       )
     in
     M.Pure tt
@@ -567,7 +567,7 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
         let left_bit := Array.get left_bits j in
         let right_bit := Array.get right_bits j in
         let left_xor_right := xor left_bit right_bit in
-        M.equal out_bit left_xor_right
+        M.assert_eq out_bit left_xor_right
       )
     in
     M.Pure tt

@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Plonky3.MExpr.
 
 (*
 pub struct ImmInstruction<T> {
@@ -51,6 +52,11 @@ Module AdapterAirContext.
     AdapterAirContext.writes := List.map (Array.map f) self.(AdapterAirContext.writes);
     AdapterAirContext.instruction := ImmInstruction.map f self.(AdapterAirContext.instruction);
   |}.
+
+  Global Instance AdapterAirContextIsEval {NUM_LIMBS : Z} {T : Set} `{Eval.C T Z} :
+      Eval.C (t NUM_LIMBS T) (t NUM_LIMBS Z) := {
+    eval p _ env self := map (Eval.eval env) self;
+  }.
 End AdapterAirContext.
 
 (* TODO: from `instructions.rs`, move there *)
@@ -123,6 +129,16 @@ Module BranchEqualCoreAir.
   Arguments t : clear implicits.
 End BranchEqualCoreAir.
 
+Fixpoint sum_for_in_zero_to_n_starting_from_aux {p} `{Prime p} (n : nat) (f : Z -> Z) (start : Z) :
+    Z :=
+  match n with
+  | O => start
+  | S n => BinOp.add (sum_for_in_zero_to_n_starting_from_aux n f start) (f (Z.of_nat n))
+  end.
+
+Definition sum_for_in_zero_to_n_starting_from {p} `{Prime p} (n : Z) (f : Z -> Z) (start : Z) : Z :=
+  sum_for_in_zero_to_n_starting_from_aux (Z.to_nat n) f start.
+
 Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local : BranchEqualCoreCols.t NUM_LIMBS Z)
@@ -134,7 +150,7 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
   ] in
 
   let* is_valid : Z :=
-    List.fold_left
+    M.List.fold_left
       (fun acc flag =>
         let* _ := M.assert_bool flag in
         M.pure (BinOp.add acc flag)
@@ -158,10 +174,9 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
   let* _ := M.for_in_zero_to_n NUM_LIMBS (fun i =>
     M.assert_zero (BinOp.mul cmp_eq (BinOp.sub (Array.get a i) (Array.get b i)))
   ) in
-  let sum : Z := M.sum_for_in_zero_to_n NUM_LIMBS (fun i =>
-    BinOp.mul (Array.get inv_marker i) (BinOp.sub (Array.get a i) (Array.get b i))
-  ) in
-  let sum := BinOp.add sum cmp_eq in
+  let sum : Z := sum_for_in_zero_to_n_starting_from NUM_LIMBS (fun i =>
+    BinOp.mul (BinOp.sub (Array.get a i) (Array.get b i)) (Array.get inv_marker i)
+  ) cmp_eq in
   let* _ := M.when is_valid (M.assert_one sum) in
 
   let flags_with_opcode_integer : list (Z * Z) :=
@@ -199,6 +214,22 @@ Definition eval {p} `{Prime p} {NUM_LIMBS : Z}
     |};
   |}.
 
+Lemma sum_for_in_zero_to_n_starting_from_always_zero_eq {p} `{Prime p}
+    (N : Z) (f : Z -> Z) (start : Z)
+    (H_N : 0 <= N)
+    (H_f : forall i, 0 <= i < N -> f i = 0) :
+  sum_for_in_zero_to_n_starting_from N f (UnOp.from start) =
+  UnOp.from start.
+Proof.
+  unfold sum_for_in_zero_to_n_starting_from.
+  replace N with (Z.of_nat (Z.to_nat N)) in H_f by lia.
+  set (n := Z.to_nat N) in *; clearbody n.
+  set (n' := n) in H_f. assert (H_n' : (n <= n')%nat) by lia; clearbody n'.
+  induction n; cbn; intros; autorewrite with field_rewrite; trivial.
+  rewrite IHn, H_f by lia.
+  now autorewrite with field_rewrite.
+Qed.
+
 Definition goldilocks_prime : Z :=
   2^64 - 2^32 + 1.
 
@@ -206,7 +237,8 @@ Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
     (local' : BranchEqualCoreCols.t NUM_LIMBS Z)
     (from_pc' : Z)
-    (branch_equal_opcode : BranchEqualOpcode.t) :
+    (branch_equal_opcode : BranchEqualOpcode.t)
+    (H_N : 0 <= NUM_LIMBS) :
   let local :=
     M.map_mod local'
       <| BranchEqualCoreCols.opcode_beq_flag :=
@@ -318,19 +350,19 @@ Proof.
     unfold Array.Eq.t.
     destruct cmp_eq; cbn; [trivial|].
     intro.
-    set (sum_for := M.sum_for_in_zero_to_n _ _) in H_sum.
-    replace sum_for with 0 in H_sum. 2: {
+    replace (Z.b2z false) with (UnOp.from 0) in H_sum by reflexivity.
+    rewrite sum_for_in_zero_to_n_starting_from_always_zero_eq in H_sum;
+      try assumption;
+      cbn in H_sum;
+      [lia|].
+    intros.
+    replace (BinOp.sub _ _) with 0. 2: {
       symmetry.
-      apply M.sum_for_in_zero_to_n_zeros_eq.
-      intros.
-      replace (BinOp.sub _ _) with 0. 2: {
-        symmetry.
-        rewrite M.sub_zero_equiv.
-        sauto lq: on rew: off.
-      }
-      now autorewrite with field_rewrite.
+      rewrite M.sub_zero_equiv.
+      cbn; autorewrite with field_rewrite.
+      hauto l: on.
     }
-    easy.
+    reflexivity.
   }
   intros H_a_b_neq.
   cbn - [local from_pc].
