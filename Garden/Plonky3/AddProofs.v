@@ -56,9 +56,7 @@ Module AddProofUtil.
   Proof.
     nia.
   Qed.
-
 End AddProofUtil.
-
 
 (*
 Updated New Proof:
@@ -105,8 +103,6 @@ let
 *)  
 
 Module Add2Proof.
-    
-
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
         unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
     
@@ -559,21 +555,13 @@ Module Add2Proof.
           replace (a0 + a1 * 2 ^ 16 + (b0 + b1 * 2 ^ 16)) with ((a0 + b0) + (a1 + b1) * (2 ^ 16)) by lia.
 
           replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
-
           rewrite <- Hres.
-
           unfold res_val.
-
           unfold pack_16_limbs.
-
           unfold BITS_PER_LIMB.
-
           rewrite Z_mod_plus_full.
-
           unfold res0.
-          
           apply Zmod_small.
-
           apply Hrc_res.
         }
         (* i = 1 *)
@@ -582,29 +570,17 @@ Module Add2Proof.
           fold res1.
           simpl.
           replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
-
           fold a_val b_val.
-
           replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
-
           rewrite <-Hres.
-
           unfold res_val.
-
           unfold res1.
-          
           unfold pack_16_limbs.
-
           unfold range_check_32 in Hrc_res.
-
           unfold BITS_PER_LIMB.
-
           rewrite Z_div_plus_full; [|lia].
-
           cut (result.(Array.get) 0 / 2 ^ 16 = 0); [intros Hr; rewrite Hr; reflexivity |].
-
           apply Zdiv_small.
-
           apply Hrc_res.
         }
       }
@@ -994,7 +970,6 @@ Module Add3Proof.
       }
 
       easy.
-
     Qed.  
 
 End Add3Proof.
