@@ -20,7 +20,7 @@ Definition pack_16_limbs (bits : Array.t Z U32_LIMBS) : Z :=
 Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS := 
   double_val (value mod (2 ^ BITS_PER_LIMB)) (value / (2 ^ BITS_PER_LIMB)).
 
-Lemma large_prime_coprime_exp_of_2 {p} `{Prime p} : p > 2 -> Znumtheory.rel_prime (2 ^ 16) p.
+Lemma large_prime_coprime_exp_of_2 {p} `{Prime p} : 2 < p -> Znumtheory.rel_prime (2 ^ 16) p.
 Proof.
 Admitted.
 
@@ -115,7 +115,7 @@ Module Add2Proof.
       (* let result := M.map_mod result in
       let a := M.map_mod a in
       let b := M.map_mod b in *)
-      p > 2 ^ 17 ->
+      2 ^ 17 < p ->
       range_check_32 result ->
       range_check_32 a ->
       range_check_32 b ->
@@ -550,7 +550,7 @@ Module Add2Proof.
         unfold unpack_16_limbs; unfold double_val.
         apply (AddProofUtil.array_index_range_U32 i) in Hi.
         destruct Hi as [Hi0 | Hi1].
-        (* i = 0*)
+        (* i = 0 *)
         {
           rewrite Hi0.
           fold res0.
