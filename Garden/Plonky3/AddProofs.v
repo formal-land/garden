@@ -47,14 +47,13 @@ Module AddProofUtil.
     lia.
   Qed.
 
-  Lemma compound_range_check (x y a b c d p q : Z) :
-    a <= x <= b ->
-    c <= y <= d ->
-    p > 0 ->
-    q > 0 ->
+  Lemma compound_range_check (x y a b c d p q : Z)
+    (Hx : a <= x <= b)
+    (Hy : c <= y <= d)
+    (Hp : p > 0)
+    (Hq : q > 0) :
     p * a + q * c <= p * x + q * y <= p * b + q * d.
   Proof.
-    intros Hx Hy Hp Hq.
     nia.
   Qed.
 
