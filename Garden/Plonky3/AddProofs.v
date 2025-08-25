@@ -400,8 +400,6 @@ Module Add2Proof.
       set (a_val := pack_16_limbs a).
       set (b_val := pack_16_limbs b).
 
-
-
       unfold acc_r in H9'.
       unfold acc_16_r, acc_32_r in H9'.
 
@@ -500,16 +498,13 @@ Module Add2Proof.
                 }
               }
             }
-
             assert ((Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16 - 1) * Z.pow_pos 2 16 = 
               Z.pow_pos 2 16 * Z.pow_pos 2 16 - 1).
             {
               ring_simplify.
               reflexivity.
             }
-
             rewrite H5 in H4.
-
             exact H4.
           }
         }
@@ -532,7 +527,6 @@ Module Add2Proof.
           rewrite Zmod_small; auto.
         }
       }
-
       (* helper *)
       assert (Htmp : Array.Eq.t (eval_add2 a b) result).
       {
@@ -553,7 +547,6 @@ Module Add2Proof.
           fold a_val b_val.
           replace (Z.pow_pos 2 16) with (2 ^ 16) by lia.
           replace (a0 + a1 * 2 ^ 16 + (b0 + b1 * 2 ^ 16)) with ((a0 + b0) + (a1 + b1) * (2 ^ 16)) by lia.
-
           replace (Z.pow_pos 2 32) with (2 ^ 32) by lia.
           rewrite <- Hres.
           unfold res_val.
@@ -584,11 +577,9 @@ Module Add2Proof.
           apply Hrc_res.
         }
       }
-
       eapply Run.Implies. {
         repeat constructor.
       }
-
       easy.
     Qed.
 End Add2Proof.
@@ -629,14 +620,12 @@ Module Add3Proof.
       set (c1 := c.(Array.get) 1) in HA, HB.
       set (res0 := result.(Array.get) 0) in HA, HB.
       set (res1 := result.(Array.get) 1) in HA, HB.
-      
-      
       set (acc_16 := BinOp.sub (BinOp.sub (BinOp.sub res0 a0) b0) c0) in HA, HB.
       set (acc_32 := BinOp.sub (BinOp.sub (BinOp.sub res1 a1) b1) c1) in HA, HB.
       set (acc := BinOp.add acc_16 (BinOp.mul acc_32 (2 ^ 16))) in HA.
-
+      (* apply definitions *)
       unfold range_check_32 in Hrc_res, Hrc_a, Hrc_b, Hrc_c.
-
+      (* shorthand substitutions*)
       fold res0 res1 in Hrc_res.
       fold a0 a1 in Hrc_a.
       fold b0 b1 in Hrc_b.
@@ -644,7 +633,6 @@ Module Add3Proof.
 
       (* HA : acc * (acc + two_32) * (acc + 2 * two_32) = 0 *)
       (* HB : acc_16 * (acc_16 + two_16) * (acc_16 + 2 * two_16) = 0 *)
-
       set (acc_16_r := res0 - a0 - b0 - c0).
       set (acc_32_r := res1 - a1 - b1 - c1).
       set (acc_r := acc_16_r + 2 ^ 16 * acc_32_r).
