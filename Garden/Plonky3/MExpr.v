@@ -22,6 +22,10 @@ Module Var.
 
   Definition make := Build_t.
 
+  Global Instance VarIsDefault : Default.C t := {
+    default := {| index := 0 |};
+  }.
+
   Module Env.
     Definition t : Set :=
       Z -> Z.
@@ -221,6 +225,16 @@ Global Instance ExprIsToRocq : ToRocq.C Expr.t := {
     string_of_flat_expr flat indent;
 }.
 
+Global Instance UnitIsToRocq : ToRocq.C unit := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; "tt"];
+}.
+
+Global Instance StringIsToRocq : ToRocq.C string := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; self];
+}.
+
 Global Instance OptionIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (option T) := {
   to_rocq self indent :=
     match self with
@@ -277,63 +291,33 @@ Global Instance ArrayIsEval {T : Set} `{Eval.C T Z} {N : Z} :
 
 (** What we are pretty-printing at the end *)
 Module Trace.
-  Inductive t : Set :=
-  | Pure
-  | AssertZero (expr : Expr.t) (rest : t)
-  | When (condition : Expr.t) (body : t) (rest : t).
+  Module Event.
+    Inductive t : Set :=
+    | AssertZero (expr : Expr.t)
+    | Message (message : string).
 
-  Fixpoint concat (self : t) (next : t) : t :=
-    match self with
-    | Pure => next
-    | AssertZero expr rest => AssertZero expr (concat rest next)
-    | When condition body rest => When condition body (concat rest next)
-    end.
+    Global Instance IsToRocq : ToRocq.C t := {
+      to_rocq self indent :=
+        match self with
+        | AssertZero expr =>
+          ToRocq.cats [ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
+            ToRocq.to_rocq expr (indent + 2)
+          ]
+        | Message message =>
+          ToRocq.cats [ToRocq.indent indent; "Message 🦜"; ToRocq.endl;
+            ToRocq.to_rocq message (indent + 2)
+          ]
+        end;
+    }.
+  End Event.
 
-  (** We flatten the [When] operator, as while it is useful on its own, it is hard to make it appear
-      explicitly on the Rust side without modifying Plonky3 itself. *)
-  Fixpoint flatten (self : t) : list Expr.t :=
-    match self with
-    | Pure => []
-    | AssertZero expr rest => expr :: flatten rest
-    | When condition body rest =>
-      let body := flatten body in
-      let rest := flatten rest in
-      (List.map (Expr.Mul condition) body) ++ rest
-    end.
-
-  Fixpoint to_rocq (self : t) (indent : Z) : string :=
-    match self with
-    | Pure => ToRocq.cats [ToRocq.indent indent; "Pure"]
-    | AssertZero expr rest =>
-      ToRocq.cats [
-        ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
-        ToRocq.to_rocq expr (indent + 2);
-        ToRocq.endl;
-        to_rocq rest indent 
-      ]
-    | When condition body rest =>
-      ToRocq.cats [ToRocq.indent indent; "When:"; ToRocq.endl;
-        ToRocq.cats [ToRocq.indent (indent + 2); "Condition:"; ToRocq.endl;
-          ToRocq.to_rocq condition (indent + 4)
-        ];
-        ToRocq.endl;
-        ToRocq.cats [ToRocq.indent (indent + 2); "Body:"; ToRocq.endl;
-          to_rocq body (indent + 4)
-        ];
-        ToRocq.endl;
-        to_rocq rest indent
-      ]
-  end.
+  Definition t : Set := list Event.t.
 
   Global Instance IsToRocq : ToRocq.C t := {
     to_rocq self indent :=
-      let asserts := flatten self in
+      let asserts := self in
       ToRocq.separate ToRocq.endl (
-        List.map (fun assert =>
-          ToRocq.cats [ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
-            ToRocq.to_rocq assert (indent + 2)
-          ]
-        ) asserts
+        List.map (fun event => ToRocq.to_rocq event indent) asserts
       );
   }.
 End Trace.
@@ -348,25 +332,38 @@ Module MExpr.
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
   (** We add this condition here as it helps to have a clear pretty-printing *)
   | When (condition : Expr.t) (body : t A) : t A
+  | Message (message : string) (k : t A) : t A
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
   Arguments When {_}.
+  Arguments Message {_}.
 
-  Fixpoint flatten {A : Set} (self : t A) : A * Trace.t :=
+  Fixpoint to_trace {A : Set} (self : t A) : A * Trace.t :=
     match self with
-    | Pure value => (value, Trace.Pure)
-    | AssertZero expr value => (value, Trace.AssertZero expr Trace.Pure)
-    | Call e => flatten e
+    | Pure value => (value, [])
+    | AssertZero expr value => (value, [Trace.Event.AssertZero expr])
+    | Call e => to_trace e
     | Let e k =>
-      let '(value_e, constraints_e) := flatten e in
-      let '(value_k, constraints_k) := flatten (k value_e) in
-      (value_k, Trace.concat constraints_e constraints_k)
+      let '(value_e, constraints_e) := to_trace e in
+      let '(value_k, constraints_k) := to_trace (k value_e) in
+      (value_k, constraints_e ++ constraints_k)
     | When condition body =>
-      let '(value_body, constraints_body) := flatten body in
-      (value_body, Trace.When condition constraints_body Trace.Pure)
+      let '(value_body, constraints_body) := to_trace body in
+      (
+        value_body,
+        List.map (fun event =>
+          match event with
+          | Trace.Event.AssertZero expr => Trace.Event.AssertZero (Expr.Mul expr condition)
+          | Trace.Event.Message _ => event
+          end
+        ) constraints_body
+      )
+    | Message message k =>
+      let '(value_k, constraints_k) := to_trace k in
+      (value_k, [Trace.Event.Message message] ++ constraints_k)
     end.
 
   Module Eq.
@@ -395,6 +392,9 @@ Module MExpr.
       Eval.eval env condition = condition' ->
       t env body body' ->
       t env (MExpr.When condition body) (M.When condition' body')
+    | Message (message : string) (k : MExpr.t A1) (k' : M.t A2) :
+      t env k k' ->
+      t env (MExpr.Message message k) k'
     .
   End Eq.
 
@@ -411,6 +411,8 @@ Module MExpr.
       eval env (k value_e)
     | When condition body =>
       M.when (Eval.eval env condition) (eval env body)
+    | Message _ k =>
+      eval env k
     end.
 
   Fixpoint map {A B : Set} (f : A -> B) (self : t A) : t B :=
@@ -420,6 +422,7 @@ Module MExpr.
     | Call e => Call (map f e)
     | Let e k => Let e (fun x => map f (k x))
     | When condition body => When condition (map f body)
+    | Message message k => Message message (map f k)
     end.
 End MExpr.
 
@@ -427,9 +430,13 @@ Notation "'let!' x ':=' e 'in' k" :=
   (MExpr.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
+Notation "'msg!' message 'in' k" :=
+  (MExpr.Message message k)
+  (at level 200, message at level 200, k at level 200).
+
 Global Instance MExprIsToRocq {A : Set} {C : ToRocq.C A} : ToRocq.C (MExpr.t A) := {
   to_rocq self indent :=
-    let '(result, trace) := MExpr.flatten self in
+    let '(result, trace) := MExpr.to_trace self in
     ToRocq.cats (
       [ToRocq.indent indent; "Trace 🐾"; ToRocq.endl;
         ToRocq.to_rocq trace (indent + 2)
@@ -524,3 +531,161 @@ Module List.
     Qed.
   End Eq.
 End List.
+
+(** A monad to simplify the generation of data structures with fresh_var variables *)
+Module MGenerateVar.
+  Definition t (A : Set) : Set :=
+    Z -> A * Z.
+
+  Definition pure {A : Set} (value : A) : t A :=
+    fun n => (value, n).
+
+  Definition bind {A B : Set} (e : t A) (k : A -> t B) : t B :=
+    fun n =>
+      let '(value, n') := e n in
+      k value n'.
+
+  Definition generate_var : t Var.t :=
+    fun n => (Var.make n, n + 1).
+
+  Definition eval {A : Set} (x : t A) : A :=
+    fst (x 0).
+
+  Class C (A : Set) : Set := {
+    generate : t A;
+  }.
+
+  Fixpoint generate_list {A : Set} `{C A} (n : nat) : t (list A) :=
+    match n with
+    | O => pure []
+    | S n =>
+      bind generate (fun x =>
+        bind (generate_list n) (fun xs =>
+          pure (x :: xs)
+        )
+      )
+    end.
+
+  (** This is a marker that we remove with the following tactic. *)
+  Axiom run : forall {A : Set}, t A -> A.
+
+  (** A tactic that replaces all [run] markers with a bind operation.
+    This allows to represent programs without introducing
+    explicit names for all intermediate computation results. *)
+  Ltac monadic e :=
+    lazymatch e with
+    | context ctxt [let v := ?x in @?f v] =>
+      refine (bind _ _);
+        [ monadic x
+        | let v' := fresh v in
+          intro v';
+          let y := (eval cbn beta in (f v')) in
+          lazymatch context ctxt [let v := x in y] with
+          | let _ := x in y => monadic y
+          | _ =>
+            refine (bind _ _);
+              [ monadic y
+              | let w := fresh "v" in
+                intro w;
+                let z := context ctxt [w] in
+                monadic z
+              ]
+          end
+        ]
+    | context ctxt [run ?x] =>
+      lazymatch context ctxt [run x] with
+      | run x => monadic x
+      | _ =>
+        refine (bind _ _);
+          [ monadic x
+          | let v := fresh "v" in
+            intro v;
+            let y := context ctxt [v] in
+            monadic y
+          ]
+      end
+    | _ =>
+      lazymatch type of e with
+      | t _ => exact e
+      | _ => exact (pure e)
+      end
+    end.
+End MGenerateVar.
+
+Notation "e (| e1 , .. , en |)" :=
+  (MGenerateVar.run ((.. (e e1) ..) en))
+  (at level 100).
+
+Notation "e (||)" :=
+  (MGenerateVar.run e)
+  (at level 100).
+
+Notation "[[ e ]]" :=
+  (ltac:(MGenerateVar.monadic e))
+  (* Use the version below for debugging and show errors that are made obscure by the tactic *)
+  (* (MGenerateVar.pure e) *)
+  (only parsing).
+
+Notation "'let*g' x ':=' e 'in' k" :=
+  (MGenerateVar.bind e (fun x => k))
+  (at level 200, x pattern, e at level 200, k at level 200).
+
+Global Instance VarIsGenerateVar : MGenerateVar.C Var.t := {
+  generate := MGenerateVar.generate_var;
+}.
+
+Global Instance ArrayIsGenerateVar {T : Set} `{MGenerateVar.C T} `{Default.C T} {N : Z} :
+    MGenerateVar.C (Array.t T N) := {
+  generate :=
+    MGenerateVar.bind (MGenerateVar.generate_list (Z.to_nat N)) (fun l =>
+      MGenerateVar.pure (Array.of_list l)
+    )
+}.
+
+Module GenerateVarExample.
+  Definition five_items : MGenerateVar.t (list Var.t) :=
+    [[
+      [
+        MGenerateVar.generate (||);
+        MGenerateVar.generate (||);
+        MGenerateVar.generate (||);
+        MGenerateVar.generate (||);
+        MGenerateVar.generate (||)
+      ]
+    ]].
+
+  Goal MGenerateVar.eval five_items = [
+    Var.make 0;
+    Var.make 1;
+    Var.make 2;
+    Var.make 3;
+    Var.make 4
+  ].
+  Proof. reflexivity. Qed.
+
+  Definition pair_items : MGenerateVar.t (list Var.t * list Var.t) :=
+    [[
+      (
+        five_items (||),
+        five_items (||)
+      )
+    ]].
+
+  Goal MGenerateVar.eval pair_items = (
+    [
+      Var.make 0;
+      Var.make 1;
+      Var.make 2;
+      Var.make 3;
+      Var.make 4
+    ],
+    [
+      Var.make 5;
+      Var.make 6;
+      Var.make 7;
+      Var.make 8;
+      Var.make 9
+    ]
+  ).
+  Proof. reflexivity. Qed.
+End GenerateVarExample.

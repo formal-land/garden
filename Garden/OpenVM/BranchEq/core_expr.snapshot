@@ -87,10 +87,6 @@ Trace 🐾
         Variable: 7
   AssertZero:
     Mul:
-      Add:
-        Constant: 0
-        Variable: 10
-        Variable: 11
       Sub:
         Add:
           Mul:
@@ -122,6 +118,10 @@ Trace 🐾
               Variable: 7
             Variable: 15
         Constant: 1
+      Add:
+        Constant: 0
+        Variable: 10
+        Variable: 11
 Result 🛍️
   AdapterAirContext:
     to_pc:

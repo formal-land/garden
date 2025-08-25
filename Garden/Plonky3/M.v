@@ -30,6 +30,16 @@ Class Prime (p : Z) : Prop := {
 
 Axiom prime_range : forall {p} `{Prime p}, 1 < p.
 
+Module Default.
+  Class C (A : Set) : Set := {
+    default : A;
+  }.
+
+  Global Instance ZIsDefault : C Z := {
+    default := 0;
+  }.
+End Default.
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -62,6 +72,18 @@ Module Array.
   Definition to_list {A : Set} {N : Z} (x : t A N) : list A :=
     List.map (fun i => x.(get) (Z.of_nat i)) (Lists.List.seq 0 (Z.to_nat N)).
 
+  Definition of_list {A : Set} {N : Z} `{Default.C A} (l : list A): t A N :=
+    {|
+      get index := List.nth (Z.to_nat index) l Default.default
+    |}.
+
+  Global Instance IsDefault (A : Set) (N : Z) `{Default.C A} : Default.C (t A N) := {
+    default :=
+      {|
+        get index := Default.default
+      |}
+  }.
+
   Module Eq.
     Definition t {A : Set} {N : Z} (x y : t A N) : Prop :=
       forall (i : Z), 0 <= i < N -> x.(get) i = y.(get) i.
@@ -69,6 +91,8 @@ Module Array.
     Axiom dec : forall {A : Set} {N : Z} (x y : Array.t A N), {t x y} + {~ t x y}.
   End Eq.
 End Array.
+
+Notation "x .[ i ]" := (Array.get x i) (at level 9).
 
 Module UnOp.
   Definition opp {p} `{Prime p} (x : Z) : Z :=
@@ -112,51 +136,6 @@ Module M.
   Arguments Let {_ _}.
   Arguments When {_}.
 
-  (** This is a marker that we remove with the following tactic. *)
-  Axiom run : forall {A : Set}, t A -> A.
-
-  (** A tactic that replaces all [run] markers with a bind operation.
-    This allows to represent programs without introducing
-    explicit names for all intermediate computation results. *)
-  Ltac monadic e :=
-    lazymatch e with
-    | context ctxt [let v := ?x in @?f v] =>
-      refine (Let _ _);
-        [ monadic x
-        | let v' := fresh v in
-          intro v';
-          let y := (eval cbn beta in (f v')) in
-          lazymatch context ctxt [let v := x in y] with
-          | let _ := x in y => monadic y
-          | _ =>
-            refine (Let _ _);
-              [ monadic y
-              | let w := fresh "v" in
-                intro w;
-                let z := context ctxt [w] in
-                monadic z
-              ]
-          end
-        ]
-    | context ctxt [run ?x] =>
-      lazymatch context ctxt [run x] with
-      | run x => monadic x
-      | _ =>
-        refine (Let _ _);
-          [ monadic x
-          | let v := fresh "v" in
-            intro v;
-            let y := context ctxt [v] in
-            monadic y
-          ]
-      end
-    | _ =>
-      lazymatch type of e with
-      | t _ => exact e
-      | _ => exact (Pure e)
-      end
-    end.
-
   Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
     match e with
     | M.Pure value => M.Pure (f value)
@@ -170,20 +149,6 @@ End M.
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
-
-Notation "e (| e1 , .. , en |)" :=
-  (M.run ((.. (e e1) ..) en))
-  (at level 100).
-
-Notation "e (||)" :=
-  (M.run e)
-  (at level 100).
-
-Notation "[[ e ]]" :=
-  (ltac:(M.monadic e))
-  (* Use the version below for debugging and show errors that are made obscure by the tactic *)
-  (* (M.Pure e) *)
-  (only parsing).
 
 Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
