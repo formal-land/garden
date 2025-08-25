@@ -29,39 +29,14 @@ Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop :=
 
 Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
 Proof.
-  split; intros H.
-  {
-    apply Z.lt_le_pred in H. 
-    auto.
-  }
-  {
-    lia.
-  }
+  lia.
 Qed.  
 
 (* helper for add2 and add3 *)
 Module AddProofUtil.
   Lemma array_index_range_U32 (i : Z) : 0 <= i < U32_LIMBS -> i = 0 \/ i = 1.
   Proof.
-    intros Hi.
-    destruct Hi as [Hi0  Hi1].
-    assert (i = 0 \/ i = 1 \/ i >= 2) as H_cases by lia.
-    destruct H_cases as [Hi_eq0 | Hi_ge1].
-    {
-      left. 
-      exact Hi_eq0.
-    }
-    {
-      destruct Hi_ge1 as [Hi_eq1 | Hi_ge2].
-      {
-        right.
-        exact Hi_eq1.
-      }
-      {
-        exfalso.
-        easy.
-      }
-    }
+    cbn; lia.
   Qed.
 
   Lemma constant_unwrap {p} `{Prime p} (x : Z) : x > 0 -> p > x -> UnOp.from x = x.
