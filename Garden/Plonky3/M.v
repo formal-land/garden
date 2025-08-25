@@ -28,8 +28,7 @@ Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
 
-Axiom prime_range : forall {p} `{Prime p}, p > 1.
-
+Axiom prime_range : forall {p} `{Prime p}, 1 < p.
 
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -422,7 +421,6 @@ Module Limbs.
     rewrite from_of_bools_eq; trivial.
     nia.
   Qed.
-
 End Limbs.
 
 Module ArrayLimbs.
@@ -432,8 +430,6 @@ Module ArrayLimbs.
         else if i =? 1 then val2
         else 0 (* Default case, should not happen *)
     |}.
-  
-  
 End ArrayLimbs.
 
 Ltac show_equality_modulo :=
