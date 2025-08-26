@@ -10,9 +10,26 @@ Module Field.
     value : Z;
   }.
 
+  Definition make := Build_t.
+
   Definition eval {p} `{Prime p} (self : t) : Z :=
     UnOp.from self.(value).
   Arguments eval {p} {_} _ /.
+
+  Definition from_canonical_u32 (value : Z) : t :=
+    make (value mod (2 ^ 32)).
+
+  Definition from_canonical_usize (value : Z) : t :=
+    make (value mod (2 ^ 64)).
+
+  (* TODO: compute the actual value *)
+  Definition inverse (self : t) : t :=
+    make self.(value).
+    (* make (self.(value) * 123456789). *)
+    (* if self.(value) =? 65536 then
+      make 18446462594437939201
+    else
+      make 123456789. *)
 End Field.
 
 Module Var.
@@ -203,7 +220,7 @@ Module ToRocq.
     end.
 
   Definition of_Z (z : Z) : PrimString.string :=
-    pstring_of_uint (Nat.to_uint (Z.to_nat z)).
+    pstring_of_uint (N.to_uint (Z.to_N z)).
 End ToRocq.
 
 Fixpoint string_of_flat_expr (expr : Expr.Flat.t) (indent : Z) : string :=

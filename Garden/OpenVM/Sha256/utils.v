@@ -21,6 +21,23 @@ Definition SHA256_WORD_U8S : Z := SHA256_WORD_BITS / 8.
 Definition SHA256_HASH_WORDS : Z := 8.
 
 (*
+pub const SHA256_H: [u32; 8] = [
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+];
+*)
+Definition SHA256_H : Array.t Z 8 :=
+  Array.of_list [
+    0x6a09e667;
+    0xbb67ae85;
+    0x3c6ef372;
+    0xa54ff53a;
+    0x510e527f;
+    0x9b05688c;
+    0x1f83d9ab;
+    0x5be0cd19
+  ].
+
+(*
 pub(crate) fn xor_bit<F: FieldAlgebra + Clone>(
     x: impl Into<F>,
     y: impl Into<F>,
@@ -167,3 +184,15 @@ Definition constrain_word_addition
       carries.[i] *E Expr.from_canonical_u32 (2 ^ 16) in
     MExpr.assert_eq limb_sum expected_sum_limb
   ).
+
+(*
+pub fn u32_into_limbs<const NUM_LIMBS: usize>(num: u32) -> [u32; NUM_LIMBS] {
+    let limb_bits = 32 / NUM_LIMBS;
+    array::from_fn(|i| (num >> (limb_bits * i)) & ((1 << limb_bits) - 1))
+}
+*)
+Definition u32_into_limbs (NUM_LIMBS : Z) (num : Z) : Array.t Z NUM_LIMBS :=
+  let limb_bits : Z := 32 / NUM_LIMBS in
+  {|
+    Array.get (i : Z) := Z.land (num / (2 ^ (limb_bits * i))) ((2 ^ limb_bits) - 1);
+  |}.

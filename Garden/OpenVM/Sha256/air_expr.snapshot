@@ -12079,5 +12079,5181 @@ Trace 🐾
       Sub:
         Variable: 897
         Constant: 1
+  Message 🦜
+    eval_digest_row
+  Message 🦜
+    eval_digest_row::first_loop
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 468
+            Constant: 1
+          Mul:
+            Variable: 469
+            Constant: 2
+          Mul:
+            Variable: 470
+            Constant: 4
+          Mul:
+            Variable: 471
+            Constant: 8
+          Mul:
+            Variable: 472
+            Constant: 16
+          Mul:
+            Variable: 473
+            Constant: 32
+          Mul:
+            Variable: 474
+            Constant: 64
+          Mul:
+            Variable: 475
+            Constant: 128
+          Mul:
+            Variable: 476
+            Constant: 256
+          Mul:
+            Variable: 477
+            Constant: 512
+          Mul:
+            Variable: 478
+            Constant: 1024
+          Mul:
+            Variable: 479
+            Constant: 2048
+          Mul:
+            Variable: 480
+            Constant: 4096
+          Mul:
+            Variable: 481
+            Constant: 8192
+          Mul:
+            Variable: 482
+            Constant: 16384
+          Mul:
+            Variable: 483
+            Constant: 32768
+        Constant: 62778
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 596
+            Constant: 1
+          Mul:
+            Variable: 597
+            Constant: 2
+          Mul:
+            Variable: 598
+            Constant: 4
+          Mul:
+            Variable: 599
+            Constant: 8
+          Mul:
+            Variable: 600
+            Constant: 16
+          Mul:
+            Variable: 601
+            Constant: 32
+          Mul:
+            Variable: 602
+            Constant: 64
+          Mul:
+            Variable: 603
+            Constant: 128
+          Mul:
+            Variable: 604
+            Constant: 256
+          Mul:
+            Variable: 605
+            Constant: 512
+          Mul:
+            Variable: 606
+            Constant: 1024
+          Mul:
+            Variable: 607
+            Constant: 2048
+          Mul:
+            Variable: 608
+            Constant: 4096
+          Mul:
+            Variable: 609
+            Constant: 8192
+          Mul:
+            Variable: 610
+            Constant: 16384
+          Mul:
+            Variable: 611
+            Constant: 32768
+        Constant: 52505
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 484
+            Constant: 1
+          Mul:
+            Variable: 485
+            Constant: 2
+          Mul:
+            Variable: 486
+            Constant: 4
+          Mul:
+            Variable: 487
+            Constant: 8
+          Mul:
+            Variable: 488
+            Constant: 16
+          Mul:
+            Variable: 489
+            Constant: 32
+          Mul:
+            Variable: 490
+            Constant: 64
+          Mul:
+            Variable: 491
+            Constant: 128
+          Mul:
+            Variable: 492
+            Constant: 256
+          Mul:
+            Variable: 493
+            Constant: 512
+          Mul:
+            Variable: 494
+            Constant: 1024
+          Mul:
+            Variable: 495
+            Constant: 2048
+          Mul:
+            Variable: 496
+            Constant: 4096
+          Mul:
+            Variable: 497
+            Constant: 8192
+          Mul:
+            Variable: 498
+            Constant: 16384
+          Mul:
+            Variable: 499
+            Constant: 32768
+        Constant: 42319
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 612
+            Constant: 1
+          Mul:
+            Variable: 613
+            Constant: 2
+          Mul:
+            Variable: 614
+            Constant: 4
+          Mul:
+            Variable: 615
+            Constant: 8
+          Mul:
+            Variable: 616
+            Constant: 16
+          Mul:
+            Variable: 617
+            Constant: 32
+          Mul:
+            Variable: 618
+            Constant: 64
+          Mul:
+            Variable: 619
+            Constant: 128
+          Mul:
+            Variable: 620
+            Constant: 256
+          Mul:
+            Variable: 621
+            Constant: 512
+          Mul:
+            Variable: 622
+            Constant: 1024
+          Mul:
+            Variable: 623
+            Constant: 2048
+          Mul:
+            Variable: 624
+            Constant: 4096
+          Mul:
+            Variable: 625
+            Constant: 8192
+          Mul:
+            Variable: 626
+            Constant: 16384
+          Mul:
+            Variable: 627
+            Constant: 32768
+        Constant: 23520
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 500
+            Constant: 1
+          Mul:
+            Variable: 501
+            Constant: 2
+          Mul:
+            Variable: 502
+            Constant: 4
+          Mul:
+            Variable: 503
+            Constant: 8
+          Mul:
+            Variable: 504
+            Constant: 16
+          Mul:
+            Variable: 505
+            Constant: 32
+          Mul:
+            Variable: 506
+            Constant: 64
+          Mul:
+            Variable: 507
+            Constant: 128
+          Mul:
+            Variable: 508
+            Constant: 256
+          Mul:
+            Variable: 509
+            Constant: 512
+          Mul:
+            Variable: 510
+            Constant: 1024
+          Mul:
+            Variable: 511
+            Constant: 2048
+          Mul:
+            Variable: 512
+            Constant: 4096
+          Mul:
+            Variable: 513
+            Constant: 8192
+          Mul:
+            Variable: 514
+            Constant: 16384
+          Mul:
+            Variable: 515
+            Constant: 32768
+        Constant: 62322
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 628
+            Constant: 1
+          Mul:
+            Variable: 629
+            Constant: 2
+          Mul:
+            Variable: 630
+            Constant: 4
+          Mul:
+            Variable: 631
+            Constant: 8
+          Mul:
+            Variable: 632
+            Constant: 16
+          Mul:
+            Variable: 633
+            Constant: 32
+          Mul:
+            Variable: 634
+            Constant: 64
+          Mul:
+            Variable: 635
+            Constant: 128
+          Mul:
+            Variable: 636
+            Constant: 256
+          Mul:
+            Variable: 637
+            Constant: 512
+          Mul:
+            Variable: 638
+            Constant: 1024
+          Mul:
+            Variable: 639
+            Constant: 2048
+          Mul:
+            Variable: 640
+            Constant: 4096
+          Mul:
+            Variable: 641
+            Constant: 8192
+          Mul:
+            Variable: 642
+            Constant: 16384
+          Mul:
+            Variable: 643
+            Constant: 32768
+        Constant: 55723
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 516
+            Constant: 1
+          Mul:
+            Variable: 517
+            Constant: 2
+          Mul:
+            Variable: 518
+            Constant: 4
+          Mul:
+            Variable: 519
+            Constant: 8
+          Mul:
+            Variable: 520
+            Constant: 16
+          Mul:
+            Variable: 521
+            Constant: 32
+          Mul:
+            Variable: 522
+            Constant: 64
+          Mul:
+            Variable: 523
+            Constant: 128
+          Mul:
+            Variable: 524
+            Constant: 256
+          Mul:
+            Variable: 525
+            Constant: 512
+          Mul:
+            Variable: 526
+            Constant: 1024
+          Mul:
+            Variable: 527
+            Constant: 2048
+          Mul:
+            Variable: 528
+            Constant: 4096
+          Mul:
+            Variable: 529
+            Constant: 8192
+          Mul:
+            Variable: 530
+            Constant: 16384
+          Mul:
+            Variable: 531
+            Constant: 32768
+        Constant: 15470
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 644
+            Constant: 1
+          Mul:
+            Variable: 645
+            Constant: 2
+          Mul:
+            Variable: 646
+            Constant: 4
+          Mul:
+            Variable: 647
+            Constant: 8
+          Mul:
+            Variable: 648
+            Constant: 16
+          Mul:
+            Variable: 649
+            Constant: 32
+          Mul:
+            Variable: 650
+            Constant: 64
+          Mul:
+            Variable: 651
+            Constant: 128
+          Mul:
+            Variable: 652
+            Constant: 256
+          Mul:
+            Variable: 653
+            Constant: 512
+          Mul:
+            Variable: 654
+            Constant: 1024
+          Mul:
+            Variable: 655
+            Constant: 2048
+          Mul:
+            Variable: 656
+            Constant: 4096
+          Mul:
+            Variable: 657
+            Constant: 8192
+          Mul:
+            Variable: 658
+            Constant: 16384
+          Mul:
+            Variable: 659
+            Constant: 32768
+        Constant: 8067
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 532
+            Constant: 1
+          Mul:
+            Variable: 533
+            Constant: 2
+          Mul:
+            Variable: 534
+            Constant: 4
+          Mul:
+            Variable: 535
+            Constant: 8
+          Mul:
+            Variable: 536
+            Constant: 16
+          Mul:
+            Variable: 537
+            Constant: 32
+          Mul:
+            Variable: 538
+            Constant: 64
+          Mul:
+            Variable: 539
+            Constant: 128
+          Mul:
+            Variable: 540
+            Constant: 256
+          Mul:
+            Variable: 541
+            Constant: 512
+          Mul:
+            Variable: 542
+            Constant: 1024
+          Mul:
+            Variable: 543
+            Constant: 2048
+          Mul:
+            Variable: 544
+            Constant: 4096
+          Mul:
+            Variable: 545
+            Constant: 8192
+          Mul:
+            Variable: 546
+            Constant: 16384
+          Mul:
+            Variable: 547
+            Constant: 32768
+        Constant: 44677
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 660
+            Constant: 1
+          Mul:
+            Variable: 661
+            Constant: 2
+          Mul:
+            Variable: 662
+            Constant: 4
+          Mul:
+            Variable: 663
+            Constant: 8
+          Mul:
+            Variable: 664
+            Constant: 16
+          Mul:
+            Variable: 665
+            Constant: 32
+          Mul:
+            Variable: 666
+            Constant: 64
+          Mul:
+            Variable: 667
+            Constant: 128
+          Mul:
+            Variable: 668
+            Constant: 256
+          Mul:
+            Variable: 669
+            Constant: 512
+          Mul:
+            Variable: 670
+            Constant: 1024
+          Mul:
+            Variable: 671
+            Constant: 2048
+          Mul:
+            Variable: 672
+            Constant: 4096
+          Mul:
+            Variable: 673
+            Constant: 8192
+          Mul:
+            Variable: 674
+            Constant: 16384
+          Mul:
+            Variable: 675
+            Constant: 32768
+        Constant: 26764
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 548
+            Constant: 1
+          Mul:
+            Variable: 549
+            Constant: 2
+          Mul:
+            Variable: 550
+            Constant: 4
+          Mul:
+            Variable: 551
+            Constant: 8
+          Mul:
+            Variable: 552
+            Constant: 16
+          Mul:
+            Variable: 553
+            Constant: 32
+          Mul:
+            Variable: 554
+            Constant: 64
+          Mul:
+            Variable: 555
+            Constant: 128
+          Mul:
+            Variable: 556
+            Constant: 256
+          Mul:
+            Variable: 557
+            Constant: 512
+          Mul:
+            Variable: 558
+            Constant: 1024
+          Mul:
+            Variable: 559
+            Constant: 2048
+          Mul:
+            Variable: 560
+            Constant: 4096
+          Mul:
+            Variable: 561
+            Constant: 8192
+          Mul:
+            Variable: 562
+            Constant: 16384
+          Mul:
+            Variable: 563
+            Constant: 32768
+        Constant: 47975
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 676
+            Constant: 1
+          Mul:
+            Variable: 677
+            Constant: 2
+          Mul:
+            Variable: 678
+            Constant: 4
+          Mul:
+            Variable: 679
+            Constant: 8
+          Mul:
+            Variable: 680
+            Constant: 16
+          Mul:
+            Variable: 681
+            Constant: 32
+          Mul:
+            Variable: 682
+            Constant: 64
+          Mul:
+            Variable: 683
+            Constant: 128
+          Mul:
+            Variable: 684
+            Constant: 256
+          Mul:
+            Variable: 685
+            Constant: 512
+          Mul:
+            Variable: 686
+            Constant: 1024
+          Mul:
+            Variable: 687
+            Constant: 2048
+          Mul:
+            Variable: 688
+            Constant: 4096
+          Mul:
+            Variable: 689
+            Constant: 8192
+          Mul:
+            Variable: 690
+            Constant: 16384
+          Mul:
+            Variable: 691
+            Constant: 32768
+        Constant: 39685
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 564
+            Constant: 1
+          Mul:
+            Variable: 565
+            Constant: 2
+          Mul:
+            Variable: 566
+            Constant: 4
+          Mul:
+            Variable: 567
+            Constant: 8
+          Mul:
+            Variable: 568
+            Constant: 16
+          Mul:
+            Variable: 569
+            Constant: 32
+          Mul:
+            Variable: 570
+            Constant: 64
+          Mul:
+            Variable: 571
+            Constant: 128
+          Mul:
+            Variable: 572
+            Constant: 256
+          Mul:
+            Variable: 573
+            Constant: 512
+          Mul:
+            Variable: 574
+            Constant: 1024
+          Mul:
+            Variable: 575
+            Constant: 2048
+          Mul:
+            Variable: 576
+            Constant: 4096
+          Mul:
+            Variable: 577
+            Constant: 8192
+          Mul:
+            Variable: 578
+            Constant: 16384
+          Mul:
+            Variable: 579
+            Constant: 32768
+        Constant: 58983
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 692
+            Constant: 1
+          Mul:
+            Variable: 693
+            Constant: 2
+          Mul:
+            Variable: 694
+            Constant: 4
+          Mul:
+            Variable: 695
+            Constant: 8
+          Mul:
+            Variable: 696
+            Constant: 16
+          Mul:
+            Variable: 697
+            Constant: 32
+          Mul:
+            Variable: 698
+            Constant: 64
+          Mul:
+            Variable: 699
+            Constant: 128
+          Mul:
+            Variable: 700
+            Constant: 256
+          Mul:
+            Variable: 701
+            Constant: 512
+          Mul:
+            Variable: 702
+            Constant: 1024
+          Mul:
+            Variable: 703
+            Constant: 2048
+          Mul:
+            Variable: 704
+            Constant: 4096
+          Mul:
+            Variable: 705
+            Constant: 8192
+          Mul:
+            Variable: 706
+            Constant: 16384
+          Mul:
+            Variable: 707
+            Constant: 32768
+        Constant: 21119
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 580
+            Constant: 1
+          Mul:
+            Variable: 581
+            Constant: 2
+          Mul:
+            Variable: 582
+            Constant: 4
+          Mul:
+            Variable: 583
+            Constant: 8
+          Mul:
+            Variable: 584
+            Constant: 16
+          Mul:
+            Variable: 585
+            Constant: 32
+          Mul:
+            Variable: 586
+            Constant: 64
+          Mul:
+            Variable: 587
+            Constant: 128
+          Mul:
+            Variable: 588
+            Constant: 256
+          Mul:
+            Variable: 589
+            Constant: 512
+          Mul:
+            Variable: 590
+            Constant: 1024
+          Mul:
+            Variable: 591
+            Constant: 2048
+          Mul:
+            Variable: 592
+            Constant: 4096
+          Mul:
+            Variable: 593
+            Constant: 8192
+          Mul:
+            Variable: 594
+            Constant: 16384
+          Mul:
+            Variable: 595
+            Constant: 32768
+        Constant: 27145
+  AssertZero:
+    Mul:
+      Add:
+        Sub:
+          Constant: 1
+          Add:
+            Variable: 457
+            Variable: 459
+        Mul:
+          Variable: 460
+          Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 708
+            Constant: 1
+          Mul:
+            Variable: 709
+            Constant: 2
+          Mul:
+            Variable: 710
+            Constant: 4
+          Mul:
+            Variable: 711
+            Constant: 8
+          Mul:
+            Variable: 712
+            Constant: 16
+          Mul:
+            Variable: 713
+            Constant: 32
+          Mul:
+            Variable: 714
+            Constant: 64
+          Mul:
+            Variable: 715
+            Constant: 128
+          Mul:
+            Variable: 716
+            Constant: 256
+          Mul:
+            Variable: 717
+            Constant: 512
+          Mul:
+            Variable: 718
+            Constant: 1024
+          Mul:
+            Variable: 719
+            Constant: 2048
+          Mul:
+            Variable: 720
+            Constant: 4096
+          Mul:
+            Variable: 721
+            Constant: 8192
+          Mul:
+            Variable: 722
+            Constant: 16384
+          Mul:
+            Variable: 723
+            Constant: 32768
+        Constant: 20750
+  Message 🦜
+    eval_digest_row::second_loop
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 468
+            Constant: 1
+          Mul:
+            Variable: 469
+            Constant: 2
+          Mul:
+            Variable: 470
+            Constant: 4
+          Mul:
+            Variable: 471
+            Constant: 8
+          Mul:
+            Variable: 472
+            Constant: 16
+          Mul:
+            Variable: 473
+            Constant: 32
+          Mul:
+            Variable: 474
+            Constant: 64
+          Mul:
+            Variable: 475
+            Constant: 128
+        Variable: 782
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 596
+            Constant: 1
+          Mul:
+            Variable: 597
+            Constant: 2
+          Mul:
+            Variable: 598
+            Constant: 4
+          Mul:
+            Variable: 599
+            Constant: 8
+          Mul:
+            Variable: 600
+            Constant: 16
+          Mul:
+            Variable: 601
+            Constant: 32
+          Mul:
+            Variable: 602
+            Constant: 64
+          Mul:
+            Variable: 603
+            Constant: 128
+        Variable: 798
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 476
+            Constant: 1
+          Mul:
+            Variable: 477
+            Constant: 2
+          Mul:
+            Variable: 478
+            Constant: 4
+          Mul:
+            Variable: 479
+            Constant: 8
+          Mul:
+            Variable: 480
+            Constant: 16
+          Mul:
+            Variable: 481
+            Constant: 32
+          Mul:
+            Variable: 482
+            Constant: 64
+          Mul:
+            Variable: 483
+            Constant: 128
+        Variable: 783
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 604
+            Constant: 1
+          Mul:
+            Variable: 605
+            Constant: 2
+          Mul:
+            Variable: 606
+            Constant: 4
+          Mul:
+            Variable: 607
+            Constant: 8
+          Mul:
+            Variable: 608
+            Constant: 16
+          Mul:
+            Variable: 609
+            Constant: 32
+          Mul:
+            Variable: 610
+            Constant: 64
+          Mul:
+            Variable: 611
+            Constant: 128
+        Variable: 799
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 484
+            Constant: 1
+          Mul:
+            Variable: 485
+            Constant: 2
+          Mul:
+            Variable: 486
+            Constant: 4
+          Mul:
+            Variable: 487
+            Constant: 8
+          Mul:
+            Variable: 488
+            Constant: 16
+          Mul:
+            Variable: 489
+            Constant: 32
+          Mul:
+            Variable: 490
+            Constant: 64
+          Mul:
+            Variable: 491
+            Constant: 128
+        Variable: 784
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 612
+            Constant: 1
+          Mul:
+            Variable: 613
+            Constant: 2
+          Mul:
+            Variable: 614
+            Constant: 4
+          Mul:
+            Variable: 615
+            Constant: 8
+          Mul:
+            Variable: 616
+            Constant: 16
+          Mul:
+            Variable: 617
+            Constant: 32
+          Mul:
+            Variable: 618
+            Constant: 64
+          Mul:
+            Variable: 619
+            Constant: 128
+        Variable: 800
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 492
+            Constant: 1
+          Mul:
+            Variable: 493
+            Constant: 2
+          Mul:
+            Variable: 494
+            Constant: 4
+          Mul:
+            Variable: 495
+            Constant: 8
+          Mul:
+            Variable: 496
+            Constant: 16
+          Mul:
+            Variable: 497
+            Constant: 32
+          Mul:
+            Variable: 498
+            Constant: 64
+          Mul:
+            Variable: 499
+            Constant: 128
+        Variable: 785
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 620
+            Constant: 1
+          Mul:
+            Variable: 621
+            Constant: 2
+          Mul:
+            Variable: 622
+            Constant: 4
+          Mul:
+            Variable: 623
+            Constant: 8
+          Mul:
+            Variable: 624
+            Constant: 16
+          Mul:
+            Variable: 625
+            Constant: 32
+          Mul:
+            Variable: 626
+            Constant: 64
+          Mul:
+            Variable: 627
+            Constant: 128
+        Variable: 801
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 500
+            Constant: 1
+          Mul:
+            Variable: 501
+            Constant: 2
+          Mul:
+            Variable: 502
+            Constant: 4
+          Mul:
+            Variable: 503
+            Constant: 8
+          Mul:
+            Variable: 504
+            Constant: 16
+          Mul:
+            Variable: 505
+            Constant: 32
+          Mul:
+            Variable: 506
+            Constant: 64
+          Mul:
+            Variable: 507
+            Constant: 128
+        Variable: 778
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 628
+            Constant: 1
+          Mul:
+            Variable: 629
+            Constant: 2
+          Mul:
+            Variable: 630
+            Constant: 4
+          Mul:
+            Variable: 631
+            Constant: 8
+          Mul:
+            Variable: 632
+            Constant: 16
+          Mul:
+            Variable: 633
+            Constant: 32
+          Mul:
+            Variable: 634
+            Constant: 64
+          Mul:
+            Variable: 635
+            Constant: 128
+        Variable: 794
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 508
+            Constant: 1
+          Mul:
+            Variable: 509
+            Constant: 2
+          Mul:
+            Variable: 510
+            Constant: 4
+          Mul:
+            Variable: 511
+            Constant: 8
+          Mul:
+            Variable: 512
+            Constant: 16
+          Mul:
+            Variable: 513
+            Constant: 32
+          Mul:
+            Variable: 514
+            Constant: 64
+          Mul:
+            Variable: 515
+            Constant: 128
+        Variable: 779
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 636
+            Constant: 1
+          Mul:
+            Variable: 637
+            Constant: 2
+          Mul:
+            Variable: 638
+            Constant: 4
+          Mul:
+            Variable: 639
+            Constant: 8
+          Mul:
+            Variable: 640
+            Constant: 16
+          Mul:
+            Variable: 641
+            Constant: 32
+          Mul:
+            Variable: 642
+            Constant: 64
+          Mul:
+            Variable: 643
+            Constant: 128
+        Variable: 795
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 516
+            Constant: 1
+          Mul:
+            Variable: 517
+            Constant: 2
+          Mul:
+            Variable: 518
+            Constant: 4
+          Mul:
+            Variable: 519
+            Constant: 8
+          Mul:
+            Variable: 520
+            Constant: 16
+          Mul:
+            Variable: 521
+            Constant: 32
+          Mul:
+            Variable: 522
+            Constant: 64
+          Mul:
+            Variable: 523
+            Constant: 128
+        Variable: 780
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 644
+            Constant: 1
+          Mul:
+            Variable: 645
+            Constant: 2
+          Mul:
+            Variable: 646
+            Constant: 4
+          Mul:
+            Variable: 647
+            Constant: 8
+          Mul:
+            Variable: 648
+            Constant: 16
+          Mul:
+            Variable: 649
+            Constant: 32
+          Mul:
+            Variable: 650
+            Constant: 64
+          Mul:
+            Variable: 651
+            Constant: 128
+        Variable: 796
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 524
+            Constant: 1
+          Mul:
+            Variable: 525
+            Constant: 2
+          Mul:
+            Variable: 526
+            Constant: 4
+          Mul:
+            Variable: 527
+            Constant: 8
+          Mul:
+            Variable: 528
+            Constant: 16
+          Mul:
+            Variable: 529
+            Constant: 32
+          Mul:
+            Variable: 530
+            Constant: 64
+          Mul:
+            Variable: 531
+            Constant: 128
+        Variable: 781
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 652
+            Constant: 1
+          Mul:
+            Variable: 653
+            Constant: 2
+          Mul:
+            Variable: 654
+            Constant: 4
+          Mul:
+            Variable: 655
+            Constant: 8
+          Mul:
+            Variable: 656
+            Constant: 16
+          Mul:
+            Variable: 657
+            Constant: 32
+          Mul:
+            Variable: 658
+            Constant: 64
+          Mul:
+            Variable: 659
+            Constant: 128
+        Variable: 797
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 532
+            Constant: 1
+          Mul:
+            Variable: 533
+            Constant: 2
+          Mul:
+            Variable: 534
+            Constant: 4
+          Mul:
+            Variable: 535
+            Constant: 8
+          Mul:
+            Variable: 536
+            Constant: 16
+          Mul:
+            Variable: 537
+            Constant: 32
+          Mul:
+            Variable: 538
+            Constant: 64
+          Mul:
+            Variable: 539
+            Constant: 128
+        Variable: 774
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 660
+            Constant: 1
+          Mul:
+            Variable: 661
+            Constant: 2
+          Mul:
+            Variable: 662
+            Constant: 4
+          Mul:
+            Variable: 663
+            Constant: 8
+          Mul:
+            Variable: 664
+            Constant: 16
+          Mul:
+            Variable: 665
+            Constant: 32
+          Mul:
+            Variable: 666
+            Constant: 64
+          Mul:
+            Variable: 667
+            Constant: 128
+        Variable: 790
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 540
+            Constant: 1
+          Mul:
+            Variable: 541
+            Constant: 2
+          Mul:
+            Variable: 542
+            Constant: 4
+          Mul:
+            Variable: 543
+            Constant: 8
+          Mul:
+            Variable: 544
+            Constant: 16
+          Mul:
+            Variable: 545
+            Constant: 32
+          Mul:
+            Variable: 546
+            Constant: 64
+          Mul:
+            Variable: 547
+            Constant: 128
+        Variable: 775
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 668
+            Constant: 1
+          Mul:
+            Variable: 669
+            Constant: 2
+          Mul:
+            Variable: 670
+            Constant: 4
+          Mul:
+            Variable: 671
+            Constant: 8
+          Mul:
+            Variable: 672
+            Constant: 16
+          Mul:
+            Variable: 673
+            Constant: 32
+          Mul:
+            Variable: 674
+            Constant: 64
+          Mul:
+            Variable: 675
+            Constant: 128
+        Variable: 791
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 548
+            Constant: 1
+          Mul:
+            Variable: 549
+            Constant: 2
+          Mul:
+            Variable: 550
+            Constant: 4
+          Mul:
+            Variable: 551
+            Constant: 8
+          Mul:
+            Variable: 552
+            Constant: 16
+          Mul:
+            Variable: 553
+            Constant: 32
+          Mul:
+            Variable: 554
+            Constant: 64
+          Mul:
+            Variable: 555
+            Constant: 128
+        Variable: 776
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 676
+            Constant: 1
+          Mul:
+            Variable: 677
+            Constant: 2
+          Mul:
+            Variable: 678
+            Constant: 4
+          Mul:
+            Variable: 679
+            Constant: 8
+          Mul:
+            Variable: 680
+            Constant: 16
+          Mul:
+            Variable: 681
+            Constant: 32
+          Mul:
+            Variable: 682
+            Constant: 64
+          Mul:
+            Variable: 683
+            Constant: 128
+        Variable: 792
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 556
+            Constant: 1
+          Mul:
+            Variable: 557
+            Constant: 2
+          Mul:
+            Variable: 558
+            Constant: 4
+          Mul:
+            Variable: 559
+            Constant: 8
+          Mul:
+            Variable: 560
+            Constant: 16
+          Mul:
+            Variable: 561
+            Constant: 32
+          Mul:
+            Variable: 562
+            Constant: 64
+          Mul:
+            Variable: 563
+            Constant: 128
+        Variable: 777
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 684
+            Constant: 1
+          Mul:
+            Variable: 685
+            Constant: 2
+          Mul:
+            Variable: 686
+            Constant: 4
+          Mul:
+            Variable: 687
+            Constant: 8
+          Mul:
+            Variable: 688
+            Constant: 16
+          Mul:
+            Variable: 689
+            Constant: 32
+          Mul:
+            Variable: 690
+            Constant: 64
+          Mul:
+            Variable: 691
+            Constant: 128
+        Variable: 793
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 564
+            Constant: 1
+          Mul:
+            Variable: 565
+            Constant: 2
+          Mul:
+            Variable: 566
+            Constant: 4
+          Mul:
+            Variable: 567
+            Constant: 8
+          Mul:
+            Variable: 568
+            Constant: 16
+          Mul:
+            Variable: 569
+            Constant: 32
+          Mul:
+            Variable: 570
+            Constant: 64
+          Mul:
+            Variable: 571
+            Constant: 128
+        Variable: 770
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 692
+            Constant: 1
+          Mul:
+            Variable: 693
+            Constant: 2
+          Mul:
+            Variable: 694
+            Constant: 4
+          Mul:
+            Variable: 695
+            Constant: 8
+          Mul:
+            Variable: 696
+            Constant: 16
+          Mul:
+            Variable: 697
+            Constant: 32
+          Mul:
+            Variable: 698
+            Constant: 64
+          Mul:
+            Variable: 699
+            Constant: 128
+        Variable: 786
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 572
+            Constant: 1
+          Mul:
+            Variable: 573
+            Constant: 2
+          Mul:
+            Variable: 574
+            Constant: 4
+          Mul:
+            Variable: 575
+            Constant: 8
+          Mul:
+            Variable: 576
+            Constant: 16
+          Mul:
+            Variable: 577
+            Constant: 32
+          Mul:
+            Variable: 578
+            Constant: 64
+          Mul:
+            Variable: 579
+            Constant: 128
+        Variable: 771
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 700
+            Constant: 1
+          Mul:
+            Variable: 701
+            Constant: 2
+          Mul:
+            Variable: 702
+            Constant: 4
+          Mul:
+            Variable: 703
+            Constant: 8
+          Mul:
+            Variable: 704
+            Constant: 16
+          Mul:
+            Variable: 705
+            Constant: 32
+          Mul:
+            Variable: 706
+            Constant: 64
+          Mul:
+            Variable: 707
+            Constant: 128
+        Variable: 787
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 580
+            Constant: 1
+          Mul:
+            Variable: 581
+            Constant: 2
+          Mul:
+            Variable: 582
+            Constant: 4
+          Mul:
+            Variable: 583
+            Constant: 8
+          Mul:
+            Variable: 584
+            Constant: 16
+          Mul:
+            Variable: 585
+            Constant: 32
+          Mul:
+            Variable: 586
+            Constant: 64
+          Mul:
+            Variable: 587
+            Constant: 128
+        Variable: 772
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 708
+            Constant: 1
+          Mul:
+            Variable: 709
+            Constant: 2
+          Mul:
+            Variable: 710
+            Constant: 4
+          Mul:
+            Variable: 711
+            Constant: 8
+          Mul:
+            Variable: 712
+            Constant: 16
+          Mul:
+            Variable: 713
+            Constant: 32
+          Mul:
+            Variable: 714
+            Constant: 64
+          Mul:
+            Variable: 715
+            Constant: 128
+        Variable: 788
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 588
+            Constant: 1
+          Mul:
+            Variable: 589
+            Constant: 2
+          Mul:
+            Variable: 590
+            Constant: 4
+          Mul:
+            Variable: 591
+            Constant: 8
+          Mul:
+            Variable: 592
+            Constant: 16
+          Mul:
+            Variable: 593
+            Constant: 32
+          Mul:
+            Variable: 594
+            Constant: 64
+          Mul:
+            Variable: 595
+            Constant: 128
+        Variable: 773
+  AssertZero:
+    Mul:
+      Sub:
+        Constant: 1
+        Variable: 460
+      Variable: 459
+      Sub:
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 716
+            Constant: 1
+          Mul:
+            Variable: 717
+            Constant: 2
+          Mul:
+            Variable: 718
+            Constant: 4
+          Mul:
+            Variable: 719
+            Constant: 8
+          Mul:
+            Variable: 720
+            Constant: 16
+          Mul:
+            Variable: 721
+            Constant: 32
+          Mul:
+            Variable: 722
+            Constant: 64
+          Mul:
+            Variable: 723
+            Constant: 128
+        Variable: 789
+  Message 🦜
+    eval_digest_row::third_loop
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 802
+          Constant: 0
+          Mul:
+            Variable: 107
+            Constant: 1
+          Mul:
+            Variable: 108
+            Constant: 2
+          Mul:
+            Variable: 109
+            Constant: 4
+          Mul:
+            Variable: 110
+            Constant: 8
+          Mul:
+            Variable: 111
+            Constant: 16
+          Mul:
+            Variable: 112
+            Constant: 32
+          Mul:
+            Variable: 113
+            Constant: 64
+          Mul:
+            Variable: 114
+            Constant: 128
+          Mul:
+            Variable: 115
+            Constant: 256
+          Mul:
+            Variable: 116
+            Constant: 512
+          Mul:
+            Variable: 117
+            Constant: 1024
+          Mul:
+            Variable: 118
+            Constant: 2048
+          Mul:
+            Variable: 119
+            Constant: 4096
+          Mul:
+            Variable: 120
+            Constant: 8192
+          Mul:
+            Variable: 121
+            Constant: 16384
+          Mul:
+            Variable: 122
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 770
+            Constant: 1
+          Mul:
+            Variable: 771
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 802
+              Constant: 0
+              Mul:
+                Variable: 107
+                Constant: 1
+              Mul:
+                Variable: 108
+                Constant: 2
+              Mul:
+                Variable: 109
+                Constant: 4
+              Mul:
+                Variable: 110
+                Constant: 8
+              Mul:
+                Variable: 111
+                Constant: 16
+              Mul:
+                Variable: 112
+                Constant: 32
+              Mul:
+                Variable: 113
+                Constant: 64
+              Mul:
+                Variable: 114
+                Constant: 128
+              Mul:
+                Variable: 115
+                Constant: 256
+              Mul:
+                Variable: 116
+                Constant: 512
+              Mul:
+                Variable: 117
+                Constant: 1024
+              Mul:
+                Variable: 118
+                Constant: 2048
+              Mul:
+                Variable: 119
+                Constant: 4096
+              Mul:
+                Variable: 120
+                Constant: 8192
+              Mul:
+                Variable: 121
+                Constant: 16384
+              Mul:
+                Variable: 122
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 770
+                Constant: 1
+              Mul:
+                Variable: 771
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 803
+          Constant: 0
+          Mul:
+            Variable: 123
+            Constant: 1
+          Mul:
+            Variable: 124
+            Constant: 2
+          Mul:
+            Variable: 125
+            Constant: 4
+          Mul:
+            Variable: 126
+            Constant: 8
+          Mul:
+            Variable: 127
+            Constant: 16
+          Mul:
+            Variable: 128
+            Constant: 32
+          Mul:
+            Variable: 129
+            Constant: 64
+          Mul:
+            Variable: 130
+            Constant: 128
+          Mul:
+            Variable: 131
+            Constant: 256
+          Mul:
+            Variable: 132
+            Constant: 512
+          Mul:
+            Variable: 133
+            Constant: 1024
+          Mul:
+            Variable: 134
+            Constant: 2048
+          Mul:
+            Variable: 135
+            Constant: 4096
+          Mul:
+            Variable: 136
+            Constant: 8192
+          Mul:
+            Variable: 137
+            Constant: 16384
+          Mul:
+            Variable: 138
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 802
+                Constant: 0
+                Mul:
+                  Variable: 107
+                  Constant: 1
+                Mul:
+                  Variable: 108
+                  Constant: 2
+                Mul:
+                  Variable: 109
+                  Constant: 4
+                Mul:
+                  Variable: 110
+                  Constant: 8
+                Mul:
+                  Variable: 111
+                  Constant: 16
+                Mul:
+                  Variable: 112
+                  Constant: 32
+                Mul:
+                  Variable: 113
+                  Constant: 64
+                Mul:
+                  Variable: 114
+                  Constant: 128
+                Mul:
+                  Variable: 115
+                  Constant: 256
+                Mul:
+                  Variable: 116
+                  Constant: 512
+                Mul:
+                  Variable: 117
+                  Constant: 1024
+                Mul:
+                  Variable: 118
+                  Constant: 2048
+                Mul:
+                  Variable: 119
+                  Constant: 4096
+                Mul:
+                  Variable: 120
+                  Constant: 8192
+                Mul:
+                  Variable: 121
+                  Constant: 16384
+                Mul:
+                  Variable: 122
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 770
+                  Constant: 1
+                Mul:
+                  Variable: 771
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 772
+            Constant: 1
+          Mul:
+            Variable: 773
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 803
+              Constant: 0
+              Mul:
+                Variable: 123
+                Constant: 1
+              Mul:
+                Variable: 124
+                Constant: 2
+              Mul:
+                Variable: 125
+                Constant: 4
+              Mul:
+                Variable: 126
+                Constant: 8
+              Mul:
+                Variable: 127
+                Constant: 16
+              Mul:
+                Variable: 128
+                Constant: 32
+              Mul:
+                Variable: 129
+                Constant: 64
+              Mul:
+                Variable: 130
+                Constant: 128
+              Mul:
+                Variable: 131
+                Constant: 256
+              Mul:
+                Variable: 132
+                Constant: 512
+              Mul:
+                Variable: 133
+                Constant: 1024
+              Mul:
+                Variable: 134
+                Constant: 2048
+              Mul:
+                Variable: 135
+                Constant: 4096
+              Mul:
+                Variable: 136
+                Constant: 8192
+              Mul:
+                Variable: 137
+                Constant: 16384
+              Mul:
+                Variable: 138
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 802
+                    Constant: 0
+                    Mul:
+                      Variable: 107
+                      Constant: 1
+                    Mul:
+                      Variable: 108
+                      Constant: 2
+                    Mul:
+                      Variable: 109
+                      Constant: 4
+                    Mul:
+                      Variable: 110
+                      Constant: 8
+                    Mul:
+                      Variable: 111
+                      Constant: 16
+                    Mul:
+                      Variable: 112
+                      Constant: 32
+                    Mul:
+                      Variable: 113
+                      Constant: 64
+                    Mul:
+                      Variable: 114
+                      Constant: 128
+                    Mul:
+                      Variable: 115
+                      Constant: 256
+                    Mul:
+                      Variable: 116
+                      Constant: 512
+                    Mul:
+                      Variable: 117
+                      Constant: 1024
+                    Mul:
+                      Variable: 118
+                      Constant: 2048
+                    Mul:
+                      Variable: 119
+                      Constant: 4096
+                    Mul:
+                      Variable: 120
+                      Constant: 8192
+                    Mul:
+                      Variable: 121
+                      Constant: 16384
+                    Mul:
+                      Variable: 122
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 770
+                      Constant: 1
+                    Mul:
+                      Variable: 771
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 772
+                Constant: 1
+              Mul:
+                Variable: 773
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 804
+          Constant: 0
+          Mul:
+            Variable: 75
+            Constant: 1
+          Mul:
+            Variable: 76
+            Constant: 2
+          Mul:
+            Variable: 77
+            Constant: 4
+          Mul:
+            Variable: 78
+            Constant: 8
+          Mul:
+            Variable: 79
+            Constant: 16
+          Mul:
+            Variable: 80
+            Constant: 32
+          Mul:
+            Variable: 81
+            Constant: 64
+          Mul:
+            Variable: 82
+            Constant: 128
+          Mul:
+            Variable: 83
+            Constant: 256
+          Mul:
+            Variable: 84
+            Constant: 512
+          Mul:
+            Variable: 85
+            Constant: 1024
+          Mul:
+            Variable: 86
+            Constant: 2048
+          Mul:
+            Variable: 87
+            Constant: 4096
+          Mul:
+            Variable: 88
+            Constant: 8192
+          Mul:
+            Variable: 89
+            Constant: 16384
+          Mul:
+            Variable: 90
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 774
+            Constant: 1
+          Mul:
+            Variable: 775
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 804
+              Constant: 0
+              Mul:
+                Variable: 75
+                Constant: 1
+              Mul:
+                Variable: 76
+                Constant: 2
+              Mul:
+                Variable: 77
+                Constant: 4
+              Mul:
+                Variable: 78
+                Constant: 8
+              Mul:
+                Variable: 79
+                Constant: 16
+              Mul:
+                Variable: 80
+                Constant: 32
+              Mul:
+                Variable: 81
+                Constant: 64
+              Mul:
+                Variable: 82
+                Constant: 128
+              Mul:
+                Variable: 83
+                Constant: 256
+              Mul:
+                Variable: 84
+                Constant: 512
+              Mul:
+                Variable: 85
+                Constant: 1024
+              Mul:
+                Variable: 86
+                Constant: 2048
+              Mul:
+                Variable: 87
+                Constant: 4096
+              Mul:
+                Variable: 88
+                Constant: 8192
+              Mul:
+                Variable: 89
+                Constant: 16384
+              Mul:
+                Variable: 90
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 774
+                Constant: 1
+              Mul:
+                Variable: 775
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 805
+          Constant: 0
+          Mul:
+            Variable: 91
+            Constant: 1
+          Mul:
+            Variable: 92
+            Constant: 2
+          Mul:
+            Variable: 93
+            Constant: 4
+          Mul:
+            Variable: 94
+            Constant: 8
+          Mul:
+            Variable: 95
+            Constant: 16
+          Mul:
+            Variable: 96
+            Constant: 32
+          Mul:
+            Variable: 97
+            Constant: 64
+          Mul:
+            Variable: 98
+            Constant: 128
+          Mul:
+            Variable: 99
+            Constant: 256
+          Mul:
+            Variable: 100
+            Constant: 512
+          Mul:
+            Variable: 101
+            Constant: 1024
+          Mul:
+            Variable: 102
+            Constant: 2048
+          Mul:
+            Variable: 103
+            Constant: 4096
+          Mul:
+            Variable: 104
+            Constant: 8192
+          Mul:
+            Variable: 105
+            Constant: 16384
+          Mul:
+            Variable: 106
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 804
+                Constant: 0
+                Mul:
+                  Variable: 75
+                  Constant: 1
+                Mul:
+                  Variable: 76
+                  Constant: 2
+                Mul:
+                  Variable: 77
+                  Constant: 4
+                Mul:
+                  Variable: 78
+                  Constant: 8
+                Mul:
+                  Variable: 79
+                  Constant: 16
+                Mul:
+                  Variable: 80
+                  Constant: 32
+                Mul:
+                  Variable: 81
+                  Constant: 64
+                Mul:
+                  Variable: 82
+                  Constant: 128
+                Mul:
+                  Variable: 83
+                  Constant: 256
+                Mul:
+                  Variable: 84
+                  Constant: 512
+                Mul:
+                  Variable: 85
+                  Constant: 1024
+                Mul:
+                  Variable: 86
+                  Constant: 2048
+                Mul:
+                  Variable: 87
+                  Constant: 4096
+                Mul:
+                  Variable: 88
+                  Constant: 8192
+                Mul:
+                  Variable: 89
+                  Constant: 16384
+                Mul:
+                  Variable: 90
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 774
+                  Constant: 1
+                Mul:
+                  Variable: 775
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 776
+            Constant: 1
+          Mul:
+            Variable: 777
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 805
+              Constant: 0
+              Mul:
+                Variable: 91
+                Constant: 1
+              Mul:
+                Variable: 92
+                Constant: 2
+              Mul:
+                Variable: 93
+                Constant: 4
+              Mul:
+                Variable: 94
+                Constant: 8
+              Mul:
+                Variable: 95
+                Constant: 16
+              Mul:
+                Variable: 96
+                Constant: 32
+              Mul:
+                Variable: 97
+                Constant: 64
+              Mul:
+                Variable: 98
+                Constant: 128
+              Mul:
+                Variable: 99
+                Constant: 256
+              Mul:
+                Variable: 100
+                Constant: 512
+              Mul:
+                Variable: 101
+                Constant: 1024
+              Mul:
+                Variable: 102
+                Constant: 2048
+              Mul:
+                Variable: 103
+                Constant: 4096
+              Mul:
+                Variable: 104
+                Constant: 8192
+              Mul:
+                Variable: 105
+                Constant: 16384
+              Mul:
+                Variable: 106
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 804
+                    Constant: 0
+                    Mul:
+                      Variable: 75
+                      Constant: 1
+                    Mul:
+                      Variable: 76
+                      Constant: 2
+                    Mul:
+                      Variable: 77
+                      Constant: 4
+                    Mul:
+                      Variable: 78
+                      Constant: 8
+                    Mul:
+                      Variable: 79
+                      Constant: 16
+                    Mul:
+                      Variable: 80
+                      Constant: 32
+                    Mul:
+                      Variable: 81
+                      Constant: 64
+                    Mul:
+                      Variable: 82
+                      Constant: 128
+                    Mul:
+                      Variable: 83
+                      Constant: 256
+                    Mul:
+                      Variable: 84
+                      Constant: 512
+                    Mul:
+                      Variable: 85
+                      Constant: 1024
+                    Mul:
+                      Variable: 86
+                      Constant: 2048
+                    Mul:
+                      Variable: 87
+                      Constant: 4096
+                    Mul:
+                      Variable: 88
+                      Constant: 8192
+                    Mul:
+                      Variable: 89
+                      Constant: 16384
+                    Mul:
+                      Variable: 90
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 774
+                      Constant: 1
+                    Mul:
+                      Variable: 775
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 776
+                Constant: 1
+              Mul:
+                Variable: 777
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 806
+          Constant: 0
+          Mul:
+            Variable: 43
+            Constant: 1
+          Mul:
+            Variable: 44
+            Constant: 2
+          Mul:
+            Variable: 45
+            Constant: 4
+          Mul:
+            Variable: 46
+            Constant: 8
+          Mul:
+            Variable: 47
+            Constant: 16
+          Mul:
+            Variable: 48
+            Constant: 32
+          Mul:
+            Variable: 49
+            Constant: 64
+          Mul:
+            Variable: 50
+            Constant: 128
+          Mul:
+            Variable: 51
+            Constant: 256
+          Mul:
+            Variable: 52
+            Constant: 512
+          Mul:
+            Variable: 53
+            Constant: 1024
+          Mul:
+            Variable: 54
+            Constant: 2048
+          Mul:
+            Variable: 55
+            Constant: 4096
+          Mul:
+            Variable: 56
+            Constant: 8192
+          Mul:
+            Variable: 57
+            Constant: 16384
+          Mul:
+            Variable: 58
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 778
+            Constant: 1
+          Mul:
+            Variable: 779
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 806
+              Constant: 0
+              Mul:
+                Variable: 43
+                Constant: 1
+              Mul:
+                Variable: 44
+                Constant: 2
+              Mul:
+                Variable: 45
+                Constant: 4
+              Mul:
+                Variable: 46
+                Constant: 8
+              Mul:
+                Variable: 47
+                Constant: 16
+              Mul:
+                Variable: 48
+                Constant: 32
+              Mul:
+                Variable: 49
+                Constant: 64
+              Mul:
+                Variable: 50
+                Constant: 128
+              Mul:
+                Variable: 51
+                Constant: 256
+              Mul:
+                Variable: 52
+                Constant: 512
+              Mul:
+                Variable: 53
+                Constant: 1024
+              Mul:
+                Variable: 54
+                Constant: 2048
+              Mul:
+                Variable: 55
+                Constant: 4096
+              Mul:
+                Variable: 56
+                Constant: 8192
+              Mul:
+                Variable: 57
+                Constant: 16384
+              Mul:
+                Variable: 58
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 778
+                Constant: 1
+              Mul:
+                Variable: 779
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 807
+          Constant: 0
+          Mul:
+            Variable: 59
+            Constant: 1
+          Mul:
+            Variable: 60
+            Constant: 2
+          Mul:
+            Variable: 61
+            Constant: 4
+          Mul:
+            Variable: 62
+            Constant: 8
+          Mul:
+            Variable: 63
+            Constant: 16
+          Mul:
+            Variable: 64
+            Constant: 32
+          Mul:
+            Variable: 65
+            Constant: 64
+          Mul:
+            Variable: 66
+            Constant: 128
+          Mul:
+            Variable: 67
+            Constant: 256
+          Mul:
+            Variable: 68
+            Constant: 512
+          Mul:
+            Variable: 69
+            Constant: 1024
+          Mul:
+            Variable: 70
+            Constant: 2048
+          Mul:
+            Variable: 71
+            Constant: 4096
+          Mul:
+            Variable: 72
+            Constant: 8192
+          Mul:
+            Variable: 73
+            Constant: 16384
+          Mul:
+            Variable: 74
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 806
+                Constant: 0
+                Mul:
+                  Variable: 43
+                  Constant: 1
+                Mul:
+                  Variable: 44
+                  Constant: 2
+                Mul:
+                  Variable: 45
+                  Constant: 4
+                Mul:
+                  Variable: 46
+                  Constant: 8
+                Mul:
+                  Variable: 47
+                  Constant: 16
+                Mul:
+                  Variable: 48
+                  Constant: 32
+                Mul:
+                  Variable: 49
+                  Constant: 64
+                Mul:
+                  Variable: 50
+                  Constant: 128
+                Mul:
+                  Variable: 51
+                  Constant: 256
+                Mul:
+                  Variable: 52
+                  Constant: 512
+                Mul:
+                  Variable: 53
+                  Constant: 1024
+                Mul:
+                  Variable: 54
+                  Constant: 2048
+                Mul:
+                  Variable: 55
+                  Constant: 4096
+                Mul:
+                  Variable: 56
+                  Constant: 8192
+                Mul:
+                  Variable: 57
+                  Constant: 16384
+                Mul:
+                  Variable: 58
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 778
+                  Constant: 1
+                Mul:
+                  Variable: 779
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 780
+            Constant: 1
+          Mul:
+            Variable: 781
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 807
+              Constant: 0
+              Mul:
+                Variable: 59
+                Constant: 1
+              Mul:
+                Variable: 60
+                Constant: 2
+              Mul:
+                Variable: 61
+                Constant: 4
+              Mul:
+                Variable: 62
+                Constant: 8
+              Mul:
+                Variable: 63
+                Constant: 16
+              Mul:
+                Variable: 64
+                Constant: 32
+              Mul:
+                Variable: 65
+                Constant: 64
+              Mul:
+                Variable: 66
+                Constant: 128
+              Mul:
+                Variable: 67
+                Constant: 256
+              Mul:
+                Variable: 68
+                Constant: 512
+              Mul:
+                Variable: 69
+                Constant: 1024
+              Mul:
+                Variable: 70
+                Constant: 2048
+              Mul:
+                Variable: 71
+                Constant: 4096
+              Mul:
+                Variable: 72
+                Constant: 8192
+              Mul:
+                Variable: 73
+                Constant: 16384
+              Mul:
+                Variable: 74
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 806
+                    Constant: 0
+                    Mul:
+                      Variable: 43
+                      Constant: 1
+                    Mul:
+                      Variable: 44
+                      Constant: 2
+                    Mul:
+                      Variable: 45
+                      Constant: 4
+                    Mul:
+                      Variable: 46
+                      Constant: 8
+                    Mul:
+                      Variable: 47
+                      Constant: 16
+                    Mul:
+                      Variable: 48
+                      Constant: 32
+                    Mul:
+                      Variable: 49
+                      Constant: 64
+                    Mul:
+                      Variable: 50
+                      Constant: 128
+                    Mul:
+                      Variable: 51
+                      Constant: 256
+                    Mul:
+                      Variable: 52
+                      Constant: 512
+                    Mul:
+                      Variable: 53
+                      Constant: 1024
+                    Mul:
+                      Variable: 54
+                      Constant: 2048
+                    Mul:
+                      Variable: 55
+                      Constant: 4096
+                    Mul:
+                      Variable: 56
+                      Constant: 8192
+                    Mul:
+                      Variable: 57
+                      Constant: 16384
+                    Mul:
+                      Variable: 58
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 778
+                      Constant: 1
+                    Mul:
+                      Variable: 779
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 780
+                Constant: 1
+              Mul:
+                Variable: 781
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 808
+          Constant: 0
+          Mul:
+            Variable: 11
+            Constant: 1
+          Mul:
+            Variable: 12
+            Constant: 2
+          Mul:
+            Variable: 13
+            Constant: 4
+          Mul:
+            Variable: 14
+            Constant: 8
+          Mul:
+            Variable: 15
+            Constant: 16
+          Mul:
+            Variable: 16
+            Constant: 32
+          Mul:
+            Variable: 17
+            Constant: 64
+          Mul:
+            Variable: 18
+            Constant: 128
+          Mul:
+            Variable: 19
+            Constant: 256
+          Mul:
+            Variable: 20
+            Constant: 512
+          Mul:
+            Variable: 21
+            Constant: 1024
+          Mul:
+            Variable: 22
+            Constant: 2048
+          Mul:
+            Variable: 23
+            Constant: 4096
+          Mul:
+            Variable: 24
+            Constant: 8192
+          Mul:
+            Variable: 25
+            Constant: 16384
+          Mul:
+            Variable: 26
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 782
+            Constant: 1
+          Mul:
+            Variable: 783
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 808
+              Constant: 0
+              Mul:
+                Variable: 11
+                Constant: 1
+              Mul:
+                Variable: 12
+                Constant: 2
+              Mul:
+                Variable: 13
+                Constant: 4
+              Mul:
+                Variable: 14
+                Constant: 8
+              Mul:
+                Variable: 15
+                Constant: 16
+              Mul:
+                Variable: 16
+                Constant: 32
+              Mul:
+                Variable: 17
+                Constant: 64
+              Mul:
+                Variable: 18
+                Constant: 128
+              Mul:
+                Variable: 19
+                Constant: 256
+              Mul:
+                Variable: 20
+                Constant: 512
+              Mul:
+                Variable: 21
+                Constant: 1024
+              Mul:
+                Variable: 22
+                Constant: 2048
+              Mul:
+                Variable: 23
+                Constant: 4096
+              Mul:
+                Variable: 24
+                Constant: 8192
+              Mul:
+                Variable: 25
+                Constant: 16384
+              Mul:
+                Variable: 26
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 782
+                Constant: 1
+              Mul:
+                Variable: 783
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 809
+          Constant: 0
+          Mul:
+            Variable: 27
+            Constant: 1
+          Mul:
+            Variable: 28
+            Constant: 2
+          Mul:
+            Variable: 29
+            Constant: 4
+          Mul:
+            Variable: 30
+            Constant: 8
+          Mul:
+            Variable: 31
+            Constant: 16
+          Mul:
+            Variable: 32
+            Constant: 32
+          Mul:
+            Variable: 33
+            Constant: 64
+          Mul:
+            Variable: 34
+            Constant: 128
+          Mul:
+            Variable: 35
+            Constant: 256
+          Mul:
+            Variable: 36
+            Constant: 512
+          Mul:
+            Variable: 37
+            Constant: 1024
+          Mul:
+            Variable: 38
+            Constant: 2048
+          Mul:
+            Variable: 39
+            Constant: 4096
+          Mul:
+            Variable: 40
+            Constant: 8192
+          Mul:
+            Variable: 41
+            Constant: 16384
+          Mul:
+            Variable: 42
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 808
+                Constant: 0
+                Mul:
+                  Variable: 11
+                  Constant: 1
+                Mul:
+                  Variable: 12
+                  Constant: 2
+                Mul:
+                  Variable: 13
+                  Constant: 4
+                Mul:
+                  Variable: 14
+                  Constant: 8
+                Mul:
+                  Variable: 15
+                  Constant: 16
+                Mul:
+                  Variable: 16
+                  Constant: 32
+                Mul:
+                  Variable: 17
+                  Constant: 64
+                Mul:
+                  Variable: 18
+                  Constant: 128
+                Mul:
+                  Variable: 19
+                  Constant: 256
+                Mul:
+                  Variable: 20
+                  Constant: 512
+                Mul:
+                  Variable: 21
+                  Constant: 1024
+                Mul:
+                  Variable: 22
+                  Constant: 2048
+                Mul:
+                  Variable: 23
+                  Constant: 4096
+                Mul:
+                  Variable: 24
+                  Constant: 8192
+                Mul:
+                  Variable: 25
+                  Constant: 16384
+                Mul:
+                  Variable: 26
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 782
+                  Constant: 1
+                Mul:
+                  Variable: 783
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 784
+            Constant: 1
+          Mul:
+            Variable: 785
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 809
+              Constant: 0
+              Mul:
+                Variable: 27
+                Constant: 1
+              Mul:
+                Variable: 28
+                Constant: 2
+              Mul:
+                Variable: 29
+                Constant: 4
+              Mul:
+                Variable: 30
+                Constant: 8
+              Mul:
+                Variable: 31
+                Constant: 16
+              Mul:
+                Variable: 32
+                Constant: 32
+              Mul:
+                Variable: 33
+                Constant: 64
+              Mul:
+                Variable: 34
+                Constant: 128
+              Mul:
+                Variable: 35
+                Constant: 256
+              Mul:
+                Variable: 36
+                Constant: 512
+              Mul:
+                Variable: 37
+                Constant: 1024
+              Mul:
+                Variable: 38
+                Constant: 2048
+              Mul:
+                Variable: 39
+                Constant: 4096
+              Mul:
+                Variable: 40
+                Constant: 8192
+              Mul:
+                Variable: 41
+                Constant: 16384
+              Mul:
+                Variable: 42
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 808
+                    Constant: 0
+                    Mul:
+                      Variable: 11
+                      Constant: 1
+                    Mul:
+                      Variable: 12
+                      Constant: 2
+                    Mul:
+                      Variable: 13
+                      Constant: 4
+                    Mul:
+                      Variable: 14
+                      Constant: 8
+                    Mul:
+                      Variable: 15
+                      Constant: 16
+                    Mul:
+                      Variable: 16
+                      Constant: 32
+                    Mul:
+                      Variable: 17
+                      Constant: 64
+                    Mul:
+                      Variable: 18
+                      Constant: 128
+                    Mul:
+                      Variable: 19
+                      Constant: 256
+                    Mul:
+                      Variable: 20
+                      Constant: 512
+                    Mul:
+                      Variable: 21
+                      Constant: 1024
+                    Mul:
+                      Variable: 22
+                      Constant: 2048
+                    Mul:
+                      Variable: 23
+                      Constant: 4096
+                    Mul:
+                      Variable: 24
+                      Constant: 8192
+                    Mul:
+                      Variable: 25
+                      Constant: 16384
+                    Mul:
+                      Variable: 26
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 782
+                      Constant: 1
+                    Mul:
+                      Variable: 783
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 784
+                Constant: 1
+              Mul:
+                Variable: 785
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 810
+          Constant: 0
+          Mul:
+            Variable: 235
+            Constant: 1
+          Mul:
+            Variable: 236
+            Constant: 2
+          Mul:
+            Variable: 237
+            Constant: 4
+          Mul:
+            Variable: 238
+            Constant: 8
+          Mul:
+            Variable: 239
+            Constant: 16
+          Mul:
+            Variable: 240
+            Constant: 32
+          Mul:
+            Variable: 241
+            Constant: 64
+          Mul:
+            Variable: 242
+            Constant: 128
+          Mul:
+            Variable: 243
+            Constant: 256
+          Mul:
+            Variable: 244
+            Constant: 512
+          Mul:
+            Variable: 245
+            Constant: 1024
+          Mul:
+            Variable: 246
+            Constant: 2048
+          Mul:
+            Variable: 247
+            Constant: 4096
+          Mul:
+            Variable: 248
+            Constant: 8192
+          Mul:
+            Variable: 249
+            Constant: 16384
+          Mul:
+            Variable: 250
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 786
+            Constant: 1
+          Mul:
+            Variable: 787
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 810
+              Constant: 0
+              Mul:
+                Variable: 235
+                Constant: 1
+              Mul:
+                Variable: 236
+                Constant: 2
+              Mul:
+                Variable: 237
+                Constant: 4
+              Mul:
+                Variable: 238
+                Constant: 8
+              Mul:
+                Variable: 239
+                Constant: 16
+              Mul:
+                Variable: 240
+                Constant: 32
+              Mul:
+                Variable: 241
+                Constant: 64
+              Mul:
+                Variable: 242
+                Constant: 128
+              Mul:
+                Variable: 243
+                Constant: 256
+              Mul:
+                Variable: 244
+                Constant: 512
+              Mul:
+                Variable: 245
+                Constant: 1024
+              Mul:
+                Variable: 246
+                Constant: 2048
+              Mul:
+                Variable: 247
+                Constant: 4096
+              Mul:
+                Variable: 248
+                Constant: 8192
+              Mul:
+                Variable: 249
+                Constant: 16384
+              Mul:
+                Variable: 250
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 786
+                Constant: 1
+              Mul:
+                Variable: 787
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 811
+          Constant: 0
+          Mul:
+            Variable: 251
+            Constant: 1
+          Mul:
+            Variable: 252
+            Constant: 2
+          Mul:
+            Variable: 253
+            Constant: 4
+          Mul:
+            Variable: 254
+            Constant: 8
+          Mul:
+            Variable: 255
+            Constant: 16
+          Mul:
+            Variable: 256
+            Constant: 32
+          Mul:
+            Variable: 257
+            Constant: 64
+          Mul:
+            Variable: 258
+            Constant: 128
+          Mul:
+            Variable: 259
+            Constant: 256
+          Mul:
+            Variable: 260
+            Constant: 512
+          Mul:
+            Variable: 261
+            Constant: 1024
+          Mul:
+            Variable: 262
+            Constant: 2048
+          Mul:
+            Variable: 263
+            Constant: 4096
+          Mul:
+            Variable: 264
+            Constant: 8192
+          Mul:
+            Variable: 265
+            Constant: 16384
+          Mul:
+            Variable: 266
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 810
+                Constant: 0
+                Mul:
+                  Variable: 235
+                  Constant: 1
+                Mul:
+                  Variable: 236
+                  Constant: 2
+                Mul:
+                  Variable: 237
+                  Constant: 4
+                Mul:
+                  Variable: 238
+                  Constant: 8
+                Mul:
+                  Variable: 239
+                  Constant: 16
+                Mul:
+                  Variable: 240
+                  Constant: 32
+                Mul:
+                  Variable: 241
+                  Constant: 64
+                Mul:
+                  Variable: 242
+                  Constant: 128
+                Mul:
+                  Variable: 243
+                  Constant: 256
+                Mul:
+                  Variable: 244
+                  Constant: 512
+                Mul:
+                  Variable: 245
+                  Constant: 1024
+                Mul:
+                  Variable: 246
+                  Constant: 2048
+                Mul:
+                  Variable: 247
+                  Constant: 4096
+                Mul:
+                  Variable: 248
+                  Constant: 8192
+                Mul:
+                  Variable: 249
+                  Constant: 16384
+                Mul:
+                  Variable: 250
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 786
+                  Constant: 1
+                Mul:
+                  Variable: 787
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 788
+            Constant: 1
+          Mul:
+            Variable: 789
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 811
+              Constant: 0
+              Mul:
+                Variable: 251
+                Constant: 1
+              Mul:
+                Variable: 252
+                Constant: 2
+              Mul:
+                Variable: 253
+                Constant: 4
+              Mul:
+                Variable: 254
+                Constant: 8
+              Mul:
+                Variable: 255
+                Constant: 16
+              Mul:
+                Variable: 256
+                Constant: 32
+              Mul:
+                Variable: 257
+                Constant: 64
+              Mul:
+                Variable: 258
+                Constant: 128
+              Mul:
+                Variable: 259
+                Constant: 256
+              Mul:
+                Variable: 260
+                Constant: 512
+              Mul:
+                Variable: 261
+                Constant: 1024
+              Mul:
+                Variable: 262
+                Constant: 2048
+              Mul:
+                Variable: 263
+                Constant: 4096
+              Mul:
+                Variable: 264
+                Constant: 8192
+              Mul:
+                Variable: 265
+                Constant: 16384
+              Mul:
+                Variable: 266
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 810
+                    Constant: 0
+                    Mul:
+                      Variable: 235
+                      Constant: 1
+                    Mul:
+                      Variable: 236
+                      Constant: 2
+                    Mul:
+                      Variable: 237
+                      Constant: 4
+                    Mul:
+                      Variable: 238
+                      Constant: 8
+                    Mul:
+                      Variable: 239
+                      Constant: 16
+                    Mul:
+                      Variable: 240
+                      Constant: 32
+                    Mul:
+                      Variable: 241
+                      Constant: 64
+                    Mul:
+                      Variable: 242
+                      Constant: 128
+                    Mul:
+                      Variable: 243
+                      Constant: 256
+                    Mul:
+                      Variable: 244
+                      Constant: 512
+                    Mul:
+                      Variable: 245
+                      Constant: 1024
+                    Mul:
+                      Variable: 246
+                      Constant: 2048
+                    Mul:
+                      Variable: 247
+                      Constant: 4096
+                    Mul:
+                      Variable: 248
+                      Constant: 8192
+                    Mul:
+                      Variable: 249
+                      Constant: 16384
+                    Mul:
+                      Variable: 250
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 786
+                      Constant: 1
+                    Mul:
+                      Variable: 787
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 788
+                Constant: 1
+              Mul:
+                Variable: 789
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 812
+          Constant: 0
+          Mul:
+            Variable: 203
+            Constant: 1
+          Mul:
+            Variable: 204
+            Constant: 2
+          Mul:
+            Variable: 205
+            Constant: 4
+          Mul:
+            Variable: 206
+            Constant: 8
+          Mul:
+            Variable: 207
+            Constant: 16
+          Mul:
+            Variable: 208
+            Constant: 32
+          Mul:
+            Variable: 209
+            Constant: 64
+          Mul:
+            Variable: 210
+            Constant: 128
+          Mul:
+            Variable: 211
+            Constant: 256
+          Mul:
+            Variable: 212
+            Constant: 512
+          Mul:
+            Variable: 213
+            Constant: 1024
+          Mul:
+            Variable: 214
+            Constant: 2048
+          Mul:
+            Variable: 215
+            Constant: 4096
+          Mul:
+            Variable: 216
+            Constant: 8192
+          Mul:
+            Variable: 217
+            Constant: 16384
+          Mul:
+            Variable: 218
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 790
+            Constant: 1
+          Mul:
+            Variable: 791
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 812
+              Constant: 0
+              Mul:
+                Variable: 203
+                Constant: 1
+              Mul:
+                Variable: 204
+                Constant: 2
+              Mul:
+                Variable: 205
+                Constant: 4
+              Mul:
+                Variable: 206
+                Constant: 8
+              Mul:
+                Variable: 207
+                Constant: 16
+              Mul:
+                Variable: 208
+                Constant: 32
+              Mul:
+                Variable: 209
+                Constant: 64
+              Mul:
+                Variable: 210
+                Constant: 128
+              Mul:
+                Variable: 211
+                Constant: 256
+              Mul:
+                Variable: 212
+                Constant: 512
+              Mul:
+                Variable: 213
+                Constant: 1024
+              Mul:
+                Variable: 214
+                Constant: 2048
+              Mul:
+                Variable: 215
+                Constant: 4096
+              Mul:
+                Variable: 216
+                Constant: 8192
+              Mul:
+                Variable: 217
+                Constant: 16384
+              Mul:
+                Variable: 218
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 790
+                Constant: 1
+              Mul:
+                Variable: 791
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 813
+          Constant: 0
+          Mul:
+            Variable: 219
+            Constant: 1
+          Mul:
+            Variable: 220
+            Constant: 2
+          Mul:
+            Variable: 221
+            Constant: 4
+          Mul:
+            Variable: 222
+            Constant: 8
+          Mul:
+            Variable: 223
+            Constant: 16
+          Mul:
+            Variable: 224
+            Constant: 32
+          Mul:
+            Variable: 225
+            Constant: 64
+          Mul:
+            Variable: 226
+            Constant: 128
+          Mul:
+            Variable: 227
+            Constant: 256
+          Mul:
+            Variable: 228
+            Constant: 512
+          Mul:
+            Variable: 229
+            Constant: 1024
+          Mul:
+            Variable: 230
+            Constant: 2048
+          Mul:
+            Variable: 231
+            Constant: 4096
+          Mul:
+            Variable: 232
+            Constant: 8192
+          Mul:
+            Variable: 233
+            Constant: 16384
+          Mul:
+            Variable: 234
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 812
+                Constant: 0
+                Mul:
+                  Variable: 203
+                  Constant: 1
+                Mul:
+                  Variable: 204
+                  Constant: 2
+                Mul:
+                  Variable: 205
+                  Constant: 4
+                Mul:
+                  Variable: 206
+                  Constant: 8
+                Mul:
+                  Variable: 207
+                  Constant: 16
+                Mul:
+                  Variable: 208
+                  Constant: 32
+                Mul:
+                  Variable: 209
+                  Constant: 64
+                Mul:
+                  Variable: 210
+                  Constant: 128
+                Mul:
+                  Variable: 211
+                  Constant: 256
+                Mul:
+                  Variable: 212
+                  Constant: 512
+                Mul:
+                  Variable: 213
+                  Constant: 1024
+                Mul:
+                  Variable: 214
+                  Constant: 2048
+                Mul:
+                  Variable: 215
+                  Constant: 4096
+                Mul:
+                  Variable: 216
+                  Constant: 8192
+                Mul:
+                  Variable: 217
+                  Constant: 16384
+                Mul:
+                  Variable: 218
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 790
+                  Constant: 1
+                Mul:
+                  Variable: 791
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 792
+            Constant: 1
+          Mul:
+            Variable: 793
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 813
+              Constant: 0
+              Mul:
+                Variable: 219
+                Constant: 1
+              Mul:
+                Variable: 220
+                Constant: 2
+              Mul:
+                Variable: 221
+                Constant: 4
+              Mul:
+                Variable: 222
+                Constant: 8
+              Mul:
+                Variable: 223
+                Constant: 16
+              Mul:
+                Variable: 224
+                Constant: 32
+              Mul:
+                Variable: 225
+                Constant: 64
+              Mul:
+                Variable: 226
+                Constant: 128
+              Mul:
+                Variable: 227
+                Constant: 256
+              Mul:
+                Variable: 228
+                Constant: 512
+              Mul:
+                Variable: 229
+                Constant: 1024
+              Mul:
+                Variable: 230
+                Constant: 2048
+              Mul:
+                Variable: 231
+                Constant: 4096
+              Mul:
+                Variable: 232
+                Constant: 8192
+              Mul:
+                Variable: 233
+                Constant: 16384
+              Mul:
+                Variable: 234
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 812
+                    Constant: 0
+                    Mul:
+                      Variable: 203
+                      Constant: 1
+                    Mul:
+                      Variable: 204
+                      Constant: 2
+                    Mul:
+                      Variable: 205
+                      Constant: 4
+                    Mul:
+                      Variable: 206
+                      Constant: 8
+                    Mul:
+                      Variable: 207
+                      Constant: 16
+                    Mul:
+                      Variable: 208
+                      Constant: 32
+                    Mul:
+                      Variable: 209
+                      Constant: 64
+                    Mul:
+                      Variable: 210
+                      Constant: 128
+                    Mul:
+                      Variable: 211
+                      Constant: 256
+                    Mul:
+                      Variable: 212
+                      Constant: 512
+                    Mul:
+                      Variable: 213
+                      Constant: 1024
+                    Mul:
+                      Variable: 214
+                      Constant: 2048
+                    Mul:
+                      Variable: 215
+                      Constant: 4096
+                    Mul:
+                      Variable: 216
+                      Constant: 8192
+                    Mul:
+                      Variable: 217
+                      Constant: 16384
+                    Mul:
+                      Variable: 218
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 790
+                      Constant: 1
+                    Mul:
+                      Variable: 791
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 792
+                Constant: 1
+              Mul:
+                Variable: 793
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 814
+          Constant: 0
+          Mul:
+            Variable: 171
+            Constant: 1
+          Mul:
+            Variable: 172
+            Constant: 2
+          Mul:
+            Variable: 173
+            Constant: 4
+          Mul:
+            Variable: 174
+            Constant: 8
+          Mul:
+            Variable: 175
+            Constant: 16
+          Mul:
+            Variable: 176
+            Constant: 32
+          Mul:
+            Variable: 177
+            Constant: 64
+          Mul:
+            Variable: 178
+            Constant: 128
+          Mul:
+            Variable: 179
+            Constant: 256
+          Mul:
+            Variable: 180
+            Constant: 512
+          Mul:
+            Variable: 181
+            Constant: 1024
+          Mul:
+            Variable: 182
+            Constant: 2048
+          Mul:
+            Variable: 183
+            Constant: 4096
+          Mul:
+            Variable: 184
+            Constant: 8192
+          Mul:
+            Variable: 185
+            Constant: 16384
+          Mul:
+            Variable: 186
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 794
+            Constant: 1
+          Mul:
+            Variable: 795
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 814
+              Constant: 0
+              Mul:
+                Variable: 171
+                Constant: 1
+              Mul:
+                Variable: 172
+                Constant: 2
+              Mul:
+                Variable: 173
+                Constant: 4
+              Mul:
+                Variable: 174
+                Constant: 8
+              Mul:
+                Variable: 175
+                Constant: 16
+              Mul:
+                Variable: 176
+                Constant: 32
+              Mul:
+                Variable: 177
+                Constant: 64
+              Mul:
+                Variable: 178
+                Constant: 128
+              Mul:
+                Variable: 179
+                Constant: 256
+              Mul:
+                Variable: 180
+                Constant: 512
+              Mul:
+                Variable: 181
+                Constant: 1024
+              Mul:
+                Variable: 182
+                Constant: 2048
+              Mul:
+                Variable: 183
+                Constant: 4096
+              Mul:
+                Variable: 184
+                Constant: 8192
+              Mul:
+                Variable: 185
+                Constant: 16384
+              Mul:
+                Variable: 186
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 794
+                Constant: 1
+              Mul:
+                Variable: 795
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 815
+          Constant: 0
+          Mul:
+            Variable: 187
+            Constant: 1
+          Mul:
+            Variable: 188
+            Constant: 2
+          Mul:
+            Variable: 189
+            Constant: 4
+          Mul:
+            Variable: 190
+            Constant: 8
+          Mul:
+            Variable: 191
+            Constant: 16
+          Mul:
+            Variable: 192
+            Constant: 32
+          Mul:
+            Variable: 193
+            Constant: 64
+          Mul:
+            Variable: 194
+            Constant: 128
+          Mul:
+            Variable: 195
+            Constant: 256
+          Mul:
+            Variable: 196
+            Constant: 512
+          Mul:
+            Variable: 197
+            Constant: 1024
+          Mul:
+            Variable: 198
+            Constant: 2048
+          Mul:
+            Variable: 199
+            Constant: 4096
+          Mul:
+            Variable: 200
+            Constant: 8192
+          Mul:
+            Variable: 201
+            Constant: 16384
+          Mul:
+            Variable: 202
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 814
+                Constant: 0
+                Mul:
+                  Variable: 171
+                  Constant: 1
+                Mul:
+                  Variable: 172
+                  Constant: 2
+                Mul:
+                  Variable: 173
+                  Constant: 4
+                Mul:
+                  Variable: 174
+                  Constant: 8
+                Mul:
+                  Variable: 175
+                  Constant: 16
+                Mul:
+                  Variable: 176
+                  Constant: 32
+                Mul:
+                  Variable: 177
+                  Constant: 64
+                Mul:
+                  Variable: 178
+                  Constant: 128
+                Mul:
+                  Variable: 179
+                  Constant: 256
+                Mul:
+                  Variable: 180
+                  Constant: 512
+                Mul:
+                  Variable: 181
+                  Constant: 1024
+                Mul:
+                  Variable: 182
+                  Constant: 2048
+                Mul:
+                  Variable: 183
+                  Constant: 4096
+                Mul:
+                  Variable: 184
+                  Constant: 8192
+                Mul:
+                  Variable: 185
+                  Constant: 16384
+                Mul:
+                  Variable: 186
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 794
+                  Constant: 1
+                Mul:
+                  Variable: 795
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 796
+            Constant: 1
+          Mul:
+            Variable: 797
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 815
+              Constant: 0
+              Mul:
+                Variable: 187
+                Constant: 1
+              Mul:
+                Variable: 188
+                Constant: 2
+              Mul:
+                Variable: 189
+                Constant: 4
+              Mul:
+                Variable: 190
+                Constant: 8
+              Mul:
+                Variable: 191
+                Constant: 16
+              Mul:
+                Variable: 192
+                Constant: 32
+              Mul:
+                Variable: 193
+                Constant: 64
+              Mul:
+                Variable: 194
+                Constant: 128
+              Mul:
+                Variable: 195
+                Constant: 256
+              Mul:
+                Variable: 196
+                Constant: 512
+              Mul:
+                Variable: 197
+                Constant: 1024
+              Mul:
+                Variable: 198
+                Constant: 2048
+              Mul:
+                Variable: 199
+                Constant: 4096
+              Mul:
+                Variable: 200
+                Constant: 8192
+              Mul:
+                Variable: 201
+                Constant: 16384
+              Mul:
+                Variable: 202
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 814
+                    Constant: 0
+                    Mul:
+                      Variable: 171
+                      Constant: 1
+                    Mul:
+                      Variable: 172
+                      Constant: 2
+                    Mul:
+                      Variable: 173
+                      Constant: 4
+                    Mul:
+                      Variable: 174
+                      Constant: 8
+                    Mul:
+                      Variable: 175
+                      Constant: 16
+                    Mul:
+                      Variable: 176
+                      Constant: 32
+                    Mul:
+                      Variable: 177
+                      Constant: 64
+                    Mul:
+                      Variable: 178
+                      Constant: 128
+                    Mul:
+                      Variable: 179
+                      Constant: 256
+                    Mul:
+                      Variable: 180
+                      Constant: 512
+                    Mul:
+                      Variable: 181
+                      Constant: 1024
+                    Mul:
+                      Variable: 182
+                      Constant: 2048
+                    Mul:
+                      Variable: 183
+                      Constant: 4096
+                    Mul:
+                      Variable: 184
+                      Constant: 8192
+                    Mul:
+                      Variable: 185
+                      Constant: 16384
+                    Mul:
+                      Variable: 186
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 794
+                      Constant: 1
+                    Mul:
+                      Variable: 795
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 796
+                Constant: 1
+              Mul:
+                Variable: 797
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 816
+          Constant: 0
+          Mul:
+            Variable: 139
+            Constant: 1
+          Mul:
+            Variable: 140
+            Constant: 2
+          Mul:
+            Variable: 141
+            Constant: 4
+          Mul:
+            Variable: 142
+            Constant: 8
+          Mul:
+            Variable: 143
+            Constant: 16
+          Mul:
+            Variable: 144
+            Constant: 32
+          Mul:
+            Variable: 145
+            Constant: 64
+          Mul:
+            Variable: 146
+            Constant: 128
+          Mul:
+            Variable: 147
+            Constant: 256
+          Mul:
+            Variable: 148
+            Constant: 512
+          Mul:
+            Variable: 149
+            Constant: 1024
+          Mul:
+            Variable: 150
+            Constant: 2048
+          Mul:
+            Variable: 151
+            Constant: 4096
+          Mul:
+            Variable: 152
+            Constant: 8192
+          Mul:
+            Variable: 153
+            Constant: 16384
+          Mul:
+            Variable: 154
+            Constant: 32768
+          Constant: 0
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 798
+            Constant: 1
+          Mul:
+            Variable: 799
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 816
+              Constant: 0
+              Mul:
+                Variable: 139
+                Constant: 1
+              Mul:
+                Variable: 140
+                Constant: 2
+              Mul:
+                Variable: 141
+                Constant: 4
+              Mul:
+                Variable: 142
+                Constant: 8
+              Mul:
+                Variable: 143
+                Constant: 16
+              Mul:
+                Variable: 144
+                Constant: 32
+              Mul:
+                Variable: 145
+                Constant: 64
+              Mul:
+                Variable: 146
+                Constant: 128
+              Mul:
+                Variable: 147
+                Constant: 256
+              Mul:
+                Variable: 148
+                Constant: 512
+              Mul:
+                Variable: 149
+                Constant: 1024
+              Mul:
+                Variable: 150
+                Constant: 2048
+              Mul:
+                Variable: 151
+                Constant: 4096
+              Mul:
+                Variable: 152
+                Constant: 8192
+              Mul:
+                Variable: 153
+                Constant: 16384
+              Mul:
+                Variable: 154
+                Constant: 32768
+              Constant: 0
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 798
+                Constant: 1
+              Mul:
+                Variable: 799
+                Constant: 256
+        Constant: 1
+  AssertZero:
+    Mul:
+      Variable: 459
+      Constant: 18446462594437939201
+      Sub:
+        Add:
+          Variable: 817
+          Constant: 0
+          Mul:
+            Variable: 155
+            Constant: 1
+          Mul:
+            Variable: 156
+            Constant: 2
+          Mul:
+            Variable: 157
+            Constant: 4
+          Mul:
+            Variable: 158
+            Constant: 8
+          Mul:
+            Variable: 159
+            Constant: 16
+          Mul:
+            Variable: 160
+            Constant: 32
+          Mul:
+            Variable: 161
+            Constant: 64
+          Mul:
+            Variable: 162
+            Constant: 128
+          Mul:
+            Variable: 163
+            Constant: 256
+          Mul:
+            Variable: 164
+            Constant: 512
+          Mul:
+            Variable: 165
+            Constant: 1024
+          Mul:
+            Variable: 166
+            Constant: 2048
+          Mul:
+            Variable: 167
+            Constant: 4096
+          Mul:
+            Variable: 168
+            Constant: 8192
+          Mul:
+            Variable: 169
+            Constant: 16384
+          Mul:
+            Variable: 170
+            Constant: 32768
+          Mul:
+            Constant: 18446462594437939201
+            Sub:
+              Add:
+                Variable: 816
+                Constant: 0
+                Mul:
+                  Variable: 139
+                  Constant: 1
+                Mul:
+                  Variable: 140
+                  Constant: 2
+                Mul:
+                  Variable: 141
+                  Constant: 4
+                Mul:
+                  Variable: 142
+                  Constant: 8
+                Mul:
+                  Variable: 143
+                  Constant: 16
+                Mul:
+                  Variable: 144
+                  Constant: 32
+                Mul:
+                  Variable: 145
+                  Constant: 64
+                Mul:
+                  Variable: 146
+                  Constant: 128
+                Mul:
+                  Variable: 147
+                  Constant: 256
+                Mul:
+                  Variable: 148
+                  Constant: 512
+                Mul:
+                  Variable: 149
+                  Constant: 1024
+                Mul:
+                  Variable: 150
+                  Constant: 2048
+                Mul:
+                  Variable: 151
+                  Constant: 4096
+                Mul:
+                  Variable: 152
+                  Constant: 8192
+                Mul:
+                  Variable: 153
+                  Constant: 16384
+                Mul:
+                  Variable: 154
+                  Constant: 32768
+                Constant: 0
+              Add:
+                Constant: 0
+                Mul:
+                  Variable: 798
+                  Constant: 1
+                Mul:
+                  Variable: 799
+                  Constant: 256
+        Add:
+          Constant: 0
+          Mul:
+            Variable: 800
+            Constant: 1
+          Mul:
+            Variable: 801
+            Constant: 256
+      Sub:
+        Mul:
+          Constant: 18446462594437939201
+          Sub:
+            Add:
+              Variable: 817
+              Constant: 0
+              Mul:
+                Variable: 155
+                Constant: 1
+              Mul:
+                Variable: 156
+                Constant: 2
+              Mul:
+                Variable: 157
+                Constant: 4
+              Mul:
+                Variable: 158
+                Constant: 8
+              Mul:
+                Variable: 159
+                Constant: 16
+              Mul:
+                Variable: 160
+                Constant: 32
+              Mul:
+                Variable: 161
+                Constant: 64
+              Mul:
+                Variable: 162
+                Constant: 128
+              Mul:
+                Variable: 163
+                Constant: 256
+              Mul:
+                Variable: 164
+                Constant: 512
+              Mul:
+                Variable: 165
+                Constant: 1024
+              Mul:
+                Variable: 166
+                Constant: 2048
+              Mul:
+                Variable: 167
+                Constant: 4096
+              Mul:
+                Variable: 168
+                Constant: 8192
+              Mul:
+                Variable: 169
+                Constant: 16384
+              Mul:
+                Variable: 170
+                Constant: 32768
+              Mul:
+                Constant: 18446462594437939201
+                Sub:
+                  Add:
+                    Variable: 816
+                    Constant: 0
+                    Mul:
+                      Variable: 139
+                      Constant: 1
+                    Mul:
+                      Variable: 140
+                      Constant: 2
+                    Mul:
+                      Variable: 141
+                      Constant: 4
+                    Mul:
+                      Variable: 142
+                      Constant: 8
+                    Mul:
+                      Variable: 143
+                      Constant: 16
+                    Mul:
+                      Variable: 144
+                      Constant: 32
+                    Mul:
+                      Variable: 145
+                      Constant: 64
+                    Mul:
+                      Variable: 146
+                      Constant: 128
+                    Mul:
+                      Variable: 147
+                      Constant: 256
+                    Mul:
+                      Variable: 148
+                      Constant: 512
+                    Mul:
+                      Variable: 149
+                      Constant: 1024
+                    Mul:
+                      Variable: 150
+                      Constant: 2048
+                    Mul:
+                      Variable: 151
+                      Constant: 4096
+                    Mul:
+                      Variable: 152
+                      Constant: 8192
+                    Mul:
+                      Variable: 153
+                      Constant: 16384
+                    Mul:
+                      Variable: 154
+                      Constant: 32768
+                    Constant: 0
+                  Add:
+                    Constant: 0
+                    Mul:
+                      Variable: 798
+                      Constant: 1
+                    Mul:
+                      Variable: 799
+                      Constant: 256
+            Add:
+              Constant: 0
+              Mul:
+                Variable: 800
+                Constant: 1
+              Mul:
+                Variable: 801
+                Constant: 256
+        Constant: 1
 Result 🛍️
   tt

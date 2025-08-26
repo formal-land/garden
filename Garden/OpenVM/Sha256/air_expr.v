@@ -256,10 +256,210 @@ Definition eval_message_schedule
     ) in
   MExpr.pure tt.
 
+(*
+fn eval_digest_row<AB: InteractionBuilder>(
+    &self,
+    builder: &mut AB,
+    local: &Sha256RoundCols<AB::Var>,
+    next: &Sha256DigestCols<AB::Var>,
+)
+*)
+Definition eval_digest_row
+    (local_cols : Sha256RoundCols.t Var.t)
+    (next_cols : Sha256DigestCols.t Var.t) :
+    MExpr.t unit :=
+  msg! "eval_digest_row" in
+  (*
+    for i in 0..SHA256_ROUNDS_PER_ROW {
+        let a = next.hash.a[i].map(|x| x.into());
+        let e = next.hash.e[i].map(|x| x.into());
+        for j in 0..SHA256_WORD_U16S {
+            let a_limb = compose::<AB::Expr>(&a[j * 16..(j + 1) * 16], 1);
+            let e_limb = compose::<AB::Expr>(&e[j * 16..(j + 1) * 16], 1);
+
+            // If it is a padding row or the last row of a message, the `hash` should be the
+            // [SHA256_H]
+            builder
+                .when(
+                    next.flags.is_padding_row()
+                        + next.flags.is_last_block * next.flags.is_digest_row,
+                )
+                .assert_eq(
+                    a_limb,
+                    AB::Expr::from_canonical_u32(
+                        u32_into_limbs::<2>(SHA256_H[SHA256_ROUNDS_PER_ROW - i - 1])[j],
+                    ),
+                );
+
+            builder
+                .when(
+                    next.flags.is_padding_row()
+                        + next.flags.is_last_block * next.flags.is_digest_row,
+                )
+                .assert_eq(
+                    e_limb,
+                    AB::Expr::from_canonical_u32(
+                        u32_into_limbs::<2>(SHA256_H[SHA256_ROUNDS_PER_ROW - i + 3])[j],
+                    ),
+                );
+        }
+    }
+  *)
+  msg! "eval_digest_row::first_loop" in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_ROUNDS_PER_ROW (fun i =>
+      let a := next_cols.(Sha256DigestCols.hash).(Sha256WorkVarsCols.a).[i] in
+      let e := next_cols.(Sha256DigestCols.hash).(Sha256WorkVarsCols.e).[i] in
+      MExpr.for_in_zero_to_n SHA256_WORD_U16S (fun j =>
+        let a_limb := utils.compose (Array.slice_range (Array.map Expr.Var a) (j * 16) ((j + 1) * 16)) 1 in
+        let e_limb := utils.compose (Array.slice_range (Array.map Expr.Var e) (j * 16) ((j + 1) * 16)) 1 in
+        let! _ :=
+          MExpr.when (
+            Impl_Sha256FlagsCols.is_padding_row next_cols.(Sha256DigestCols.flags)
+            +E next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_last_block)
+            *E next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_digest_row)
+          ) (
+            MExpr.assert_eq
+              a_limb
+              (Expr.from_canonical_u32 (utils.u32_into_limbs 2 SHA256_H.[SHA256_ROUNDS_PER_ROW - i - 1]).[j])
+          ) in
+        let! _ :=
+          MExpr.when (
+            Impl_Sha256FlagsCols.is_padding_row next_cols.(Sha256DigestCols.flags)
+            +E next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_last_block)
+            *E next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_digest_row)
+          ) (
+            MExpr.assert_eq
+              e_limb
+              (Expr.from_canonical_u32 (utils.u32_into_limbs 2 SHA256_H.[SHA256_ROUNDS_PER_ROW - i + 3]).[j])
+          ) in
+        MExpr.pure tt
+      )
+    ) in
+
+  (*
+    for i in 0..SHA256_ROUNDS_PER_ROW {
+        let prev_a = next.hash.a[i].map(|x| x.into());
+        let prev_e = next.hash.e[i].map(|x| x.into());
+        let cur_a = next.final_hash[SHA256_ROUNDS_PER_ROW - i - 1].map(|x| x.into());
+
+        let cur_e = next.final_hash[SHA256_ROUNDS_PER_ROW - i + 3].map(|x| x.into());
+        for j in 0..SHA256_WORD_U8S {
+            let prev_a_limb = compose::<AB::Expr>(&prev_a[j * 8..(j + 1) * 8], 1);
+            let prev_e_limb = compose::<AB::Expr>(&prev_e[j * 8..(j + 1) * 8], 1);
+
+            builder
+                .when(not(next.flags.is_last_block) * next.flags.is_digest_row)
+                .assert_eq(prev_a_limb, cur_a[j].clone());
+
+            builder
+                .when(not(next.flags.is_last_block) * next.flags.is_digest_row)
+                .assert_eq(prev_e_limb, cur_e[j].clone());
+        }
+    }
+    *)
+  msg! "eval_digest_row::second_loop" in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_ROUNDS_PER_ROW (fun i =>
+      let prev_a := next_cols.(Sha256DigestCols.hash).(Sha256WorkVarsCols.a).[i] in
+      let prev_e := next_cols.(Sha256DigestCols.hash).(Sha256WorkVarsCols.e).[i] in
+      let cur_a := next_cols.(Sha256DigestCols.final_hash).[SHA256_ROUNDS_PER_ROW - i - 1] in
+      let cur_e := next_cols.(Sha256DigestCols.final_hash).[SHA256_ROUNDS_PER_ROW - i + 3] in
+      MExpr.for_in_zero_to_n SHA256_WORD_U8S (fun j =>
+        let prev_a_limb := utils.compose (Array.slice_range (Array.map Expr.Var prev_a) (j * 8) ((j + 1) * 8)) 1 in
+        let prev_e_limb := utils.compose (Array.slice_range (Array.map Expr.Var prev_e) (j * 8) ((j + 1) * 8)) 1 in
+        let! _ :=
+          MExpr.when (
+            Expr.not next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_last_block) *E
+            next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_digest_row)
+        ) (
+          MExpr.assert_eq
+            prev_a_limb
+            (Array.map Expr.Var cur_a).[j]
+        ) in
+        let! _ :=
+          MExpr.when (
+            Expr.not next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_last_block) *E
+            next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_digest_row)
+        ) (
+          MExpr.assert_eq
+            prev_e_limb
+            (Array.map Expr.Var cur_e).[j]
+        ) in
+        MExpr.pure tt
+      )
+    ) in
+
+  (*
+    for i in 0..SHA256_HASH_WORDS {
+        let mut carry = AB::Expr::ZERO;
+        for j in 0..SHA256_WORD_U16S {
+            let work_var_limb = if i < SHA256_ROUNDS_PER_ROW {
+                compose::<AB::Expr>(
+                    &local.work_vars.a[SHA256_ROUNDS_PER_ROW - 1 - i][j * 16..(j + 1) * 16],
+                    1,
+                )
+            } else {
+                compose::<AB::Expr>(
+                    &local.work_vars.e[SHA256_ROUNDS_PER_ROW + 3 - i][j * 16..(j + 1) * 16],
+                    1,
+                )
+            };
+            let final_hash_limb =
+                compose::<AB::Expr>(&next.final_hash[i][j * 2..(j + 1) * 2], 8);
+
+            carry = AB::Expr::from(AB::F::from_canonical_u32(1 << 16).inverse())
+                * (next.prev_hash[i][j] + work_var_limb + carry - final_hash_limb);
+            builder
+                .when(next.flags.is_digest_row)
+                .assert_bool(carry.clone());
+        }
+        // constrain the final hash limbs two at a time since we can do two checks per
+        // interaction
+        for chunk in next.final_hash[i].chunks(2) {
+            self.bitwise_lookup_bus
+                .send_range(chunk[0], chunk[1])
+                .eval(builder, next.flags.is_digest_row);
+        }
+    }
+  *)
+  msg! "eval_digest_row::third_loop" in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_HASH_WORDS (fun i =>
+      let carry : Expr.t := Expr.ZERO in
+      let! _ :=
+        List.fold_left (fun carry j =>
+          let j := Z.of_nat j in
+          let work_var_limb :=
+            if i <? SHA256_ROUNDS_PER_ROW then
+              utils.compose (Array.slice_range (Array.map Expr.Var local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.a).[SHA256_ROUNDS_PER_ROW - i - 1]) (j * 16) ((j + 1) * 16)) 1
+            else
+              utils.compose (Array.slice_range (Array.map Expr.Var local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.e).[SHA256_ROUNDS_PER_ROW + 3 - i]) (j * 16) ((j + 1) * 16)) 1 in
+          let final_hash_limb :=
+            utils.compose (Array.slice_range (Array.map Expr.Var next_cols.(Sha256DigestCols.final_hash).[i]) (j * 2) ((j + 1) * 2)) 8 in
+          let carry :=
+            (* TODO: have the expression with the inverse *)
+            (* Expr.Constant (Field.inverse (Field.from_canonical_u32 (2 ^ 16))) *E *)
+            Expr.constant 18446462594437939201 *E
+            (next_cols.(Sha256DigestCols.prev_hash).[i].[j] +E work_var_limb +E carry -E final_hash_limb) in
+          let! _ :=
+            MExpr.when (next_cols.(Sha256DigestCols.flags).(Sha256FlagsCols.is_digest_row)) (
+            MExpr.assert_bool carry
+          ) in
+          MExpr.pure carry
+        )
+        carry
+        (List.seq 0 (Z.to_nat SHA256_WORD_U16S)) in
+      (* TODO: lookup bus *)
+      MExpr.pure tt
+    ) in
+  MExpr.pure tt.
+
 (* fn eval_transitions<AB: InteractionBuilder>(&self, builder: &mut AB, start_col: usize) *)
 Definition eval_transitions
     (start_col : Z)
-    (local_cols next_cols : Sha256RoundCols.t Var.t) :
+    (round_local_cols round_next_cols : Sha256RoundCols.t Var.t)
+    (digest_local_cols digest_next_cols : Sha256DigestCols.t Var.t) :
     MExpr.t unit :=
   (*
     let main = builder.main();
@@ -279,6 +479,8 @@ Definition eval_transitions
     let next_is_padding_row = next_cols.flags.is_padding_row();
   *)
   msg! "eval_transitions" in
+  let local_cols := round_local_cols in
+  let next_cols := round_next_cols in
   let local_is_padding_row := Impl_Sha256FlagsCols.is_padding_row local_cols.(Sha256RoundCols.flags) in
   let next_is_padding_row := Impl_Sha256FlagsCols.is_padding_row next_cols.(Sha256RoundCols.flags) in
 
@@ -456,20 +658,23 @@ Definition eval_transitions
     MExpr.assert_zero next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx)
     )) in
 
+  (* self.eval_message_schedule::<AB>(builder, local_cols, next_cols); *)
+  let! _ := eval_message_schedule local_cols next_cols in
+  (* self.eval_work_vars::<AB>(builder, local_cols, next_cols); *)
   (*
-    self.eval_message_schedule::<AB>(builder, local_cols, next_cols);
-    self.eval_work_vars::<AB>(builder, local_cols, next_cols);
     let next_cols: &Sha256DigestCols<AB::Var> =
         next[start_col..start_col + SHA256_DIGEST_WIDTH].borrow();
-    self.eval_digest_row(builder, local_cols, next_cols);
+  *)
+  let next_cols := digest_next_cols in
+  (* self.eval_digest_row(builder, local_cols, next_cols); *)
+  let! _ := eval_digest_row local_cols next_cols in
+  (*
     let local_cols: &Sha256DigestCols<AB::Var> =
         local[start_col..start_col + SHA256_DIGEST_WIDTH].borrow();
-    self.eval_prev_hash::<AB>(builder, local_cols, next_is_padding_row);
   *)
-  let! _ := eval_message_schedule local_cols next_cols in
-  (* let! _ := eval_work_vars start_col local_cols next_cols in
-  let! _ := eval_digest_row start_col local_cols next_cols in
-  let! _ := eval_prev_hash start_col local_cols next_is_padding_row in *)
+  let local_cols := digest_local_cols in
+  (* self.eval_prev_hash::<AB>(builder, local_cols, next_is_padding_row); *)
+  (* let! _ := eval_prev_hash local_cols next_is_padding_row in *)
   MExpr.pure tt.
 
 (*
@@ -484,22 +689,36 @@ where
 *)
 Definition eval
     (start_col : Z)
-    (row_local_cols : Sha256DigestCols.t Var.t)
-    (transitions_local_cols transitions_next_cols : Sha256RoundCols.t Var.t) :
+    (round_local_cols round_next_cols : Sha256RoundCols.t Var.t)
+    (digest_local_cols digest_next_cols : Sha256DigestCols.t Var.t) :
     MExpr.t unit :=
-  let! _ := eval_row start_col row_local_cols in
-  let! _ := eval_transitions start_col transitions_local_cols transitions_next_cols in
+  let! _ := eval_row start_col digest_local_cols in
+  let! _ :=
+    eval_transitions start_col
+      round_local_cols round_next_cols
+      digest_local_cols digest_next_cols in
   MExpr.pure tt.
 
 Definition print_eval : string :=
   let start_col := 0 in
-  let row_local_cols :=
-    MGenerateVar.eval [[ MGenerateVar.generate (A := Sha256DigestCols.t Var.t) (||) ]] in
-  let '(transitions_local_cols, transitions_next_cols) :=
-    MGenerateVar.eval [[ (MGenerateVar.generate (||), MGenerateVar.generate (||)) ]] in
+  let '(round_local_cols, round_next_cols) :=
+    MGenerateVar.eval [[ (
+      MGenerateVar.generate (A := Sha256RoundCols.t Var.t) (||),
+      MGenerateVar.generate (A := Sha256RoundCols.t Var.t) (||)
+    ) ]] in
+  (* Because the "round" version is longer than the "digest" one *)
+  let digest_local_cols :=
+    MGenerateVar.eval [[
+      MGenerateVar.generate (A := Sha256DigestCols.t Var.t) (||)
+    ]] in
+  let '(_, digest_next_cols) :=
+    MGenerateVar.eval [[ (
+      MGenerateVar.generate (A := Sha256RoundCols.t Var.t) (||),
+      MGenerateVar.generate (A := Sha256DigestCols.t Var.t) (||)
+    ) ]] in
   ToRocq.cats [
     ToRocq.endl;
-    ToRocq.to_rocq (eval start_col row_local_cols transitions_local_cols transitions_next_cols) 0;
+    ToRocq.to_rocq (eval start_col round_local_cols round_next_cols digest_local_cols digest_next_cols) 0;
     ToRocq.endl
   ].
 
