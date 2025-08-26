@@ -724,7 +724,8 @@ Module Add3Proof.
         rewrite Hacc_16 in HB.
         rewrite FieldRewrite.from_from in HB.
         rewrite! FieldRewrite.add_from_left in HB.
-        rewrite! FieldEquiv.add_equiv in HB.
+        replace (BinOp.add acc_16_r (2 ^ 16)) with (UnOp.from (acc_16_r + 2 ^ 16)) in HB by reflexivity.
+        replace (BinOp.add acc_16_r (2 ^ 16 * 2)) with (UnOp.from (acc_16_r + 2 ^ 16 * 2)) in HB by reflexivity.
         destruct HB as [HBa | HB'].
         {
           left.
