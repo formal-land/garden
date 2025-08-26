@@ -437,15 +437,6 @@ Module Limbs.
   Qed.
 End Limbs.
 
-Module ArrayLimbs.
-  Definition double_val_array (val1 val2 : Z) : Array.t Z 2 :=
-    {| Array.get i := 
-        if i =? 0 then val1
-        else if i =? 1 then val2
-        else 0 (* Default case, should not happen *)
-    |}.
-End ArrayLimbs.
-
 Ltac show_equality_modulo :=
   unfold
     UnOp.from,
