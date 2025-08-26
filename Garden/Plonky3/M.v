@@ -97,16 +97,18 @@ Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t (A : Set) : Set :=
   | Pure (value : A) : t A
-  | Equal (x1 x2 : Z) (value : A) : t A
+  | AssertZero (x : Z) (value : A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call (e : t A) : t A
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
+  | When (condition : Z) (e : t A) : t A
   .
   Arguments Pure {_}.
-  Arguments Equal {_}.
+  Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
+  Arguments When {_}.
 
   (** This is a marker that we remove with the following tactic. *)
   Axiom run : forall {A : Set}, t A -> A.
@@ -155,10 +157,11 @@ Module M.
 
   Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
     match e with
-    | M.Pure x => M.Pure (f x)
-    | M.Equal x y value => M.Equal x y (f value)
+    | M.Pure value => M.Pure (f value)
+    | M.AssertZero x value => M.AssertZero x (f value)
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
+    | M.When condition e => M.When condition (map f e)
     end.
 End M.
 
@@ -183,15 +186,12 @@ Notation "[[ e ]]" :=
 Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
 
-Definition equal (x y : Z) : M.t unit :=
-  M.Equal x y tt.
-
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
-  equal x 0.
+  M.AssertZero x tt.
 
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  equal (BinOp.mul x (BinOp.sub x 1)) 0.
+  M.AssertZero (BinOp.mul x (BinOp.sub x 1)) tt.
 
 Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> M.t unit) : M.t unit :=
   match N with
@@ -254,7 +254,10 @@ End Pair.
 
 (* fn assert_one<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_one {p} `{Prime p} (x : Z) : M.t unit :=
-  M.equal x (1 mod p).
+  M.AssertZero (BinOp.sub x 1) tt.
+
+Definition assert_eq {p} `{Prime p} (x y : Z) : M.t unit :=
+  M.AssertZero (BinOp.sub x y) tt.
 
   (* fn assert_bools<const N: usize, I: Into<Self::Expr>>(&mut self, array: [I; N]) *)
 Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
@@ -262,11 +265,8 @@ Definition assert_bools {p} `{Prime p} {N : Z} (l : Array.t Z N) : M.t unit :=
     M.assert_bool (l.(Array.get) i)
   ).
 
-Definition when (condition : Z) (e : M.t unit) : M.t unit :=
-  if condition =? 0 then
-    M.pure tt
-  else
-    e.
+Definition when {p} `{Prime p} {A : Set} (condition : Z) (e : M.t A) : M.t A :=
+  M.When condition e.
 
 Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
   if condition then
@@ -653,23 +653,26 @@ End FieldRewrite.
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
 
-  Inductive t : forall {A : Set}, M.t A -> A -> Prop -> Prop :=
-  | Pure {A : Set} (value : A) :
+  Inductive t {A : Set} : M.t A -> A -> Prop -> Prop :=
+  | Pure (value : A) :
     {{ M.Pure value 🔽 value, True }}
-  | Equal {A : Set} (x1 x2 : Z) (value : A) :
-    {{ M.Equal x1 x2 value 🔽 value, x1 = x2 }}
-  | Call {A : Set} (e : M.t A) (value : A) (P : Prop) :
+  | AssertZero (x : Z) (value : A) :
+    {{ M.AssertZero x value 🔽 value, x = 0 }}
+  | Call (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
-  | Let {A B : Set} (e : M.t A) (k : A -> M.t B) (value : A) (output : B) (P1 P2 : Prop) :
+  | Let {B : Set} (e : M.t B) (k : B -> M.t A) (value : B) (output : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> {{ k value 🔽 output, P2 }}) ->
     {{ M.Let e k 🔽 output, P1 /\ P2 }}
-  | Implies {A : Set} (e : M.t A) (value : A) (P1 P2 : Prop) :
+  | When (condition : Z) (e : M.t A) (value : A) (P : Prop) :
+    (condition <> 0 -> {{ e 🔽 value, P }}) ->
+    {{ M.When condition e 🔽 value, condition <> 0 -> P }}
+  | Implies (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> P2) ->
     {{ e 🔽 value, P2 }}
-  | Replace {A : Set} (e : M.t A) (value1 value2 : A) (P : Prop) :
+  | Replace (e : M.t A) (value1 value2 : A) (P : Prop) :
     {{ e 🔽 value1, P }} ->
     value1 = value2 ->
     {{ e 🔽 value2, P }}
@@ -759,7 +762,7 @@ Module Run.
       unfold M.assert_zeros.
       apply ForInZeroToN.
       intros.
-      apply Equal.
+      apply AssertZero.
     }
     trivial.
   Qed.
@@ -802,9 +805,10 @@ Module Run.
     (apply AssertZeros) ||
     (eapply Run.ForInZeroToN) ||
     (apply Run.Pure) ||
-    (apply Run.Equal) ||
+    (apply Run.AssertZero) ||
     (apply Run.Call) ||
     (eapply Run.Let) ||
+    (apply Run.When) ||
     match goal with
     | |- True -> _ => intros _
     | _ => intros

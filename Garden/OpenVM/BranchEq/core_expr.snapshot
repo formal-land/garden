@@ -1,4 +1,4 @@
-Builder:
+Trace 🐾
   AssertZero:
     Mul:
       Variable: 10
@@ -14,15 +14,13 @@ Builder:
   AssertZero:
     Mul:
       Add:
-        Add:
-          Constant: 0
-          Variable: 10
+        Constant: 0
+        Variable: 10
         Variable: 11
       Sub:
         Add:
-          Add:
-            Constant: 0
-            Variable: 10
+          Constant: 0
+          Variable: 10
           Variable: 11
         Constant: 1
   AssertZero:
@@ -90,89 +88,84 @@ Builder:
   AssertZero:
     Mul:
       Add:
-        Add:
-          Constant: 0
-          Variable: 10
+        Constant: 0
+        Variable: 10
         Variable: 11
       Sub:
         Add:
-          Add:
-            Add:
-              Add:
-                Add:
-                  Mul:
-                    Variable: 8
-                    Variable: 10
-                  Mul:
-                    Sub:
-                      Constant: 1
-                      Variable: 8
-                    Variable: 11
-                Mul:
-                  Sub:
-                    Variable: 0
-                    Variable: 4
-                  Variable: 12
-              Mul:
-                Sub:
-                  Variable: 1
-                  Variable: 5
-                Variable: 13
-            Mul:
-              Sub:
-                Variable: 2
-                Variable: 6
-              Variable: 14
+          Mul:
+            Variable: 8
+            Variable: 10
+          Mul:
+            Sub:
+              Constant: 1
+              Variable: 8
+            Variable: 11
+          Mul:
+            Sub:
+              Variable: 0
+              Variable: 4
+            Variable: 12
+          Mul:
+            Sub:
+              Variable: 1
+              Variable: 5
+            Variable: 13
+          Mul:
+            Sub:
+              Variable: 2
+              Variable: 6
+            Variable: 14
           Mul:
             Sub:
               Variable: 3
               Variable: 7
             Variable: 15
         Constant: 1
-AdapterAirContext:
-  to_pc:
-    Some:
-      Add:
+Result 🛍️
+  AdapterAirContext:
+    to_pc:
+      Some:
         Add:
           Variable: 16
           Mul:
             Variable: 8
             Variable: 9
-        Mul:
-          Sub:
-            Constant: 1
-            Variable: 8
-          Constant: 23
-  reads:
-    Array:
+          Mul:
+            Sub:
+              Constant: 1
+              Variable: 8
+            Constant: 23
+    reads:
       Array:
-        Variable: 0
-        Variable: 1
-        Variable: 2
-        Variable: 3
+        Array:
+          Variable: 0
+          Variable: 1
+          Variable: 2
+          Variable: 3
+        Array:
+          Variable: 4
+          Variable: 5
+          Variable: 6
+          Variable: 7
+    writes:
       Array:
-        Variable: 4
-        Variable: 5
-        Variable: 6
-        Variable: 7
-  writes:
-    Array:
-  instruction:
-    ImmInstruction:
-      Add:
-        Add:
-          Constant: 0
-          Variable: 10
-        Variable: 11
-      Add:
-        Add:
+    instruction:
+      ImmInstruction:
+        is_valid:
+          Add:
+            Constant: 0
+            Variable: 10
+            Variable: 11
+        opcode:
           Add:
             Constant: 0
             Mul:
               Variable: 10
               Constant: 0
-          Mul:
-            Variable: 11
-            Constant: 1
-        Constant: 12
-      Variable: 9
+            Mul:
+              Variable: 11
+              Constant: 1
+            Constant: 12
+        immediate:
+          Variable: 9

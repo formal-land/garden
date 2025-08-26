@@ -30,7 +30,7 @@ Definition eval_round_flags {p} `{Prime p}
     (local next : KeccakCols.t) :
     M.t unit :=
   let* _ := when_bool is_first_row (
-    M.equal (local.(KeccakCols.step_flags).(Array.get) 0) 1
+    M.assert_one (local.(KeccakCols.step_flags).(Array.get) 0)
   ) in
   let* _ := when_bool is_first_row (
     M.assert_zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
@@ -46,7 +46,9 @@ Definition eval_round_flags {p} `{Prime p}
 
 Module Spec.
   Lemma spec_first_row {p} `{Prime p}
-      (local next : KeccakCols.t) :
+      (local' next' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    let next := M.map_mod next' in
     {{ eval_round_flags true false local next 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->
@@ -61,8 +63,10 @@ Module Spec.
     intros.
     destruct (i =? 0) eqn:H_eq; try lia.
     {
-      assert (i = 0) by lia.
-      sfirstorder.
+      replace i with 0 by lia.
+      replace 1 with (UnOp.from 1) by now autorewrite with field_rewrite.
+      apply sub_zero_equiv.
+      now autorewrite with field_rewrite in *.
     }
     { assert (1 <= i < NUM_ROUNDS) by lia.
       intuition.
@@ -70,7 +74,7 @@ Module Spec.
       | [ H : _ |- _ ] =>
         rewrite <- (H (i - 1)) by lia
       end.
-      f_equal; lia.
+      now replace (1 + (i - 1)) with i by lia.
     }
   Qed.
 
