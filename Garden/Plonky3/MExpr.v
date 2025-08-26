@@ -79,8 +79,18 @@ Module Expr.
 
   Definition ONE : t := constant 1.
 
+  Definition NEG_ONE : t := constant (-1).
+
+  Definition TWO : t := constant 2.
+
   Definition not (e : t) : t :=
     Sub ONE e.
+
+  Definition from_canonical_u32 (value : Z) : t :=
+    constant (value mod (2 ^ 32)).
+
+  Definition from_canonical_usize (value : Z) : t :=
+    constant (value mod (2 ^ 64)).
 
   (** We group additions and multiplications together, to operate on a list instead of on a couple
       of values. The main idea is to simplify the pretty-printing. *)
@@ -126,6 +136,15 @@ Module Expr.
       end.
   End Flat.
 End Expr.
+
+(* Notations *)
+Notation "x +E y" := (Expr.Add x y) (at level 50, left associativity).
+Notation "x -E y" := (Expr.Sub x y) (at level 50, left associativity).
+Notation "-E x" := (Expr.Neg x) (at level 35, right associativity).
+Notation "x *E y" := (Expr.Mul x y) (at level 40, left associativity).
+
+(* Coercion from Var.t to Expr.t *)
+Global Coercion Expr.Var : Var.t >-> Expr.t.
 
 Module ToRocq.
   Class C (T : Set) : Set := {
@@ -356,7 +375,7 @@ Module MExpr.
         value_body,
         List.map (fun event =>
           match event with
-          | Trace.Event.AssertZero expr => Trace.Event.AssertZero (Expr.Mul expr condition)
+          | Trace.Event.AssertZero expr => Trace.Event.AssertZero (Expr.Mul condition expr)
           | Trace.Event.Message _ => event
           end
         ) constraints_body
@@ -462,6 +481,9 @@ Definition assert_one (e : Expr.t) : MExpr.t unit :=
 
 Definition assert_bool (e : Expr.t) : MExpr.t unit :=
   assert_zero (Expr.Mul e (Expr.Sub e Expr.ONE)).
+
+Definition assert_eq (e1 e2 : Expr.t) : MExpr.t unit :=
+  assert_zero (Expr.Sub e1 e2).
 
 Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> MExpr.t unit) : MExpr.t unit :=
   match N with

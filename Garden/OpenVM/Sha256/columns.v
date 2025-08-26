@@ -144,3 +144,81 @@ Module Sha256DigestCols.
       ]];
   }.
 End Sha256DigestCols.
+
+(*
+pub struct Sha256MessageScheduleCols<T> {
+    pub w: [[T; SHA256_WORD_BITS]; SHA256_ROUNDS_PER_ROW],
+    pub carry_or_buffer: [[T; SHA256_WORD_U8S]; SHA256_ROUNDS_PER_ROW],
+}
+*)
+Module Sha256MessageScheduleCols.
+  Record t {T : Set} : Set := {
+    w : Array.t (Array.t T SHA256_WORD_BITS) SHA256_ROUNDS_PER_ROW;
+    carry_or_buffer : Array.t (Array.t T SHA256_WORD_U8S) SHA256_ROUNDS_PER_ROW;
+  }.
+  Arguments t : clear implicits.
+
+  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+    generate :=
+      [[
+        {|
+          Sha256MessageScheduleCols.w := MGenerateVar.generate (||);
+          Sha256MessageScheduleCols.carry_or_buffer := MGenerateVar.generate (||);
+        |}
+      ]];
+  }.
+End Sha256MessageScheduleCols.
+
+(*
+pub struct Sha256RoundCols<T> {
+    pub flags: Sha256FlagsCols<T>,
+    pub work_vars: Sha256WorkVarsCols<T>,
+    pub schedule_helper: Sha256MessageHelperCols<T>,
+    pub message_schedule: Sha256MessageScheduleCols<T>,
+}
+*)
+Module Sha256RoundCols.
+  Record t {T : Set} : Set := {
+    flags : Sha256FlagsCols.t T;
+    work_vars : Sha256WorkVarsCols.t T;
+    schedule_helper : Sha256MessageHelperCols.t T;
+    message_schedule : Sha256MessageScheduleCols.t T;
+  }.
+  Arguments t : clear implicits.
+
+  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+    generate :=
+      [[
+        {|
+          Sha256RoundCols.flags := MGenerateVar.generate (||);
+          Sha256RoundCols.work_vars := MGenerateVar.generate (||);
+          Sha256RoundCols.schedule_helper := MGenerateVar.generate (||);
+          Sha256RoundCols.message_schedule := MGenerateVar.generate (||);
+        |}
+      ]];
+  }.
+End Sha256RoundCols.
+
+(* impl<O, T: Copy + core::ops::Add<Output = O>> Sha256FlagsCols<T> { *)
+Module Impl_Sha256FlagsCols.
+  (*
+  pub fn is_not_padding_row(&self) -> O {
+      self.is_round_row + self.is_digest_row
+  }
+  *)
+  Definition is_not_padding_row (self : Sha256FlagsCols.t Var.t) : Expr.t :=
+    Expr.Add
+      (Expr.Var self.(Sha256FlagsCols.is_round_row))
+      (Expr.Var self.(Sha256FlagsCols.is_digest_row)).
+
+  (*
+    pub fn is_padding_row(&self) -> O
+    where
+        O: FieldAlgebra,
+    {
+        not(self.is_not_padding_row())
+    }
+  *)
+  Definition is_padding_row (self : Sha256FlagsCols.t Var.t) : Expr.t :=
+    Expr.not (is_not_padding_row self).
+End Impl_Sha256FlagsCols.

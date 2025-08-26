@@ -1,5 +1,6 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.MExpr.
+Require Import Garden.OpenVM.primitives.utils.
 Require Import Garden.OpenVM.Sha256.columns.
 Require Import Garden.OpenVM.Sha256.utils.
 
@@ -68,4 +69,438 @@ Definition print_eval_row : string :=
     ToRocq.endl
   ].
 
-Compute print_eval_row.
+(*
+fn eval_message_schedule<AB: InteractionBuilder>(
+    &self,
+    builder: &mut AB,
+    local: &Sha256RoundCols<AB::Var>,
+    next: &Sha256RoundCols<AB::Var>,
+)
+*)
+Definition eval_message_schedule
+    (local_cols next_cols : Sha256RoundCols.t Var.t) :
+    MExpr.t unit :=
+  msg! "eval_message_schedule" in
+  (*
+    let w = [local.message_schedule.w, next.message_schedule.w].concat();
+  *)
+  let w := Array.concat
+    local_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.w)
+    next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.w)
+  in
+
+  (*
+    for i in 0..SHA256_ROUNDS_PER_ROW - 1 {
+        // here we constrain the w_3 of the i_th word of the next row
+        // w_3 of next is w[i+4-3] = w[i+1]
+        let w_3 = w[i + 1].map(|x| x.into());
+        let expected_w_3 = next.schedule_helper.w_3[i];
+        for j in 0..SHA256_WORD_U16S {
+            let w_3_limb = compose::<AB::Expr>(&w_3[j * 16..(j + 1) * 16], 1);
+            builder
+                .when(local.flags.is_round_row)
+                .assert_eq(w_3_limb, expected_w_3[j].into());
+        }
+    }
+  *)
+  msg! "eval_message_schedule::first_loop" in
+  let! _ := for_in_zero_to_n (SHA256_ROUNDS_PER_ROW - 1) (fun i =>
+    let w_3 := Array.get w (i + 1) in
+    let expected_w_3 := next_cols.(Sha256RoundCols.schedule_helper).(Sha256MessageHelperCols.w_3).[i] in
+    MExpr.for_in_zero_to_n SHA256_WORD_U16S (fun j =>
+      let w_3_limb := utils.compose (Array.slice_range (Array.map Expr.Var w_3) (j * 16) ((j + 1) * 16)) 1 in
+      let! _ :=
+        MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) (
+        MExpr.assert_eq w_3_limb expected_w_3.[j]
+      ) in
+      MExpr.pure tt
+    )
+  ) in
+
+  (*
+    for i in 0..SHA256_ROUNDS_PER_ROW {
+        // w_idx
+        let w_idx = w[i].map(|x| x.into());
+        // sig_0(w_{idx+1})
+        let sig_w = small_sig0_field::<AB::Expr>(&w[i + 1]);
+        for j in 0..SHA256_WORD_U16S {
+            let w_idx_limb = compose::<AB::Expr>(&w_idx[j * 16..(j + 1) * 16], 1);
+            let sig_w_limb = compose::<AB::Expr>(&sig_w[j * 16..(j + 1) * 16], 1);
+
+            // We would like to constrain this only on rows 0..16, but we can't do a conditional
+            // check because the degree is already 3. So we must fill in
+            // `intermed_4` with dummy values on rows 0 and 16 to ensure the constraint holds on
+            // these rows.
+            builder.when_transition().assert_eq(
+                next.schedule_helper.intermed_4[i][j],
+                w_idx_limb + sig_w_limb,
+            );
+        }
+    }
+  *)
+  msg! "eval_message_schedule::second_loop" in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_ROUNDS_PER_ROW (fun i =>
+      let w_idx := w.[i] in
+      let sig_w := utils.small_sig0_field (Array.map Expr.Var w.[i + 1]) in
+      MExpr.for_in_zero_to_n SHA256_WORD_U16S (fun j =>
+        let w_idx_limb := utils.compose (Array.slice_range (Array.map Expr.Var w_idx) (j * 16) ((j + 1) * 16)) 1 in
+        let sig_w_limb := utils.compose (Array.slice_range sig_w (j * 16) ((j + 1) * 16)) 1 in
+        let! _ :=
+          MExpr.when Expr.IsTransition (
+            MExpr.assert_eq
+              next_cols.(Sha256RoundCols.schedule_helper).(Sha256MessageHelperCols.intermed_4).[i].[j]
+              (w_idx_limb +E sig_w_limb)
+          ) in
+        MExpr.pure tt
+      )
+    ) in
+
+  (*
+    for i in 0..SHA256_ROUNDS_PER_ROW {
+        // Note, here by w_{t} we mean the i_th word of the `next` row
+        // w_{t-7}
+        let w_7 = if i < 3 {
+            local.schedule_helper.w_3[i].map(|x| x.into())
+        } else {
+            let w_3 = w[i - 3].map(|x| x.into());
+            array::from_fn(|j| compose::<AB::Expr>(&w_3[j * 16..(j + 1) * 16], 1))
+        };
+        // sig_0(w_{t-15}) + w_{t-16}
+        let intermed_16 = local.schedule_helper.intermed_12[i].map(|x| x.into());
+
+        let carries = array::from_fn(|j| {
+            next.message_schedule.carry_or_buffer[i][j * 2]
+                + AB::Expr::TWO * next.message_schedule.carry_or_buffer[i][j * 2 + 1]
+        });
+
+        // Constrain `W_{idx} = sig_1(W_{idx-2}) + W_{idx-7} + sig_0(W_{idx-15}) + W_{idx-16}`
+        // We would like to constrain this only on rows 4..16, but we can't do a conditional
+        // check because the degree of sum is already 3 So we must fill in
+        // `intermed_12` with dummy values on rows 0..3 and 15 and 16 to ensure the constraint
+        // holds on rows 0..4 and 16. Note that the dummy value goes in the previous
+        // row to make the current row's constraint hold.
+        constraint_word_addition(
+            // Note: here we can't do a conditional check because the degree of sum is already
+            // 3
+            &mut builder.when_transition(),
+            &[&small_sig1_field::<AB::Expr>(&w[i + 2])],
+            &[&w_7, &intermed_16],
+            &w[i + 4],
+            &carries,
+        );
+
+        for j in 0..SHA256_WORD_U16S {
+            // When on rows 4..16 message schedule carries should be 0 or 1
+            let is_row_4_15 = next.flags.is_round_row - next.flags.is_first_4_rows;
+            builder
+                .when(is_row_4_15.clone())
+                .assert_bool(next.message_schedule.carry_or_buffer[i][j * 2]);
+            builder
+                .when(is_row_4_15)
+                .assert_bool(next.message_schedule.carry_or_buffer[i][j * 2 + 1]);
+        }
+        // Constrain w being composed of bits
+        for j in 0..SHA256_WORD_BITS {
+            builder
+                .when(next.flags.is_round_row)
+                .assert_bool(next.message_schedule.w[i][j]);
+        }
+    }
+  *)
+  msg! "eval_message_schedule::third_loop" in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_ROUNDS_PER_ROW (fun i =>
+      let w_7 :=
+        if i <? 3 then
+          Array.map Expr.Var local_cols.(Sha256RoundCols.schedule_helper).(Sha256MessageHelperCols.w_3).[i]
+        else
+          let w_3 := w.[i - 3] in
+          {| Array.get j := utils.compose (Array.slice_range (Array.map Expr.Var w_3) (j * 16) ((j + 1) * 16)) 1 |}
+      in
+      let intermed_16 := local_cols.(Sha256RoundCols.schedule_helper).(Sha256MessageHelperCols.intermed_12).[i] in
+      let carries := {| Array.get j :=
+        next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.carry_or_buffer).[i].[j * 2] +E
+        (Expr.TWO *E next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.carry_or_buffer).[i].[j * 2 + 1])
+      |} in
+      let! _ :=
+        MExpr.when Expr.IsTransition (
+        utils.constrain_word_addition
+          [utils.small_sig1_field (Array.map Expr.Var w.[i + 2])]
+          [w_7; Array.map Expr.Var intermed_16]
+          (Array.map Expr.Var w.[i + 4])
+          carries
+        ) in
+      let! _ :=
+        MExpr.for_in_zero_to_n SHA256_WORD_U16S (fun j =>
+          let is_row_4_15 :=
+            next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) -E
+            next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_first_4_rows) in
+          let! _ :=
+            MExpr.when is_row_4_15 (
+            MExpr.assert_bool (next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.carry_or_buffer).[i].[j * 2])
+          ) in
+          let! _ :=
+            MExpr.when is_row_4_15 (
+            MExpr.assert_bool (next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.carry_or_buffer).[i].[j * 2 + 1])
+          ) in
+          MExpr.pure tt
+        ) in
+      let! _ :=
+        MExpr.for_in_zero_to_n SHA256_WORD_BITS (fun j =>
+          MExpr.when next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) (
+          MExpr.assert_bool (next_cols.(Sha256RoundCols.message_schedule).(Sha256MessageScheduleCols.w).[i].[j])
+        )
+      ) in
+      MExpr.pure tt
+    ) in
+  MExpr.pure tt.
+
+(* fn eval_transitions<AB: InteractionBuilder>(&self, builder: &mut AB, start_col: usize) *)
+Definition eval_transitions
+    (start_col : Z)
+    (local_cols next_cols : Sha256RoundCols.t Var.t) :
+    MExpr.t unit :=
+  (*
+    let main = builder.main();
+    let local = main.row_slice(0);
+    let next = main.row_slice(1);
+
+    // Doesn't matter what column structs we use here
+    let local_cols: &Sha256RoundCols<AB::Var> =
+        local[start_col..start_col + SHA256_ROUND_WIDTH].borrow();
+    let next_cols: &Sha256RoundCols<AB::Var> =
+        next[start_col..start_col + SHA256_ROUND_WIDTH].borrow();
+
+    let local_is_padding_row = local_cols.flags.is_padding_row();
+    // Note that there will always be a padding row in the trace since the unpadded height is a
+    // multiple of 17. So the next row is padding iff the current block is the last
+    // block in the trace.
+    let next_is_padding_row = next_cols.flags.is_padding_row();
+  *)
+  msg! "eval_transitions" in
+  let local_is_padding_row := Impl_Sha256FlagsCols.is_padding_row local_cols.(Sha256RoundCols.flags) in
+  let next_is_padding_row := Impl_Sha256FlagsCols.is_padding_row next_cols.(Sha256RoundCols.flags) in
+
+  (*
+    // We check that the very last block has `is_last_block` set to true, which guarantees that
+    // there is at least one complete message. If other digest rows have `is_last_block` set to
+    // true, then the trace will be interpreted as containing multiple messages.
+    builder
+        .when(next_is_padding_row.clone())
+        .when(local_cols.flags.is_digest_row)
+        .assert_one(local_cols.flags.is_last_block);
+    // If we are in a round row, the next row cannot be a padding row
+    builder
+        .when(local_cols.flags.is_round_row)
+        .assert_zero(next_is_padding_row.clone());
+    // The first row must be a round row
+    builder
+        .when_first_row()
+        .assert_one(local_cols.flags.is_round_row);
+    // If we are in a padding row, the next row must also be a padding row
+    builder
+        .when_transition()
+        .when(local_is_padding_row.clone())
+        .assert_one(next_is_padding_row.clone());
+    // If we are in a digest row, the next row cannot be a digest row
+    builder
+        .when(local_cols.flags.is_digest_row)
+        .assert_zero(next_cols.flags.is_digest_row);
+  *)
+  msg! "eval_transitions::first_block" in
+  let! _ :=
+    MExpr.when next_is_padding_row (
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row) (
+    MExpr.assert_one local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_last_block)
+    )) in
+  let! _ :=
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) (
+    MExpr.assert_zero next_is_padding_row
+    ) in
+  let! _ :=
+    MExpr.when Expr.IsFirstRow (
+    MExpr.assert_one local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row)
+    ) in
+  let! _ :=
+    MExpr.when Expr.IsTransition (
+    MExpr.when local_is_padding_row (
+    MExpr.assert_one next_is_padding_row
+    )) in
+  let! _ :=
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row) (
+    MExpr.assert_zero next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row)
+    ) in
+
+  (*
+    // Constrain how much the row index changes by
+    // round->round: 1
+    // round->digest: 1
+    // digest->round: -16
+    // digest->padding: 1
+    // padding->padding: 0
+    // Other transitions are not allowed by the above constraints
+    let delta = local_cols.flags.is_round_row * AB::Expr::ONE
+        + local_cols.flags.is_digest_row
+            * next_cols.flags.is_round_row
+            * AB::Expr::from_canonical_u32(16)
+            * AB::Expr::NEG_ONE
+        + local_cols.flags.is_digest_row * next_is_padding_row.clone() * AB::Expr::ONE;
+  *)
+  let delta : Expr.t :=
+    local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) *E Expr.ONE
+      +E local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row)
+        *E next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row)
+        *E Expr.from_canonical_u32 16
+        *E Expr.NEG_ONE
+      +E local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row)
+        *E next_is_padding_row
+        *E Expr.ONE in
+
+  (*
+    // Constrain the global block index
+    // We set the global block index to 0 for padding rows
+    // Starting with 1 so it is not the same as the padding rows
+
+    // Global block index is 1 on first row
+    builder
+        .when_first_row()
+        .assert_one(local_cols.flags.global_block_idx);
+  *)
+  msg! "eval_transitions::second_block" in
+  let! _ :=
+    MExpr.when Expr.IsFirstRow (
+    MExpr.assert_one local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx)
+    ) in
+
+  (*
+    // Global block index is constant on all rows in a block
+    builder.when(local_cols.flags.is_round_row).assert_eq(
+        local_cols.flags.global_block_idx,
+        next_cols.flags.global_block_idx,
+    );
+    // Global block index increases by 1 between blocks
+    builder
+        .when_transition()
+        .when(local_cols.flags.is_digest_row)
+        .when(next_cols.flags.is_round_row)
+        .assert_eq(
+            local_cols.flags.global_block_idx + AB::Expr::ONE,
+            next_cols.flags.global_block_idx,
+        );
+    // Global block index is 0 on padding rows
+    builder
+        .when(local_is_padding_row.clone())
+        .assert_zero(local_cols.flags.global_block_idx);
+  *)
+  let! _ :=
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) (
+    MExpr.assert_eq local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx)
+      next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx)
+    ) in
+  let! _ :=
+    MExpr.when Expr.IsTransition (
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row) (
+    MExpr.when next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row) (
+    MExpr.assert_eq
+      (Expr.Add local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx) Expr.ONE)
+      next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx)
+    ))) in
+  let! _ :=
+    MExpr.when local_is_padding_row (
+    MExpr.assert_zero local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.global_block_idx)
+    ) in
+
+  (*
+    // Constrain the local block index
+    // We set the local block index to 0 for padding rows
+
+    // Local block index is constant on all rows in a block
+    // and its value on padding rows is equal to its value on the first block
+    builder.when(not(local_cols.flags.is_digest_row)).assert_eq(
+        local_cols.flags.local_block_idx,
+        next_cols.flags.local_block_idx,
+    );
+    // Local block index increases by 1 between blocks in the same message
+    builder
+        .when(local_cols.flags.is_digest_row)
+        .when(not(local_cols.flags.is_last_block))
+        .assert_eq(
+            local_cols.flags.local_block_idx + AB::Expr::ONE,
+            next_cols.flags.local_block_idx,
+        );
+    // Local block index is 0 on padding rows
+    // Combined with the above, this means that the local block index is 0 in the first block
+    builder
+        .when(local_cols.flags.is_digest_row)
+        .when(local_cols.flags.is_last_block)
+        .assert_zero(next_cols.flags.local_block_idx);
+    *)
+  msg! "eval_transitions::third_block" in
+  let! _ :=
+    MExpr.when (Expr.not local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row)) (
+    MExpr.assert_eq
+      local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx)
+      next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx)
+    ) in
+  let! _ :=
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row) (
+    MExpr.when (Expr.not local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_last_block)) (
+    MExpr.assert_eq
+      (local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx) +E Expr.ONE)
+      next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx)
+    )) in
+  let! _ :=
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_digest_row) (
+    MExpr.when local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_last_block) (
+    MExpr.assert_zero next_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.local_block_idx)
+    )) in
+
+  (*
+    self.eval_message_schedule::<AB>(builder, local_cols, next_cols);
+    self.eval_work_vars::<AB>(builder, local_cols, next_cols);
+    let next_cols: &Sha256DigestCols<AB::Var> =
+        next[start_col..start_col + SHA256_DIGEST_WIDTH].borrow();
+    self.eval_digest_row(builder, local_cols, next_cols);
+    let local_cols: &Sha256DigestCols<AB::Var> =
+        local[start_col..start_col + SHA256_DIGEST_WIDTH].borrow();
+    self.eval_prev_hash::<AB>(builder, local_cols, next_is_padding_row);
+  *)
+  let! _ := eval_message_schedule local_cols next_cols in
+  (* let! _ := eval_work_vars start_col local_cols next_cols in
+  let! _ := eval_digest_row start_col local_cols next_cols in
+  let! _ := eval_prev_hash start_col local_cols next_is_padding_row in *)
+  MExpr.pure tt.
+
+(*
+fn eval<'a>(&'a self, builder: &'a mut AB, start_col: Self::AirContext<'a>)
+where
+    <AB as AirBuilder>::Var: 'a,
+    <AB as AirBuilder>::Expr: 'a,
+{
+    self.eval_row(builder, start_col);
+    self.eval_transitions(builder, start_col);
+}
+*)
+Definition eval
+    (start_col : Z)
+    (row_local_cols : Sha256DigestCols.t Var.t)
+    (transitions_local_cols transitions_next_cols : Sha256RoundCols.t Var.t) :
+    MExpr.t unit :=
+  let! _ := eval_row start_col row_local_cols in
+  let! _ := eval_transitions start_col transitions_local_cols transitions_next_cols in
+  MExpr.pure tt.
+
+Definition print_eval : string :=
+  let start_col := 0 in
+  let row_local_cols :=
+    MGenerateVar.eval [[ MGenerateVar.generate (A := Sha256DigestCols.t Var.t) (||) ]] in
+  let '(transitions_local_cols, transitions_next_cols) :=
+    MGenerateVar.eval [[ (MGenerateVar.generate (||), MGenerateVar.generate (||)) ]] in
+  ToRocq.cats [
+    ToRocq.endl;
+    ToRocq.to_rocq (eval start_col row_local_cols transitions_local_cols transitions_next_cols) 0;
+    ToRocq.endl
+  ].
+
+Compute print_eval.

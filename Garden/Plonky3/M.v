@@ -56,6 +56,11 @@ Module Array.
       get := x.(get)
     |}.
 
+  Definition slice_range {A : Set} {N : Z} (x : t A N) (start end_ : Z) : t A (end_ - start) :=
+    {|
+      get index := x.(get) (start + index)
+    |}.
+
   Definition get_mod {p} `{Prime p} {N : Z} (x : t Z N) (i : Z) : Z :=
     x.(get) i mod p.
 
@@ -67,6 +72,15 @@ Module Array.
   Definition map {A B : Set} {N : Z} (f : A -> B) (x : t A N) : t B N := 
     {|
       get index := f (x.(get) index)
+    |}.
+
+  Definition concat {A : Set} {N1 N2 : Z} (x1 : t A N1) (x2 : t A N2) : t A (N1 + N2) :=
+    {|
+      get index :=
+        if index <? N1 then
+          x1.(get) index
+        else
+          x2.(get) (index - N1)
     |}.
 
   Definition to_list {A : Set} {N : Z} (x : t A N) : list A :=
