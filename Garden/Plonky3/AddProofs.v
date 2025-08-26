@@ -24,8 +24,13 @@ Lemma large_prime_coprime_exp_of_2 {p} `{Prime p} : 2 < p -> Znumtheory.rel_prim
 Proof.
 Admitted.
 
-Definition range_check_32 (x : Array.t Z U32_LIMBS) : Prop := 
-  0 <= x.(Array.get) 0 < 2 ^ 16 /\ 0 <= x.(Array.get) 1 < 2 ^ 16.
+Module RangeCheck32.
+  Record t (x : Array.t Z U32_LIMBS) : Prop := {
+    first : 0 <= x.(Array.get) 0 < 2 ^ 16;
+    second : 0 <= x.(Array.get) 1 < 2 ^ 16;
+  }.
+End RangeCheck32.
+
 
 Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
 Proof.
@@ -37,6 +42,11 @@ Module AddProofUtil.
   Lemma array_index_range_U32 (i : Z) : 0 <= i < U32_LIMBS -> i = 0 \/ i = 1.
   Proof.
     cbn; lia.
+  Qed.
+
+  Lemma p_times_2_exp_16 {x : Z} (p : Z) (Hx : x > 0) (Hp : x < p) : 2 ^ 16 * p > 2 ^ 16 * x.
+  Proof.
+    nia.
   Qed.
 
   Lemma constant_unwrap {p} `{Prime p} (x : Z) : x > 0 -> p > x -> UnOp.from x = x.
@@ -111,9 +121,9 @@ Module Add2Proof.
       let a := M.map_mod a in
       let b := M.map_mod b in *)
       2 ^ 17 < p ->
-      range_check_32 result ->
-      range_check_32 a ->
-      range_check_32 b ->
+      RangeCheck32.t result ->
+      RangeCheck32.t a ->
+      RangeCheck32.t b ->
       {{ add2 result a b 🔽
         tt,
         Array.Eq.t (eval_add2 a b) result
@@ -135,8 +145,10 @@ Module Add2Proof.
       set (res0 := result.(Array.get) 0) in H1.
       set (res1 := result.(Array.get) 1) in H1.
 
-      unfold range_check_32 in Hrc_res, Hrc_a, Hrc_b.
-      fold a0 a1 b0 b1 res0 res1 in Hrc_res, Hrc_a, Hrc_b.
+      destruct Hrc_res as [Hrc_res_first Hrc_res_second].
+      destruct Hrc_a as [Hrc_a_first Hrc_a_second].
+      destruct Hrc_b as [Hrc_b_first Hrc_b_second].
+      fold a0 a1 b0 b1 res0 res1 in Hrc_res_first, Hrc_res_second, Hrc_a_first, Hrc_a_second, Hrc_b_first, Hrc_b_second.
 
       eapply Run.LetAccumulate. {
         constructor.
@@ -373,7 +385,8 @@ Module Add2Proof.
         *)
         assert (H2_16_p : 2 ^ 16 * p > 2 ^ 33).
         {
-          lia.
+          replace (2 ^ 33) with ((2 ^ 16) * (2 ^ 17)) by lia.
+          apply AddProofUtil.p_times_2_exp_16; lia.
         }
 
         destruct H8' as [H8a | H8b].
@@ -453,8 +466,7 @@ Module Add2Proof.
           unfold res_val.
           unfold pack_16_limbs.
           unfold BITS_PER_LIMB.
-          fold res0 res1 in Hrc_res.
-          destruct Hrc_res as [Hrc0 Hrc1].
+          fold res0 res1 in Hrc_res_first, Hrc_res_second.
           fold res0 res1.
           split.
           (* >= 0 *)
@@ -474,12 +486,12 @@ Module Add2Proof.
             assert (res0 <= Z.pow_pos 2 16 - 1).
             { 
               apply int_upper. 
-              exact (proj2 Hrc0). 
+              exact (proj2 Hrc_res_first). 
             }
             assert (res1 <= Z.pow_pos 2 16 - 1).
             { 
               apply int_upper. 
-              exact (proj2 Hrc1). 
+              exact (proj2 Hrc_res_second). 
             }
             assert (res0 + res1 * Z.pow_pos 2 16 <= 
               (Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16 - 1) * Z.pow_pos 2 16).
@@ -555,7 +567,7 @@ Module Add2Proof.
           rewrite Z_mod_plus_full.
           unfold res0.
           apply Zmod_small.
-          apply Hrc_res.
+          apply Hrc_res_first.
         }
         (* i = 1 *)
         {
@@ -569,12 +581,11 @@ Module Add2Proof.
           unfold res_val.
           unfold res1.
           unfold pack_16_limbs.
-          unfold range_check_32 in Hrc_res.
           unfold BITS_PER_LIMB.
           rewrite Z_div_plus_full; [|lia].
           cut (result.(Array.get) 0 / 2 ^ 16 = 0); [intros Hr; rewrite Hr; reflexivity |].
           apply Zdiv_small.
-          apply Hrc_res.
+          apply Hrc_res_first.
         }
       }
       eapply Run.Implies. {
@@ -593,10 +604,10 @@ Module Add3Proof.
       let a := M.map_mod a in
       let b := M.map_mod b in *)
       p > 3 * 2 ^ 17 ->
-      range_check_32 result ->
-      range_check_32 a ->
-      range_check_32 b ->
-      range_check_32 c ->
+      RangeCheck32.t result ->
+      RangeCheck32.t a ->
+      RangeCheck32.t b ->
+      RangeCheck32.t c ->
       {{ add3 result a b c 🔽
         tt,
         Array.Eq.t (eval_add3 a b c) result
@@ -624,12 +635,15 @@ Module Add3Proof.
       set (acc_32 := BinOp.sub (BinOp.sub (BinOp.sub res1 a1) b1) c1) in HA, HB.
       set (acc := BinOp.add acc_16 (BinOp.mul acc_32 (2 ^ 16))) in HA.
       (* apply definitions *)
-      unfold range_check_32 in Hrc_res, Hrc_a, Hrc_b, Hrc_c.
+      destruct Hrc_res as [Hrc_res_first Hrc_res_second].
+      destruct Hrc_a as [Hrc_a_first Hrc_a_second].
+      destruct Hrc_b as [Hrc_b_first Hrc_b_second].
+      destruct Hrc_c as [Hrc_c_first Hrc_c_second].
       (* shorthand substitutions*)
-      fold res0 res1 in Hrc_res.
-      fold a0 a1 in Hrc_a.
-      fold b0 b1 in Hrc_b.
-      fold c0 c1 in Hrc_c.
+      fold res0 res1 in Hrc_res_first, Hrc_res_second.
+      fold a0 a1 in Hrc_a_first, Hrc_a_second.
+      fold b0 b1 in Hrc_b_first, Hrc_b_second.
+      fold c0 c1 in Hrc_c_first, Hrc_c_second.
 
       (* HA : acc * (acc + two_32) * (acc + 2 * two_32) = 0 *)
       (* HB : acc_16 * (acc_16 + two_16) * (acc_16 + 2 * two_16) = 0 *)
@@ -811,7 +825,8 @@ Module Add3Proof.
       {
         assert (H2_16_p : 2 ^ 16 * p > 3 * 2 ^ 33).
         {
-          lia.
+          replace (3 * 2 ^ 33) with ((2 ^ 16) * (3 * 2 ^ 17)) by lia.
+          apply AddProofUtil.p_times_2_exp_16; lia.
         }
         destruct H4 as [H4a | H4''].
         {
@@ -887,10 +902,10 @@ Module Add3Proof.
           replace (Z.pow_pos 2 32 - 1) with (1 * (Z.pow_pos 2 16 - 1) + (Z.pow_pos 2 16) * (Z.pow_pos 2 16 - 1)) by lia.
           apply (AddProofUtil.compound_range_check res0 res1 0 (Z.pow_pos 2 16 - 1) 0 (Z.pow_pos 2 16 - 1) 1 (Z.pow_pos 2 16)).
           {
-            split; [| apply int_upper]; apply Hrc_res.
+            split; [|apply int_upper]; apply Hrc_res_first.
           }
           {
-            split; [| apply int_upper]; apply Hrc_res.
+            split; [| apply int_upper]; apply Hrc_res_second.
           }
           {
             lia.
@@ -932,7 +947,7 @@ Module Add3Proof.
           rewrite Hsum_eq_res.
           rewrite Z_mod_plus_full.
           apply Zmod_small.
-          apply (proj1 Hrc_res).
+          apply Hrc_res_first.
         }
         (* i = 1 *)
         {
@@ -947,7 +962,7 @@ Module Add3Proof.
           rewrite Z_div_plus_full; [|lia].
           assert (Hres0 : res0 / Z.pow_pos 2 16 = 0). {
             apply Zdiv_small.
-            apply (proj1 Hrc_res).
+            apply Hrc_res_first.
           }
           rewrite Hres0.
           auto.
