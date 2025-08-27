@@ -28,6 +28,8 @@ Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
 
+Axiom prime_range : forall {p} `{Prime p}, 1 < p.
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -497,6 +499,7 @@ Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
 Proof.
 Admitted.
 
+
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
   Lemma from_zero {p} `{Prime p} : UnOp.from 0 = 0.
@@ -818,3 +821,56 @@ Module Run.
     repeat run_step.
 End Run.
 Export Run.
+
+(* could be later moved together to a single module doing modulo arithmetics. *)
+
+(* Utilities used for modulo arithmetics *)
+Lemma mod_when_smaller {p : Z} (x : Z) (Hx : 0 <= x < p) :
+  x mod p = x.
+Proof.
+  apply Zmod_small; auto.
+Qed.
+
+(* possible referencehttps://math.stackexchange.com/questions/2542245/how-to-prove-chinese-remainder-theorem-by-coq *)
+Lemma chinese_remainder_simpler: forall n p a b : Z,
+    n <> 0 ->
+    p <> 0 ->
+    Znumtheory.rel_prime n p ->
+    exists x:Z, (x mod n = a mod n) /\ (x mod p = b mod p). 
+Proof.
+  intros n p a b npos ppos coprime. 
+  destruct (Znumtheory.rel_prime_bezout _ _ coprime) as [u v H0].
+  exists (a * v * p + b * u * n). split.
+  - rewrite Z.mod_add. 2: exact npos.
+    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
+    assert ((u * n + v * p) mod n = 1 mod n) as H.
+    rewrite H0. reflexivity.
+    rewrite Z.add_comm, Z.mod_add in H. rewrite H.
+    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
+    reflexivity. exact npos.
+  - rewrite Z.add_comm, Z.mod_add. 2: exact ppos.
+    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
+    assert ((u * n + v * p) mod p = 1 mod p) as H.
+    rewrite H0. reflexivity.
+    rewrite Z.mod_add in H. rewrite H.
+    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
+    reflexivity. exact ppos.  
+Qed.
+
+(** Binary Chinese Remainder Theorem: if p, q are coprime, then the equation system 
+    "x mod p = a /\ x mod q = b" has a unique solution modulo p * q *)
+Axiom binary_chinese_remainder_alt : forall (p q x t : Z),
+  p <> 0 ->
+  q <> 0 ->
+  Znumtheory.rel_prime p q ->
+  x mod p = t mod p ->
+  x mod q = t mod q ->
+  x mod (p * q) = t mod (p * q).
+
+Lemma mod_0_range (k : Z) (x : Z) :
+    k > 0 -> 
+    -k < x < k ->
+    x mod k = 0 ->
+    x = 0.
+Proof.
+Admitted.
