@@ -12080,6 +12080,106 @@ Trace 🐾
         Variable: 897
         Constant: 1
   Message 🦜
+    eval_work_vars
+  Message 🦜
+    eval_work_vars::first_loop
+  Interaction:
+    message:
+      Variable: 267
+      Variable: 275
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 268
+      Variable: 276
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 269
+      Variable: 277
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 270
+      Variable: 278
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 271
+      Variable: 279
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 272
+      Variable: 280
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 273
+      Variable: 281
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Interaction:
+    message:
+      Variable: 274
+      Variable: 282
+      Constant: 0
+      Constant: 0
+    count:
+      Variable: 0
+    bus_index:
+      8000
+    count_weight:
+      1
+  Message 🦜
     eval_digest_row
   Message 🦜
     eval_digest_row::first_loop

@@ -1,8 +1,56 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.MExpr.
+Require Import Garden.OpenVM.primitives.bitwise_op_lookup.
+Require Import Garden.OpenVM.primitives.encoder.
 Require Import Garden.OpenVM.primitives.utils.
 Require Import Garden.OpenVM.Sha256.columns.
 Require Import Garden.OpenVM.Sha256.utils.
+
+(* We hardcode this value *)
+Definition row_idx_encoder: Encoder.t := {|
+  Encoder.var_cnt := 5;
+  Encoder.flag_cnt := 18;
+  Encoder.max_flag_degree := 2;
+  Encoder.pts := [
+    [0; 0; 0; 0; 0];
+    [0; 0; 0; 0; 1];
+    [0; 0; 0; 0; 2];
+    [0; 0; 0; 1; 0];
+    [0; 0; 0; 1; 1];
+    [0; 0; 0; 2; 0];
+    [0; 0; 1; 0; 0];
+    [0; 0; 1; 0; 1];
+    [0; 0; 1; 1; 0];
+    [0; 0; 2; 0; 0];
+    [0; 1; 0; 0; 0];
+    [0; 1; 0; 0; 1];
+    [0; 1; 0; 1; 0];
+    [0; 1; 1; 0; 0];
+    [0; 2; 0; 0; 0];
+    [1; 0; 0; 0; 0];
+    [1; 0; 0; 0; 1];
+    [1; 0; 0; 1; 0];
+    [1; 0; 1; 0; 0];
+    [1; 1; 0; 0; 0];
+    [2; 0; 0; 0; 0]
+  ];
+  Encoder.reserve_invalid := false;
+|}.
+
+(*
+pub struct Sha256Air {
+    pub bitwise_lookup_bus: BitwiseOperationLookupBus,
+    pub row_idx_encoder: Encoder,
+    bus: PermutationCheckBus,
+}
+*)
+Module Sha256Air.
+  Record t : Set := {
+    bitwise_lookup_bus : BitwiseOperationLookupBus.t;
+    row_idx_encoder : Encoder.t;
+    bus : Z;
+  }.
+End Sha256Air.
 
 (*
 fn eval_row<AB: InteractionBuilder>(&self, builder: &mut AB, start_col: usize)
@@ -257,6 +305,55 @@ Definition eval_message_schedule
   MExpr.pure tt.
 
 (*
+fn eval_work_vars<AB: InteractionBuilder>(
+    &self,
+    builder: &mut AB,
+    local: &Sha256RoundCols<AB::Var>,
+    next: &Sha256RoundCols<AB::Var>,
+)
+*)
+Definition eval_work_vars
+    (self : Sha256Air.t)
+    (local_cols next_cols : Sha256RoundCols.t Var.t) :
+    MExpr.t unit :=
+  msg! "eval_work_vars" in
+  (*
+    let a = [local.work_vars.a, next.work_vars.a].concat();
+    let e = [local.work_vars.e, next.work_vars.e].concat();
+    for i in 0..SHA256_ROUNDS_PER_ROW {
+        for j in 0..SHA256_WORD_U16S {
+            // Although we need carry_a <= 6 and carry_e <= 5, constraining carry_a, carry_e in
+            // [0, 2^8) is enough to prevent overflow and ensure the soundness
+            // of the addition we want to check
+            self.bitwise_lookup_bus
+                .send_range(local.work_vars.carry_a[i][j], local.work_vars.carry_e[i][j])
+                .eval(builder, local.flags.is_round_row);
+        }
+  *)
+  msg! "eval_work_vars::first_loop" in
+  let a := Array.concat
+    local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.a)
+    next_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.a)
+  in
+  let e := Array.concat
+    local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.e)
+    next_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.e) in
+  let! _ :=
+    MExpr.for_in_zero_to_n SHA256_ROUNDS_PER_ROW (fun i =>
+      MExpr.for_in_zero_to_n SHA256_WORD_U16S (fun j =>
+        let interaction :=
+          Impl_BitwiseOperationLookupBus.send_range
+            self.(Sha256Air.bitwise_lookup_bus)
+            (local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.carry_a).[i].[j])
+            (local_cols.(Sha256RoundCols.work_vars).(Sha256WorkVarsCols.carry_e).[i].[j]) in
+        Impl_BitwiseOperationLookupBusInteraction.eval
+          interaction
+          local_cols.(Sha256RoundCols.flags).(Sha256FlagsCols.is_round_row)
+      )
+    ) in
+  MExpr.pure tt.
+
+(*
 fn eval_digest_row<AB: InteractionBuilder>(
     &self,
     builder: &mut AB,
@@ -450,13 +547,20 @@ Definition eval_digest_row
         )
         carry
         (List.seq 0 (Z.to_nat SHA256_WORD_U16S)) in
-      (* TODO: lookup bus *)
+      let! _ :=
+        let chunks :=
+          Array.to_list next_cols.(Sha256DigestCols.final_hash).[i] in
+        MExpr.List.iter (fun j =>
+          (* TODO interaction *)
+          MExpr.pure tt
+        ) chunks in
       MExpr.pure tt
     ) in
   MExpr.pure tt.
 
 (* fn eval_transitions<AB: InteractionBuilder>(&self, builder: &mut AB, start_col: usize) *)
 Definition eval_transitions
+    (self : Sha256Air.t)
     (start_col : Z)
     (round_local_cols round_next_cols : Sha256RoundCols.t Var.t)
     (digest_local_cols digest_next_cols : Sha256DigestCols.t Var.t) :
@@ -661,6 +765,7 @@ Definition eval_transitions
   (* self.eval_message_schedule::<AB>(builder, local_cols, next_cols); *)
   let! _ := eval_message_schedule local_cols next_cols in
   (* self.eval_work_vars::<AB>(builder, local_cols, next_cols); *)
+  let! _ := eval_work_vars self local_cols next_cols in
   (*
     let next_cols: &Sha256DigestCols<AB::Var> =
         next[start_col..start_col + SHA256_DIGEST_WIDTH].borrow();
@@ -688,18 +793,28 @@ where
 }
 *)
 Definition eval
+    (self : Sha256Air.t)
     (start_col : Z)
     (round_local_cols round_next_cols : Sha256RoundCols.t Var.t)
     (digest_local_cols digest_next_cols : Sha256DigestCols.t Var.t) :
     MExpr.t unit :=
   let! _ := eval_row start_col digest_local_cols in
   let! _ :=
-    eval_transitions start_col
+    eval_transitions self start_col
       round_local_cols round_next_cols
       digest_local_cols digest_next_cols in
   MExpr.pure tt.
 
 Definition print_eval : string :=
+  let self : Sha256Air.t := {|
+    Sha256Air.bitwise_lookup_bus := {|
+      BitwiseOperationLookupBus.inner := {|
+        LookupBus.index := 8000;
+      |};
+    |};
+    Sha256Air.row_idx_encoder := row_idx_encoder;
+    Sha256Air.bus := 8001;
+  |} in
   let start_col := 0 in
   let '(round_local_cols, round_next_cols) :=
     MGenerateVar.eval [[ (
@@ -718,7 +833,7 @@ Definition print_eval : string :=
     ) ]] in
   ToRocq.cats [
     ToRocq.endl;
-    ToRocq.to_rocq (eval start_col round_local_cols round_next_cols digest_local_cols digest_next_cols) 0;
+    ToRocq.to_rocq (eval self start_col round_local_cols round_next_cols digest_local_cols digest_next_cols) 0;
     ToRocq.endl
   ].
 

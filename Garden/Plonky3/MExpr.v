@@ -271,6 +271,11 @@ Global Instance StringIsToRocq : ToRocq.C string := {
     ToRocq.cats [ToRocq.indent indent; self];
 }.
 
+Global Instance ZIsToRocq : ToRocq.C Z := {
+  to_rocq self indent :=
+    ToRocq.cats [ToRocq.indent indent; ToRocq.of_Z self];
+}.
+
 Global Instance OptionIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (option T) := {
   to_rocq self indent :=
     match self with
@@ -325,12 +330,50 @@ Global Instance ArrayIsEval {T : Set} `{Eval.C T Z} {N : Z} :
   eval p _ env self := Array.map (Eval.eval env) self;
 }.
 
+(** For interactions with buses *)
+Module Interaction.
+  (*
+  pub struct Interaction<Expr> {
+      pub message: Vec<Expr>,
+      pub count: Expr,
+      pub bus_index: u16,
+      pub count_weight: u32,
+  }
+  *)
+  Record t : Set := {
+    message : list Expr.t;
+    count : Expr.t;
+    bus_index : Z;
+    count_weight : Z;
+  }.
+
+  Global Instance IsToRocq : ToRocq.C t := {
+    to_rocq self indent :=
+      ToRocq.cats [ToRocq.indent indent; "Interaction:"; ToRocq.endl;
+        ToRocq.indent (indent + 2); "message:"; ToRocq.endl;
+        ToRocq.separate ToRocq.endl (
+          List.map (fun expr => ToRocq.to_rocq expr (indent + 4)) self.(message)
+        );
+        ToRocq.endl;
+        ToRocq.indent (indent + 2); "count:"; ToRocq.endl;
+        ToRocq.to_rocq self.(count) (indent + 4);
+        ToRocq.endl;
+        ToRocq.indent (indent + 2); "bus_index:"; ToRocq.endl;
+        ToRocq.to_rocq self.(bus_index) (indent + 4);
+        ToRocq.endl;
+        ToRocq.indent (indent + 2); "count_weight:"; ToRocq.endl;
+        ToRocq.to_rocq self.(count_weight) (indent + 4)
+      ];
+  }.
+End Interaction.
+
 (** What we are pretty-printing at the end *)
 Module Trace.
   Module Event.
     Inductive t : Set :=
     | AssertZero (expr : Expr.t)
-    | Message (message : string).
+    | Message (message : string)
+    | Interaction (interaction : Interaction.t).
 
     Global Instance IsToRocq : ToRocq.C t := {
       to_rocq self indent :=
@@ -343,6 +386,8 @@ Module Trace.
           ToRocq.cats [ToRocq.indent indent; "Message 🦜"; ToRocq.endl;
             ToRocq.to_rocq message (indent + 2)
           ]
+        | Interaction interaction =>
+          ToRocq.to_rocq interaction indent
         end;
     }.
   End Event.
@@ -369,6 +414,7 @@ Module MExpr.
   (** We add this condition here as it helps to have a clear pretty-printing *)
   | When (condition : Expr.t) (body : t A) : t A
   | Message (message : string) (k : t A) : t A
+  | Interaction (interaction : Interaction.t) (value : A) : t A
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
@@ -376,6 +422,7 @@ Module MExpr.
   Arguments Let {_ _}.
   Arguments When {_}.
   Arguments Message {_}.
+  Arguments Interaction {_}.
 
   Fixpoint to_trace {A : Set} (self : t A) : A * Trace.t :=
     match self with
@@ -393,13 +440,15 @@ Module MExpr.
         List.map (fun event =>
           match event with
           | Trace.Event.AssertZero expr => Trace.Event.AssertZero (Expr.Mul condition expr)
-          | Trace.Event.Message _ => event
+          | Trace.Event.Message _ | Trace.Event.Interaction _ => event
           end
         ) constraints_body
       )
     | Message message k =>
       let '(value_k, constraints_k) := to_trace k in
       (value_k, [Trace.Event.Message message] ++ constraints_k)
+    | Interaction interaction value =>
+      (value, [Trace.Event.Interaction interaction])
     end.
 
   Module Eq.
@@ -449,6 +498,9 @@ Module MExpr.
       M.when (Eval.eval env condition) (eval env body)
     | Message _ k =>
       eval env k
+    | Interaction interaction value =>
+      (* TODO *)
+      M.pure value
     end.
 
   Fixpoint map {A B : Set} (f : A -> B) (self : t A) : t B :=
@@ -459,6 +511,7 @@ Module MExpr.
     | Let e k => Let e (fun x => map f (k x))
     | When condition body => When condition (map f body)
     | Message message k => Message message (map f k)
+    | Interaction interaction value => Interaction interaction (f value)
     end.
 End MExpr.
 
@@ -489,6 +542,73 @@ Definition pure {A : Set} (value : A) : MExpr.t A :=
 
 Definition when {A : Set} (condition : Expr.t) (body : MExpr.t A) : MExpr.t A :=
   MExpr.When condition body.
+
+Definition interaction (interaction : Interaction.t) : MExpr.t unit :=
+  MExpr.Interaction interaction tt.
+
+(*
+pub struct LookupBus {
+    pub index: BusIndex,
+}
+*)
+Module LookupBus.
+  Record t : Set := {
+    index : Z;
+  }.
+End LookupBus.
+
+(* impl LookupBus { *)
+Module Impl_LookupBus.
+  (*
+    pub fn lookup_key<AB, E>(
+        &self,
+        builder: &mut AB,
+        query: impl IntoIterator<Item = E>,
+        enabled: impl Into<AB::Expr>,
+    ) where
+        AB: InteractionBuilder,
+        E: Into<AB::Expr>,
+    {
+        builder.push_interaction(self.index, query, enabled, 1);
+    }
+  *)
+  Definition lookup_key
+    (self : LookupBus.t)
+    (query : list Expr.t)
+    (enabled : Expr.t) :
+    MExpr.t unit :=
+  interaction {|
+    Interaction.message := query;
+    Interaction.count := enabled;
+    Interaction.bus_index := self.(LookupBus.index);
+    Interaction.count_weight := 1;
+  |}.
+
+  (*
+    pub fn add_key_with_lookups<AB, E>(
+        &self,
+        builder: &mut AB,
+        key: impl IntoIterator<Item = E>,
+        num_lookups: impl Into<AB::Expr>,
+    ) where
+        AB: InteractionBuilder,
+        E: Into<AB::Expr>,
+    {
+        builder.push_interaction(self.index, key, -num_lookups.into(), 0);
+    }
+  *)
+  Definition add_key_with_lookups
+    (self : LookupBus.t)
+    (key : list Expr.t)
+    (num_lookups : Expr.t) :
+    MExpr.t unit :=
+  interaction {|
+    Interaction.message := key;
+    Interaction.count := num_lookups;
+    Interaction.bus_index := self.(LookupBus.index);
+    Interaction.count_weight := 0;
+  |}.
+End Impl_LookupBus.
 
 Definition assert_zero (e : Expr.t) : MExpr.t unit :=
   MExpr.AssertZero e tt.
@@ -541,6 +661,14 @@ Module List.
     | x :: xs =>
       let! acc := f acc x in
       fold_left f acc xs
+    end.
+
+  Fixpoint iter {A : Set} (f : A -> MExpr.t unit) (l : list A) : MExpr.t unit :=
+    match l with
+    | [] => pure tt
+    | x :: xs =>
+      let! _ := f x in
+      iter f xs
     end.
 
   Module Eq.
