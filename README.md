@@ -12,7 +12,7 @@ Vitalik declared that, in order to be ready for the L1, zkVMs must be formally v
 - **Functional correctness**: the circuit computes the right output (typically the RISC-V semantics);
 - **Completeness**: the circuit never blocks.
 
-You can get more details about the properties to verify in our blog post [🦄 What to verify in a zkVM](https://formal.land/blog/2025/08/12/verification-of-zkvm). The list of zkVMs with their formal verification status is maintained on [Ethproofs.org.](https://ethproofs.org/).
+You can get more details about the properties to verify in our blog post [🦄 What to verify in a zkVM](https://formal.land/blog/2025/08/12/verification-of-zkvm). The list of zkVMs with their formal verification status is maintained on [Ethproofs.org](https://ethproofs.org/).
 
 The Garden framework aims to be:
 
