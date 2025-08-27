@@ -6,7 +6,7 @@
 
 ## What
 
-Vitalik declared that, in order to be ready for the L1, zkVMs must be formally verified. This includes verifying the circuit constraints, which are one of the most critical parts of a zkVM. With **Garden**, we provide a friendly framework in the [Rocq](https://rocq-prover.org/) formal system to make sure that the three main properties of a circuit, namely:
+Vitalik declared that, in order to be ready for the L1, zkVMs must be formally verified. This includes verifying the circuit constraints, which are one of the most critical parts of a zkVM. With **Garden**, we provide a friendly framework in the [Rocq](https://rocq-prover.org/) formal system to make sure that the three main properties of a circuit hold:
 
 - **Determinism**: only one possible trace for each input;
 - **Functional correctness**: the circuit computes the right output (typically the RISC-V semantics);
