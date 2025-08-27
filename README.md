@@ -17,7 +17,7 @@ You can get more details about the properties to verify in our blog post [🦄 W
 The Garden framework aims to be:
 
 - **Effective**: the formal verification of circuits must be efficient, as this is a competitive space;
-- **Maintainable**: no black magic, proofs must be understandable by a human;
+- **Maintainable**: no black magic;
 - **Tied to the code**: the formal model must be tied to the code generating the circuits, not the low-level constraints themselves.
 
 We provide several examples (many of which are Work in Progress at the moment) about:
