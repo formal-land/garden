@@ -21,7 +21,7 @@ all: CoqMakefile
 	$(MAKE) snapshot
 
 snapshot:
-	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | head -n -2 > OpenVM/BranchEq/core_expr.snapshot
+	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | sed -e '$d' -e '$d' > OpenVM/BranchEq/core_expr.snapshot
 
 clean-coq: CoqMakefile
 	$(MAKECOQ) clean
