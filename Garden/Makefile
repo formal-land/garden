@@ -20,8 +20,17 @@ all: CoqMakefile
 	$(MAKECOQ) all
 	$(MAKE) snapshot
 
+# Detect OS and set appropriate commands
+UTILHEADNAME_S := $(shell uname -s)
+ifeq ($(UTILHEADNAME_S),Darwin)
+    HEAD_CMD = ghead
+else
+    HEAD_CMD = head
+endif
+
 snapshot:
-	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | head -n -2 > OpenVM/BranchEq/core_expr.snapshot
+	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/BranchEq/core_expr.snapshot
+
 
 clean-coq: CoqMakefile
 	$(MAKECOQ) clean
