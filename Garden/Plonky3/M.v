@@ -478,7 +478,6 @@ Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
 Proof.
 Admitted.
 
-
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
   Lemma from_zero {p} `{Prime p} : UnOp.from 0 = 0.
@@ -800,6 +799,72 @@ Module Run.
     repeat run_step.
 End Run.
 Export Run.
+
+(** Evaluation rule to show the completeness of a circuit. *)
+Module Complete.
+  Reserved Notation "{{ e ✅ value }}".
+
+  Inductive t {A : Set} : M.t A -> A -> Prop :=
+  | Pure (value : A) :
+    {{ M.Pure value ✅ value }}
+  | AssertZero (x : Z) (value : A) :
+    x = 0 ->
+    {{ M.AssertZero x value ✅ value }}
+  | Call (e : M.t A) (value : A) :
+    {{ e ✅ value }} ->
+    {{ M.Call e ✅ value }}
+  | Let {B : Set} (e : M.t B) (value : B) (k : B -> M.t A) (value_k : A) :
+    {{ e ✅ value }} ->
+    {{ k value ✅ value_k }} ->
+    {{ M.Let e k ✅ value_k }}
+  | When (condition : Z) (e : M.t A) (value : A) :
+    (condition <> 0 -> {{ e ✅ value }}) ->
+    {{ M.When condition e ✅ value }}
+
+  where "{{ e ✅ value }}" := (t e value).
+
+  Lemma ForInZeroToN_nat {N : nat} (f : Z -> M.t unit) :
+    (forall i, 0 <= i < Z.of_nat N ->
+      {{ f i ✅ tt }}
+    ) ->
+    {{ M.for_in_zero_to_n (Z.of_nat N) f ✅ tt }}.
+  Proof.
+    intros H_body.
+    with_strategy transparent [M.for_in_zero_to_n] unfold M.for_in_zero_to_n.
+    replace (Z.to_nat (Z.of_nat N)) with N by lia.
+    induction N; cbn in *.
+    { apply Complete.Pure. }
+    { eapply Complete.Let. {
+        apply IHN.
+        intros i H_i.
+        apply H_body.
+        lia.
+      }
+      apply H_body.
+      lia.
+    }
+  Qed.
+
+  Lemma ForInZeroToN {N : Z} (f : Z -> M.t unit) :
+    (forall i, 0 <= i < N ->
+      {{ f i ✅ tt }}
+    ) ->
+    {{ M.for_in_zero_to_n N f ✅ tt }}.
+  Proof.
+    intros H_body.
+    assert (N < 0 \/ N = Z.of_nat (Z.to_nat N)) as [H_N | H_N] by lia.
+    { with_strategy transparent [M.for_in_zero_to_n] unfold M.for_in_zero_to_n.
+      replace (Z.to_nat N) with 0%nat by lia.
+      cbn.
+      apply Complete.Pure.
+    }
+    { rewrite H_N.
+      apply ForInZeroToN_nat.
+      hauto q: on.
+    }
+  Qed.
+End Complete.
+Export Complete.
 
 (* could be later moved together to a single module doing modulo arithmetics. *)
 
