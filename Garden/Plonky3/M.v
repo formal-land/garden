@@ -949,4 +949,6 @@ Definition test3 : Z := mod_inverse 5 17.
 Definition test4 : Z := mod_inverse 5 (2 ^ 64 - 2 ^ 32 + 1).
 
 Eval compute in test1.
+Eval compute in test2.
+Eval compute in test3.
 Eval compute in test4.
