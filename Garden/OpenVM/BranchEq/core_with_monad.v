@@ -269,6 +269,30 @@ Definition get_expected_cmp_result {NUM_LIMBS : Z}
       true
   end.
 
+Definition get_expected_result {p} `{Prime p} {NUM_LIMBS : Z}
+    (self : BranchEqualCoreAir.t NUM_LIMBS)
+    (local : BranchEqualCoreCols.t NUM_LIMBS Z)
+    (from_pc : Z)
+    (expected_cmp_result : bool) :
+    AdapterAirContext.t NUM_LIMBS Z :=
+  {|
+    AdapterAirContext.to_pc :=
+      Some (BinOp.add from_pc (
+        if expected_cmp_result then
+          local.(BranchEqualCoreCols.imm)
+        else
+          self.(BranchEqualCoreAir.pc_step)
+      ));
+    AdapterAirContext.reads := [local.(BranchEqualCoreCols.a); local.(BranchEqualCoreCols.b)];
+    AdapterAirContext.writes := [];
+    AdapterAirContext.instruction := {|
+      ImmInstruction.is_valid := 1;
+      ImmInstruction.opcode :=
+        BinOp.add local.(BranchEqualCoreCols.opcode_bne_flag) self.(BranchEqualCoreAir.offset);
+      ImmInstruction.immediate := local.(BranchEqualCoreCols.imm)
+    |};
+  |}.
+
 (** Determinism *)
 Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (self : BranchEqualCoreAir.t NUM_LIMBS)
@@ -284,28 +308,12 @@ Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
       local.(BranchEqualCoreCols.a)
       local.(BranchEqualCoreCols.b) in
   {{ eval self local from_pc 🔽
-    {|
-      AdapterAirContext.to_pc :=
-        Some (BinOp.add from_pc (
-          if expected_cmp_result then
-            local.(BranchEqualCoreCols.imm)
-          else
-            self.(BranchEqualCoreAir.pc_step)
-        ));
-      AdapterAirContext.reads := [local.(BranchEqualCoreCols.a); local.(BranchEqualCoreCols.b)];
-      AdapterAirContext.writes := [];
-      AdapterAirContext.instruction := {|
-        ImmInstruction.is_valid := 1;
-        ImmInstruction.opcode :=
-          BinOp.add local.(BranchEqualCoreCols.opcode_bne_flag) self.(BranchEqualCoreAir.offset);
-        ImmInstruction.immediate := local.(BranchEqualCoreCols.imm)
-      |};
-    |},
+    get_expected_result self local from_pc expected_cmp_result,
     local.(BranchEqualCoreCols.cmp_result) = Z.b2z expected_cmp_result
   }}.
 Proof.
   intros.
-  unfold eval.
+  unfold eval, get_expected_result.
   eapply Run.LetAccumulate with (value := 1) (P1 := True). {
     destruct branch_equal_opcode; cbn;
       eapply Run.Implies; repeat econstructor.
@@ -451,27 +459,11 @@ Lemma eval_complete `{Prime goldilocks_prime} {NUM_LIMBS : Z}
           diff_inv_marker.[i] = 0
     ),
   {{ eval self local from_pc ✅
-    {|
-      AdapterAirContext.to_pc :=
-        Some (BinOp.add from_pc (
-          if expected_cmp_result then
-            local.(BranchEqualCoreCols.imm)
-          else
-            self.(BranchEqualCoreAir.pc_step)
-        ));
-      AdapterAirContext.reads := [local.(BranchEqualCoreCols.a); local.(BranchEqualCoreCols.b)];
-      AdapterAirContext.writes := [];
-      AdapterAirContext.instruction := {|
-        ImmInstruction.is_valid := 1;
-        ImmInstruction.opcode :=
-          BinOp.add local.(BranchEqualCoreCols.opcode_bne_flag) self.(BranchEqualCoreAir.offset);
-        ImmInstruction.immediate := local.(BranchEqualCoreCols.imm)
-      |};
-    |}
+    get_expected_result self local from_pc expected_cmp_result
   }}.
 Proof.
   intros.
-  unfold eval.
+  unfold eval, get_expected_result.
   eapply Complete.Let with (value := 1). {
     cbn.
     destruct branch_equal_opcode; cbn;
