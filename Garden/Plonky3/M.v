@@ -921,27 +921,22 @@ Proof.
 Admitted.
 
 
-Fixpoint fast_pow (base exp acc modulus : Z) (cnt : nat) : Z :=
-  match cnt with
-  | O => acc
-  | S cnt' =>
-    if exp =? 0 then acc
-    else
-      let new_acc := if Z.odd exp then (acc * base) mod modulus else acc in
-      let new_base := (base * base) mod modulus in
-      fast_pow new_base (Z.div exp 2) new_acc modulus cnt'
+Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
+  match exponent with
+  | xH => acc
+  | xO p =>
+    let acc := (acc * acc) mod modulus in
+    fast_pow_modulo_positive acc base modulus p
+  | xI p =>
+    let acc := (acc * acc * base) mod modulus in
+    fast_pow_modulo_positive acc base modulus p
   end.
 
-Definition fast_power_mod (base exp modulus : Z) : Z :=
-  if modulus <? 1 then 0
-  else if exp <? 0 then 0
-  else if exp =? 0 then 1
-  else fast_pow base exp 1 modulus (Z.to_nat exp + 1).
-
-(* Modular inverse using Fermat's Little Theorem *)
 Definition mod_inverse (a p : Z) : Z :=
-  if Z.ltb p 2 then 0
-  else fast_power_mod a (p - 2) p.
+  match p with
+  | Zpos p' => fast_pow_modulo_positive 1 a p p'
+  | _ => 0 (* We will always have 1 <= p *)
+  end.
 
 Definition test1 : Z := mod_inverse 3 7.
 Definition test2 : Z := mod_inverse 2 11. 
