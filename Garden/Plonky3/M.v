@@ -1,9 +1,9 @@
+Require Export Coq.PArith.BinPosDef.
 Require Export Coq.Strings.Ascii.
 Require Export Coq.Strings.String.
 Require Export Coq.ZArith.ZArith.
-Require Export Coq.PArith.BinPosDef.
+
 Require Export RecordUpdate.
-Require Export Coq.Program.Wf.
 
 Require Export Lia.
 From Hammer Require Export Tactics.
@@ -938,15 +938,30 @@ Definition mod_inverse (a p : Z) : Z :=
   | _ => 0 (* We will always have 1 <= p *)
   end.
 
-  
-(* 
-Definition test1 : Z := mod_inverse 3 7.
-Definition test2 : Z := mod_inverse 2 11. 
-Definition test3 : Z := mod_inverse 5 17.
-Definition test4 : Z := mod_inverse 5 (2 ^ 64 - 2 ^ 32 + 1).
 
-Eval compute in test1.
-Eval compute in test2.
-Eval compute in test3.
-Eval compute in test4. 
-*)
+Module Test_mod_inverse.
+  Definition test1 : Z := mod_inverse 3 7.
+  Goal test1 = 5.
+  Proof.
+    reflexivity.
+  Qed.
+
+
+  Definition test2 : Z := mod_inverse 2 11. 
+  Goal test2 = 6.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition test3 : Z := mod_inverse 5 17.
+  Goal test3 = 7.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition test4 : Z := mod_inverse 5 (2 ^ 31 - 1).
+  Goal test4 = 858993459.
+  Proof.
+    reflexivity.
+  Qed.
+End Test_mod_inverse.
