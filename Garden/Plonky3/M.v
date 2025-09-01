@@ -938,10 +938,8 @@ Definition mod_inverse (a p : Z) : Z :=
   | _ => 0 (* We will always have 1 <= p *)
   end.
 
-
-Definition pow_test_1 : Z := fast_pow_modulo_positive 1 3 7 5.
-Eval compute in pow_test_1.
   
+(* 
 Definition test1 : Z := mod_inverse 3 7.
 Definition test2 : Z := mod_inverse 2 11. 
 Definition test3 : Z := mod_inverse 5 17.
@@ -950,4 +948,5 @@ Definition test4 : Z := mod_inverse 5 (2 ^ 64 - 2 ^ 32 + 1).
 Eval compute in test1.
 Eval compute in test2.
 Eval compute in test3.
-Eval compute in test4.
+Eval compute in test4. 
+*)
