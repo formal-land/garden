@@ -1,6 +1,7 @@
 Require Export Coq.Strings.Ascii.
 Require Export Coq.Strings.String.
 Require Export Coq.ZArith.ZArith.
+Require Export Coq.PArith.BinPosDef.
 Require Export RecordUpdate.
 Require Export Coq.Program.Wf.
 
@@ -923,21 +924,24 @@ Admitted.
 
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
-  | xH => acc
+  | xH => (acc * base) mod modulus
   | xO p =>
-    let acc := (acc * acc) mod modulus in
-    fast_pow_modulo_positive acc base modulus p
+    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
   | xI p =>
-    let acc := (acc * acc * base) mod modulus in
-    fast_pow_modulo_positive acc base modulus p
+    let acc := (acc * base) mod modulus in
+    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
   end.
 
 Definition mod_inverse (a p : Z) : Z :=
   match p with
-  | Zpos p' => fast_pow_modulo_positive 1 a p p'
+  | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
   | _ => 0 (* We will always have 1 <= p *)
   end.
 
+
+Definition pow_test_1 : Z := fast_pow_modulo_positive 1 3 7 5.
+Eval compute in pow_test_1.
+  
 Definition test1 : Z := mod_inverse 3 7.
 Definition test2 : Z := mod_inverse 2 11. 
 Definition test3 : Z := mod_inverse 5 17.
