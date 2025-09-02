@@ -1,6 +1,8 @@
+Require Export Coq.PArith.BinPosDef.
 Require Export Coq.Strings.Ascii.
 Require Export Coq.Strings.String.
 Require Export Coq.ZArith.ZArith.
+
 Require Export RecordUpdate.
 
 Require Export Lia.
@@ -918,3 +920,48 @@ Lemma mod_0_range (k : Z) (x : Z) :
     x = 0.
 Proof.
 Admitted.
+
+
+Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
+  match exponent with
+  | xH => (acc * base) mod modulus
+  | xO p =>
+    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
+  | xI p =>
+    let acc := (acc * base) mod modulus in
+    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
+  end.
+
+Definition mod_inverse (a p : Z) : Z :=
+  match p with
+  | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
+  | _ => 0 (* We will always have 1 <= p *)
+  end.
+
+
+Module Test_mod_inverse.
+  Definition test1 : Z := mod_inverse 3 7.
+  Goal test1 = 5.
+  Proof.
+    reflexivity.
+  Qed.
+
+
+  Definition test2 : Z := mod_inverse 2 11. 
+  Goal test2 = 6.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition test3 : Z := mod_inverse 5 17.
+  Goal test3 = 7.
+  Proof.
+    reflexivity.
+  Qed.
+
+  Definition test4 : Z := mod_inverse 5 (2 ^ 31 - 1).
+  Goal test4 = 858993459.
+  Proof.
+    reflexivity.
+  Qed.
+End Test_mod_inverse.
