@@ -1,4 +1,4 @@
-Require Import Garden.Garden.
+Require Import Circom.M.
 Require Import Circom.Circomlib.translation.circuits.sha256.xor3.
 
 Import Run.

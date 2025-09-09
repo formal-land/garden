@@ -44,6 +44,6 @@ def process_json_files(input_dir, output_dir, command):
 
 input_directory = "third-party/circomlib"
 output_directory = "Garden/Circom/Circomlib/translation"
-your_command = ["python", "scripts/coq_of_circom.py"]
+your_command = ["python", "scripts/rocq_of_circom.py"]
 
 process_json_files(input_directory, output_directory, your_command)

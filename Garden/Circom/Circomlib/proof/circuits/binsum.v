@@ -1,4 +1,4 @@
-Require Import Garden.Garden.
+Require Import Circom.M.
 Require Circom.Circomlib.translation.circuits.binsum.
 
 Import Run.

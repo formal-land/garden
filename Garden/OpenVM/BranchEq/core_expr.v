@@ -1,6 +1,6 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.MExpr.
-Require Import Garden.OpenVM.BranchEq.core_with_monad.
+Require Import Garden.OpenVM.BranchEq.core.
 
 Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
   to_rocq self indent :=
@@ -63,9 +63,9 @@ Lemma sum_for_in_zero_to_n_starting_from_eq {p} `{Prime p}
     )
     (H_start : Eval.eval env start = start') :
   Eval.eval env (sum_for_in_zero_to_n_starting_from N f start) =
-  core_with_monad.sum_for_in_zero_to_n_starting_from N f' start'.
+  core.sum_for_in_zero_to_n_starting_from N f' start'.
 Proof.
-  unfold sum_for_in_zero_to_n_starting_from, core_with_monad.sum_for_in_zero_to_n_starting_from.
+  unfold sum_for_in_zero_to_n_starting_from, core.sum_for_in_zero_to_n_starting_from.
   set (n := Z.to_nat N); clearbody n.
   induction n; cbn; intros; scongruence.
 Qed.
@@ -190,13 +190,13 @@ Lemma eval_eq {p} `{Prime p} {NUM_LIMBS : Z}
     (from_pc : Var.t) :
   MExpr.Eq.t env
     (eval self local from_pc)
-    (core_with_monad.eval
+    (core.eval
       self
       (BranchEqualCoreCols.map (Var.eval env.(Env.var)) local)
       (Var.eval env.(Env.var) from_pc)
     ).
 Proof.
-  unfold eval, core_with_monad.eval.
+  unfold eval, core.eval.
   econstructor. {
     apply List.Eq.fold_left_eq; try reflexivity.
     econstructor. {

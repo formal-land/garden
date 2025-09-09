@@ -1,4 +1,4 @@
-Require Import Garden.Garden.
+Require Import Circom.M.
 
 (*
 pub const DIM: usize = 5;
