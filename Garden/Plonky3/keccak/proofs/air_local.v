@@ -1,5 +1,5 @@
 Require Import Garden.Plonky3.M.
-Require Import Garden.Plonky3.keccak.air_small_parts.
+Require Import Garden.Plonky3.keccak.proofs.air_small_parts.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 
