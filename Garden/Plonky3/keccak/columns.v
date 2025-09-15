@@ -45,26 +45,26 @@ Module KeccakCols.
   }.
 
   Definition get_preimage (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.preimage).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.preimage).[y].[x].[limb].
 
   Definition get_a (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.a).[y].[x].[limb].
 
   Definition get_c (local : KeccakCols.t) (x z : Z) : Z :=
-    ((local.(KeccakCols.c).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.c).[x].[z].
 
   Definition get_c_prime (local : KeccakCols.t) (x z : Z) : Z :=
-    ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.c_prime).[x].[z].
 
   Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : Z :=
-    (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.a_prime).[y].[x].[z].
 
   Definition get_a_prime_prime (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.a_prime_prime).[y].[x].[limb].
 
   Module Bool.
     Definition get_a (local : KeccakCols.t) (x y z : Z) : bool :=
-      Limbs.get_bit BITS_PER_LIMB ((local.(KeccakCols.a).(Array.get) y).(Array.get) x) z.
+      Limbs.get_bit BITS_PER_LIMB (local.(KeccakCols.a).[y].[x]) z.
 
     Definition get_c (local : KeccakCols.t) (x z : Z) : bool :=
       Z.odd ((get_c local x z)).

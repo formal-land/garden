@@ -135,6 +135,12 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
+(* Notations *)
+Notation "x +F y" := (BinOp.add x y) (at level 50, left associativity).
+Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
+Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
+Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
+
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t (A : Set) : Set :=
