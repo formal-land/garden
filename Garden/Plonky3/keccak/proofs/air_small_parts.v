@@ -455,11 +455,8 @@ Module a_prime_prime.
         |}
       )).
 
-  Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
-    {{ eval local 🔽
-      tt,
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
       forall (y x : Z),
       0 <= y < 5 ->
       0 <= x < 5 ->
@@ -469,13 +466,22 @@ Module a_prime_prime.
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       KeccakCols.get_a_prime_prime local x y limb =
-      UnOp.from a_prime_prime'.[limb]
+      UnOp.from a_prime_prime'.[limb].
+  End Post.
+
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+    {{ eval local 🔽
+      tt,
+      Post.t local
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
+    unfold Post.t.
     cbn; rewrite_db field_rewrite.
     hauto q: on.
   Qed.
@@ -490,21 +496,26 @@ Module a_prime_prime_0_0_bits_bools.
       M.t unit :=
     M.assert_bools local.(KeccakCols.a_prime_prime_0_0_bits).
 
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (z : Z),
+      0 <= z < 64 ->
+      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits).[z].
+  End Post.
+
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
       let local := M.map_mod local in
     {{ eval local 🔽
       tt,
-      forall (z : Z),
-      0 <= z < 64 ->
-      exists (b : bool),
-      local.(KeccakCols.a_prime_prime_0_0_bits).[z] = Z.b2z b
+      Post.t local
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
+    unfold Post.t.
     sfirstorder.
   Qed.
 End a_prime_prime_0_0_bits_bools.
@@ -541,24 +552,27 @@ Module a_prime_prime_0_0_limbs.
           local.(KeccakCols.a_prime_prime).[0].[0].[limb]
     |}.
 
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      UnOp.from local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
+      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB local.(KeccakCols.a_prime_prime_0_0_bits)).[limb].
+  End Post.
+
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
       let local := M.map_mod local in
     {{ eval local 🔽
       tt,
-      let a_prime_prime_0_0' : Array.t Z U64_LIMBS :=
-        Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-          local.(KeccakCols.a_prime_prime_0_0_bits) in
-      forall (limb : Z),
-      0 <= limb < U64_LIMBS ->
-      UnOp.from local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
-      UnOp.from a_prime_prime_0_0'.[limb]
+      Post.t local
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
+    unfold Post.t.
     cbn.
     hauto l: on.
   Qed.
@@ -578,7 +592,8 @@ End a_prime_prime_0_0_limbs.
 *)
 Definition get_xored_bit {p} `{Prime p}
     (local : KeccakCols.t)
-    (i : Z) : Z :=
+    (i : Z) :
+    Z :=
   let rc_bit_i : Z :=
     Lists.List.fold_left (fun acc r =>
       let this_round := local.(KeccakCols.step_flags).[r] in
@@ -619,27 +634,27 @@ Module a_prime_prime_prime_0_0_limbs.
           local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb]
     |}.
 
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      UnOp.from local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
+      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_xored_bit local z; |}).[limb].
+  End Post.
+
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
       let local := M.map_mod local in
     {{ eval local 🔽
       tt,
-      let a_prime_prime_prime_0_0_limb' : Array.t Z U64_LIMBS :=
-        Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-          {|
-            Array.get z :=
-              get_xored_bit local z;
-          |} in
-      forall (limb : Z),
-      0 <= limb < U64_LIMBS ->
-      UnOp.from local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
-      UnOp.from a_prime_prime_prime_0_0_limb'.[limb]
+      Post.t local
     }}.
   Proof.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
+    unfold Post.t.
     hauto l: on.
   Qed.
 End a_prime_prime_prime_0_0_limbs.
@@ -675,6 +690,17 @@ Module a_prime_prime_prime_next_a.
       ))
     )).
 
+  Module Post.
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) : Prop :=
+      forall (y x : Z),
+      0 <= y < 5 ->
+      0 <= x < 5 ->
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      UnOp.from (Impl_KeccakCols.a_prime_prime_prime local y x limb) =
+      UnOp.from (next.(KeccakCols.a).[y].[x].[limb]).
+  End Post.
+
   Lemma implies {p} `{Prime p}
       (local next : KeccakCols.t) :
     let local := M.map_mod local in
@@ -684,13 +710,7 @@ Module a_prime_prime_prime_next_a.
     not_final_step <> 0 ->
     {{ eval local next true 🔽
       tt,
-      forall (y x : Z),
-      0 <= y < 5 ->
-      0 <= x < 5 ->
-      forall (limb : Z),
-      0 <= limb < U64_LIMBS ->
-      UnOp.from (Impl_KeccakCols.a_prime_prime_prime local y x limb) =
-      UnOp.from (next.(KeccakCols.a).[y].[x].[limb])
+      Post.t local next
     }}.
   Proof.
     intros * H_not_final_step.
@@ -698,6 +718,7 @@ Module a_prime_prime_prime_next_a.
     eapply Run.Implies. {
       Run.run.
     }
+    unfold Post.t.
     hauto lq: on rew: off.
   Qed.
 End a_prime_prime_prime_next_a.
