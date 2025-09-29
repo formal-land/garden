@@ -280,7 +280,8 @@ Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
 Definition not {p} `{Prime p} (x : Z) : Z :=
   BinOp.sub 1 x.
 
-Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
+Definition xor {p} `{Prime p} (x y : Z) : Z :=
+  (x +F y) -F ((x *F y) *F 2).
 
 Axiom from_xor_eq : forall {p} `{Prime p} (x y : Z),
   UnOp.from (xor x y) = xor x y.
@@ -323,7 +324,8 @@ Qed.
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
-Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+Definition andn {p} `{Prime p} (x y : Z) : Z :=
+  (1 -F x) *F y.
 
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
@@ -997,3 +999,166 @@ Module Test_mod_inverse.
     reflexivity.
   Qed.
 End Test_mod_inverse.
+
+(** A monad to simplify the generation of data structures with fresh_var variables *)
+Module MGenerate.
+  Definition t (A : Set) : Set :=
+    Z -> A * Z.
+
+  Definition pure {A : Set} (value : A) : t A :=
+    fun n => (value, n).
+
+  Definition bind {A B : Set} (e : t A) (k : A -> t B) : t B :=
+    fun n =>
+      let '(value, n') := e n in
+      k value n'.
+
+  (** Fake constructor used for the pretty-printing. *)
+  Definition Var (z : Z) : Z :=
+    z.
+  Global Opaque Var.
+
+  Definition generate_var : t Z :=
+    fun n => (Var n, n + 1).
+
+  Definition eval {A : Set} (x : t A) : A :=
+    fst (x 0).
+
+  Class C (A : Set) : Set := {
+    generate : t A;
+  }.
+
+  Fixpoint generate_list {A : Set} `{C A} (n : nat) : t (list A) :=
+    match n with
+    | O => pure []
+    | S n =>
+      bind generate (fun x =>
+        bind (generate_list n) (fun xs =>
+          pure (x :: xs)
+        )
+      )
+    end.
+
+  (** This is a marker that we remove with the following tactic. *)
+  Axiom run : forall {A : Set}, t A -> A.
+
+  (** A tactic that replaces all [run] markers with a bind operation.
+    This allows to represent programs without introducing
+    explicit names for all intermediate computation results. *)
+  Ltac monadic e :=
+    lazymatch e with
+    | context ctxt [let v := ?x in @?f v] =>
+      refine (bind _ _);
+        [ monadic x
+        | let v' := fresh v in
+          intro v';
+          let y := (eval cbn beta in (f v')) in
+          lazymatch context ctxt [let v := x in y] with
+          | let _ := x in y => monadic y
+          | _ =>
+            refine (bind _ _);
+              [ monadic y
+              | let w := fresh "v" in
+                intro w;
+                let z := context ctxt [w] in
+                monadic z
+              ]
+          end
+        ]
+    | context ctxt [run ?x] =>
+      lazymatch context ctxt [run x] with
+      | run x => monadic x
+      | _ =>
+        refine (bind _ _);
+          [ monadic x
+          | let v := fresh "v" in
+            intro v;
+            let y := context ctxt [v] in
+            monadic y
+          ]
+      end
+    | _ =>
+      lazymatch type of e with
+      | t _ => exact e
+      | _ => exact (pure e)
+      end
+    end.
+End MGenerate.
+
+Notation "e (| e1 , .. , en |)" :=
+  (MGenerate.run ((.. (e e1) ..) en))
+  (at level 100).
+
+Notation "e (||)" :=
+  (MGenerate.run e)
+  (at level 100).
+
+Notation "[[ e ]]" :=
+  (ltac:(MGenerate.monadic e))
+  (* Use the version below for debugging and show errors that are made obscure by the tactic *)
+  (* (MGenerate.pure e) *)
+  (only parsing).
+
+Notation "'let*g' x ':=' e 'in' k" :=
+  (MGenerate.bind e (fun x => k))
+  (at level 200, x pattern, e at level 200, k at level 200).
+
+Global Instance VarIsGenerate : MGenerate.C Z := {
+  generate := MGenerate.generate_var;
+}.
+
+Global Instance ArrayIsGenerate {T : Set} `{MGenerate.C T} `{Default.C T} {N : Z} :
+    MGenerate.C (Array.t T N) := {
+  generate :=
+    MGenerate.bind (MGenerate.generate_list (Z.to_nat N)) (fun l =>
+      MGenerate.pure (Array.of_list l)
+    )
+}.
+
+Module GenerateExample.
+  Definition five_items : MGenerate.t (list Z) :=
+    [[
+      [
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||)
+      ]
+    ]].
+
+  Goal MGenerate.eval five_items = [
+    MGenerate.Var 0;
+    MGenerate.Var 1;
+    MGenerate.Var 2;
+    MGenerate.Var 3;
+    MGenerate.Var 4
+  ].
+  Proof. reflexivity. Qed.
+
+  Definition pair_items : MGenerate.t (list Z * list Z) :=
+    [[
+      (
+        five_items (||),
+        five_items (||)
+      )
+    ]].
+
+  Goal MGenerate.eval pair_items = (
+    [
+      MGenerate.Var 0;
+      MGenerate.Var 1;
+      MGenerate.Var 2;
+      MGenerate.Var 3;
+      MGenerate.Var 4
+    ],
+    [
+      MGenerate.Var 5;
+      MGenerate.Var 6;
+      MGenerate.Var 7;
+      MGenerate.Var 8;
+      MGenerate.Var 9
+    ]
+  ).
+  Proof. reflexivity. Qed.
+End GenerateExample.

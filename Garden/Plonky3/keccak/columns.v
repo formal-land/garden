@@ -44,6 +44,24 @@ Module KeccakCols.
     |};
   }.
 
+  Global Instance IsGenerate : MGenerate.C KeccakCols.t := {
+    generate :=
+      [[
+        {|
+          KeccakCols.step_flags := MGenerate.generate (||);
+          KeccakCols.export := MGenerate.generate (||);
+          KeccakCols.preimage := MGenerate.generate (||);
+          KeccakCols.a := MGenerate.generate (||);
+          KeccakCols.c := MGenerate.generate (||);
+          KeccakCols.c_prime := MGenerate.generate (||);
+          KeccakCols.a_prime := MGenerate.generate (||);
+          KeccakCols.a_prime_prime := MGenerate.generate (||);
+          KeccakCols.a_prime_prime_0_0_bits := MGenerate.generate (||);
+          KeccakCols.a_prime_prime_prime_0_0_limbs := MGenerate.generate (||);
+        |}
+      ]];
+  }.
+
   Module Eq.
     Record t (x y : KeccakCols.t): Prop := {
       step_flags : Equal.t x.(KeccakCols.step_flags) y.(KeccakCols.step_flags);

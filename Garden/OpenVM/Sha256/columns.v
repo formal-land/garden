@@ -35,17 +35,17 @@ Module Sha256FlagsCols.
     Sha256FlagsCols.local_block_idx := f self.(Sha256FlagsCols.local_block_idx);
   |}.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256FlagsCols.is_round_row := MGenerateVar.generate (||);
-          Sha256FlagsCols.is_first_4_rows := MGenerateVar.generate (||);
-          Sha256FlagsCols.is_digest_row := MGenerateVar.generate (||);
-          Sha256FlagsCols.is_last_block := MGenerateVar.generate (||);
-          Sha256FlagsCols.row_idx := MGenerateVar.generate (||);
-          Sha256FlagsCols.global_block_idx := MGenerateVar.generate (||);
-          Sha256FlagsCols.local_block_idx := MGenerateVar.generate (||);
+          Sha256FlagsCols.is_round_row := MGenerate.generate (||);
+          Sha256FlagsCols.is_first_4_rows := MGenerate.generate (||);
+          Sha256FlagsCols.is_digest_row := MGenerate.generate (||);
+          Sha256FlagsCols.is_last_block := MGenerate.generate (||);
+          Sha256FlagsCols.row_idx := MGenerate.generate (||);
+          Sha256FlagsCols.global_block_idx := MGenerate.generate (||);
+          Sha256FlagsCols.local_block_idx := MGenerate.generate (||);
         |}
       ]];
   }.
@@ -70,14 +70,14 @@ Module Sha256WorkVarsCols.
   }.
   Arguments t : clear implicits.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256WorkVarsCols.a := MGenerateVar.generate (||);
-          Sha256WorkVarsCols.e := MGenerateVar.generate (||);
-          Sha256WorkVarsCols.carry_a := MGenerateVar.generate (||);
-          Sha256WorkVarsCols.carry_e := MGenerateVar.generate (||);
+          Sha256WorkVarsCols.a := MGenerate.generate (||);
+          Sha256WorkVarsCols.e := MGenerate.generate (||);
+          Sha256WorkVarsCols.carry_a := MGenerate.generate (||);
+          Sha256WorkVarsCols.carry_e := MGenerate.generate (||);
         |}
       ]];
   }.
@@ -100,14 +100,14 @@ Module Sha256MessageHelperCols.
   }.
   Arguments t : clear implicits.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256MessageHelperCols.w_3 := MGenerateVar.generate (||);
-          Sha256MessageHelperCols.intermed_4 := MGenerateVar.generate (||);
-          Sha256MessageHelperCols.intermed_8 := MGenerateVar.generate (||);
-          Sha256MessageHelperCols.intermed_12 := MGenerateVar.generate (||);
+          Sha256MessageHelperCols.w_3 := MGenerate.generate (||);
+          Sha256MessageHelperCols.intermed_4 := MGenerate.generate (||);
+          Sha256MessageHelperCols.intermed_8 := MGenerate.generate (||);
+          Sha256MessageHelperCols.intermed_12 := MGenerate.generate (||);
         |}
       ]];
   }.
@@ -131,15 +131,15 @@ Module Sha256DigestCols.
   }.
   Arguments t : clear implicits.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256DigestCols.flags := MGenerateVar.generate (||);
-          Sha256DigestCols.hash := MGenerateVar.generate (||);
-          Sha256DigestCols.schedule_helper := MGenerateVar.generate (||);
-          Sha256DigestCols.final_hash := MGenerateVar.generate (||);
-          Sha256DigestCols.prev_hash := MGenerateVar.generate (||);
+          Sha256DigestCols.flags := MGenerate.generate (||);
+          Sha256DigestCols.hash := MGenerate.generate (||);
+          Sha256DigestCols.schedule_helper := MGenerate.generate (||);
+          Sha256DigestCols.final_hash := MGenerate.generate (||);
+          Sha256DigestCols.prev_hash := MGenerate.generate (||);
         |}
       ]];
   }.
@@ -158,12 +158,12 @@ Module Sha256MessageScheduleCols.
   }.
   Arguments t : clear implicits.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256MessageScheduleCols.w := MGenerateVar.generate (||);
-          Sha256MessageScheduleCols.carry_or_buffer := MGenerateVar.generate (||);
+          Sha256MessageScheduleCols.w := MGenerate.generate (||);
+          Sha256MessageScheduleCols.carry_or_buffer := MGenerate.generate (||);
         |}
       ]];
   }.
@@ -186,14 +186,14 @@ Module Sha256RoundCols.
   }.
   Arguments t : clear implicits.
 
-  Global Instance IsGenerateVar : MGenerateVar.C (t Var.t) := {
+  Global Instance IsGenerateVar : MGenerate.C (t Var.t) := {
     generate :=
       [[
         {|
-          Sha256RoundCols.flags := MGenerateVar.generate (||);
-          Sha256RoundCols.work_vars := MGenerateVar.generate (||);
-          Sha256RoundCols.schedule_helper := MGenerateVar.generate (||);
-          Sha256RoundCols.message_schedule := MGenerateVar.generate (||);
+          Sha256RoundCols.flags := MGenerate.generate (||);
+          Sha256RoundCols.work_vars := MGenerate.generate (||);
+          Sha256RoundCols.schedule_helper := MGenerate.generate (||);
+          Sha256RoundCols.message_schedule := MGenerate.generate (||);
         |}
       ]];
   }.
