@@ -1,3 +1,5 @@
+Message 🦜
+  preimage_a
 AssertZero:
   Mul:
     Variable: 0
@@ -22,18 +24,24 @@ AssertZero:
     Sub:
       Variable: 28
       Variable: 128
+Message 🦜
+  export_bool
 AssertZero:
   Mul:
     Variable: 24
     Sub:
       Variable: 24
       Constant: 1
+Message 🦜
+  export_zero
 AssertZero:
   Mul:
     Sub:
       Constant: 1
       Variable: 23
     Variable: 24
+Message 🦜
+  c_c_prime
 AssertZero:
   Mul:
     Variable: 225
@@ -2018,6 +2026,8 @@ AssertZero:
             Constant: 2
         Variable: 287
         Constant: 2
+Message 🦜
+  a_a_prime_c_c_prime
 AssertZero:
   Mul:
     Variable: 865
@@ -6418,6 +6428,8 @@ AssertZero:
           Variable: 593
           Constant: 2
     Variable: 128
+Message 🦜
+  a_prime_c_prime
 AssertZero:
   Mul:
     Sub:
@@ -7762,6 +7774,8 @@ AssertZero:
           Variable: 928
         Variable: 608
       Constant: 4
+Message 🦜
+  a_prime_prime
 AssertZero:
   Sub:
     Add:
@@ -10658,6 +10672,8 @@ AssertZero:
           Variable: 913
           Constant: 2
     Variable: 2468
+Message 🦜
+  a_prime_prime_0_0_bits_bools
 AssertZero:
   Mul:
     Variable: 2565
@@ -11042,6 +11058,8 @@ AssertZero:
     Sub:
       Variable: 2628
       Constant: 1
+Message 🦜
+  a_prime_prime_0_0_limbs
 AssertZero:
   Sub:
     Add:
@@ -11698,6 +11716,8 @@ AssertZero:
           Variable: 2614
       Variable: 2613
     Variable: 2468
+Message 🦜
+  a_prime_prime_prime_0_0_limbs
 AssertZero:
   Sub:
     Add:

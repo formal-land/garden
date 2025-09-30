@@ -730,12 +730,16 @@ Module OfShallow.
     lazymatch trace with
     | List.nil => constr:(List.nil (A := MExpr.Trace.Event.t))
     | List.cons ?event ?trace =>
-      lazymatch event with
-      | M.Trace.Event.AssertZero ?expr =>
-        let expr := to_expr expr in
-        let trace := to_mexpr_trace_aux trace in
-        constr:(List.cons (MExpr.Trace.Event.AssertZero expr) trace)
-      end
+      let event :=
+        lazymatch event with
+        | M.Trace.Event.AssertZero ?expr =>
+          let expr := to_expr expr in
+          constr:(MExpr.Trace.Event.AssertZero expr)
+        | M.Trace.Event.Message ?message =>
+          constr:(MExpr.Trace.Event.Message message)
+        end in
+      let trace := to_mexpr_trace_aux trace in
+      constr:(List.cons event trace)
     end.
 
   Ltac to_mexpr_trace e :=

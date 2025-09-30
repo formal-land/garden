@@ -6,33 +6,27 @@ Require Import Garden.Plonky3.keccak.constants.
 
 (** In this definition, we group all the constraints about the current [local] row. *)
 Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : M.t unit :=
+  msg* "preimage_a" in
   let* _ := preimage_a.eval SQUARE_SIZE local in
+  msg* "export_bool" in
   let* _ := export_bool.eval local in
+  msg* "export_zero" in
   let* _ := export_zero.eval local in
+  msg* "c_c_prime" in
   let* _ := c_c_prime.eval SQUARE_SIZE local in
+  msg* "a_a_prime_c_c_prime" in
   let* _ := a_a_prime_c_c_prime.eval SQUARE_SIZE local in
+  msg* "a_prime_c_prime" in
   let* _ := a_prime_c_prime.eval SQUARE_SIZE local in
+  msg* "a_prime_prime" in
   let* _ := a_prime_prime.eval SQUARE_SIZE local in
+  msg* "a_prime_prime_0_0_bits_bools" in
   let* _ := a_prime_prime_0_0_bits_bools.eval local in
+  msg* "a_prime_prime_0_0_limbs" in
   let* _ := a_prime_prime_0_0_limbs.eval local in
+  msg* "a_prime_prime_prime_0_0_limbs" in
   let* _ := a_prime_prime_prime_0_0_limbs.eval local in
   M.pure tt.
-
-Module PrettyPrint.
-  Parameter p : Z.
-  Instance IsPrime : Prime p.
-  Admitted.
-
-  Compute PrettyPrint.cats [
-    PrettyPrint.endl;
-    PrettyPrint.to_string
-      ltac:(OfShallow.to_mexpr_trace (snd (
-        M.to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))
-      )))
-      0;
-    PrettyPrint.endl
-  ].
-End PrettyPrint.
 
 Definition xorbs (bs : list bool) : bool :=
   Lists.List.fold_left xorb bs false.
@@ -343,43 +337,43 @@ Lemma eval_local_implies {p} `{Prime p} (H_p : 6 <= p) (local' : KeccakCols.t) :
 Proof.
   intros * [].
   unfold eval_local.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply preimage_a.implies.
   }
   intros H_eval_assert_preimage_a.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply export_bool.implies.
   }
   intros H_eval_assert_export_bool.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply export_zero.implies.
   }
   intros H_eval_assert_export_zero.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply c_c_prime.implies.
   }
   intros [].
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_a_prime_c_c_prime.implies.
   }
   intros [].
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_prime_c_prime.implies.
   }
   intros H_eval_assert_a_prime_c_prime.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_prime_prime.implies.
   }
   intros H_eval_assert_a_prime_prime.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_prime_prime_0_0_bits_bools.implies.
   }
   intros H_eval_assert_a_prime_prime_0_0_bits_bools.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_prime_prime_0_0_limbs.implies.
   }
   intros H_eval_assert_a_prime_prime_0_0_limbs.
-  eapply Run.LetAccumulate. {
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply a_prime_prime_prime_0_0_limbs.implies.
   }
   intros H_eval_assert_a_prime_prime_prime_0_0_limbs.
@@ -572,3 +566,19 @@ Module FunctionalSpec.
     unfold local_of_input; f_equal.
   Admitted.
 End FunctionalSpec.
+
+Module PrettyPrint.
+  Parameter p : Z.
+  Instance IsPrime : Prime p.
+  Admitted.
+
+  Compute PrettyPrint.cats [
+    PrettyPrint.endl;
+    PrettyPrint.to_string
+      ltac:(OfShallow.to_mexpr_trace (snd (
+        M.to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))
+      )))
+      0;
+    PrettyPrint.endl
+  ].
+End PrettyPrint.

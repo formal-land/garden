@@ -1,6 +1,5 @@
 Require Export Coq.PArith.BinPosDef.
-Require Export Coq.Strings.Ascii.
-Require Export Coq.Strings.String.
+Require Export Coq.Strings.PrimString.
 Require Export Coq.ZArith.ZArith.
 
 Require Export RecordUpdate.
@@ -14,8 +13,6 @@ Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 
 Global Set Primitive Projections.
 Global Set Printing Projections.
-Global Open Scope char_scope.
-Global Open Scope string_scope.
 Global Open Scope list_scope.
 Global Open Scope type_scope.
 Global Open Scope Z_scope.
@@ -25,7 +22,7 @@ Export List.ListNotations.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
 Parameter IsPrime : Z -> Prop.
-
+Require Export Coq.Strings.PrimString.
 Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
@@ -158,11 +155,13 @@ Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
 Module Trace.
   Module Event.
     Inductive t : Set :=
-    | AssertZero (expr : Z).
+    | AssertZero (expr : Z)
+    | Message (message : string).
 
     Definition map_condition {p} `{Prime p} (condition : Z) (event : t) : t :=
       match event with
       | AssertZero expr => AssertZero (condition *F expr)
+      | Message _ => event
       end.
   End Event.
 
@@ -179,12 +178,14 @@ Module M.
   | Call (e : t A) : t A
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
   | When (condition : Z) (e : t A) : t A
+  | Message (message : string) (k : t A) : t A
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
   Arguments When {_}.
+  Arguments Message {_}.
 
   Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
     match e with
@@ -193,6 +194,7 @@ Module M.
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
     | M.When condition e => M.When condition (map f e)
+    | M.Message message k => M.Message message (map f k)
     end.
 
   Fixpoint to_trace {p} `{Prime p} {A : Set} (e : M.t A) : A * Trace.t :=
@@ -207,12 +209,19 @@ Module M.
     | M.When condition e =>
       let '(value_e, trace_e) := to_trace e in
       (value_e, List.map (Trace.Event.map_condition condition) trace_e)
+    | M.Message message k =>
+      let '(value_k, trace_k) := to_trace k in
+      (value_k, [Trace.Event.Message message] ++ trace_k)
     end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
+
+Notation "'msg*' message 'in' k" :=
+  (M.Message message k)
+  (at level 200, message at level 200, k at level 200).
 
 Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
@@ -714,6 +723,9 @@ Module Run.
   | When (condition : Z) (e : M.t A) (value : A) (P : Prop) :
     (condition <> 0 -> {{ e 🔽 value, P }}) ->
     {{ M.When condition e 🔽 value, condition <> 0 -> P }}
+  | Message (message : string) (e : M.t A) (value : A) (P : Prop) :
+    {{ e 🔽 value, P }} ->
+    {{ M.Message message e 🔽 value, P }}
   | Implies (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> P2) ->
@@ -855,6 +867,7 @@ Module Run.
     (apply Run.Call) ||
     (eapply Run.Let) ||
     (apply Run.When) ||
+    (apply Run.Message) ||
     match goal with
     | |- True -> _ => intros _
     | _ => intros
