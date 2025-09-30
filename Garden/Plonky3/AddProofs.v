@@ -31,7 +31,6 @@ Module RangeCheck32.
   }.
 End RangeCheck32.
 
-
 Lemma int_upper (x y : Z) : x < y <-> x <= y - 1.
 Proof.
   lia.
@@ -114,8 +113,8 @@ let
 
 Module Add2Proof.
     Definition eval_add2 {p} `{Prime p} (a b : Array.t Z U32_LIMBS) : Array.t Z U32_LIMBS :=
-        unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
-    
+      unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
+
     Lemma implies {p} `{Prime p} (result a b : Array.t Z U32_LIMBS) :
       (* let result := M.map_mod result in
       let a := M.map_mod a in
@@ -126,7 +125,7 @@ Module Add2Proof.
       RangeCheck32.t b ->
       {{ add2 result a b 🔽
         tt,
-        Array.Eq.t (eval_add2 a b) result
+        Equal.t (eval_add2 a b) result
       }}.
     Proof.
       cbn.
@@ -540,10 +539,9 @@ Module Add2Proof.
         }
       }
       (* helper *)
-      assert (Htmp : Array.Eq.t (eval_add2 a b) result).
+      assert (Htmp : Equal.t (eval_add2 a b) result).
       {
-        unfold eval_add2.
-        unfold Array.Eq.t.
+        with_strategy opaque [Z.pow] cbn.
         intros i.
         unfold U32_LIMBS.
         unfold BITS_PER_LIMB.
@@ -610,7 +608,7 @@ Module Add3Proof.
       RangeCheck32.t c ->
       {{ add3 result a b c 🔽
         tt,
-        Array.Eq.t (eval_add3 a b c) result
+        Equal.t (eval_add3 a b c) result
       }}.
     Proof.
       intros Hp Hrc_res Hrc_a Hrc_b Hrc_c.
@@ -928,9 +926,9 @@ Module Add3Proof.
         }
       }
 
-      assert (Htmp : Array.Eq.t (eval_add3 a b c) result).
+      assert (Htmp : Equal.t (eval_add3 a b c) result).
       {
-        unfold Array.Eq.t.
+        with_strategy opaque [Z.pow] cbn.
         unfold U32_LIMBS.
         intros i Hi.
         apply (AddProofUtil.array_index_range_U32 i) in Hi.

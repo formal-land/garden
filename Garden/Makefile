@@ -31,6 +31,7 @@ endif
 snapshot:
 	coqc -R . Garden OpenVM/BranchEq/core_expr.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/BranchEq/core_expr.snapshot
 	coqc -R . Garden OpenVM/Sha256/air_expr.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/Sha256/air_expr.snapshot
+	coqc -R . Garden Plonky3/keccak/proofs/air_local.v | tail -n +2 | $(HEAD_CMD) -n -2 > Plonky3/keccak/proofs/air_local.snapshot
 
 clean-coq: CoqMakefile
 	$(MAKECOQ) clean

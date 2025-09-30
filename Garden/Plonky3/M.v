@@ -1,6 +1,5 @@
 Require Export Coq.PArith.BinPosDef.
-Require Export Coq.Strings.Ascii.
-Require Export Coq.Strings.String.
+Require Export Coq.Strings.PrimString.
 Require Export Coq.ZArith.ZArith.
 
 Require Export RecordUpdate.
@@ -14,8 +13,6 @@ Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
 
 Global Set Primitive Projections.
 Global Set Printing Projections.
-Global Open Scope char_scope.
-Global Open Scope string_scope.
 Global Open Scope list_scope.
 Global Open Scope type_scope.
 Global Open Scope Z_scope.
@@ -25,7 +22,7 @@ Export List.ListNotations.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
 Parameter IsPrime : Z -> Prop.
-
+Require Export Coq.Strings.PrimString.
 Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
@@ -41,6 +38,16 @@ Module Default.
     default := 0;
   }.
 End Default.
+
+Module Equal.
+  Class C (A : Set) : Type := {
+    t : A -> A -> Prop;
+  }.
+End Equal.
+
+Global Instance ZIsEqual : Equal.C Z := {
+  Equal.t := eq;
+}.
 
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -101,10 +108,14 @@ Module Array.
   }.
 
   Module Eq.
-    Definition t {A : Set} {N : Z} (x y : t A N) : Prop :=
-      forall (i : Z), 0 <= i < N -> x.(get) i = y.(get) i.
+    Global Instance IsEqual (A : Set) (N : Z) `{Equal.C A} : Equal.C (t A N) := {
+      Equal.t (x y : t A N) :=
+        forall (i : Z),
+        0 <= i < N ->
+        Equal.t (x.(get) i) (y.(get) i);
+    }.
 
-    Axiom dec : forall {A : Set} {N : Z} (x y : Array.t A N), {t x y} + {~ t x y}.
+    Axiom dec : forall {N : Z} (x y : Array.t Z N), {Equal.t x y} + {~ Equal.t x y}.
   End Eq.
 End Array.
 
@@ -135,6 +146,28 @@ Module BinOp.
     (x mod y) mod p.
 End BinOp.
 
+(* Notations *)
+Notation "x +F y" := (BinOp.add x y) (at level 50, left associativity).
+Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
+Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
+Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
+
+Module Trace.
+  Module Event.
+    Inductive t : Set :=
+    | AssertZero (expr : Z)
+    | Message (message : string).
+
+    Definition map_condition {p} `{Prime p} (condition : Z) (event : t) : t :=
+      match event with
+      | AssertZero expr => AssertZero (condition *F expr)
+      | Message _ => event
+      end.
+  End Event.
+
+  Definition t : Set := list Event.t.
+End Trace.
+
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t (A : Set) : Set :=
@@ -145,12 +178,14 @@ Module M.
   | Call (e : t A) : t A
   | Let {B : Set} (e : t B) (k : B -> t A) : t A
   | When (condition : Z) (e : t A) : t A
+  | Message (message : string) (k : t A) : t A
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
   Arguments When {_}.
+  Arguments Message {_}.
 
   Fixpoint map {A B : Set} (f : A -> B) (e : M.t A) : M.t B :=
     match e with
@@ -159,12 +194,34 @@ Module M.
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
     | M.When condition e => M.When condition (map f e)
+    | M.Message message k => M.Message message (map f k)
+    end.
+
+  Fixpoint to_trace {p} `{Prime p} {A : Set} (e : M.t A) : A * Trace.t :=
+    match e with
+    | M.Pure value => (value, [])
+    | M.AssertZero expr value => (value, [Trace.Event.AssertZero expr])
+    | M.Call e => to_trace e
+    | M.Let e k =>
+      let '(value_e, trace_e) := to_trace e in
+      let '(value_k, trace_k) := to_trace (k value_e) in
+      (value_k, trace_e ++ trace_k)
+    | M.When condition e =>
+      let '(value_e, trace_e) := to_trace e in
+      (value_e, List.map (Trace.Event.map_condition condition) trace_e)
+    | M.Message message k =>
+      let '(value_k, trace_k) := to_trace k in
+      (value_k, [Trace.Event.Message message] ++ trace_k)
     end.
 End M.
 
 Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
+
+Notation "'msg*' message 'in' k" :=
+  (M.Message message k)
+  (at level 200, message at level 200, k at level 200).
 
 Definition pure {A : Set} (x : A) : M.t A :=
   M.Pure x.
@@ -260,7 +317,8 @@ Definition when_bool (condition : bool) (e : M.t unit) : M.t unit :=
 Definition not {p} `{Prime p} (x : Z) : Z :=
   BinOp.sub 1 x.
 
-Parameter xor : forall {p} `{Prime p}, Z -> Z -> Z.
+Definition xor {p} `{Prime p} (x y : Z) : Z :=
+  (x +F y) -F ((x *F y) *F 2).
 
 Axiom from_xor_eq : forall {p} `{Prime p} (x y : Z),
   UnOp.from (xor x y) = xor x y.
@@ -303,7 +361,8 @@ Qed.
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
-Parameter andn : forall {p} `{Prime p}, Z -> Z -> Z.
+Definition andn {p} `{Prime p} (x y : Z) : Z :=
+  (1 -F x) *F y.
 
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
@@ -336,87 +395,6 @@ Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
 {
   map_mod := Array.map map_mod;
 }.
-
-Module Limbs.
-  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
-      Array.t Z NB_LIMBS :=
-    {|
-      Array.get limb :=
-        let l : list nat :=
-          List.rev (
-            List.seq
-              (Z.to_nat (limb * BITS_PER_LIMB))%Z
-              (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
-          ) in
-        Lists.List.fold_left (fun acc (z : nat) =>
-          let z : Z := Z.of_nat z in
-          BinOp.add (BinOp.mul 2 acc) (a.(Array.get) z)
-        ) l 0
-    |}.
-
-  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (a.(Array.get) z)
-      )
-      (limb : Z) :
-    0 <= limb < NB_LIMBS ->
-    UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb) =
-    (of_bools NB_LIMBS BITS_PER_LIMB a).(Array.get) limb.
-  Admitted.
-
-  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
-      (a : Array.t Z NB_LIMBS)
-      (bit : Z) :
-      bool :=
-    let limb := bit / BITS_PER_LIMB in
-    let bit_in_limb := bit mod BITS_PER_LIMB in
-    let limb_value := a.(Array.get) limb in
-    Z.testbit limb_value bit_in_limb.
-
-  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (bit : Z)
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (a.(Array.get) z)
-      ) :
-    get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
-    Z.odd (a.(Array.get) bit).
-  Admitted.
-
-  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a_limbs : Array.t Z NB_LIMBS)
-      (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (a_bools.(Array.get) z)
-      )
-      (H_limbs :
-        forall (limb : Z),
-        0 <= limb < NB_LIMBS ->
-        a_limbs.(Array.get) limb =
-        UnOp.from ((of_bools NB_LIMBS BITS_PER_LIMB a_bools).(Array.get) limb)
-      ) :
-    0 <= NB_LIMBS ->
-    forall (bit : Z),
-    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
-    get_bit BITS_PER_LIMB a_limbs bit =
-    Z.odd (a_bools.(Array.get) bit).
-  Proof.
-    intros.
-    unfold get_bit.
-    rewrite H_limbs by nia.
-    rewrite <- get_bit_of_bools_eq by assumption.
-    rewrite from_of_bools_eq; trivial.
-    nia.
-  Qed.
-End Limbs.
 
 Ltac show_equality_modulo :=
   unfold
@@ -632,6 +610,100 @@ Module FieldRewrite.
     end.
 End FieldRewrite.
 
+(** Utilities around the manipulation of limbs *)
+Module Limbs.
+  (** Convert an array of bools to an array of limbs. *)
+  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
+      Array.t Z NB_LIMBS :=
+    {|
+      Array.get limb :=
+        let l : list nat :=
+          List.rev (
+            List.seq
+              (Z.to_nat (limb * BITS_PER_LIMB))%Z
+              (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
+          ) in
+        (* We sum all the bits times 2 to the n *)
+        Lists.List.fold_left (fun acc (z : nat) =>
+          let z : Z := Z.of_nat z in
+          (2 *F acc) +F a.[z]
+        ) l 0
+    |}.
+
+  (** We have taken the modulo of the result. *)
+  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t a.[z]
+      )
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
+    UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a).[limb] =
+    (of_bools NB_LIMBS BITS_PER_LIMB a).[limb].
+  Proof.
+    cbn.
+    set (l := List.rev _); clearbody l.
+    assert (H_acc : UnOp.from 0 = 0) by trivial; revert H_acc.
+    generalize 0 as acc.
+    induction l; cbn; trivial; intros.
+    apply IHl.
+    now FieldRewrite.run.
+  Qed.
+
+  (** Extract a single bit from an array of limbs. *)
+  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
+      (a : Array.t Z NB_LIMBS)
+      (bit : Z) :
+      bool :=
+    let limb := bit / BITS_PER_LIMB in
+    let bit_in_limb := bit mod BITS_PER_LIMB in
+    let limb_value := a.(Array.get) limb in
+    Z.testbit limb_value bit_in_limb.
+
+  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (bit : Z)
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t (a.(Array.get) z)
+      ) :
+    get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
+    Z.odd a.[bit].
+  Admitted.
+
+  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a_limbs : Array.t Z NB_LIMBS)
+      (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t a_bools.[z]
+      )
+      (H_limbs :
+        forall (limb : Z),
+        0 <= limb < NB_LIMBS ->
+        a_limbs.[limb] =
+        UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a_bools).[limb]
+      ) :
+    0 <= NB_LIMBS ->
+    forall (bit : Z),
+    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
+    get_bit BITS_PER_LIMB a_limbs bit =
+    Z.odd (a_bools.(Array.get) bit).
+  Proof.
+    intros.
+    unfold get_bit.
+    rewrite H_limbs by nia.
+    rewrite <- get_bit_of_bools_eq by assumption.
+    rewrite from_of_bools_eq; trivial.
+    nia.
+  Qed.
+End Limbs.
+
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
 Module Run.
   Reserved Notation "{{ e 🔽 output , P }}".
@@ -651,6 +723,9 @@ Module Run.
   | When (condition : Z) (e : M.t A) (value : A) (P : Prop) :
     (condition <> 0 -> {{ e 🔽 value, P }}) ->
     {{ M.When condition e 🔽 value, condition <> 0 -> P }}
+  | Message (message : string) (e : M.t A) (value : A) (P : Prop) :
+    {{ e 🔽 value, P }} ->
+    {{ M.Message message e 🔽 value, P }}
   | Implies (e : M.t A) (value : A) (P1 P2 : Prop) :
     {{ e 🔽 value, P1 }} ->
     (P1 -> P2) ->
@@ -792,6 +867,7 @@ Module Run.
     (apply Run.Call) ||
     (eapply Run.Let) ||
     (apply Run.When) ||
+    (apply Run.Message) ||
     match goal with
     | |- True -> _ => intros _
     | _ => intros
@@ -946,7 +1022,6 @@ Module Test_mod_inverse.
     reflexivity.
   Qed.
 
-
   Definition test2 : Z := mod_inverse 2 11. 
   Goal test2 = 6.
   Proof.
@@ -965,3 +1040,167 @@ Module Test_mod_inverse.
     reflexivity.
   Qed.
 End Test_mod_inverse.
+
+(** A monad to simplify the generation of data structures with fresh variables. This is useful to
+    validate that our models have the same constraints as the original implementations. *)
+Module MGenerate.
+  Definition t (A : Set) : Set :=
+    Z -> A * Z.
+
+  Definition pure {A : Set} (value : A) : t A :=
+    fun n => (value, n).
+
+  Definition bind {A B : Set} (e : t A) (k : A -> t B) : t B :=
+    fun n =>
+      let '(value, n') := e n in
+      k value n'.
+
+  (** Fake constructor used for the pretty-printing. *)
+  Definition Var (z : Z) : Z :=
+    z.
+  Global Opaque Var.
+
+  Definition generate_var : t Z :=
+    fun n => (Var n, n + 1).
+
+  Definition eval {A : Set} (x : t A) : A :=
+    fst (x 0).
+
+  Class C (A : Set) : Set := {
+    generate : t A;
+  }.
+
+  Fixpoint generate_list {A : Set} `{C A} (n : nat) : t (list A) :=
+    match n with
+    | O => pure []
+    | S n =>
+      bind generate (fun x =>
+        bind (generate_list n) (fun xs =>
+          pure (x :: xs)
+        )
+      )
+    end.
+
+  (** This is a marker that we remove with the following tactic. *)
+  Axiom run : forall {A : Set}, t A -> A.
+
+  (** A tactic that replaces all [run] markers with a bind operation.
+    This allows to represent programs without introducing
+    explicit names for all intermediate computation results. *)
+  Ltac monadic e :=
+    lazymatch e with
+    | context ctxt [let v := ?x in @?f v] =>
+      refine (bind _ _);
+        [ monadic x
+        | let v' := fresh v in
+          intro v';
+          let y := (eval cbn beta in (f v')) in
+          lazymatch context ctxt [let v := x in y] with
+          | let _ := x in y => monadic y
+          | _ =>
+            refine (bind _ _);
+              [ monadic y
+              | let w := fresh "v" in
+                intro w;
+                let z := context ctxt [w] in
+                monadic z
+              ]
+          end
+        ]
+    | context ctxt [run ?x] =>
+      lazymatch context ctxt [run x] with
+      | run x => monadic x
+      | _ =>
+        refine (bind _ _);
+          [ monadic x
+          | let v := fresh "v" in
+            intro v;
+            let y := context ctxt [v] in
+            monadic y
+          ]
+      end
+    | _ =>
+      lazymatch type of e with
+      | t _ => exact e
+      | _ => exact (pure e)
+      end
+    end.
+End MGenerate.
+
+Notation "e (| e1 , .. , en |)" :=
+  (MGenerate.run ((.. (e e1) ..) en))
+  (at level 100).
+
+Notation "e (||)" :=
+  (MGenerate.run e)
+  (at level 100).
+
+Notation "[[ e ]]" :=
+  (ltac:(MGenerate.monadic e))
+  (* Use the version below for debugging and show errors that are made obscure by the tactic *)
+  (* (MGenerate.pure e) *)
+  (only parsing).
+
+Notation "'let*g' x ':=' e 'in' k" :=
+  (MGenerate.bind e (fun x => k))
+  (at level 200, x pattern, e at level 200, k at level 200).
+
+Global Instance VarIsGenerate : MGenerate.C Z := {
+  generate := MGenerate.generate_var;
+}.
+
+Global Instance ArrayIsGenerate {T : Set} `{MGenerate.C T} `{Default.C T} {N : Z} :
+    MGenerate.C (Array.t T N) := {
+  generate :=
+    MGenerate.bind (MGenerate.generate_list (Z.to_nat N)) (fun l =>
+      MGenerate.pure (Array.of_list l)
+    )
+}.
+
+Module GenerateExample.
+  Definition five_items : MGenerate.t (list Z) :=
+    [[
+      [
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||);
+        MGenerate.generate (||)
+      ]
+    ]].
+
+  Goal MGenerate.eval five_items = [
+    MGenerate.Var 0;
+    MGenerate.Var 1;
+    MGenerate.Var 2;
+    MGenerate.Var 3;
+    MGenerate.Var 4
+  ].
+  Proof. reflexivity. Qed.
+
+  Definition pair_items : MGenerate.t (list Z * list Z) :=
+    [[
+      (
+        five_items (||),
+        five_items (||)
+      )
+    ]].
+
+  Goal MGenerate.eval pair_items = (
+    [
+      MGenerate.Var 0;
+      MGenerate.Var 1;
+      MGenerate.Var 2;
+      MGenerate.Var 3;
+      MGenerate.Var 4
+    ],
+    [
+      MGenerate.Var 5;
+      MGenerate.Var 6;
+      MGenerate.Var 7;
+      MGenerate.Var 8;
+      MGenerate.Var 9
+    ]
+  ).
+  Proof. reflexivity. Qed.
+End GenerateExample.

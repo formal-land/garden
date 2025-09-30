@@ -44,27 +44,64 @@ Module KeccakCols.
     |};
   }.
 
+  Global Instance IsGenerate : MGenerate.C KeccakCols.t := {
+    generate :=
+      [[
+        {|
+          KeccakCols.step_flags := MGenerate.generate (||);
+          KeccakCols.export := MGenerate.generate (||);
+          KeccakCols.preimage := MGenerate.generate (||);
+          KeccakCols.a := MGenerate.generate (||);
+          KeccakCols.c := MGenerate.generate (||);
+          KeccakCols.c_prime := MGenerate.generate (||);
+          KeccakCols.a_prime := MGenerate.generate (||);
+          KeccakCols.a_prime_prime := MGenerate.generate (||);
+          KeccakCols.a_prime_prime_0_0_bits := MGenerate.generate (||);
+          KeccakCols.a_prime_prime_prime_0_0_limbs := MGenerate.generate (||);
+        |}
+      ]];
+  }.
+
+  Module Eq.
+    Record t (x y : KeccakCols.t): Prop := {
+      step_flags : Equal.t x.(KeccakCols.step_flags) y.(KeccakCols.step_flags);
+      export : Equal.t x.(KeccakCols.export) y.(KeccakCols.export);
+      preimage : Equal.t x.(KeccakCols.preimage) y.(KeccakCols.preimage);
+      a : Equal.t x.(KeccakCols.a) y.(KeccakCols.a);
+      c : Equal.t x.(KeccakCols.c) y.(KeccakCols.c);
+      c_prime : Equal.t x.(KeccakCols.c_prime) y.(KeccakCols.c_prime);
+      a_prime : Equal.t x.(KeccakCols.a_prime) y.(KeccakCols.a_prime);
+      a_prime_prime : Equal.t x.(KeccakCols.a_prime_prime) y.(KeccakCols.a_prime_prime);
+      a_prime_prime_0_0_bits : Equal.t x.(KeccakCols.a_prime_prime_0_0_bits) y.(KeccakCols.a_prime_prime_0_0_bits);
+      a_prime_prime_prime_0_0_limbs : Equal.t x.(KeccakCols.a_prime_prime_prime_0_0_limbs) y.(KeccakCols.a_prime_prime_prime_0_0_limbs);
+    }.
+  End Eq.
+
+  Global Instance IsEqual : Equal.C KeccakCols.t := {
+    Equal.t := Eq.t;
+  }.
+
   Definition get_preimage (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.preimage).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.preimage).[y].[x].[limb].
 
   Definition get_a (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.a).[y].[x].[limb].
 
   Definition get_c (local : KeccakCols.t) (x z : Z) : Z :=
-    ((local.(KeccakCols.c).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.c).[x].[z].
 
   Definition get_c_prime (local : KeccakCols.t) (x z : Z) : Z :=
-    ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.c_prime).[x].[z].
 
   Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : Z :=
-    (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z).
+    local.(KeccakCols.a_prime).[y].[x].[z].
 
   Definition get_a_prime_prime (local : KeccakCols.t) (x y limb : Z) : Z :=
-    ((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb.
+    local.(KeccakCols.a_prime_prime).[y].[x].[limb].
 
   Module Bool.
     Definition get_a (local : KeccakCols.t) (x y z : Z) : bool :=
-      Limbs.get_bit BITS_PER_LIMB ((local.(KeccakCols.a).(Array.get) y).(Array.get) x) z.
+      Limbs.get_bit BITS_PER_LIMB (local.(KeccakCols.a).[y].[x]) z.
 
     Definition get_c (local : KeccakCols.t) (x z : Z) : bool :=
       Z.odd ((get_c local x z)).
@@ -96,11 +133,17 @@ Module Impl_KeccakCols.
       self.a_prime[b][a][(z + 64 - rot) % 64]
   }
   *)
-  Definition b (self : KeccakCols.t) (x y z : Z) : Z :=
+  Definition b_of_a_prime {T : Set}
+      (a_prime : Array.t (Array.t (Array.t T 64) 5) 5)
+      (x y z : Z) :
+      T :=
     let a := (x + 3 * y) mod 5 in
     let b := x in
-    let rot := (R.(Array.get) a).(Array.get) b in
-    ((self.(KeccakCols.a_prime).(Array.get) b).(Array.get) a).(Array.get) ((z + 64 - rot) mod 64).
+    let rot := R.[a].[b] in
+    a_prime.[b].[a].[(z + 64 - rot) mod 64].
+
+  Definition b (self : KeccakCols.t) (x y z : Z) : Z :=
+    b_of_a_prime self.(KeccakCols.a_prime) x y z.
 
   (*
   pub fn a_prime_prime_prime(&self, y: usize, x: usize, limb: usize) -> T {
@@ -117,9 +160,9 @@ Module Impl_KeccakCols.
   *)
   Definition a_prime_prime_prime (self : KeccakCols.t) (y x limb : Z) : Z :=
     if (y =? 0) && (x =? 0) then
-      (self.(KeccakCols.a_prime_prime_prime_0_0_limbs).(Array.get) limb)
+      self.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb]
     else
-      ((self.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb.
+      self.(KeccakCols.a_prime_prime).[y].[x].[limb].
 End Impl_KeccakCols.
 
 Module U64.

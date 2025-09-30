@@ -2,36 +2,36 @@ Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.MExpr.
 Require Import Garden.OpenVM.BranchEq.core.
 
-Global Instance ImmInstructionIsToRocq : ToRocq.C (ImmInstruction.t Expr.t) := {
-  to_rocq self indent :=
-    ToRocq.cats [ToRocq.indent indent; "ImmInstruction:"; ToRocq.endl;
-      ToRocq.indent (indent + 2); "is_valid:"; ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.is_valid) (indent + 4); ToRocq.endl;
-      ToRocq.indent (indent + 2); "opcode:"; ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.opcode) (indent + 4); ToRocq.endl;
-      ToRocq.indent (indent + 2); "immediate:"; ToRocq.endl;
-      ToRocq.to_rocq self.(ImmInstruction.immediate) (indent + 4)
+Global Instance ImmInstructionIsToRocq : PrettyPrint.C (ImmInstruction.t Expr.t) := {
+  to_string self indent :=
+    PrettyPrint.cats [PrettyPrint.indent indent; "ImmInstruction:"; PrettyPrint.endl;
+      PrettyPrint.indent (indent + 2); "is_valid:"; PrettyPrint.endl;
+      PrettyPrint.to_string self.(ImmInstruction.is_valid) (indent + 4); PrettyPrint.endl;
+      PrettyPrint.indent (indent + 2); "opcode:"; PrettyPrint.endl;
+      PrettyPrint.to_string self.(ImmInstruction.opcode) (indent + 4); PrettyPrint.endl;
+      PrettyPrint.indent (indent + 2); "immediate:"; PrettyPrint.endl;
+      PrettyPrint.to_string self.(ImmInstruction.immediate) (indent + 4)
     ];
 }.
 
 Global Instance AdapterAirContextIsToRocq {NUM_LIMBS : Z} :
-    ToRocq.C (AdapterAirContext.t NUM_LIMBS Expr.t) := {
-  to_rocq self indent :=
-    ToRocq.cats [ToRocq.indent indent; "AdapterAirContext:"; ToRocq.endl;
-      ToRocq.cats [ToRocq.indent (indent + 2); "to_pc:"; ToRocq.endl;
-        ToRocq.to_rocq self.(AdapterAirContext.to_pc) (indent + 4)
+    PrettyPrint.C (AdapterAirContext.t NUM_LIMBS Expr.t) := {
+  to_string self indent :=
+    PrettyPrint.cats [PrettyPrint.indent indent; "AdapterAirContext:"; PrettyPrint.endl;
+      PrettyPrint.cats [PrettyPrint.indent (indent + 2); "to_pc:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(AdapterAirContext.to_pc) (indent + 4)
       ];
-      ToRocq.endl;
-      ToRocq.cats [ToRocq.indent (indent + 2); "reads:"; ToRocq.endl;
-        ToRocq.to_rocq self.(AdapterAirContext.reads) (indent + 4)
+      PrettyPrint.endl;
+      PrettyPrint.cats [PrettyPrint.indent (indent + 2); "reads:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(AdapterAirContext.reads) (indent + 4)
       ];
-      ToRocq.endl;
-      ToRocq.cats [ToRocq.indent (indent + 2); "writes:"; ToRocq.endl;
-        ToRocq.to_rocq self.(AdapterAirContext.writes) (indent + 4)
+      PrettyPrint.endl;
+      PrettyPrint.cats [PrettyPrint.indent (indent + 2); "writes:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(AdapterAirContext.writes) (indent + 4)
       ];
-      ToRocq.endl;
-      ToRocq.cats [ToRocq.indent (indent + 2); "instruction:"; ToRocq.endl;
-        ToRocq.to_rocq self.(AdapterAirContext.instruction) (indent + 4)
+      PrettyPrint.endl;
+      PrettyPrint.cats [PrettyPrint.indent (indent + 2); "instruction:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(AdapterAirContext.instruction) (indent + 4)
       ]
     ];
 }.
@@ -173,10 +173,10 @@ Definition print_branch_eq {NUM_LIMBS : Z} : string :=
     BranchEqualCoreCols.diff_inv_marker := {| Array.get := fun i => Var.make (i + 2 * NUM_LIMBS + 4) |};
   |} in
   let from_pc : Var.t := Var.make (3 * NUM_LIMBS + 4) in
-  ToRocq.cats [
-    ToRocq.endl;
-    ToRocq.to_rocq (eval air local from_pc) 0;
-    ToRocq.endl
+  PrettyPrint.cats [
+    PrettyPrint.endl;
+    PrettyPrint.to_string (eval air local from_pc) 0;
+    PrettyPrint.endl
   ].
 
 Compute print_branch_eq (NUM_LIMBS := 4).

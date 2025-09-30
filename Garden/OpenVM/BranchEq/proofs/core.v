@@ -131,15 +131,14 @@ Proof.
   intros _.
   eapply Run.LetAccumulate with (P1 :=
     if cmp_eq then
-      Array.Eq.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b)
+      Equal.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b)
     else
       True
   ). {
     eapply Run.Implies. {
       Run.run.
     }
-    intros H_for.
-    unfold Array.Eq.t.
+    intros H_for; cbn.
     destruct cmp_eq; cbn; [|trivial].
     intros i H_i.
     pose proof (H_for i H_i) as H_for_i.
@@ -153,13 +152,12 @@ Proof.
     if cmp_eq then
       True
     else
-      ~ (Array.Eq.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b))
+      ~ (Equal.t local.(BranchEqualCoreCols.a) local.(BranchEqualCoreCols.b))
   ). {
     eapply Run.Implies. {
       repeat constructor.
     }
-    intros H_sum.
-    unfold Array.Eq.t.
+    intros H_sum; cbn.
     destruct cmp_eq; cbn; [trivial|].
     intro.
     replace (Z.b2z false) with (UnOp.from 0) in H_sum by reflexivity.
@@ -282,7 +280,7 @@ Proof.
     apply Complete.ForInZeroToN.
     intros.
     unfold get_expected_cmp_result in *.
-    destruct branch_equal_opcode, Array.Eq.dec as [H_a_b_eq|]; unfold Array.Eq.t in *; cbn; 
+    destruct branch_equal_opcode, Array.Eq.dec as [H_a_b_eq|]; cbn; 
       autorewrite with field_rewrite;
       apply Complete.AssertZero;
       try reflexivity.
@@ -298,7 +296,7 @@ Proof.
     destruct Array.Eq.dec as [H_a_b_eq | H_a_b_neq]; cbn.
     {
       replace (Z.b2z cmp_eq) with (UnOp.from 1) by now destruct branch_equal_opcode.
-      unfold Array.Eq.t in H_a_b_eq.
+      cbn in H_a_b_eq.
       rewrite sum_for_in_zero_to_n_starting_from_always_zero_eq; try reflexivity; try lia; intros.
       set (diff := BinOp.sub _ _).
       replace diff with 0; try reflexivity.

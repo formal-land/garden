@@ -53,6 +53,10 @@ Module Var.
   Arguments eval {p} {_} _ _ /.
 End Var.
 
+Global Instance VarIsGenerate : MGenerate.C Var.t := {
+  generate := fun n => (Var.make n, n + 1);
+}.
+
 Module Expr.
   Inductive t : Set :=
   | Var (var : Var.t)
@@ -163,9 +167,9 @@ Notation "x *E y" := (Expr.Mul x y) (at level 40, left associativity).
 (* Coercion from Var.t to Expr.t *)
 Global Coercion Expr.Var : Var.t >-> Expr.t.
 
-Module ToRocq.
+Module PrettyPrint.
   Class C (T : Set) : Set := {
-    to_rocq (value : T) (indent : Z) : string;
+    to_string (value : T) (indent : Z) : string;
   }.
 
   Fixpoint indent_aux (indent : nat) : string :=
@@ -221,83 +225,83 @@ Module ToRocq.
 
   Definition of_Z (z : Z) : PrimString.string :=
     pstring_of_uint (N.to_uint (Z.to_N z)).
-End ToRocq.
+End PrettyPrint.
 
 Fixpoint string_of_flat_expr (expr : Expr.Flat.t) (indent : Z) : string :=
   match expr with
   | Expr.Flat.Var var =>
-    ToRocq.cats [ToRocq.indent indent; "Variable: "; ToRocq.of_Z var.(Var.index)]
+    PrettyPrint.cats [PrettyPrint.indent indent; "Variable: "; PrettyPrint.of_Z var.(Var.index)]
   | Expr.Flat.IsFirstRow =>
-    ToRocq.cats [ToRocq.indent indent; "IsFirstRow"]
+    PrettyPrint.cats [PrettyPrint.indent indent; "IsFirstRow"]
   | Expr.Flat.IsLastRow =>
-    ToRocq.cats [ToRocq.indent indent; "IsLastRow"]
+    PrettyPrint.cats [PrettyPrint.indent indent; "IsLastRow"]
   | Expr.Flat.IsTransition =>
-    ToRocq.cats [ToRocq.indent indent; "IsTransition"]
+    PrettyPrint.cats [PrettyPrint.indent indent; "IsTransition"]
   | Expr.Flat.Constant value =>
-    ToRocq.cats [ToRocq.indent indent; "Constant: "; ToRocq.of_Z value.(Field.value)]
+    PrettyPrint.cats [PrettyPrint.indent indent; "Constant: "; PrettyPrint.of_Z value.(Field.value)]
   | Expr.Flat.Add xs =>
-    ToRocq.cats [ToRocq.indent indent; "Add:"; ToRocq.endl;
-      ToRocq.separate ToRocq.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
+    PrettyPrint.cats [PrettyPrint.indent indent; "Add:"; PrettyPrint.endl;
+      PrettyPrint.separate PrettyPrint.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
     ]
   | Expr.Flat.Sub x y =>
-    ToRocq.cats [ToRocq.indent indent; "Sub:"; ToRocq.endl;
+    PrettyPrint.cats [PrettyPrint.indent indent; "Sub:"; PrettyPrint.endl;
       string_of_flat_expr x (indent + 2);
-      ToRocq.endl;
+      PrettyPrint.endl;
       string_of_flat_expr y (indent + 2)
     ]
   | Expr.Flat.Neg x =>
-    ToRocq.cats [ToRocq.indent indent; "Neg:"; ToRocq.endl;
+    PrettyPrint.cats [PrettyPrint.indent indent; "Neg:"; PrettyPrint.endl;
       string_of_flat_expr x (indent + 2)
     ]
   | Expr.Flat.Mul xs =>
-    ToRocq.cats [ToRocq.indent indent; "Mul:"; ToRocq.endl;
-      ToRocq.separate ToRocq.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
+    PrettyPrint.cats [PrettyPrint.indent indent; "Mul:"; PrettyPrint.endl;
+      PrettyPrint.separate PrettyPrint.endl (List.map (fun x => string_of_flat_expr x (indent + 2)) xs)
     ]
   end.
 
-Global Instance ExprIsToRocq : ToRocq.C Expr.t := {
-  to_rocq self indent :=
+Global Instance ExprIsPrettyPrint : PrettyPrint.C Expr.t := {
+  to_string self indent :=
     let flat := Expr.Flat.flatten self in
     string_of_flat_expr flat indent;
 }.
 
-Global Instance UnitIsToRocq : ToRocq.C unit := {
-  to_rocq self indent :=
-    ToRocq.cats [ToRocq.indent indent; "tt"];
+Global Instance UnitIsPrettyPrint : PrettyPrint.C unit := {
+  to_string self indent :=
+    PrettyPrint.cats [PrettyPrint.indent indent; "tt"];
 }.
 
-Global Instance StringIsToRocq : ToRocq.C string := {
-  to_rocq self indent :=
-    ToRocq.cats [ToRocq.indent indent; self];
+Global Instance StringIsPrettyPrint : PrettyPrint.C string := {
+  to_string self indent :=
+    PrettyPrint.cats [PrettyPrint.indent indent; self];
 }.
 
-Global Instance ZIsToRocq : ToRocq.C Z := {
-  to_rocq self indent :=
-    ToRocq.cats [ToRocq.indent indent; ToRocq.of_Z self];
+Global Instance ZIsPrettyPrint : PrettyPrint.C Z := {
+  to_string self indent :=
+    PrettyPrint.cats [PrettyPrint.indent indent; PrettyPrint.of_Z self];
 }.
 
-Global Instance OptionIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (option T) := {
-  to_rocq self indent :=
+Global Instance OptionIsPrettyPrint {T : Set} {C : PrettyPrint.C T} : PrettyPrint.C (option T) := {
+  to_string self indent :=
     match self with
     | Some x =>
-      ToRocq.cats [ToRocq.indent indent; "Some:"; ToRocq.endl;
-        ToRocq.to_rocq x (indent + 2)
+      PrettyPrint.cats [PrettyPrint.indent indent; "Some:"; PrettyPrint.endl;
+        PrettyPrint.to_string x (indent + 2)
       ]
-    | None => ToRocq.cats [ToRocq.indent indent; "None"]
+    | None => PrettyPrint.cats [PrettyPrint.indent indent; "None"]
     end;
 }.
 
-Global Instance ListIsToRocq {T : Set} {C : ToRocq.C T} : ToRocq.C (list T) := {
-  to_rocq self indent :=
-    ToRocq.cats (
-      [ToRocq.indent indent; "Array:"] ++
-      List.map (fun item => ToRocq.cats [ToRocq.endl; ToRocq.to_rocq item (indent + 2)]) self
+Global Instance ListIsPrettyPrint {T : Set} {C : PrettyPrint.C T} : PrettyPrint.C (list T) := {
+  to_string self indent :=
+    PrettyPrint.cats (
+      [PrettyPrint.indent indent; "Array:"] ++
+      List.map (fun item => PrettyPrint.cats [PrettyPrint.endl; PrettyPrint.to_string item (indent + 2)]) self
     );
 }.
 
-Global Instance ArrayIsToRocq {T : Set} {C : ToRocq.C T} {N : Z} : ToRocq.C (Array.t T N) := {
-  to_rocq self indent :=
-    ToRocq.to_rocq (Array.to_list self) indent
+Global Instance ArrayIsPrettyPrint {T : Set} {C : PrettyPrint.C T} {N : Z} : PrettyPrint.C (Array.t T N) := {
+  to_string self indent :=
+    PrettyPrint.to_string (Array.to_list self) indent
 }.
 
 Module Env.
@@ -347,22 +351,22 @@ Module Interaction.
     count_weight : Z;
   }.
 
-  Global Instance IsToRocq : ToRocq.C t := {
-    to_rocq self indent :=
-      ToRocq.cats [ToRocq.indent indent; "Interaction:"; ToRocq.endl;
-        ToRocq.indent (indent + 2); "message:"; ToRocq.endl;
-        ToRocq.separate ToRocq.endl (
-          List.map (fun expr => ToRocq.to_rocq expr (indent + 4)) self.(message)
+  Global Instance IsPrettyPrint : PrettyPrint.C t := {
+    to_string self indent :=
+      PrettyPrint.cats [PrettyPrint.indent indent; "Interaction:"; PrettyPrint.endl;
+        PrettyPrint.indent (indent + 2); "message:"; PrettyPrint.endl;
+        PrettyPrint.separate PrettyPrint.endl (
+          List.map (fun expr => PrettyPrint.to_string expr (indent + 4)) self.(message)
         );
-        ToRocq.endl;
-        ToRocq.indent (indent + 2); "count:"; ToRocq.endl;
-        ToRocq.to_rocq self.(count) (indent + 4);
-        ToRocq.endl;
-        ToRocq.indent (indent + 2); "bus_index:"; ToRocq.endl;
-        ToRocq.to_rocq self.(bus_index) (indent + 4);
-        ToRocq.endl;
-        ToRocq.indent (indent + 2); "count_weight:"; ToRocq.endl;
-        ToRocq.to_rocq self.(count_weight) (indent + 4)
+        PrettyPrint.endl;
+        PrettyPrint.indent (indent + 2); "count:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(count) (indent + 4);
+        PrettyPrint.endl;
+        PrettyPrint.indent (indent + 2); "bus_index:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(bus_index) (indent + 4);
+        PrettyPrint.endl;
+        PrettyPrint.indent (indent + 2); "count_weight:"; PrettyPrint.endl;
+        PrettyPrint.to_string self.(count_weight) (indent + 4)
       ];
   }.
 End Interaction.
@@ -375,30 +379,30 @@ Module Trace.
     | Message (message : string)
     | Interaction (interaction : Interaction.t).
 
-    Global Instance IsToRocq : ToRocq.C t := {
-      to_rocq self indent :=
+    Global Instance IsPrettyPrint : PrettyPrint.C t := {
+      to_string self indent :=
         match self with
         | AssertZero expr =>
-          ToRocq.cats [ToRocq.indent indent; "AssertZero:"; ToRocq.endl;
-            ToRocq.to_rocq expr (indent + 2)
+          PrettyPrint.cats [PrettyPrint.indent indent; "AssertZero:"; PrettyPrint.endl;
+            PrettyPrint.to_string expr (indent + 2)
           ]
         | Message message =>
-          ToRocq.cats [ToRocq.indent indent; "Message 🦜"; ToRocq.endl;
-            ToRocq.to_rocq message (indent + 2)
+          PrettyPrint.cats [PrettyPrint.indent indent; "Message 🦜"; PrettyPrint.endl;
+            PrettyPrint.to_string message (indent + 2)
           ]
         | Interaction interaction =>
-          ToRocq.to_rocq interaction indent
+          PrettyPrint.to_string interaction indent
         end;
     }.
   End Event.
 
   Definition t : Set := list Event.t.
 
-  Global Instance IsToRocq : ToRocq.C t := {
-    to_rocq self indent :=
+  Global Instance IsPrettyPrint : PrettyPrint.C t := {
+    to_string self indent :=
       let asserts := self in
-      ToRocq.separate ToRocq.endl (
-        List.map (fun event => ToRocq.to_rocq event indent) asserts
+      PrettyPrint.separate PrettyPrint.endl (
+        List.map (fun event => PrettyPrint.to_string event indent) asserts
       );
   }.
 End Trace.
@@ -523,16 +527,16 @@ Notation "'msg!' message 'in' k" :=
   (MExpr.Message message k)
   (at level 200, message at level 200, k at level 200).
 
-Global Instance MExprIsToRocq {A : Set} {C : ToRocq.C A} : ToRocq.C (MExpr.t A) := {
-  to_rocq self indent :=
+Global Instance MExprIsPrettyPrint {A : Set} {C : PrettyPrint.C A} : PrettyPrint.C (MExpr.t A) := {
+  to_string self indent :=
     let '(result, trace) := MExpr.to_trace self in
-    ToRocq.cats (
-      [ToRocq.indent indent; "Trace 🐾"; ToRocq.endl;
-        ToRocq.to_rocq trace (indent + 2)
+    PrettyPrint.cats (
+      [PrettyPrint.indent indent; "Trace 🐾"; PrettyPrint.endl;
+        PrettyPrint.to_string trace (indent + 2)
       ] ++
-      [ToRocq.endl] ++
-      [ToRocq.indent indent; "Result 🛍️"; ToRocq.endl;
-        ToRocq.to_rocq result (indent + 2)
+      [PrettyPrint.endl] ++
+      [PrettyPrint.indent indent; "Result 🛍️"; PrettyPrint.endl;
+        PrettyPrint.to_string result (indent + 2)
       ]
     );
 }.
@@ -699,160 +703,56 @@ Module List.
   End Eq.
 End List.
 
-(** A monad to simplify the generation of data structures with fresh_var variables *)
-Module MGenerateVar.
-  Definition t (A : Set) : Set :=
-    Z -> A * Z.
-
-  Definition pure {A : Set} (value : A) : t A :=
-    fun n => (value, n).
-
-  Definition bind {A B : Set} (e : t A) (k : A -> t B) : t B :=
-    fun n =>
-      let '(value, n') := e n in
-      k value n'.
-
-  Definition generate_var : t Var.t :=
-    fun n => (Var.make n, n + 1).
-
-  Definition eval {A : Set} (x : t A) : A :=
-    fst (x 0).
-
-  Class C (A : Set) : Set := {
-    generate : t A;
-  }.
-
-  Fixpoint generate_list {A : Set} `{C A} (n : nat) : t (list A) :=
-    match n with
-    | O => pure []
-    | S n =>
-      bind generate (fun x =>
-        bind (generate_list n) (fun xs =>
-          pure (x :: xs)
-        )
-      )
-    end.
-
-  (** This is a marker that we remove with the following tactic. *)
-  Axiom run : forall {A : Set}, t A -> A.
-
-  (** A tactic that replaces all [run] markers with a bind operation.
-    This allows to represent programs without introducing
-    explicit names for all intermediate computation results. *)
-  Ltac monadic e :=
+(** Utilities to convert the shallow representation of circuits into this deep representation. *)
+Module OfShallow.
+  Ltac to_expr e :=
     lazymatch e with
-    | context ctxt [let v := ?x in @?f v] =>
-      refine (bind _ _);
-        [ monadic x
-        | let v' := fresh v in
-          intro v';
-          let y := (eval cbn beta in (f v')) in
-          lazymatch context ctxt [let v := x in y] with
-          | let _ := x in y => monadic y
-          | _ =>
-            refine (bind _ _);
-              [ monadic y
-              | let w := fresh "v" in
-                intro w;
-                let z := context ctxt [w] in
-                monadic z
-              ]
-          end
-        ]
-    | context ctxt [run ?x] =>
-      lazymatch context ctxt [run x] with
-      | run x => monadic x
-      | _ =>
-        refine (bind _ _);
-          [ monadic x
-          | let v := fresh "v" in
-            intro v;
-            let y := context ctxt [v] in
-            monadic y
-          ]
-      end
-    | _ =>
-      lazymatch type of e with
-      | t _ => exact e
-      | _ => exact (pure e)
-      end
+    | MGenerate.Var ?index => constr:(Expr.var index)
+    | UnOp.opp ?x =>
+      let x := to_expr x in
+      constr:(Expr.Neg x)
+    | BinOp.add ?x ?y =>
+      let x := to_expr x in
+      let y := to_expr y in
+      constr:(Expr.Add x y)
+    | BinOp.sub ?x ?y =>
+      let x := to_expr x in
+      let y := to_expr y in
+      constr:(Expr.Sub x y)
+    | BinOp.mul ?x ?y =>
+      let x := to_expr x in
+      let y := to_expr y in
+      constr:(Expr.Mul x y)
+    | ?z => constr:(Expr.constant z)
     end.
-End MGenerateVar.
 
-Notation "e (| e1 , .. , en |)" :=
-  (MGenerateVar.run ((.. (e e1) ..) en))
-  (at level 100).
+  Ltac to_mexpr_trace_aux trace :=
+    lazymatch trace with
+    | List.nil => constr:(List.nil (A := MExpr.Trace.Event.t))
+    | List.cons ?event ?trace =>
+      let event :=
+        lazymatch event with
+        | M.Trace.Event.AssertZero ?expr =>
+          let expr := to_expr expr in
+          constr:(MExpr.Trace.Event.AssertZero expr)
+        | M.Trace.Event.Message ?message =>
+          constr:(MExpr.Trace.Event.Message message)
+        end in
+      let trace := to_mexpr_trace_aux trace in
+      constr:(List.cons event trace)
+    end.
 
-Notation "e (||)" :=
-  (MGenerateVar.run e)
-  (at level 100).
-
-Notation "[[ e ]]" :=
-  (ltac:(MGenerateVar.monadic e))
-  (* Use the version below for debugging and show errors that are made obscure by the tactic *)
-  (* (MGenerateVar.pure e) *)
-  (only parsing).
-
-Notation "'let*g' x ':=' e 'in' k" :=
-  (MGenerateVar.bind e (fun x => k))
-  (at level 200, x pattern, e at level 200, k at level 200).
-
-Global Instance VarIsGenerateVar : MGenerateVar.C Var.t := {
-  generate := MGenerateVar.generate_var;
-}.
-
-Global Instance ArrayIsGenerateVar {T : Set} `{MGenerateVar.C T} `{Default.C T} {N : Z} :
-    MGenerateVar.C (Array.t T N) := {
-  generate :=
-    MGenerateVar.bind (MGenerateVar.generate_list (Z.to_nat N)) (fun l =>
-      MGenerateVar.pure (Array.of_list l)
-    )
-}.
-
-Module GenerateVarExample.
-  Definition five_items : MGenerateVar.t (list Var.t) :=
-    [[
-      [
-        MGenerateVar.generate (||);
-        MGenerateVar.generate (||);
-        MGenerateVar.generate (||);
-        MGenerateVar.generate (||);
-        MGenerateVar.generate (||)
-      ]
-    ]].
-
-  Goal MGenerateVar.eval five_items = [
-    Var.make 0;
-    Var.make 1;
-    Var.make 2;
-    Var.make 3;
-    Var.make 4
-  ].
-  Proof. reflexivity. Qed.
-
-  Definition pair_items : MGenerateVar.t (list Var.t * list Var.t) :=
-    [[
-      (
-        five_items (||),
-        five_items (||)
-      )
-    ]].
-
-  Goal MGenerateVar.eval pair_items = (
-    [
-      Var.make 0;
-      Var.make 1;
-      Var.make 2;
-      Var.make 3;
-      Var.make 4
-    ],
-    [
-      Var.make 5;
-      Var.make 6;
-      Var.make 7;
-      Var.make 8;
-      Var.make 9
-    ]
-  ).
-  Proof. reflexivity. Qed.
-End GenerateVarExample.
+  Ltac to_mexpr_trace e :=
+    let v := fresh "v" in
+    pose e as v;
+    (
+      with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
+      with_strategy transparent [M.for_in_zero_to_n]
+        cbv in v
+    );
+    lazymatch eval unfold v in v with
+    | ?e =>
+      let result := to_mexpr_trace_aux e in
+      exact result
+    end.
+End OfShallow.
