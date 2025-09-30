@@ -155,6 +155,20 @@ Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
 Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
 Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
 
+Module Trace.
+  Module Event.
+    Inductive t : Set :=
+    | AssertZero (expr : Z).
+
+    Definition map_condition {p} `{Prime p} (condition : Z) (event : t) : t :=
+      match event with
+      | AssertZero expr => AssertZero (condition *F expr)
+      end.
+  End Event.
+
+  Definition t : Set := list Event.t.
+End Trace.
+
 Module M.
   (** The monad to write constraints generation in a certain field [F] *)
   Inductive t (A : Set) : Set :=
@@ -179,6 +193,20 @@ Module M.
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
     | M.When condition e => M.When condition (map f e)
+    end.
+
+  Fixpoint to_trace {p} `{Prime p} {A : Set} (e : M.t A) : A * Trace.t :=
+    match e with
+    | M.Pure value => (value, [])
+    | M.AssertZero expr value => (value, [Trace.Event.AssertZero expr])
+    | M.Call e => to_trace e
+    | M.Let e k =>
+      let '(value_e, trace_e) := to_trace e in
+      let '(value_k, trace_k) := to_trace (k value_e) in
+      (value_k, trace_e ++ trace_k)
+    | M.When condition e =>
+      let '(value_e, trace_e) := to_trace e in
+      (value_e, List.map (Trace.Event.map_condition condition) trace_e)
     end.
 End M.
 
@@ -1000,7 +1028,8 @@ Module Test_mod_inverse.
   Qed.
 End Test_mod_inverse.
 
-(** A monad to simplify the generation of data structures with fresh_var variables *)
+(** A monad to simplify the generation of data structures with fresh variables. This is useful to
+    validate that our models have the same constraints as the original implementations. *)
 Module MGenerate.
   Definition t (A : Set) : Set :=
     Z -> A * Z.

@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Plonky3.MExpr.
 Require Import Garden.Plonky3.keccak.proofs.air_small_parts.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
@@ -17,217 +18,21 @@ Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : 
   let* _ := a_prime_prime_prime_0_0_limbs.eval local in
   M.pure tt.
 
-Require Import Plonky3.MExpr.
+Module PrettyPrint.
+  Parameter p : Z.
+  Instance IsPrime : Prime p.
+  Admitted.
 
-Module Trace.
-  Module Event.
-    Inductive t : Set :=
-    | AssertZero (expr : Z).
-
-    Definition map_condition {p} `{Prime p} (condition : Z) (event : t) : t :=
-      match event with
-      | AssertZero expr => AssertZero (condition *F expr)
-      end.
-  End Event.
-
-  Definition t : Set := list Event.t.
-End Trace.
-
-Fixpoint to_trace {p} `{Prime p} {A : Set} (e : M.t A) : A * Trace.t :=
-  match e with
-  | M.Pure value => (value, [])
-  | M.AssertZero expr value => (value, [Trace.Event.AssertZero expr])
-  | M.Call e => to_trace e
-  | M.Let e k =>
-    let '(value_e, trace_e) := to_trace e in
-    let '(value_k, trace_k) := to_trace (k value_e) in
-    (value_k, trace_e ++ trace_k)
-  | M.When condition e =>
-    let '(value_e, trace_e) := to_trace e in
-    (value_e, List.map (Trace.Event.map_condition condition) trace_e)
-  end.
-
-Ltac to_expr e :=
-  lazymatch e with
-  | MGenerate.Var ?index => constr:(Expr.var index)
-  | UnOp.opp ?x =>
-    let x := to_expr x in
-    constr:(Expr.Neg x)
-  | BinOp.add ?x ?y =>
-    let x := to_expr x in
-    let y := to_expr y in
-    constr:(Expr.Add x y)
-  | BinOp.sub ?x ?y =>
-    let x := to_expr x in
-    let y := to_expr y in
-    constr:(Expr.Sub x y)
-  | BinOp.mul ?x ?y =>
-    let x := to_expr x in
-    let y := to_expr y in
-    constr:(Expr.Mul x y)
-  | ?z => constr:(Expr.constant z)
-  end.
-
-Ltac to_mexpr_trace_aux trace :=
-  lazymatch trace with
-  | List.nil => constr:(List.nil (A := MExpr.Trace.Event.t))
-  | List.cons ?event ?trace =>
-    lazymatch event with
-    | Trace.Event.AssertZero ?expr =>
-      let expr := to_expr expr in
-      let trace := to_mexpr_trace_aux trace in
-      constr:(List.cons (MExpr.Trace.Event.AssertZero expr) trace)
-    end
-  end.
-
-Ltac to_mexpr_trace e :=
-  let v := fresh "v" in
-  pose e as v;
-  (
-    with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-    with_strategy transparent [M.for_in_zero_to_n]
-      cbv in v
-  );
-  lazymatch eval unfold v in v with
-  | ?e =>
-    let result := to_mexpr_trace_aux e in
-    exact result
-  end.
-
-Goal forall {p} `{Prime p}, True.
-Proof.
-  intros.
-  set (pre := to_trace (export_bool.eval (MGenerate.eval MGenerate.generate))).
-  (* set (all := to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))). *)
-  set (all := to_trace (
-    let local := MGenerate.eval MGenerate.generate in
-    let* _ := preimage_a.eval 1 local in
-    let* _ := export_bool.eval local in
-    let* _ := export_zero.eval local in
-    let* _ := c_c_prime.eval 1 local in
-    let* _ := a_a_prime_c_c_prime.eval 1 local in
-    let* _ := a_prime_c_prime.eval 1 local in
-    let* _ := a_prime_prime.eval 1 local in
-    let* _ := a_prime_prime_0_0_bits_bools.eval local in
-    let* _ := a_prime_prime_0_0_limbs.eval local in
-    let* _ := a_prime_prime_prime_0_0_limbs.eval local in
-    M.pure tt
-  )).
-  (* Time
-    with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-    with_strategy transparent [M.for_in_zero_to_n]
-    cbv in all.
-  Show. *)
-  (* Time set (bla := ltac:(to_mexpr_trace (snd all))). *)
-  Compute ToRocq.cats [
-    ToRocq.endl;
-    ToRocq.to_rocq ltac:(to_mexpr_trace (snd all)) 0;
-    ToRocq.endl
+  Compute PrettyPrint.cats [
+    PrettyPrint.endl;
+    PrettyPrint.to_string
+      ltac:(OfShallow.to_mexpr_trace (snd (
+        M.to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))
+      )))
+      0;
+    PrettyPrint.endl
   ].
-Admitted.
-
-(*
-  Compute ToRocq.to_rocq ltac:(to_mexpr_trace (snd all)) 0.
-  sdfsdf.
-
-  set (gre := ltac:(
-    let g := to_expr (MGenerate.Var 91 -F MGenerate.Var 191) in
-    exact g
-  )).
-  set (result := 12).
-  set (gre2 := ltac:(
-    to_mexpr_trace (snd pre)
-  )).
-
-  Compute ToRocq.to_rocq ltac:(to_mexpr_trace (snd pre)) 0.
-  Compute ToRocq.to_rocq ltac:(to_mexpr_trace (snd all)) 0.
-
-  set (foo := ltac:(to_mexpr_trace (snd pre))).
-  set (foo5 := ltac:(to_mexpr (
-    M.Let (M.Pure 12) (fun x => M.Pure x)
-  ))).
-  set (foo2 := ltac:(to_mexpr pre)).
-  (* set (bar2 := MExpr.Pure tt). *)
-  let v := fresh "v" in
-  pose (M.Pure tt) as v;
-  (
-    with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-    with_strategy transparent [M.for_in_zero_to_n]
-      cbv in v
-  ).
-  set (foo := ltac:(to_mexpr (M.Pure tt))).
-
-  Ltac to_mexpr_aux e :=
-    match e with
-    | M.Pure ?value =>
-      constr:(MExpr.Pure value)
-    | M.AssertZero ?expr ?value =>
-      constr:(MExpr.Pure value)
-    | M.Call ?e =>
-      constr:(MExpr.Call (ltac:(to_mexpr_aux e)))
-    | M.Let ?e ?k =>
-      constr:(MExpr.Let (ltac:(to_mexpr_aux e)) (fun x => ltac:(to_mexpr_aux (k x))))
-    | M.When ?condition ?e =>
-      constr:(MExpr.When condition (ltac:(to_mexpr_aux e)))
-    end.
-
-  Ltac to_mexpr e :=
-    let v := fresh "v" in
-    pose e as v;
-    (
-      with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-      with_strategy transparent [M.for_in_zero_to_n]
-        cbv in v
-    );
-    match eval unfold v in v with
-    | ?e =>
-      let result := fresh "result" in
-      let result := to_mexpr_aux e in
-      exact result
-    end.
-
-  (* Ltac to_mexpr e :=
-    let v := fresh "v" in
-    let v := (
-      with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-      with_strategy transparent [M.for_in_zero_to_n]
-        exact ltac:(eval cbv in e)
-    ) in
-    pose (ltac:(constr:(v))) as arg. *)
-
-  set (foo := ltac:(to_mexpr (M.Pure 12))).
-  set (foo5 := ltac:(to_mexpr (
-    M.Let (M.Pure 12) (fun x => M.Pure x)
-  ))).
-  set (foo2 := ltac:(to_mexpr pre)).
-  (* set (bar2 := MExpr.Pure tt). *)
-  let v := fresh "v" in
-  pose (M.Pure tt) as v;
-  (
-    with_strategy opaque [UnOp.opp UnOp.from BinOp.add BinOp.sub BinOp.mul]
-    with_strategy transparent [M.for_in_zero_to_n]
-      cbv in v
-  ).
-  set (foo := ltac:(to_mexpr (M.Pure tt))).
-
-
-  Print pre.
-  dsfdf.
-
-  set (ll := (MGenerate.eval MGenerate.generate : KeccakCols.t)).
-  Time cbv in ll.
-  Show.
-  dfsdf.
-  
-  set (x := eval_local (MGenerate.eval MGenerate.generate)).
-  unfold eval_local in x.
-  cbn in x.
-  unfold MGenerate.eval, MGenerate.generate_list, MGenerate.generate_var in x.
-  cbn in x.
-  Show.
-  Time cbv in x.
-Qed.
-*)
+End PrettyPrint.
 
 Definition xorbs (bs : list bool) : bool :=
   Lists.List.fold_left xorb bs false.

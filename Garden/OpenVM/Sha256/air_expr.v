@@ -111,10 +111,10 @@ Definition print_eval_row : string :=
   let start_col := 0 in
   let local_cols : Sha256DigestCols.t Var.t :=
     MGenerate.eval MGenerate.generate in
-  ToRocq.cats [
-    ToRocq.endl;
-    ToRocq.to_rocq (eval_row start_col local_cols) 0;
-    ToRocq.endl
+  PrettyPrint.cats [
+    PrettyPrint.endl;
+    PrettyPrint.to_string (eval_row start_col local_cols) 0;
+    PrettyPrint.endl
   ].
 
 (*
@@ -831,10 +831,10 @@ Definition print_eval : string :=
       MGenerate.generate (A := Sha256RoundCols.t Var.t) (||),
       MGenerate.generate (A := Sha256DigestCols.t Var.t) (||)
     ) ]] in
-  ToRocq.cats [
-    ToRocq.endl;
-    ToRocq.to_rocq (eval self start_col round_local_cols round_next_cols digest_local_cols digest_next_cols) 0;
-    ToRocq.endl
+  PrettyPrint.cats [
+    PrettyPrint.endl;
+    PrettyPrint.to_string (eval self start_col round_local_cols round_next_cols digest_local_cols digest_next_cols) 0;
+    PrettyPrint.endl
   ].
 
 Compute print_eval.

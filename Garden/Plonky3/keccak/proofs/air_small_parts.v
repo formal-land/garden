@@ -198,8 +198,8 @@ Module c_c_prime.
           let xor :=
             xor3
               (local.(KeccakCols.c).[x].[z])
-              (local.(KeccakCols.c).[(x + 4) mod 5].[z])
-              (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64]) in
+              (local.(KeccakCols.c).[(x + 4) mod SQUARE_SIZE].[z])
+              (local.(KeccakCols.c).[(x + 1) mod SQUARE_SIZE].[(z + 63) mod 64]) in
           local.(KeccakCols.c_prime).[x].[z] -F xor
       |}
     ).
@@ -212,8 +212,8 @@ Module c_c_prime.
         KeccakCols.get_c_prime local x z =
         M.xor3
           (KeccakCols.get_c local x z)
-          (KeccakCols.get_c local ((x + 4) mod 5) z)
-          (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64));
+          (KeccakCols.get_c local ((x + 4) mod SQUARE_SIZE) z)
+          (KeccakCols.get_c local ((x + 1) mod SQUARE_SIZE) ((z + 63) mod 64));
       c_bools (x z : Z) :
         0 <= x < SQUARE_SIZE ->
         0 <= z < 64 ->
@@ -373,16 +373,16 @@ Module a_prime_c_prime.
             Lists.List.fold_left (fun acc y =>
               acc +F local.(KeccakCols.a_prime).[y].[x].[z]
             )
-            (List.map Z.of_nat (List.seq 0 5)) 0 in
+            (List.map Z.of_nat (List.seq 0 (Z.to_nat SQUARE_SIZE))) 0 in
           let diff := sum -F local.(KeccakCols.c_prime).[x].[z] in
           (diff *F (diff -F 2)) *F (diff -F four)
         |}
       ).
 
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
       let local := M.map_mod local in
+    let SQUARE_SIZE := 5 in
     {{ eval SQUARE_SIZE local 🔽
       tt,
       forall (x z : Z),
@@ -390,13 +390,11 @@ Module a_prime_c_prime.
       0 <= z < 64 ->
       let diff :=
         let sum :=
-          Lists.List.fold_left BinOp.add [
-            KeccakCols.get_a_prime local x 0 z;
-            KeccakCols.get_a_prime local x 1 z;
-            KeccakCols.get_a_prime local x 2 z;
-            KeccakCols.get_a_prime local x 3 z;
-            KeccakCols.get_a_prime local x 4 z
-          ] 0 in
+          Lists.List.fold_left BinOp.add (
+            List.map
+              (fun y => KeccakCols.get_a_prime local x (Z.of_nat y) z)
+              (List.seq 0 (Z.to_nat SQUARE_SIZE))
+          ) 0 in
         sum -F local.(KeccakCols.c_prime).[x].[z] in
       (diff *F (diff -F 2)) *F (diff -F 4) =
       0
@@ -431,13 +429,14 @@ End a_prime_c_prime.
 *)
 Module a_prime_prime.
   Definition get_bit {p} `{Prime p}
+      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) (y x : Z)
       (z : Z) :
       Z :=
     let andn :=
       M.andn
-        (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
-        (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
+        (Impl_KeccakCols.b local ((x + 1) mod SQUARE_SIZE) y z)
+        (Impl_KeccakCols.b local ((x + 2) mod SQUARE_SIZE) y z) in
     M.xor andn (Impl_KeccakCols.b local x y z).
 
   Definition eval {p} `{Prime p}
@@ -458,7 +457,7 @@ Module a_prime_prime.
             Lists.List.fold_left (fun acc (z : nat) =>
               let z : Z := Z.of_nat z in
               (2 *F acc) +F
-              get_bit local y x z
+              get_bit SQUARE_SIZE local y x z
             ) l 0 in
           computed_limb -F local.(KeccakCols.a_prime_prime).[y].[x].[limb]
         |}
@@ -471,7 +470,7 @@ Module a_prime_prime.
       0 <= x < SQUARE_SIZE ->
       let a_prime_prime' : Array.t Z U64_LIMBS :=
         Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-          {| Array.get z := get_bit local y x z; |} in
+          {| Array.get z := get_bit SQUARE_SIZE local y x z; |} in
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       KeccakCols.get_a_prime_prime local x y limb =
