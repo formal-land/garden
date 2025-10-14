@@ -1154,7 +1154,16 @@ Global Instance ArrayIsGenerate {T : Set} `{MGenerate.C T} `{Default.C T} {N : Z
   generate :=
     MGenerate.bind (MGenerate.generate_list (Z.to_nat N)) (fun l =>
       MGenerate.pure (Array.of_list l)
-    )
+    );
+}.
+
+Global Instance CoupleIsGenerate {T1 T2 : Set} `{MGenerate.C T1} `{MGenerate.C T2} :
+    MGenerate.C (T1 * T2) := {
+  generate :=
+    MGenerate.bind MGenerate.generate (fun v1 =>
+    MGenerate.bind MGenerate.generate (fun v2 =>
+      MGenerate.pure (v1, v2)
+    ));
 }.
 
 Module GenerateExample.

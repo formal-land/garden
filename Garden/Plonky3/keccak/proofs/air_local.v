@@ -4,10 +4,15 @@ Require Import Garden.Plonky3.keccak.proofs.air_small_parts.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 
-(** In this definition, we group all the constraints about the current [local] row. *)
-Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : M.t unit :=
+(** Definition grouping all the constraints. *)
+Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z)
+    (local next : KeccakCols.t)
+    (is_transition : Z) :
+    M.t unit :=
   msg* "preimage_a" in
   let* _ := preimage_a.eval SQUARE_SIZE local in
+  msg* "preimage_next_preimage" in
+  let* _ := preimage_next_preimage.eval SQUARE_SIZE local next is_transition in
   msg* "export_bool" in
   let* _ := export_bool.eval local in
   msg* "export_zero" in
@@ -327,10 +332,14 @@ Module Post.
   }.
 End Post.
 
-Lemma eval_local_implies {p} `{Prime p} (H_p : 6 <= p) (local' : KeccakCols.t) :
+Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
+    (local' next' : KeccakCols.t)
+    (is_transition' : bool) :
   let local := M.map_mod local' in
+  let next := M.map_mod next' in
+  let is_transition := Z.b2z is_transition' in
   Pre.t local ->
-  {{ eval_local 5 local 🔽
+  {{ eval_local 5 local next is_transition 🔽
     tt,
     Post.t local
   }}.
@@ -341,6 +350,10 @@ Proof.
     apply preimage_a.implies.
   }
   intros H_eval_assert_preimage_a.
+  apply Run.Message; eapply Run.LetAccumulate. {
+    apply preimage_next_preimage.implies.
+  }
+  intros H_eval_preimage_next_preimage.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply export_bool.implies.
   }
@@ -572,13 +585,22 @@ Module PrettyPrint.
   Instance IsPrime : Prime p.
   Admitted.
 
+  Definition local_next : KeccakCols.t * KeccakCols.t :=
+    MGenerate.eval MGenerate.generate.
+
   Compute PrettyPrint.cats [
     PrettyPrint.endl;
+    PrettyPrint.indent 0; "Trace 🐾"; PrettyPrint.endl;
     PrettyPrint.to_string
       ltac:(OfShallow.to_mexpr_trace (snd (
-        M.to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))
+        M.to_trace (
+          eval_local 1
+            (fst local_next)
+            (snd local_next)
+            OfShallow.IsTransition
+        )
       )))
-      0;
+      2;
     PrettyPrint.endl
   ].
 End PrettyPrint.

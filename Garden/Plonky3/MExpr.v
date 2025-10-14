@@ -705,9 +705,16 @@ End List.
 
 (** Utilities to convert the shallow representation of circuits into this deep representation. *)
 Module OfShallow.
+  Parameter IsFirstRow : Z.
+  Parameter IsLastRow : Z.
+  Parameter IsTransition : Z.
+
   Ltac to_expr e :=
     lazymatch e with
     | MGenerate.Var ?index => constr:(Expr.var index)
+    | IsFirstRow => constr:(Expr.IsFirstRow)
+    | IsLastRow => constr:(Expr.IsLastRow)
+    | IsTransition => constr:(Expr.IsTransition)
     | UnOp.opp ?x =>
       let x := to_expr x in
       constr:(Expr.Neg x)

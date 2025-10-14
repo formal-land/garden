@@ -68,14 +68,14 @@ Module preimage_next_preimage.
   Definition eval {p} `{Prime p}
       (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
-      (is_transition : bool) :
+      (is_transition : Z) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
     let not_final_step := BinOp.sub 1 final_step in
     M.for_in_zero_to_n SQUARE_SIZE (fun y =>
     M.for_in_zero_to_n SQUARE_SIZE (fun x =>
       M.when not_final_step (
-      M.when_bool is_transition (
+      M.when is_transition (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
             local.(KeccakCols.preimage).[y].[x].[limb] -F next.(KeccakCols.preimage).[y].[x].[limb]
@@ -85,31 +85,41 @@ Module preimage_next_preimage.
 
   Lemma implies {p} `{Prime p}
       (SQUARE_SIZE : Z)
-      (local next : KeccakCols.t) :
+      (local next : KeccakCols.t)
+      (is_transition : bool) :
       let local := M.map_mod local in
       let next := M.map_mod next in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
       let not_final_step := BinOp.sub 1 final_step in
-      {{ eval SQUARE_SIZE local next true 🔽
+      {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
         tt,
-        not_final_step <> 0 ->
-        forall (y x limb : Z),
-        0 <= y < SQUARE_SIZE ->
-        0 <= x < SQUARE_SIZE ->
-        0 <= limb < U64_LIMBS ->
-        KeccakCols.get_preimage local x y limb =
-        KeccakCols.get_preimage next x y limb
+        if is_transition then
+          not_final_step <> 0 ->
+          forall (y x limb : Z),
+          0 <= y < SQUARE_SIZE ->
+          0 <= x < SQUARE_SIZE ->
+          0 <= limb < U64_LIMBS ->
+          KeccakCols.get_preimage local x y limb =
+          KeccakCols.get_preimage next x y limb
+        else
+          True
       }}.
   Proof.
     intros.
     unfold eval.
     unfold not_final_step, final_step in *.
+    destruct is_transition.
     { eapply Run.Implies. {
         Run.run.
       }
       cbn.
       rewrite_db field_rewrite.
       hauto l: on.
+    }
+    { eapply Run.Implies. {
+        Run.run.
+      }
+      easy.
     }
   Qed.
 End preimage_next_preimage.
