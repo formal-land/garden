@@ -304,7 +304,7 @@ Module a_a_prime_c_c_prime.
                 List.rev (
                   List.seq
                     (Z.to_nat (limb * BITS_PER_LIMB))%Z
-                    (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
+                    (Z.to_nat BITS_PER_LIMB)
                 ) in
               Lists.List.fold_left (fun acc (z : nat) =>
                 let z : Z := Z.of_nat z in
@@ -371,6 +371,13 @@ End a_a_prime_c_c_prime.
   }
 *)
 Module a_prime_c_prime.
+  Fixpoint get_sum {p} `{Prime p} (l : list Z) : Z :=
+    match l with
+    | [] => 0
+    | [z] => z
+    | z :: l => z +F get_sum l
+    end.
+
   Definition eval {p} `{Prime p}
       (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
@@ -380,10 +387,11 @@ Module a_prime_c_prime.
       M.assert_zeros (N := 64) {|
         Array.get z :=
           let sum : Z :=
-            Lists.List.fold_left (fun acc y =>
-              acc +F local.(KeccakCols.a_prime).[y].[x].[z]
-            )
-            (List.map Z.of_nat (List.seq 0 (Z.to_nat SQUARE_SIZE))) 0 in
+            get_sum (
+              List.map
+                (fun y => local.(KeccakCols.a_prime).[Z.of_nat y].[x].[z])
+                (List.seq 0 (Z.to_nat SQUARE_SIZE))
+            ) in
           let diff := sum -F local.(KeccakCols.c_prime).[x].[z] in
           (diff *F (diff -F 2)) *F (diff -F four)
         |}
@@ -400,11 +408,11 @@ Module a_prime_c_prime.
       0 <= z < 64 ->
       let diff :=
         let sum :=
-          Lists.List.fold_left BinOp.add (
+          get_sum (
             List.map
               (fun y => KeccakCols.get_a_prime local x (Z.of_nat y) z)
               (List.seq 0 (Z.to_nat SQUARE_SIZE))
-          ) 0 in
+          ) in
         sum -F local.(KeccakCols.c_prime).[x].[z] in
       (diff *F (diff -F 2)) *F (diff -F 4) =
       0
@@ -462,7 +470,7 @@ Module a_prime_prime.
               List.rev (
                 List.seq
                   (Z.to_nat (limb * BITS_PER_LIMB))
-                  (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))
+                  (Z.to_nat BITS_PER_LIMB)
               ) in
             Lists.List.fold_left (fun acc (z : nat) =>
               let z : Z := Z.of_nat z in
@@ -561,7 +569,7 @@ Module a_prime_prime_0_0_limbs.
             List.rev (
               List.seq
                 (Z.to_nat (limb * BITS_PER_LIMB))
-                (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))
+                (Z.to_nat BITS_PER_LIMB)
               ) in
           Lists.List.fold_left (fun acc (z : nat) =>
             let z : Z := Z.of_nat z in
@@ -643,7 +651,7 @@ Module a_prime_prime_prime_0_0_limbs.
             List.rev (
               List.seq
                 (Z.to_nat (limb * BITS_PER_LIMB))
-                (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))
+                (Z.to_nat BITS_PER_LIMB)
               ) in
           Lists.List.fold_left (fun acc (z : nat) =>
             let z : Z := Z.of_nat z in
@@ -694,13 +702,13 @@ Module a_prime_prime_prime_next_a.
   Definition eval {p} `{Prime p}
       (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
-      (is_transition : bool) :
+      (is_transition : Z) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
     let not_final_step := BinOp.sub 1 final_step in
     M.for_in_zero_to_n SQUARE_SIZE (fun x =>
     M.for_in_zero_to_n SQUARE_SIZE (fun y =>
-      M.when_bool is_transition (
+      M.when is_transition (
       M.when not_final_step (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
@@ -723,15 +731,19 @@ Module a_prime_prime_prime_next_a.
 
   Lemma implies {p} `{Prime p}
       (SQUARE_SIZE : Z)
-      (local next : KeccakCols.t) :
+      (local next : KeccakCols.t)
+      (is_transition : bool) :
     let local := M.map_mod local in
     let next := M.map_mod next in
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
     let not_final_step := BinOp.sub 1 final_step in
     not_final_step <> 0 ->
-    {{ eval SQUARE_SIZE local next true 🔽
+    {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
       tt,
-      Post.t SQUARE_SIZE local next
+      if is_transition then
+        Post.t SQUARE_SIZE local next
+      else
+        True
     }}.
   Proof.
     intros * H_not_final_step.
@@ -740,6 +752,8 @@ Module a_prime_prime_prime_next_a.
       Run.run.
     }
     unfold Post.t.
-    hauto lq: on rew: off.
+    destruct is_transition.
+    { hauto lq: on rew: off. }
+    { easy. }
   Qed.
 End a_prime_prime_prime_next_a.

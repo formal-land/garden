@@ -231,7 +231,7 @@ Definition assert_zero (x : Z) : M.t unit :=
   M.AssertZero x tt.
 
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
-  M.AssertZero (BinOp.mul x (BinOp.sub x 1)) tt.
+  M.AssertZero (BinOp.mul (BinOp.sub 1 x) x) tt.
 
 Fixpoint for_in_zero_to_n_aux (N : nat) (f : Z -> M.t unit) : M.t unit :=
   match N with
@@ -318,7 +318,7 @@ Definition not {p} `{Prime p} (x : Z) : Z :=
   BinOp.sub 1 x.
 
 Definition xor {p} `{Prime p} (x y : Z) : Z :=
-  (x +F y) -F ((x *F y) *F 2).
+  (x +F y) -F (x *F (2 *F y)).
 
 Axiom from_xor_eq : forall {p} `{Prime p} (x y : Z),
   UnOp.from (xor x y) = xor x y.
@@ -622,7 +622,7 @@ Module Limbs.
           List.rev (
             List.seq
               (Z.to_nat (limb * BITS_PER_LIMB))%Z
-              (Z.to_nat (limb * BITS_PER_LIMB + BITS_PER_LIMB))%Z
+              (Z.to_nat BITS_PER_LIMB)
           ) in
         (* We sum all the bits times 2 to the n *)
         Lists.List.fold_left (fun acc (z : nat) =>
@@ -747,12 +747,12 @@ Module Run.
     intros H_mul.
     rewrite mul_zero_implies_zero in H_mul; destruct H_mul as [H_mul|H_mul].
     { autorewrite with field_rewrite in H_mul.
-      hauto lq: on.
+      rewrite sub_zero_equiv in H_mul.
+      rewrite <- H_mul.
+      now autorewrite with field_rewrite.
     }
     { autorewrite with field_rewrite in H_mul.
-      rewrite sub_zero_equiv in H_mul.
-      rewrite H_mul.
-      now autorewrite with field_rewrite.
+      hauto lq: on.
     }
   Qed.
 
