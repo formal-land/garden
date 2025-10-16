@@ -10,7 +10,7 @@ Definition eval
     (local next : KeccakCols.t) :
     M.t unit :=
   (* eval_round_flags(builder); *)
-  let* _ := eval_round_flags is_first_row is_transition local next in
+  (* let* _ := eval_round_flags is_first_row is_transition local next in *)
 
   (*
   let main = builder.main();

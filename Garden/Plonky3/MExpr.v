@@ -113,6 +113,40 @@ Module Expr.
   Definition from_canonical_usize (value : Z) : t :=
     constant (value mod (2 ^ 64)).
 
+  (** Note that we do not compute the modulo over the constants. This might be needed later. In any
+      case, this is checked by the pretty-printer. *)
+  Fixpoint collapse_constants (self : t) : t :=
+    match self with
+    | Var _ | IsFirstRow | IsLastRow | IsTransition | Constant _ => self
+    | Add x y =>
+      let x := collapse_constants x in
+      let y := collapse_constants y in
+      match x, y with
+      | Constant c1, Constant c2 => constant (c1.(Field.value) + c2.(Field.value))
+      | _, _ => Add x y
+      end
+    | Sub x y =>
+      let x := collapse_constants x in
+      let y := collapse_constants y in
+      match x, y with
+      | Constant c1, Constant c2 => constant (c1.(Field.value) - c2.(Field.value))
+      | _, _ => Sub x y
+      end
+    | Neg x =>
+      let x := collapse_constants x in
+      match x with
+      | Constant c => constant (- c.(Field.value))
+      | _ => Neg x
+      end
+    | Mul x y =>
+      let x := collapse_constants x in
+      let y := collapse_constants y in
+      match x, y with
+      | Constant c1, Constant c2 => constant (c1.(Field.value) * c2.(Field.value))
+      | _, _ => Mul x y
+      end
+    end.
+
   (** We group additions and multiplications together, to operate on a list instead of on a couple
       of values. The main idea is to simplify the pretty-printing. *)
   Module Flat.
@@ -261,7 +295,7 @@ Fixpoint string_of_flat_expr (expr : Expr.Flat.t) (indent : Z) : string :=
 
 Global Instance ExprIsPrettyPrint : PrettyPrint.C Expr.t := {
   to_string self indent :=
-    let flat := Expr.Flat.flatten self in
+    let flat := Expr.Flat.flatten (Expr.collapse_constants self) in
     string_of_flat_expr flat indent;
 }.
 
@@ -621,7 +655,7 @@ Definition assert_one (e : Expr.t) : MExpr.t unit :=
   assert_zero (Expr.Sub e Expr.ONE).
 
 Definition assert_bool (e : Expr.t) : MExpr.t unit :=
-  assert_zero (Expr.Mul e (Expr.Sub e Expr.ONE)).
+  assert_zero (Expr.Mul (Expr.Sub Expr.ONE e) e).
 
 Definition assert_eq (e1 e2 : Expr.t) : MExpr.t unit :=
   assert_zero (Expr.Sub e1 e2).
@@ -705,9 +739,16 @@ End List.
 
 (** Utilities to convert the shallow representation of circuits into this deep representation. *)
 Module OfShallow.
+  Parameter IsFirstRow : Z.
+  Parameter IsLastRow : Z.
+  Parameter IsTransition : Z.
+
   Ltac to_expr e :=
     lazymatch e with
     | MGenerate.Var ?index => constr:(Expr.var index)
+    | IsFirstRow => constr:(Expr.IsFirstRow)
+    | IsLastRow => constr:(Expr.IsLastRow)
+    | IsTransition => constr:(Expr.IsTransition)
     | UnOp.opp ?x =>
       let x := to_expr x in
       constr:(Expr.Neg x)

@@ -26,16 +26,16 @@ pub(crate) fn eval_round_flags<AB: AirBuilder>(builder: &mut AB) {
 }
 *)
 Definition eval_round_flags {p} `{Prime p}
-    (is_first_row is_transition : bool)
-    (local next : KeccakCols.t) :
+    (local next : KeccakCols.t)
+    (is_first_row is_transition : Z) :
     M.t unit :=
-  let* _ := when_bool is_first_row (
+  let* _ := when is_first_row (
     M.assert_one (local.(KeccakCols.step_flags).(Array.get) 0)
   ) in
-  let* _ := when_bool is_first_row (
+  let* _ := when is_first_row (
     M.assert_zeros (Array.slice_from local.(KeccakCols.step_flags) 1)
   ) in
-  let* _ := when_bool is_transition (
+  let* _ := when is_transition (
     M.assert_zeros (N := NUM_ROUNDS) {|
       Array.get i :=
         BinOp.sub (local.(KeccakCols.step_flags).(Array.get) i)
@@ -49,7 +49,7 @@ Module Spec.
       (local' next' : KeccakCols.t) :
     let local := M.map_mod local' in
     let next := M.map_mod next' in
-    {{ eval_round_flags true false local next 🔽
+    {{ eval_round_flags local next 1 0 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->
       local.(KeccakCols.step_flags).(Array.get) i =
@@ -66,15 +66,13 @@ Module Spec.
       replace i with 0 by lia.
       replace 1 with (UnOp.from 1) by now autorewrite with field_rewrite.
       apply sub_zero_equiv.
-      now autorewrite with field_rewrite in *.
+      autorewrite with field_rewrite in *.
+      hauto l: on.
     }
-    { assert (1 <= i < NUM_ROUNDS) by lia.
-      intuition.
-      match goal with
-      | [ H : _ |- _ ] =>
-        rewrite <- (H (i - 1)) by lia
-      end.
-      now replace (1 + (i - 1)) with i by lia.
+    { set (i' := i - 1).
+      replace i with (1 + i') by lia.
+      assert (0 <= i' < NUM_ROUNDS - 1) by lia.
+      hauto lq: on rew: off.
     }
   Qed.
 
@@ -82,7 +80,7 @@ Module Spec.
       (local' next' : KeccakCols.t) :
     let local := M.map_mod local' in
     let next := M.map_mod next' in
-    {{ eval_round_flags false true local next 🔽
+    {{ eval_round_flags local next 0 1 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->
       local.(KeccakCols.step_flags).(Array.get) i =
@@ -92,6 +90,8 @@ Module Spec.
     eapply Run.Implies. {
       Run.run.
     }
-    hauto q: on db: field_rewrite.
+    cbn.
+    FieldRewrite.run.
+    hauto lq: on rew: off.
   Qed.
 End Spec.

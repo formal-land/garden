@@ -1,34 +1,34 @@
 Trace 🐾
   AssertZero:
     Mul:
+      Sub:
+        Constant: 1
+        Variable: 10
       Variable: 10
-      Sub:
-        Variable: 10
-        Constant: 1
   AssertZero:
     Mul:
+      Sub:
+        Constant: 1
+        Variable: 11
       Variable: 11
-      Sub:
-        Variable: 11
-        Constant: 1
   AssertZero:
     Mul:
-      Add:
-        Constant: 0
-        Variable: 10
-        Variable: 11
       Sub:
+        Constant: 1
         Add:
           Constant: 0
           Variable: 10
           Variable: 11
-        Constant: 1
+      Add:
+        Constant: 0
+        Variable: 10
+        Variable: 11
   AssertZero:
     Mul:
-      Variable: 8
       Sub:
-        Variable: 8
         Constant: 1
+        Variable: 8
+      Variable: 8
   AssertZero:
     Mul:
       Add:

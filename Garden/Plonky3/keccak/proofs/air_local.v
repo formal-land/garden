@@ -1,13 +1,21 @@
-Require Import Garden.Plonky3.M.
+Require Import Plonky3.M.
 Require Import Plonky3.MExpr.
-Require Import Garden.Plonky3.keccak.proofs.air_small_parts.
-Require Import Garden.Plonky3.keccak.columns.
-Require Import Garden.Plonky3.keccak.constants.
+Require Import Plonky3.keccak.proofs.air_small_parts.
+Require Import Plonky3.keccak.columns.
+Require Import Plonky3.keccak.constants.
+Require Import Plonky3.keccak.round_flags.
 
-(** In this definition, we group all the constraints about the current [local] row. *)
-Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : M.t unit :=
+(** Definition grouping all the constraints. *)
+Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z)
+    (local next : KeccakCols.t)
+    (is_first_row is_transition : Z) :
+    M.t unit :=
+  msg* "eval_round_flags" in
+  let* _ := eval_round_flags local next is_first_row is_transition in
   msg* "preimage_a" in
   let* _ := preimage_a.eval SQUARE_SIZE local in
+  msg* "preimage_next_preimage" in
+  let* _ := preimage_next_preimage.eval SQUARE_SIZE local next is_transition in
   msg* "export_bool" in
   let* _ := export_bool.eval local in
   msg* "export_zero" in
@@ -26,6 +34,8 @@ Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : 
   let* _ := a_prime_prime_0_0_limbs.eval local in
   msg* "a_prime_prime_prime_0_0_limbs" in
   let* _ := a_prime_prime_prime_0_0_limbs.eval local in
+  msg* "a_prime_prime_prime_next_a" in
+  let* _ := a_prime_prime_prime_next_a.eval SQUARE_SIZE local next is_transition in
   M.pure tt.
 
 Definition xorbs (bs : list bool) : bool :=
@@ -124,25 +134,29 @@ Module FirstRowsFrom_a.
   Qed.
 End FirstRowsFrom_a.
 
+Definition p_goldilocks : Z :=
+  2^64 - 2^32 + 1.
+
 Lemma sum_eq {p} `{Prime p}
     (b0 b1 b2 b3 b4 : bool) :
-    Lists.List.fold_left BinOp.add [
+    a_prime_c_prime.get_sum [
       Z.b2z b0;
       Z.b2z b1;
       Z.b2z b2;
       Z.b2z b3;
       Z.b2z b4
-    ] 0 =
-    Lists.List.fold_left Z.add [
+    ] =
+    Lists.List.fold_right Z.add 0 [
       Z.b2z b0;
       Z.b2z b1;
       Z.b2z b2;
       Z.b2z b3;
       Z.b2z b4
-    ] 0 mod p.
+    ] mod p.
 Proof.
   cbn; unfold UnOp.from, BinOp.add.
   show_equality_modulo.
+  sauto lq: on.
 Qed.
 
 Lemma mul_diff_or_eq {p} `{Prime p} (H_p : 6 <= p)
@@ -150,24 +164,24 @@ Lemma mul_diff_or_eq {p} `{Prime p} (H_p : 6 <= p)
     (H_sum_diff :
       let diff :=
         let sum :=
-          Lists.List.fold_left BinOp.add [
+          a_prime_c_prime.get_sum [
             Z.b2z b0;
             Z.b2z b1;
             Z.b2z b2;
             Z.b2z b3;
             Z.b2z b4
-          ] 0 in
+          ] in
         BinOp.sub sum (Z.b2z b) in
       BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
     ) :
   let sum :=
-    Lists.List.fold_left Z.add [
+    Lists.List.fold_right Z.add 0 [
       Z.b2z b0;
       Z.b2z b1;
       Z.b2z b2;
       Z.b2z b3;
       Z.b2z b4
-    ] 0 in
+    ] in
   let diff :=
     sum - Z.b2z b in
   diff = 0 \/ diff - 2 = 0 \/ diff - 4 = 0.
@@ -211,13 +225,13 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
     (H_sum_diff :
       let diff :=
         let sum :=
-          Lists.List.fold_left BinOp.add [
+          a_prime_c_prime.get_sum [
             KeccakCols.get_a_prime local x 0 z;
             KeccakCols.get_a_prime local x 1 z;
             KeccakCols.get_a_prime local x 2 z;
             KeccakCols.get_a_prime local x 3 z;
             KeccakCols.get_a_prime local x 4 z
-          ] 0 in
+          ] in
         BinOp.sub sum (KeccakCols.get_c_prime local x z) in
       BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
     ) :
@@ -248,9 +262,6 @@ Proof.
   clear H_sum_diff.
   destruct_all bool; cbn in *; destruct H_sum_diff_bis as [|[|] ]; congruence.
 Qed.
-
-Definition p_goldilocks : Z :=
-  2^64 - 2^32 + 1.
 
 (** As an experiment, we do the same proof as above but using an explicit value for the prime. The
     proof both happens to be faster and much simpler to write. *)
@@ -327,10 +338,15 @@ Module Post.
   }.
 End Post.
 
-Lemma eval_local_implies {p} `{Prime p} (H_p : 6 <= p) (local' : KeccakCols.t) :
+Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
+    (local' next' : KeccakCols.t)
+    (is_first_row' is_transition' : bool) :
   let local := M.map_mod local' in
+  let next := M.map_mod next' in
+  let is_first_row := Z.b2z is_first_row' in
+  let is_transition := Z.b2z is_transition' in
   Pre.t local ->
-  {{ eval_local 5 local 🔽
+  {{ eval_local 5 local next is_first_row is_transition 🔽
     tt,
     Post.t local
   }}.
@@ -338,9 +354,17 @@ Proof.
   intros * [].
   unfold eval_local.
   apply Run.Message; eapply Run.LetAccumulate. {
+    Run.run.
+  }
+  intros _.
+  apply Run.Message; eapply Run.LetAccumulate. {
     apply preimage_a.implies.
   }
   intros H_eval_assert_preimage_a.
+  apply Run.Message; eapply Run.LetAccumulate. {
+    apply preimage_next_preimage.implies.
+  }
+  intros H_eval_preimage_next_preimage.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply export_bool.implies.
   }
@@ -377,6 +401,10 @@ Proof.
     apply a_prime_prime_prime_0_0_limbs.implies.
   }
   intros H_eval_assert_a_prime_prime_prime_0_0_limbs.
+  apply Run.Message; eapply Run.LetAccumulate. {
+    Run.run.
+  }
+  intros _.
   eapply Run.Implies. {
     apply Run.Pure.
   }
@@ -566,19 +594,3 @@ Module FunctionalSpec.
     unfold local_of_input; f_equal.
   Admitted.
 End FunctionalSpec.
-
-Module PrettyPrint.
-  Parameter p : Z.
-  Instance IsPrime : Prime p.
-  Admitted.
-
-  Compute PrettyPrint.cats [
-    PrettyPrint.endl;
-    PrettyPrint.to_string
-      ltac:(OfShallow.to_mexpr_trace (snd (
-        M.to_trace (eval_local 1 (MGenerate.eval MGenerate.generate))
-      )))
-      0;
-    PrettyPrint.endl
-  ].
-End PrettyPrint.
