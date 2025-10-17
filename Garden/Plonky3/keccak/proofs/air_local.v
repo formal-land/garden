@@ -134,9 +134,6 @@ Module FirstRowsFrom_a.
   Qed.
 End FirstRowsFrom_a.
 
-Definition p_goldilocks : Z :=
-  2^64 - 2^32 + 1.
-
 Lemma sum_eq {p} `{Prime p}
     (b0 b1 b2 b3 b4 : bool) :
     a_prime_c_prime.get_sum [
@@ -171,8 +168,8 @@ Lemma mul_diff_or_eq {p} `{Prime p} (H_p : 6 <= p)
             Z.b2z b3;
             Z.b2z b4
           ] in
-        BinOp.sub sum (Z.b2z b) in
-      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
+        sum -F (Z.b2z b) in
+      diff *F (diff -F 2) *F (diff -F 4) = 0
     ) :
   let sum :=
     Lists.List.fold_right Z.add 0 [
@@ -191,15 +188,15 @@ Proof.
   fold sum in H_sum_diff.
   rewrite M.mul_zero_implies_zero_3 in H_sum_diff.
   cbn -[sum] in H_sum_diff.
-  replace (UnOp.from (BinOp.sub _ _))
+  replace (UnOp.from (_ -F _))
     with (UnOp.from (sum - Z.b2z b))
     in H_sum_diff
     by show_equality_modulo.
-  replace (UnOp.from (BinOp.sub _ _))
+  replace (UnOp.from (_ -F _))
     with (UnOp.from (sum - Z.b2z b - 2))
     in H_sum_diff
     by show_equality_modulo.
-  replace (UnOp.from (BinOp.sub _ _))
+  replace (UnOp.from (_ -F _))
     with (UnOp.from (sum - Z.b2z b - 4))
     in H_sum_diff
     by show_equality_modulo.
@@ -232,8 +229,8 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
             KeccakCols.get_a_prime local x 3 z;
             KeccakCols.get_a_prime local x 4 z
           ] in
-        BinOp.sub sum (KeccakCols.get_c_prime local x z) in
-      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
+        sum -F (KeccakCols.get_c_prime local x z) in
+      diff *F (diff -F 2) *F (diff -F 4) = 0
     ) :
   0 <= x < 5 ->
   0 <= z < 64 ->
@@ -263,6 +260,9 @@ Proof.
   destruct_all bool; cbn in *; destruct H_sum_diff_bis as [|[|] ]; congruence.
 Qed.
 
+Definition p_goldilocks : Z :=
+  2^64 - 2^32 + 1.
+
 (** As an experiment, we do the same proof as above but using an explicit value for the prime. The
     proof both happens to be faster and much simpler to write. *)
 Lemma xor_sum_diff_eq_goldilocks `{Prime p_goldilocks} (local : KeccakCols.t) (x z : Z)
@@ -289,8 +289,8 @@ Lemma xor_sum_diff_eq_goldilocks `{Prime p_goldilocks} (local : KeccakCols.t) (x
             KeccakCols.get_a_prime local x 3 z;
             KeccakCols.get_a_prime local x 4 z
           ] 0 in
-        BinOp.sub sum (KeccakCols.get_c_prime local x z) in
-      BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff 4) = 0
+        sum -F (KeccakCols.get_c_prime local x z) in
+      diff *F (diff -F 2) *F (diff -F 4) = 0
     ) :
   0 <= x < 5 ->
   0 <= z < 64 ->
@@ -329,7 +329,13 @@ Module Pre.
 End Pre.
 
 Module Post.
-  Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
+  Record t {p} `{Prime p}
+      (local next : KeccakCols.t)
+      (is_first_row is_transition : bool) :
+    Prop :=
+  {
+    round_flags : round_flags.Spec.t local next is_first_row is_transition;
+    preimage_a : preimage_a.Spec.t local;
     to : FirstRowsFrom_a.To.t local;
     a_prime_prime : a_prime_prime.Post.t 5 local;
     a_prime_prime_0_0_bits_bools : a_prime_prime_0_0_bits_bools.Post.t local;
@@ -340,23 +346,21 @@ End Post.
 
 Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
     (local' next' : KeccakCols.t)
-    (is_first_row' is_transition' : bool) :
+    (is_first_row is_transition : bool) :
   let local := M.map_mod local' in
   let next := M.map_mod next' in
-  let is_first_row := Z.b2z is_first_row' in
-  let is_transition := Z.b2z is_transition' in
   Pre.t local ->
-  {{ eval_local 5 local next is_first_row is_transition 🔽
+  {{ eval_local 5 local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
-    Post.t local
+    Post.t local next is_first_row is_transition
   }}.
 Proof.
   intros * [].
   unfold eval_local.
   apply Run.Message; eapply Run.LetAccumulate. {
-    Run.run.
+    apply round_flags.implies.
   }
-  intros _.
+  intros H_eval_round_flags.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply preimage_a.implies.
   }
@@ -420,6 +424,8 @@ Proof.
     apply M.xor3_is_bool; apply c_bools; lia.
   }
   constructor.
+  { trivial. }
+  { trivial. }
   { apply FirstRowsFrom_a.from_implies_to.
     constructor; intros.
     { unfold KeccakCols.Bool.get_c, KeccakCols.Bool.get_c_prime.

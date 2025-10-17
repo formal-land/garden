@@ -45,6 +45,8 @@ Module Equal.
   }.
 End Equal.
 
+Notation "x =F y" := (Equal.t x y) (at level 70, no associativity).
+
 Global Instance ZIsEqual : Equal.C Z := {
   Equal.t := eq;
 }.

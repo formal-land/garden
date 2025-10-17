@@ -1,6 +1,7 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
+Require Import Garden.Plonky3.keccak.round_flags.
 
 (*
   for y in 0..5 {
@@ -26,27 +27,26 @@ Module preimage_a.
       )
     )).
 
-  Lemma implies {p} `{Prime p} (SQUARE_SIZE : Z) (local' : KeccakCols.t) :
+  Module Spec.
+    Definition t (local : KeccakCols.t) : Prop :=
+      local.(KeccakCols.step_flags).[0] <> 0 ->
+      local.(KeccakCols.preimage) =F local.(KeccakCols.a).
+  End Spec.
+
+  Lemma implies {p} `{Prime p} (local' : KeccakCols.t) :
     let local := M.map_mod local' in
-      let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
-      {{ eval SQUARE_SIZE local 🔽
-        tt,
-        first_step <> 0 ->
-        forall (y x limb : Z),
-        0 <= y < SQUARE_SIZE ->
-        0 <= x < SQUARE_SIZE ->
-        0 <= limb < U64_LIMBS ->
-        KeccakCols.get_preimage local x y limb =
-        KeccakCols.get_a local x y limb
-      }}.
+    {{ eval 5 local 🔽
+      tt,
+      Spec.t local
+    }}.
   Proof.
     intros.
     unfold eval.
     { eapply Run.Implies. {
         Run.run.
       }
-      cbn.
-      rewrite_db field_rewrite.
+      unfold Spec.t; cbn.
+      FieldRewrite.run.
       hauto l: on.
     }
   Qed.
@@ -71,7 +71,7 @@ Module preimage_next_preimage.
       (is_transition : Z) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-    let not_final_step := BinOp.sub 1 final_step in
+    let not_final_step := 1 -F final_step in
     M.for_in_zero_to_n SQUARE_SIZE (fun y =>
     M.for_in_zero_to_n SQUARE_SIZE (fun x =>
       M.when not_final_step (
@@ -90,7 +90,7 @@ Module preimage_next_preimage.
       let local := M.map_mod local in
       let next := M.map_mod next in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-      let not_final_step := BinOp.sub 1 final_step in
+      let not_final_step := 1 -F final_step in
       {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
         tt,
         if is_transition then
@@ -157,7 +157,7 @@ Module export_zero.
       (local : KeccakCols.t) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-    let not_final_step := BinOp.sub 1 final_step in
+    let not_final_step := 1 -F final_step in
     M.when not_final_step (
       M.assert_zero local.(KeccakCols.export)
     ).
@@ -166,7 +166,7 @@ Module export_zero.
       (local : KeccakCols.t) :
       let local := M.map_mod local in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-      let not_final_step := BinOp.sub 1 final_step in
+      let not_final_step := 1 -F final_step in
       {{ eval local 🔽
         tt,
         not_final_step <> 0 ->
@@ -349,13 +349,16 @@ Module a_a_prime_c_c_prime.
       Run.run.
     }
     unfold Limbs.of_bools; cbn; rewrite_db field_rewrite.
-    intros; constructor; intros.
-    { unfold KeccakCols.Bool.get_a_prime; cbn.
+    intros H_run; constructor.
+    { intros x y z H_x H_y H_z.
+      unfold KeccakCols.Bool.get_a_prime; cbn.
       hauto lq: on rew: off.
     }
-    { unfold get_bit in *.
+    { intros x y limb H_x H_y H_limb.
+      unfold get_bit in *.
       cbn in *.
-      hauto q: on.
+      pose proof (H_run y H_y x H_x) as [_ H_run_limb].
+      now rewrite (H_run_limb limb H_limb).
     }
   Qed.
 End a_a_prime_c_c_prime.
@@ -510,7 +513,9 @@ Module a_prime_prime.
     }
     unfold Post.t.
     cbn; rewrite_db field_rewrite.
-    hauto q: on.
+    intros H_run.
+    intros y x H_y H_x limb H_limb.
+    now rewrite (H_run y H_y x H_x limb H_limb).
   Qed.
 End a_prime_prime.
 
@@ -705,7 +710,7 @@ Module a_prime_prime_prime_next_a.
       (is_transition : Z) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
-    let not_final_step := BinOp.sub 1 final_step in
+    let not_final_step := 1 -F final_step in
     M.for_in_zero_to_n SQUARE_SIZE (fun x =>
     M.for_in_zero_to_n SQUARE_SIZE (fun y =>
       M.when is_transition (
@@ -736,7 +741,7 @@ Module a_prime_prime_prime_next_a.
     let local := M.map_mod local in
     let next := M.map_mod next in
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-    let not_final_step := BinOp.sub 1 final_step in
+    let not_final_step := 1 -F final_step in
     not_final_step <> 0 ->
     {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
       tt,
