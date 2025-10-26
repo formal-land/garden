@@ -579,13 +579,15 @@ Module a_prime_prime_0_0_limbs.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      UnOp.from local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
-      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB local.(KeccakCols.a_prime_prime_0_0_bits)).[limb].
+      local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
+      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+        local.(KeccakCols.a_prime_prime_0_0_bits)
+      ).[limb].
   End Post.
 
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
@@ -595,9 +597,8 @@ Module a_prime_prime_0_0_limbs.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t.
-    cbn.
-    hauto l: on.
+    unfold Post.t; cbn.
+    hauto l: on rew:db: field_rewrite.
   Qed.
 End a_prime_prime_0_0_limbs.
 
@@ -661,8 +662,10 @@ Module a_prime_prime_prime_0_0_limbs.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      UnOp.from local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
-      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_xored_bit local z; |}).[limb].
+      local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
+      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+        {| Array.get z := get_xored_bit local z; |}
+      ).[limb].
   End Post.
 
   Lemma implies {p} `{Prime p}
@@ -677,8 +680,8 @@ Module a_prime_prime_prime_0_0_limbs.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t.
-    hauto l: on.
+    unfold Post.t; cbn.
+    hauto l: on rew:db: field_rewrite.
   Qed.
 End a_prime_prime_prime_0_0_limbs.
 
@@ -720,34 +723,38 @@ Module a_prime_prime_prime_next_a.
       0 <= x < 5 ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      UnOp.from (Impl_KeccakCols.a_prime_prime_prime local y x limb) =
-      UnOp.from (next.(KeccakCols.a).[y].[x].[limb]).
+      Impl_KeccakCols.a_prime_prime_prime local y x limb =
+      next.(KeccakCols.a).[y].[x].[limb].
   End Post.
 
   Lemma implies {p} `{Prime p}
-      (local next : KeccakCols.t)
+      (local' next' : KeccakCols.t)
       (is_transition : bool) :
-    let local := M.map_mod local in
-    let next := M.map_mod next in
+    let local := M.map_mod local' in
+    let next := M.map_mod next' in
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
     let not_final_step := 1 -F final_step in
-    not_final_step <> 0 ->
     {{ eval local next (Z.b2z is_transition) 🔽
       tt,
       if is_transition then
+        not_final_step <> 0 ->
         Post.t local next
       else
         True
     }}.
   Proof.
-    intros * H_not_final_step.
+    intros.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t.
+    unfold Post.t; cbn.
     destruct is_transition.
-    { hauto lq: on rew: off. }
+    { unfold Impl_KeccakCols.a_prime_prime_prime; cbn in*.
+      intros H_run **.
+      pose proof (H_run x ltac:(lia) y ltac:(lia) ltac:(lia) ltac:(lia) limb ltac:(lia)).
+      hauto q: on rew:db: field_rewrite.
+    }
     { easy. }
   Qed.
 End a_prime_prime_prime_next_a.

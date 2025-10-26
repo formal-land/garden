@@ -318,16 +318,6 @@ Proof.
   destruct_all bool; cbv in H_sum_diff; cbv; congruence.
 Qed.
 
-Module Pre.
-  Record t (local : KeccakCols.t) : Prop := {
-    a_bools (x y z : Z) :
-      0 <= x < 5 ->
-      0 <= y < 5 ->
-      0 <= z < 64 ->
-      IsBool.t (KeccakCols.get_a local x y z)
-  }.
-End Pre.
-
 Module Post.
   Record t {p} `{Prime p}
       (local next : KeccakCols.t)
@@ -350,13 +340,12 @@ Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
     (is_first_row is_transition : bool) :
   let local := M.map_mod local' in
   let next := M.map_mod next' in
-  Pre.t local ->
   {{ eval_local local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
     Post.t local next is_first_row is_transition
   }}.
 Proof.
-  intros * [].
+  intros.
   unfold eval_local.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply round_flags.implies.
@@ -593,7 +582,6 @@ Module FunctionalSpec.
     let local := M.map_mod (Input.apply input local') in
     let next := M.map_mod (Input.apply input next') in
     forall
-      (H_pre : Pre.t local)
       (H_post : Post.t local next is_first_row is_transition),
     local = local_of_input input.
   Proof.
