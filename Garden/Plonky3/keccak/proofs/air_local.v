@@ -6,28 +6,28 @@ Require Import Plonky3.keccak.constants.
 Require Import Plonky3.keccak.round_flags.
 
 (** Definition grouping all the constraints. *)
-Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z)
+Definition eval_local {p} `{Prime p}
     (local next : KeccakCols.t)
     (is_first_row is_transition : Z) :
     M.t unit :=
   msg* "eval_round_flags" in
   let* _ := eval_round_flags local next is_first_row is_transition in
   msg* "preimage_a" in
-  let* _ := preimage_a.eval SQUARE_SIZE local in
+  let* _ := preimage_a.eval local in
   msg* "preimage_next_preimage" in
-  let* _ := preimage_next_preimage.eval SQUARE_SIZE local next is_transition in
+  let* _ := preimage_next_preimage.eval local next is_transition in
   msg* "export_bool" in
   let* _ := export_bool.eval local in
   msg* "export_zero" in
   let* _ := export_zero.eval local in
   msg* "c_c_prime" in
-  let* _ := c_c_prime.eval SQUARE_SIZE local in
+  let* _ := c_c_prime.eval local in
   msg* "a_a_prime_c_c_prime" in
-  let* _ := a_a_prime_c_c_prime.eval SQUARE_SIZE local in
+  let* _ := a_a_prime_c_c_prime.eval local in
   msg* "a_prime_c_prime" in
-  let* _ := a_prime_c_prime.eval SQUARE_SIZE local in
+  let* _ := a_prime_c_prime.eval local in
   msg* "a_prime_prime" in
-  let* _ := a_prime_prime.eval SQUARE_SIZE local in
+  let* _ := a_prime_prime.eval local in
   msg* "a_prime_prime_0_0_bits_bools" in
   let* _ := a_prime_prime_0_0_bits_bools.eval local in
   msg* "a_prime_prime_0_0_limbs" in
@@ -35,7 +35,7 @@ Definition eval_local {p} `{Prime p} (SQUARE_SIZE : Z)
   msg* "a_prime_prime_prime_0_0_limbs" in
   let* _ := a_prime_prime_prime_0_0_limbs.eval local in
   msg* "a_prime_prime_prime_next_a" in
-  let* _ := a_prime_prime_prime_next_a.eval SQUARE_SIZE local next is_transition in
+  let* _ := a_prime_prime_prime_next_a.eval local next is_transition in
   M.pure tt.
 
 Definition xorbs (bs : list bool) : bool :=
@@ -336,8 +336,9 @@ Module Post.
   {
     round_flags : round_flags.Spec.t local next is_first_row is_transition;
     preimage_a : preimage_a.Spec.t local;
+    preimage_next_preimage : preimage_next_preimage.Spec.t local next is_transition;
     to : FirstRowsFrom_a.To.t local;
-    a_prime_prime : a_prime_prime.Post.t 5 local;
+    a_prime_prime : a_prime_prime.Post.t local;
     a_prime_prime_0_0_bits_bools : a_prime_prime_0_0_bits_bools.Post.t local;
     a_prime_prime_0_0_limbs : a_prime_prime_0_0_limbs.Post.t local;
     a_prime_prime_prime_0_0_limbs : a_prime_prime_prime_0_0_limbs.Post.t local;
@@ -350,7 +351,7 @@ Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
   let local := M.map_mod local' in
   let next := M.map_mod next' in
   Pre.t local ->
-  {{ eval_local 5 local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
+  {{ eval_local local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
     Post.t local next is_first_row is_transition
   }}.
@@ -424,6 +425,7 @@ Proof.
     apply M.xor3_is_bool; apply c_bools; lia.
   }
   constructor.
+  { trivial. }
   { trivial. }
   { trivial. }
   { apply FirstRowsFrom_a.from_implies_to.
@@ -585,12 +587,14 @@ Module FunctionalSpec.
     |}.
 
   Lemma implied_by_post {p} `{Prime p}
-      (local' : KeccakCols.t)
+      (local' next' : KeccakCols.t)
+      (is_first_row is_transition : bool)
       (input : Input.t) :
     let local := M.map_mod (Input.apply input local') in
+    let next := M.map_mod (Input.apply input next') in
     forall
       (H_pre : Pre.t local)
-      (H_post : Post.t local),
+      (H_post : Post.t local next is_first_row is_transition),
     local = local_of_input input.
   Proof.
     intros.

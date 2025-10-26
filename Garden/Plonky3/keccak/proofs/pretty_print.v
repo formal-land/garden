@@ -11,8 +11,6 @@ Admitted.
 Definition local_next : KeccakCols.t * KeccakCols.t :=
   MGenerate.eval MGenerate.generate.
 
-Definition SQUARE_SIZE : Z := 5.
-
 Compute PrettyPrint.cats [
   PrettyPrint.endl;
   "Trace 🐾"; PrettyPrint.endl;
@@ -20,7 +18,6 @@ Compute PrettyPrint.cats [
     ltac:(OfShallow.to_mexpr_trace (snd (
       M.to_trace (
         eval_local
-          SQUARE_SIZE
           (fst local_next)
           (snd local_next)
           OfShallow.IsFirstRow

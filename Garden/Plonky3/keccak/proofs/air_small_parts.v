@@ -15,10 +15,10 @@ Require Import Garden.Plonky3.keccak.round_flags.
   }
 *)
 Module preimage_a.
-  Definition eval {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : M.t unit :=
+  Definition eval {p} `{Prime p} (local : KeccakCols.t) : M.t unit :=
     let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
-    M.for_in_zero_to_n SQUARE_SIZE (fun y =>
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
       M.when first_step (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
@@ -35,7 +35,7 @@ Module preimage_a.
 
   Lemma implies {p} `{Prime p} (local' : KeccakCols.t) :
     let local := M.map_mod local' in
-    {{ eval 5 local 🔽
+    {{ eval local 🔽
       tt,
       Spec.t local
     }}.
@@ -66,14 +66,13 @@ End preimage_a.
 *)
 Module preimage_next_preimage.
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
       (is_transition : Z) :
       M.t unit :=
-    let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+    let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
     let not_final_step := 1 -F final_step in
-    M.for_in_zero_to_n SQUARE_SIZE (fun y =>
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
       M.when not_final_step (
       M.when is_transition (
         M.assert_zeros (N := U64_LIMBS) {|
@@ -83,26 +82,27 @@ Module preimage_next_preimage.
       )
     ))).
 
+  Module Spec.
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) (is_transition : bool) : Prop :=
+      let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
+      let not_final_step := 1 -F final_step in
+      if is_transition then
+        not_final_step <> 0 ->
+        local.(KeccakCols.preimage) =F next.(KeccakCols.preimage)
+      else
+        True.
+  End Spec.
+
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
       (is_transition : bool) :
       let local := M.map_mod local in
       let next := M.map_mod next in
-      let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+      let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
       let not_final_step := 1 -F final_step in
-      {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
+      {{ eval local next (Z.b2z is_transition) 🔽
         tt,
-        if is_transition then
-          not_final_step <> 0 ->
-          forall (y x limb : Z),
-          0 <= y < SQUARE_SIZE ->
-          0 <= x < SQUARE_SIZE ->
-          0 <= limb < U64_LIMBS ->
-          KeccakCols.get_preimage local x y limb =
-          KeccakCols.get_preimage next x y limb
-        else
-          True
+        Spec.t local next is_transition
       }}.
   Proof.
     intros.
@@ -198,34 +198,33 @@ End export_zero.
 *)
 Module c_c_prime.
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
       M.t unit :=
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
+    M.for_in_zero_to_n 5 (fun x =>
       let* _ := M.assert_bools (local.(KeccakCols.c).(Array.get) x) in
       M.assert_zeros (N := 64) {|
         Array.get z :=
           let xor :=
             xor3
               (local.(KeccakCols.c).[x].[z])
-              (local.(KeccakCols.c).[(x + 4) mod SQUARE_SIZE].[z])
-              (local.(KeccakCols.c).[(x + 1) mod SQUARE_SIZE].[(z + 63) mod 64]) in
+              (local.(KeccakCols.c).[(x + 4) mod 5].[z])
+              (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64]) in
           local.(KeccakCols.c_prime).[x].[z] -F xor
       |}
     ).
 
   Module Valid.
-    Record t {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : Prop := {
+    Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
       c_c_prime_eq (x z : Z) :
-        0 <= x < SQUARE_SIZE ->
+        0 <= x < 5 ->
         0 <= z < 64 ->
         KeccakCols.get_c_prime local x z =
         M.xor3
           (KeccakCols.get_c local x z)
-          (KeccakCols.get_c local ((x + 4) mod SQUARE_SIZE) z)
-          (KeccakCols.get_c local ((x + 1) mod SQUARE_SIZE) ((z + 63) mod 64));
+          (KeccakCols.get_c local ((x + 4) mod 5) z)
+          (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64));
       c_bools (x z : Z) :
-        0 <= x < SQUARE_SIZE ->
+        0 <= x < 5 ->
         0 <= z < 64 ->
         KeccakCols.get_c local x z =
         Z.b2z (KeccakCols.Bool.get_c local x z)
@@ -233,12 +232,11 @@ Module c_c_prime.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local' : KeccakCols.t) :
     let local := M.map_mod local' in
-    {{ eval SQUARE_SIZE local 🔽
+    {{ eval local 🔽
       tt,
-      Valid.t SQUARE_SIZE local
+      Valid.t local
     }}.
   Proof.
     intros.
@@ -290,42 +288,41 @@ Module a_a_prime_c_c_prime.
       local.(KeccakCols.c_prime).[x].[z].
 
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
       M.t unit :=
-      M.for_in_zero_to_n SQUARE_SIZE (fun y =>
-      M.for_in_zero_to_n SQUARE_SIZE (fun x =>
-        let* _ := M.assert_bools local.(KeccakCols.a_prime).[y].[x] in
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+      let* _ := M.assert_bools local.(KeccakCols.a_prime).[y].[x] in
 
-        M.assert_zeros (N := U64_LIMBS) {|
-          Array.get limb :=
-            let computed_limb : Z :=
-              let l : list nat :=
-                List.rev (
-                  List.seq
-                    (Z.to_nat (limb * BITS_PER_LIMB))%Z
-                    (Z.to_nat BITS_PER_LIMB)
-                ) in
-              Lists.List.fold_left (fun acc (z : nat) =>
-                let z : Z := Z.of_nat z in
-                (2 *F acc) +F
-                get_bit local y x z
-              ) l 0 in
-            computed_limb -F local.(KeccakCols.a).[y].[x].[limb]
-        |}
-      )).
+      M.assert_zeros (N := U64_LIMBS) {|
+        Array.get limb :=
+          let computed_limb : Z :=
+            let l : list nat :=
+              List.rev (
+                List.seq
+                  (Z.to_nat (limb * BITS_PER_LIMB))%Z
+                  (Z.to_nat BITS_PER_LIMB)
+              ) in
+            Lists.List.fold_left (fun acc (z : nat) =>
+              let z : Z := Z.of_nat z in
+              (2 *F acc) +F
+              get_bit local y x z
+            ) l 0 in
+          computed_limb -F local.(KeccakCols.a).[y].[x].[limb]
+      |}
+    )).
 
   Module Valid.
-    Record t {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : Prop := {
+    Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
       a_prime_bools (x y z : Z) :
-        0 <= x < SQUARE_SIZE ->
-        0 <= y < SQUARE_SIZE ->
+        0 <= x < 5 ->
+        0 <= y < 5 ->
         0 <= z < 64 ->
         KeccakCols.get_a_prime local x y z =
         Z.b2z (KeccakCols.Bool.get_a_prime local x y z);
       a_a_prime_c_c_prime_eq (x y limb : Z) :
-        0 <= x < SQUARE_SIZE ->
-        0 <= y < SQUARE_SIZE ->
+        0 <= x < 5 ->
+        0 <= y < 5 ->
         0 <= limb < U64_LIMBS ->
         let a' : Array.t Z U64_LIMBS :=
           Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_bit local y x z; |} in
@@ -335,12 +332,11 @@ Module a_a_prime_c_c_prime.
   End Valid.
 
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local' : KeccakCols.t) :
-      let local := M.map_mod local' in
-    {{ eval SQUARE_SIZE local 🔽
+    let local := M.map_mod local' in
+    {{ eval local 🔽
       tt,
-      Valid.t SQUARE_SIZE local
+      Valid.t local
     }}.
   Proof.
     intros.
@@ -382,10 +378,9 @@ Module a_prime_c_prime.
     end.
 
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
       M.t unit :=
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
+    M.for_in_zero_to_n 5 (fun x =>
       let four : Z := 4 in
       M.assert_zeros (N := 64) {|
         Array.get z :=
@@ -393,7 +388,7 @@ Module a_prime_c_prime.
             get_sum (
               List.map
                 (fun y => local.(KeccakCols.a_prime).[Z.of_nat y].[x].[z])
-                (List.seq 0 (Z.to_nat SQUARE_SIZE))
+                (List.seq 0 (Z.to_nat 5))
             ) in
           let diff := sum -F local.(KeccakCols.c_prime).[x].[z] in
           (diff *F (diff -F 2)) *F (diff -F four)
@@ -403,18 +398,17 @@ Module a_prime_c_prime.
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
       let local := M.map_mod local in
-    let SQUARE_SIZE := 5 in
-    {{ eval SQUARE_SIZE local 🔽
+    {{ eval local 🔽
       tt,
       forall (x z : Z),
-      0 <= x < SQUARE_SIZE ->
+      0 <= x < 5 ->
       0 <= z < 64 ->
       let diff :=
         let sum :=
           get_sum (
             List.map
               (fun y => KeccakCols.get_a_prime local x (Z.of_nat y) z)
-              (List.seq 0 (Z.to_nat SQUARE_SIZE))
+              (List.seq 0 (Z.to_nat 5))
           ) in
         sum -F local.(KeccakCols.c_prime).[x].[z] in
       (diff *F (diff -F 2)) *F (diff -F 4) =
@@ -450,22 +444,20 @@ End a_prime_c_prime.
 *)
 Module a_prime_prime.
   Definition get_bit {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) (y x : Z)
       (z : Z) :
       Z :=
     let andn :=
       M.andn
-        (Impl_KeccakCols.b local ((x + 1) mod SQUARE_SIZE) y z)
-        (Impl_KeccakCols.b local ((x + 2) mod SQUARE_SIZE) y z) in
+        (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
+        (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
     M.xor andn (Impl_KeccakCols.b local x y z).
 
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
       M.t unit :=
-    M.for_in_zero_to_n SQUARE_SIZE (fun y =>
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
+    M.for_in_zero_to_n 5 (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
       M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
@@ -478,20 +470,20 @@ Module a_prime_prime.
             Lists.List.fold_left (fun acc (z : nat) =>
               let z : Z := Z.of_nat z in
               (2 *F acc) +F
-              get_bit SQUARE_SIZE local y x z
+              get_bit local y x z
             ) l 0 in
           computed_limb -F local.(KeccakCols.a_prime_prime).[y].[x].[limb]
         |}
       )).
 
   Module Post.
-    Definition t {p} `{Prime p} (SQUARE_SIZE : Z) (local : KeccakCols.t) : Prop :=
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
       forall (y x : Z),
-      0 <= y < SQUARE_SIZE ->
-      0 <= x < SQUARE_SIZE ->
+      0 <= y < 5 ->
+      0 <= x < 5 ->
       let a_prime_prime' : Array.t Z U64_LIMBS :=
         Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-          {| Array.get z := get_bit SQUARE_SIZE local y x z; |} in
+          {| Array.get z := get_bit local y x z; |} in
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       KeccakCols.get_a_prime_prime local x y limb =
@@ -499,12 +491,11 @@ Module a_prime_prime.
   End Post.
 
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local : KeccakCols.t) :
-      let local := M.map_mod local in
-    {{ eval SQUARE_SIZE local 🔽
+    let local := M.map_mod local in
+    {{ eval local 🔽
       tt,
-      Post.t SQUARE_SIZE local
+      Post.t local
     }}.
   Proof.
     unfold eval.
@@ -705,14 +696,13 @@ End a_prime_prime_prime_0_0_limbs.
 *)
 Module a_prime_prime_prime_next_a.
   Definition eval {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
       (is_transition : Z) :
       M.t unit :=
     let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
     let not_final_step := 1 -F final_step in
-    M.for_in_zero_to_n SQUARE_SIZE (fun x =>
-    M.for_in_zero_to_n SQUARE_SIZE (fun y =>
+    M.for_in_zero_to_n 5 (fun x =>
+    M.for_in_zero_to_n 5 (fun y =>
       M.when is_transition (
       M.when not_final_step (
         M.assert_zeros (N := U64_LIMBS) {|
@@ -724,10 +714,10 @@ Module a_prime_prime_prime_next_a.
     )).
 
   Module Post.
-    Definition t {p} `{Prime p} (SQUARE_SIZE : Z) (local next : KeccakCols.t) : Prop :=
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) : Prop :=
       forall (y x : Z),
-      0 <= y < SQUARE_SIZE ->
-      0 <= x < SQUARE_SIZE ->
+      0 <= y < 5 ->
+      0 <= x < 5 ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       UnOp.from (Impl_KeccakCols.a_prime_prime_prime local y x limb) =
@@ -735,7 +725,6 @@ Module a_prime_prime_prime_next_a.
   End Post.
 
   Lemma implies {p} `{Prime p}
-      (SQUARE_SIZE : Z)
       (local next : KeccakCols.t)
       (is_transition : bool) :
     let local := M.map_mod local in
@@ -743,10 +732,10 @@ Module a_prime_prime_prime_next_a.
     let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
     let not_final_step := 1 -F final_step in
     not_final_step <> 0 ->
-    {{ eval SQUARE_SIZE local next (Z.b2z is_transition) 🔽
+    {{ eval local next (Z.b2z is_transition) 🔽
       tt,
       if is_transition then
-        Post.t SQUARE_SIZE local next
+        Post.t local next
       else
         True
     }}.
