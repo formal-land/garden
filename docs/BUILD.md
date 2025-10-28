@@ -79,7 +79,7 @@ cd ../..
 
 Then we translate the JSON files to Coq
 ```sh
-python scripts/coq_of_circom_ci.py
+python scripts/rocq_of_circom_ci.py
 ```
 
 
