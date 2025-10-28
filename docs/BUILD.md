@@ -39,7 +39,7 @@ source "$HOME/.cargo/env"
 
 Then we install the dependency files in the Coq program
 ```sh
-opam install -y --deps-only Garden/coq-garden.opam
+opam install -y --deps-only Garden/rocq-garden.opam
 ```
 
 ## Setting Up Circom
