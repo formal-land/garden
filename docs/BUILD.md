@@ -39,7 +39,7 @@ source "$HOME/.cargo/env"
 
 Then we install the dependency files in the Coq program
 ```sh
-opam install -y --deps-only Garden/coq-garden.opam
+opam install -y --deps-only Garden/rocq-garden.opam
 ```
 
 ## Setting Up Circom
@@ -79,7 +79,7 @@ cd ../..
 
 Then we translate the JSON files to Coq
 ```sh
-python scripts/coq_of_circom_ci.py
+python scripts/rocq_of_circom_ci.py
 ```
 
 
