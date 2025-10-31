@@ -478,6 +478,12 @@ Module a_prime_prime.
 
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (H_a_prime_is_bool :
+        forall x, 0 <= x < 5 ->
+        forall y, 0 <= y < 5 ->
+        forall z, 0 <= z < 64 ->
+        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
+      ),
       forall (y x : Z),
       0 <= y < 5 ->
       0 <= x < 5 ->
@@ -487,27 +493,61 @@ Module a_prime_prime.
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       KeccakCols.get_a_prime_prime local x y limb =
-      UnOp.from a_prime_prime'.[limb].
+      a_prime_prime'.[limb].
   End Post.
 
+  Lemma get_bit_is_bool {p} `{Prime p}
+      (local : KeccakCols.t)
+      (H_a_prime_is_bool :
+        forall x, 0 <= x < 5 ->
+        forall y, 0 <= y < 5 ->
+        forall z, 0 <= z < 64 ->
+        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
+      ) :
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    IsBool.t (get_bit local y x z).
+  Proof.
+    intros; unfold get_bit.
+    apply M.xor_is_bool;
+      try apply M.andn_is_bool;
+      apply H_a_prime_is_bool; lia.
+  Qed.
+
   Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-    let local := M.map_mod local in
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
     }}.
   Proof.
+    intros.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t.
     cbn; rewrite_db field_rewrite.
     intros H_run.
-    intros y x H_y H_x limb H_limb.
-    now rewrite (H_run y H_y x H_x limb H_limb).
-  Qed.
+    unfold Post.t, U64_LIMBS.
+    intros H_a_prime_is_bool y x H_y H_x limb H_limb.
+    cbn.
+    cbn in H_limb.
+    rewrite <- H_run by trivial.
+    epose proof (
+      Limbs.from_of_bools_eq
+        U64_LIMBS BITS_PER_LIMB
+        {| Array.get z := get_bit local y x z; |}
+        _
+        limb H_limb
+    ) as H_from_of_bools_eq.
+    unfold Limbs.of_bools in H_from_of_bools_eq.
+    apply H_from_of_bools_eq.
+    Unshelve.
+    apply get_bit_is_bool; trivial.
+  (* Using an admit as [Qed] is in an infinite loop *)
+  Admitted.
 End a_prime_prime.
 
 (*
@@ -577,10 +617,11 @@ Module a_prime_prime_0_0_limbs.
 
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      a_prime_prime_0_0_bits_bools.Post.t local ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
-      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+      (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
         local.(KeccakCols.a_prime_prime_0_0_bits)
       ).[limb].
   End Post.
@@ -593,13 +634,25 @@ Module a_prime_prime_0_0_limbs.
       Post.t local
     }}.
   Proof.
-    unfold eval.
+    intros; unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t; cbn.
-    hauto l: on rew:db: field_rewrite.
-  Qed.
+    unfold Post.t; cbn - [Z.to_nat].
+    intros H_run **.
+    epose proof (
+      Limbs.from_of_bools_eq U64_LIMBS BITS_PER_LIMB
+        local.(KeccakCols.a_prime_prime_0_0_bits)
+        ltac:(assumption)
+        limb ltac:(assumption)
+    ) as H_from_of_bools_eq.
+    unfold Limbs.of_bools in H_from_of_bools_eq.
+    cbn - [Z.to_nat] in H_from_of_bools_eq.
+    rewrite <- H_from_of_bools_eq.
+    rewrite H_run by assumption.
+    now FieldRewrite.run.
+  (* We also have a non-terminating [Qed] *)
+  Admitted.
 End a_prime_prime_0_0_limbs.
 
 (*
@@ -750,7 +803,7 @@ Module a_prime_prime_prime_next_a.
     }
     unfold Post.t; cbn.
     destruct is_transition.
-    { unfold Impl_KeccakCols.a_prime_prime_prime; cbn in*.
+    { unfold Impl_KeccakCols.a_prime_prime_prime; cbn in *.
       intros H_run **.
       pose proof (H_run x ltac:(lia) y ltac:(lia) ltac:(lia) ltac:(lia) limb ltac:(lia)).
       hauto q: on rew:db: field_rewrite.

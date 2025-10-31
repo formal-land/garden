@@ -44,15 +44,24 @@ Definition xorbs (bs : list bool) : bool :=
 Module FirstRowsFrom_a.
   Module From.
     Record t (local : KeccakCols.t) : Prop := {
+      a_prime_bools (x y z : Z) :
+        0 <= x < 5 ->
+        0 <= y < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_a_prime local x y z);
+      c_bools (x z : Z) :
+        0 <= x < 5 ->
+        0 <= z < 64 ->
+        IsBool.t (KeccakCols.get_c local x z);
       c_c_prime (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.Bool.get_c_prime local x z =
-        xorbs [
+        KeccakCols.get_c_prime local x z =
+        Z.b2z (xorbs [
           KeccakCols.Bool.get_c local x z;
           KeccakCols.Bool.get_c local ((x + 4) mod 5) z;
           KeccakCols.Bool.get_c local ((x + 1) mod 5) ((z + 63) mod 64)
-        ];
+        ]);
       a_a_prime_c_c_prime (x y z : Z) :
         0 <= x < 5 ->
         0 <= y < 5 ->
@@ -82,33 +91,33 @@ Module FirstRowsFrom_a.
       a_c (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.Bool.get_c local x z =
-        xorbs [
+        KeccakCols.get_c local x z =
+        Z.b2z (xorbs [
           KeccakCols.Bool.get_a local x 0 z;
           KeccakCols.Bool.get_a local x 1 z;
           KeccakCols.Bool.get_a local x 2 z;
           KeccakCols.Bool.get_a local x 3 z;
           KeccakCols.Bool.get_a local x 4 z
-        ];
+        ]);
       c_c_prime (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.Bool.get_c_prime local x z =
-        xorbs [
+        KeccakCols.get_c_prime local x z =
+        Z.b2z (xorbs [
           KeccakCols.Bool.get_c local x z;
           KeccakCols.Bool.get_c local ((x + 4) mod 5) z;
           KeccakCols.Bool.get_c local ((x + 1) mod 5) ((z + 63) mod 64)
-        ];
+        ]);
       a_a_prime_c (x y z : Z) :
         0 <= x < 5 ->
         0 <= y < 5 ->
         0 <= z < 64 ->
-        KeccakCols.Bool.get_a_prime local x y z =
-        xorbs [
+        KeccakCols.get_a_prime local x y z =
+        Z.b2z (xorbs [
           KeccakCols.Bool.get_a local x y z;
           KeccakCols.Bool.get_c local ((x + 4) mod 5) z;
           KeccakCols.Bool.get_c local ((x + 1) mod 5) ((z + 63) mod 64)
-        ];
+        ]);
     }.
   End To.
 
@@ -120,14 +129,18 @@ Module FirstRowsFrom_a.
     intros []; constructor; intros; cbn in *.
     { repeat rewrite a_a_prime_c_c_prime by lia.
       repeat rewrite a_prime_c_prime by lia.
-      repeat destruct (KeccakCols.Bool.get_c _);
-        repeat destruct (KeccakCols.Bool.get_a_prime _);
+      unfold KeccakCols.Bool.get_c.
+      rewrite c_bools by lia.
+      repeat destruct (KeccakCols.Bool.get_a_prime _);
+        destruct (Z.odd (KeccakCols.get_c _ _ _));
         reflexivity.
     }
     { hauto l: on. }
-    { rewrite a_a_prime_c_c_prime by lia.
+    { rewrite a_prime_bools by lia.
+      rewrite a_a_prime_c_c_prime by lia.
+      unfold KeccakCols.Bool.get_a_prime, KeccakCols.Bool.get_c_prime.
       rewrite c_c_prime by lia.
-      repeat destruct (KeccakCols.Bool.get_a_prime _);
+      destruct (Z.odd (KeccakCols.get_a_prime _ _ _ _));
         repeat destruct (KeccakCols.Bool.get_c _);
         reflexivity.
     }
@@ -328,6 +341,11 @@ Module Post.
     preimage_a : preimage_a.Spec.t local;
     preimage_next_preimage : preimage_next_preimage.Spec.t local next is_transition;
     to : FirstRowsFrom_a.To.t local;
+    a_prime_is_bool :
+      forall x, 0 <= x < 5 ->
+      forall y, 0 <= y < 5 ->
+      forall z, 0 <= z < 64 ->
+      IsBool.t (KeccakCols.get_a_prime local x y z);
     a_prime_prime : a_prime_prime.Post.t local;
     a_prime_prime_0_0_bits_bools : a_prime_prime_0_0_bits_bools.Post.t local;
     a_prime_prime_0_0_limbs : a_prime_prime_0_0_limbs.Post.t local;
@@ -419,6 +437,8 @@ Proof.
   { trivial. }
   { apply FirstRowsFrom_a.from_implies_to.
     constructor; intros.
+    { apply a_prime_bools; lia. }
+    { apply c_bools; lia. }
     { unfold KeccakCols.Bool.get_c, KeccakCols.Bool.get_c_prime.
       rewrite c_c_prime_eq by lia.
       repeat rewrite c_bools by lia.
@@ -452,11 +472,301 @@ Proof.
       apply H_eval_assert_a_prime_c_prime; lia.
     }
   }
+  { intros; now apply a_prime_bools. }
   { assumption. }
   { assumption. }
   { assumption. }
   { assumption. }
 Qed.
+
+Module BoolArray.
+  Definition to_bits (a : Array.t bool 64) : Array.t Z 64 :=
+    Array.map Z.b2z a.
+
+  Definition to_limbs {p} `{Prime p} (a : Array.t bool 64) : Array.t Z U64_LIMBS :=
+    Limbs.of_bools U64_LIMBS BITS_PER_LIMB (to_bits a).
+End BoolArray.
+
+Module ComputeKeccak.
+  Definition compute_c (a : Array.t (Array.t (Array.t bool 64) 5) 5) :
+      Array.t (Array.t bool 64) 5 :=
+    {|
+      Array.get x := {|
+        Array.get z :=
+          xorbs [
+            a.[0].[x].[z];
+            a.[1].[x].[z];
+            a.[2].[x].[z];
+            a.[3].[x].[z];
+            a.[4].[x].[z]
+          ];
+      |}
+    |}.
+
+  Definition compute_c_prime (c : Array.t (Array.t bool 64) 5) :
+      Array.t (Array.t bool 64) 5 :=
+    {|
+      Array.get x := {|
+        Array.get z :=
+          xorbs [
+            c.[x].[z];
+            c.[(x + 4) mod 5].[z];
+            c.[(x + 1) mod 5].[(z + 63) mod 64]
+          ];
+      |}
+    |}.
+
+  Definition compute_a_prime
+      (a : Array.t (Array.t (Array.t bool 64) 5) 5) 
+      (c : Array.t (Array.t bool 64) 5) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    {|
+      Array.get y := {|
+        Array.get x := {|
+          Array.get z :=
+            xorbs [
+              a.[y].[x].[z];
+              c.[(x + 4) mod 5].[z];
+              c.[(x + 1) mod 5].[(z + 63) mod 64]
+            ];
+        |}
+      |}
+    |}.
+
+  Definition compute_b (a_prime : Array.t (Array.t (Array.t bool 64) 5) 5) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    {|
+      Array.get y := {|
+        Array.get x := {|
+          Array.get z :=
+            let a := (x + 3 * y) mod 5 in
+            let b := x in
+            let rot := R.[a].[b] in
+            a_prime.[b].[a].[(z + 64 - rot) mod 64];
+        |}
+      |}
+    |}.
+
+  Definition compute_a_prime_prime
+      (b : Array.t (Array.t (Array.t bool 64) 5) 5) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    {|
+      Array.get y := {|
+        Array.get x := {|
+          Array.get z :=
+            xorbs [
+              andb
+                (negb b.[y].[(x + 1) mod 5].[z])
+                b.[y].[(x + 2) mod 5].[z];
+              b.[y].[x].[z]
+            ];
+        |};
+      |}
+    |}.
+
+  Definition compute_a_prime_prime_prime_0_0
+      (a_prime_prime : Array.t (Array.t (Array.t bool 64) 5) 5)
+      (round : Z) :
+      Array.t bool 64 :=
+    {|
+      Array.get z :=
+        xorbs [
+          rc_value_bit round z;
+          a_prime_prime.[0].[0].[z]
+        ];
+    |}.
+End ComputeKeccak.
+
+Lemma post_implies_round_computation {p} `{Prime p}
+    (local' next' : KeccakCols.t)
+    (is_first_row is_transition : bool)
+    (a : Array.t (Array.t (Array.t bool 64) 5) 5)
+    (round : Z) :
+  let local := M.map_mod local' in
+  let next := M.map_mod next' in
+  Post.t local next is_first_row is_transition ->
+  (
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    KeccakCols.Bool.get_a local x y z =
+    a.[y].[x].[z]
+  ) ->
+  0 <= round < NUM_ROUNDS ->
+  (
+    forall k,
+    0 <= k < NUM_ROUNDS ->
+    local.(KeccakCols.step_flags).[k] =
+    Z.b2z (k =? round)
+  ) ->
+  let c := ComputeKeccak.compute_c a in
+  let c_prime := ComputeKeccak.compute_c_prime c in
+  let a_prime := ComputeKeccak.compute_a_prime a c in
+  let b := ComputeKeccak.compute_b a_prime in
+  let a_prime_prime := ComputeKeccak.compute_a_prime_prime b in
+  (
+    forall z, 0 <= z < 64 ->
+    air_small_parts.get_xored_bit local z =
+    Z.b2z (ComputeKeccak.compute_a_prime_prime_prime_0_0 a_prime_prime round).[z]
+  ).
+Proof.
+  intros * H_Post H_a H_round H_step_flags c c_prime a_prime b a_prime_prime.
+  destruct H_Post, to.
+  assert (H_c :
+    forall x, 0 <= x < 5 ->
+    forall z, 0 <= z < 64 ->
+    KeccakCols.get_c local x z =
+    Z.b2z (c.[x].[z])
+  ). {
+    intros.
+    rewrite a_c by lia.
+    now repeat rewrite H_a by lia.
+  }
+  assert (H_c_prime :
+    forall x, 0 <= x < 5 ->
+    forall z, 0 <= z < 64 ->
+    KeccakCols.get_c_prime local x z =
+    Z.b2z (c_prime.[x].[z])
+  ). {
+    intros.
+    rewrite c_c_prime by lia.
+    unfold KeccakCols.Bool.get_c.
+    repeat rewrite H_c by lia.
+    now repeat rewrite odd_b2z_eq.
+  }
+  assert (H_a_prime :
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    KeccakCols.get_a_prime local x y z =
+    Z.b2z (a_prime.[y].[x].[z])
+  ). {
+    intros.
+    rewrite a_a_prime_c by lia.
+    unfold KeccakCols.Bool.get_c.
+    repeat rewrite H_c by lia.
+    rewrite H_a by lia.
+    now repeat rewrite odd_b2z_eq.
+  }
+  assert (H_b :
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    Impl_KeccakCols.b local x y z =
+    Z.b2z (b.[y].[x].[z])
+  ). {
+    intros.
+    unfold Impl_KeccakCols.b, Impl_KeccakCols.b_of_a_prime.
+    unfold KeccakCols.get_a_prime in H_a_prime.
+    now rewrite H_a_prime by lia.
+  }
+  assert (H_a_prime_prime_bits :
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    a_prime_prime.get_bit local y x z =
+    Z.b2z (a_prime_prime.[y].[x].[z])
+  ). {
+    intros.
+    unfold a_prime_prime.get_bit.
+    repeat rewrite H_b by lia.
+    unfold a_prime_prime, ComputeKeccak.compute_a_prime_prime.
+    now rewrite andn_eq, xor_eq.
+  }
+  assert (H_a_prime_prime_0_0_bits :
+    forall z, 0 <= z < 64 ->
+    local.(KeccakCols.a_prime_prime_0_0_bits).[z] =
+    Z.b2z (a_prime_prime.[0].[0].[z])
+  ). {
+    intros.
+    unfold a_prime_prime_0_0_limbs.Post.t in a_prime_prime_0_0_limbs.
+    unfold a_prime_prime.Post.t, KeccakCols.get_a_prime_prime in a_prime_prime0.
+    rewrite (
+      Limbs.limbs_eq_implies_bits_eq
+        U64_LIMBS BITS_PER_LIMB
+        _
+        {| Array.get z := a_prime_prime.get_bit local 0 0 z; |}
+    ); try assumption.
+    { apply H_a_prime_prime_bits; lia. }
+    { now apply a_prime_prime.get_bit_is_bool. }
+    { intros.
+      rewrite <- a_prime_prime_0_0_limbs by assumption.
+      now rewrite a_prime_prime0.
+    }
+  }
+  intros.
+  unfold air_small_parts.get_xored_bit.
+  unfold List.map, List.seq, Z.to_nat, Pos.to_nat.
+  cbn - [M.xor rc_value_bit ComputeKeccak.compute_a_prime_prime_prime_0_0 local].
+  repeat rewrite H_step_flags by (unfold NUM_ROUNDS; lia).
+  generalize round H_round.
+  apply round_flags.i_in_bounds; cbn [Z.eqb Pos.eqb].
+  change (Z.b2z false) with 0.
+  autorewrite with field_rewrite.
+  unfold ComputeKeccak.compute_a_prime_prime_prime_0_0.
+  rewrite H_a_prime_prime_0_0_bits by assumption.
+  unfold Array.get.
+  repeat rewrite M.xor_eq.
+  easy.
+Qed.
+
+Module WithPreimage.
+  Definition t {p} `{Prime p}
+      (pre_image : Array.t (Array.t (Array.t bool 64) 5) 5)
+      (local : KeccakCols.t) :
+      Prop :=
+    forall y, 0 <= y < 5 ->
+    forall x, 0 <= x < 5 ->
+    forall limb, 0 <= limb < U64_LIMBS ->
+    (BoolArray.to_limbs pre_image.[y].[x]).[limb] =
+    local.(KeccakCols.preimage).[y].[x].[limb].
+End WithPreimage.
+
+(* Module WithPreImages.
+  Definition t {p} `{Prime p}
+      (pre_images : list (Array.t (Array.t (Array.t bool 64) 5) 5))
+      (matrix : list KeccakCols.t) :
+      Prop :=
+    forall i,
+    0 <= i < Z.of_nat (List.length pre_images) ->
+    WithPreimage.t
+      (List.nth (Z.to_nat i) pre_images Default.default)
+      (List.nth (Z.to_nat (24 * i)) matrix Default.default).
+End WithPreImages. *)
+
+Module MatrixSpec.
+  Fixpoint t {p} `{Prime p}
+      (matrix : list KeccakCols.t)
+      (dummy : KeccakCols.t)
+      (is_first_row : bool) :
+      Prop :=
+    match matrix with
+    | [] => is_first_row = false
+    | local :: matrix =>
+      let '(is_transition, next) :=
+        match matrix with
+        | [] => (false, dummy)
+        | next :: _ => (true, next)
+        end in
+      Post.t local next is_first_row is_transition /\
+      t matrix next false
+    end.
+
+  (* Lemma implies {p} `{Prime p}
+      (matrix' : list KeccakCols.t)
+      (dummy' : KeccakCols.t)
+      (pre_images : list (Array.t (Array.t (Array.t bool 64) 5) 5)) :
+    let matrix := List.map M.map_mod matrix' in
+    let dummy := M.map_mod dummy' in
+    MatrixSpec.t matrix dummy true ->
+
+    {{ eval_local local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
+      tt,
+      MatrixSpec.t matrix dummy is_first_row
+    }}.
+  Proof.
+    induction matrix; intros; cbn in *. *)
+End MatrixSpec.
 
 Module FunctionalSpec.
   Module Input.

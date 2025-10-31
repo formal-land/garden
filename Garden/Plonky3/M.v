@@ -37,6 +37,10 @@ Module Default.
   Global Instance ZIsDefault : C Z := {
     default := 0;
   }.
+
+  Global Instance BoolIsDefault : C bool := {
+    default := false;
+  }.
 End Default.
 
 Module Equal.
@@ -50,6 +54,20 @@ Notation "x =F y" := (Equal.t x y) (at level 70, no associativity).
 Global Instance ZIsEqual : Equal.C Z := {
   Equal.t := eq;
 }.
+
+Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
+  map_mod : A -> A;
+}.
+
+Module Mappable.
+  Class C (Self : Set -> Set) (A B : Set) : Set := {
+    map : (A -> B) -> Self A -> Self B;
+  }.
+
+  Global Instance IdIsMappable (A : Set) : C (fun (X : Set) => X) A A := {
+    map f x := f x;
+  }.
+End Mappable.
 
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -119,6 +137,17 @@ Module Array.
 
     Axiom dec : forall {N : Z} (x y : Array.t Z N), {Equal.t x y} + {~ Equal.t x y}.
   End Eq.
+
+  Global Instance IsMapMod  {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} : MapMod (t A N) := {
+    map_mod := map map_mod;
+  }.
+
+  Global Instance IsMappable (N : Z) (T : Set -> Set) (A B : Set)
+      `{Mappable.C T A B} :
+      Mappable.C (fun (X : Set) => t (T X) N) A B :=
+  {
+    Mappable.map f x := map (Mappable.map f) x;
+  }.
 End Array.
 
 Notation "x .[ i ]" := (Array.get x i) (at level 9).
@@ -153,6 +182,10 @@ Notation "x +F y" := (BinOp.add x y) (at level 50, left associativity).
 Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
 Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
 Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
+
+Global Instance ZIsMapMod {p} `{Prime p} : MapMod Z := {
+  map_mod := UnOp.from;
+}.
 
 Module Trace.
   Module Event.
@@ -363,9 +396,6 @@ Qed.
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
-Definition andn {p} `{Prime p} (x y : Z) : Z :=
-  (1 -F x) *F y.
-
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
     match l with
@@ -383,20 +413,6 @@ Module List.
       f x acc
     end.
 End List.
-
-Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
-  map_mod : A -> A;
-}.
-
-Global Instance MapMod_Felt {p} `{Prime p} : MapMod Z := {
-  map_mod := UnOp.from;
-}.
-
-Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
-    MapMod (Array.t A N) :=
-{
-  map_mod := Array.map map_mod;
-}.
 
 Ltac show_equality_modulo :=
   unfold
@@ -472,6 +488,14 @@ Module FieldRewrite.
   Proof.
   Admitted.
   Global Hint Rewrite @from_one : field_rewrite.
+
+  Lemma from_bool {p} `{Prime p} (x : bool) :
+    UnOp.from (Z.b2z x) = Z.b2z x.
+  Proof.
+    unfold UnOp.from.
+    destruct x; [apply from_one | apply from_zero].
+  Qed.
+  Global Hint Rewrite @from_bool : field_rewrite.
 
   Lemma from_from {p} `{Prime p} (x : Z) :
     UnOp.from (UnOp.from x) = UnOp.from x.
@@ -612,8 +636,54 @@ Module FieldRewrite.
     end.
 End FieldRewrite.
 
+Definition andn {p} `{Prime p} (x y : Z) : Z :=
+  (1 -F x) *F y.
+
+Lemma andn_eq {p} `{Prime p} (x y : bool) :
+  andn (Z.b2z x) (Z.b2z y) = Z.b2z (andb (negb x) y).
+Proof.
+  intros.
+  unfold andn.
+  now destruct x, y; cbn; FieldRewrite.run.
+Qed.
+
+Lemma andn_is_bool {p} `{Prime p} (x y : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t (andn x y).
+Proof.
+  intros -> ->.
+  rewrite andn_eq.
+  unfold IsBool.t.
+  now rewrite odd_b2z_eq.
+Qed.
+
 (** Utilities around the manipulation of limbs *)
 Module Limbs.
+  (* Definition sum_bools {p} `{Prime p} (BITS_PER_LIMB : nat)
+      (a : Array.t Z (Z.of_nat BITS_PER_LIMB)) :
+      Z :=
+    let l : list nat := List.rev (List.seq 0 BITS_PER_LIMB) in
+    Lists.List.fold_left (fun acc (z : nat) =>
+      let z : Z := Z.of_nat z in
+      (2 *F acc) +F a.[z]
+    ) l 0.
+
+  Lemma testbit_sum_bools_eq {p} `{Prime p} (BITS_PER_LIMB : nat)
+      (a : Array.t Z (Z.of_nat BITS_PER_LIMB))
+      (bit : Z)
+      (H_bit : 0 <= bit < Z.of_nat BITS_PER_LIMB) :
+    Z.testbit (sum_bools BITS_PER_LIMB a) bit =
+    Z.odd a.[bit].
+  Proof.
+    unfold sum_bools.
+    induction BITS_PER_LIMB; cbn; [lia|].
+    set (n := Z.to_nat BITS_PER_LIMB).
+    replace BITS_PER_LIMB with (Z.of_nat n) in * by lia.
+    clearbody n.
+    rewrite List.rev_seq.
+  Qed. *)
+
   (** Convert an array of bools to an array of limbs. *)
   Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
       (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
@@ -662,7 +732,7 @@ Module Limbs.
       bool :=
     let limb := bit / BITS_PER_LIMB in
     let bit_in_limb := bit mod BITS_PER_LIMB in
-    let limb_value := a.(Array.get) limb in
+    let limb_value := a.[limb] in
     Z.testbit limb_value bit_in_limb.
 
   Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
@@ -671,10 +741,12 @@ Module Limbs.
       (H_bools :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (a.(Array.get) z)
+        IsBool.t a.[z]
       ) :
-    get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
-    Z.odd a.[bit].
+    Z.b2z (get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit) =
+    a.[bit].
+  Proof.
+    unfold get_bit, of_bools.
   Admitted.
 
   Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
@@ -701,9 +773,32 @@ Module Limbs.
     unfold get_bit.
     rewrite H_limbs by nia.
     rewrite <- get_bit_of_bools_eq by assumption.
-    rewrite from_of_bools_eq; trivial.
-    nia.
+    rewrite from_of_bools_eq by (trivial; nia).
+    now rewrite odd_b2z_eq.
   Qed.
+
+  Lemma limbs_eq_implies_bits_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (a_bits1 a_bits2 : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
+      (H_bits1_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t a_bits1.[z]
+      )
+      (H_bits2_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t a_bits2.[z]
+      )
+      (H_limbs :
+        forall (limb : Z),
+        0 <= limb < NB_LIMBS ->
+        (of_bools NB_LIMBS BITS_PER_LIMB a_bits1).[limb] =
+        (of_bools NB_LIMBS BITS_PER_LIMB a_bits2).[limb]
+      ) :
+    forall (bit : Z),
+    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
+    a_bits1.[bit] = a_bits2.[bit].
+  Admitted.
 End Limbs.
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
