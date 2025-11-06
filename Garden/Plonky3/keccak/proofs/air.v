@@ -1,42 +1,9 @@
 Require Import Plonky3.M.
 Require Import Plonky3.MExpr.
-Require Import Plonky3.keccak.proofs.air_small_parts.
+Require Import Plonky3.keccak.air.
 Require Import Plonky3.keccak.columns.
 Require Import Plonky3.keccak.constants.
 Require Import Plonky3.keccak.round_flags.
-
-(** Definition grouping all the constraints. *)
-Definition eval_local {p} `{Prime p}
-    (local next : KeccakCols.t)
-    (is_first_row is_transition : Z) :
-    M.t unit :=
-  msg* "eval_round_flags" in
-  let* _ := eval_round_flags local next is_first_row is_transition in
-  msg* "preimage_a" in
-  let* _ := preimage_a.eval local in
-  msg* "preimage_next_preimage" in
-  let* _ := preimage_next_preimage.eval local next is_transition in
-  msg* "export_bool" in
-  let* _ := export_bool.eval local in
-  msg* "export_zero" in
-  let* _ := export_zero.eval local in
-  msg* "c_c_prime" in
-  let* _ := c_c_prime.eval local in
-  msg* "a_a_prime_c_c_prime" in
-  let* _ := a_a_prime_c_c_prime.eval local in
-  msg* "a_prime_c_prime" in
-  let* _ := a_prime_c_prime.eval local in
-  msg* "a_prime_prime" in
-  let* _ := a_prime_prime.eval local in
-  msg* "a_prime_prime_0_0_bits_bools" in
-  let* _ := a_prime_prime_0_0_bits_bools.eval local in
-  msg* "a_prime_prime_0_0_limbs" in
-  let* _ := a_prime_prime_0_0_limbs.eval local in
-  msg* "a_prime_prime_prime_0_0_limbs" in
-  let* _ := a_prime_prime_prime_0_0_limbs.eval local in
-  msg* "a_prime_prime_prime_next_a" in
-  let* _ := a_prime_prime_prime_next_a.eval local next is_transition in
-  M.pure tt.
 
 Definition xorbs (bs : list bool) : bool :=
   Lists.List.fold_left xorb bs false.
@@ -358,13 +325,13 @@ Lemma eval_implies {p} `{Prime p} (H_p : 6 <= p)
     (is_first_row is_transition : bool) :
   let local := M.map_mod local' in
   let next := M.map_mod next' in
-  {{ eval_local local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
+  {{ eval local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
     Post.t local next is_first_row is_transition
   }}.
 Proof.
   intros.
-  unfold eval_local.
+  unfold eval.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply round_flags.implies.
   }
@@ -606,7 +573,7 @@ Lemma post_implies_round_computation {p} `{Prime p}
   let a_prime_prime := ComputeKeccak.compute_a_prime_prime b in
   (
     forall z, 0 <= z < 64 ->
-    air_small_parts.get_xored_bit local z =
+    air.get_xored_bit local z =
     Z.b2z (ComputeKeccak.compute_a_prime_prime_prime_0_0 a_prime_prime round).[z]
   ).
 Proof.
@@ -695,7 +662,7 @@ Proof.
     }
   }
   intros.
-  unfold air_small_parts.get_xored_bit.
+  unfold air.get_xored_bit.
   unfold List.map, List.seq, Z.to_nat, Pos.to_nat.
   cbn - [M.xor rc_value_bit ComputeKeccak.compute_a_prime_prime_prime_0_0 local].
   repeat rewrite H_step_flags by (unfold NUM_ROUNDS; lia).

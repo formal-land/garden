@@ -1,6 +1,6 @@
 Require Import Plonky3.M.
 Require Import Plonky3.MExpr.
-Require Import Plonky3.keccak.proofs.air_local.
+Require Import Plonky3.keccak.air.
 Require Import Plonky3.keccak.columns.
 
 (* We do not care about the prime we use, but it is needed to have one for the printing. *)
@@ -17,7 +17,7 @@ Compute PrettyPrint.cats [
   PrettyPrint.to_string
     ltac:(OfShallow.to_mexpr_trace (snd (
       M.to_trace (
-        eval_local
+        eval
           (fst local_next)
           (snd local_next)
           OfShallow.IsFirstRow

@@ -3,33 +3,10 @@ Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 Require Import Garden.Plonky3.keccak.round_flags.
 
-(* fn eval(&self, builder: &mut AB) *)
-Definition eval
-    {p} `{Prime p}
-    (is_first_row is_first_step is_not_final_step is_transition : bool)
-    (local next : KeccakCols.t) :
-    M.t unit :=
-  (* eval_round_flags(builder); *)
-  (* let* _ := eval_round_flags is_first_row is_transition local next in *)
+(** We define the AIR function by chunks, so that we can verify them independently. It makes the
+    proof a bit easier to handle. *)
 
-  (*
-  let main = builder.main();
-  let (local, next) = (
-      main.row_slice(0).expect("The matrix is empty?"),
-      main.row_slice(1).expect("The matrix only has 1 row?"),
-  );
-  let local: &KeccakCols<AB::Var> = ( *local).borrow();
-  let next: &KeccakCols<AB::Var> = ( *next).borrow();
-
-  let first_step = local.step_flags[0];
-  let final_step = local.step_flags[NUM_ROUNDS - 1];
-  let not_final_step = AB::Expr::ONE - final_step;
-  *)
-  let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
-  let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-  let not_final_step := BinOp.sub 1 final_step in
-
-  (*
+(*
   for y in 0..5 {
       for x in 0..5 {
           builder
@@ -39,21 +16,46 @@ Definition eval
               }));
       }
   }
-  *)
-  let* _ :=
+*)
+Module preimage_a.
+  Definition eval {p} `{Prime p} (local : KeccakCols.t) : M.t unit :=
+    let first_step := local.(KeccakCols.step_flags).(Array.get) 0 in
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      when_bool is_first_step (
+      M.when first_step (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
-            BinOp.sub
-              (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
-              (Array.get (Array.get (Array.get local.(KeccakCols.a) y) x) limb)
+            local.(KeccakCols.preimage).[y].[x].[limb] -F local.(KeccakCols.a).[y].[x].[limb]
         |}
       )
-    )) in
+    )).
 
-  (*
+  Module Spec.
+    Definition t (local : KeccakCols.t) : Prop :=
+      local.(KeccakCols.step_flags).[0] <> 0 ->
+      local.(KeccakCols.preimage) =F local.(KeccakCols.a).
+  End Spec.
+
+  Lemma implies {p} `{Prime p} (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Spec.t local
+    }}.
+  Proof.
+    intros.
+    unfold eval.
+    { eapply Run.Implies. {
+        Run.run.
+      }
+      unfold Spec.t; cbn.
+      FieldRewrite.run.
+      hauto l: on.
+    }
+  Qed.
+End preimage_a.
+
+(*
   for y in 0..5 {
       for x in 0..5 {
           builder
@@ -64,33 +66,128 @@ Definition eval
               }));
       }
   }
-  *)
-  let* _ :=
+*)
+Module preimage_next_preimage.
+  Definition eval {p} `{Prime p}
+      (local next : KeccakCols.t)
+      (is_transition : Z) :
+      M.t unit :=
+    let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
+    let not_final_step := 1 -F final_step in
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      when_bool (is_not_final_step && is_transition) (
+      M.when not_final_step (
+      M.when is_transition (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
-            BinOp.sub
-              (Array.get (Array.get (Array.get local.(KeccakCols.preimage) y) x) limb)
-              (Array.get (Array.get (Array.get next.(KeccakCols.preimage) y) x) limb)
+            local.(KeccakCols.preimage).[y].[x].[limb] -F next.(KeccakCols.preimage).[y].[x].[limb]
         |}
       )
-    )) in
+    ))).
 
-  (* builder.assert_bool(local.export); *)
-  let* _ := M.assert_bool local.(KeccakCols.export) in
+  Module Spec.
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) (is_transition : bool) : Prop :=
+      let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
+      let not_final_step := 1 -F final_step in
+      if is_transition then
+        not_final_step <> 0 ->
+        local.(KeccakCols.preimage) =F next.(KeccakCols.preimage)
+      else
+        True.
+  End Spec.
 
-  (*
+  Lemma implies {p} `{Prime p}
+      (local next : KeccakCols.t)
+      (is_transition : bool) :
+      let local := M.map_mod local in
+      let next := M.map_mod next in
+      let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
+      let not_final_step := 1 -F final_step in
+      {{ eval local next (Z.b2z is_transition) 🔽
+        tt,
+        Spec.t local next is_transition
+      }}.
+  Proof.
+    intros.
+    unfold eval.
+    unfold not_final_step, final_step in *.
+    destruct is_transition.
+    { eapply Run.Implies. {
+        Run.run.
+      }
+      cbn.
+      rewrite_db field_rewrite.
+      hauto l: on.
+    }
+    { eapply Run.Implies. {
+        Run.run.
+      }
+      easy.
+    }
+  Qed.
+End preimage_next_preimage.
+
+(*
+  builder.assert_bool(local.export);
+*)
+Module export_bool.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
+    M.assert_bool local.(KeccakCols.export). 
+
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+    {{
+      eval local 🔽
+      tt,
+      IsBool.t local.(KeccakCols.export)
+    }}.
+  Proof.
+    intros.
+    apply Run.AssertBool.
+  Qed.
+End export_bool.
+
+(*
   builder
     .when(not_final_step.clone())
     .assert_zero(local.export);
-  *)
-  let* _ := when_bool is_not_final_step (
-    M.assert_zero local.(KeccakCols.export)
-  ) in
+*)
+Module export_zero.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
+    let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+    let not_final_step := 1 -F final_step in
+    M.when not_final_step (
+      M.assert_zero local.(KeccakCols.export)
+    ).
 
-  (*
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+      let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+      let not_final_step := 1 -F final_step in
+      {{ eval local 🔽
+        tt,
+        not_final_step <> 0 ->
+        local.(KeccakCols.export) = 0
+      }}.
+  Proof.
+    intros.
+    unfold eval.
+    unfold not_final_step, final_step in *.
+    { eapply Run.Implies. {
+        Run.run.
+      }
+      tauto.
+    }
+  Qed.
+End export_zero.
+
+(*
   for x in 0..5 {
       builder.assert_bools(local.c[x]);
       builder.assert_zeros::<64, _>(array::from_fn(|z| {
@@ -101,25 +198,64 @@ Definition eval
           local.c_prime[x][z] - xor
       }));
   }
-  *)
-  let* _ :=
+*)
+Module c_c_prime.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.for_in_zero_to_n 5 (fun x =>
-      let* _ := assert_bools (local.(KeccakCols.c).(Array.get) x) in
+      let* _ := M.assert_bools (local.(KeccakCols.c).(Array.get) x) in
       M.assert_zeros (N := 64) {|
         Array.get z :=
           let xor :=
             xor3
-              ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
-              ((local.(KeccakCols.c).(Array.get) ((x + 4) mod 5)).(Array.get) z)
-              ((local.(KeccakCols.c).(Array.get) ((x + 1) mod 5)).(Array.get) ((z + 63) mod 64))
-          in
-          BinOp.sub
-            ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z)
-            xor
+              (local.(KeccakCols.c).[x].[z])
+              (local.(KeccakCols.c).[(x + 4) mod 5].[z])
+              (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64]) in
+          local.(KeccakCols.c_prime).[x].[z] -F xor
       |}
-    ) in
+    ).
 
-  (*
+  Module Valid.
+    Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
+      c_c_prime_eq (x z : Z) :
+        0 <= x < 5 ->
+        0 <= z < 64 ->
+        KeccakCols.get_c_prime local x z =
+        M.xor3
+          (KeccakCols.get_c local x z)
+          (KeccakCols.get_c local ((x + 4) mod 5) z)
+          (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64));
+      c_bools (x z : Z) :
+        0 <= x < 5 ->
+        0 <= z < 64 ->
+        KeccakCols.get_c local x z =
+        Z.b2z (KeccakCols.Bool.get_c local x z)
+    }.
+  End Valid.
+
+  Lemma implies {p} `{Prime p}
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Valid.t local
+    }}.
+  Proof.
+    intros.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    cbn; rewrite_db field_rewrite.
+    unfold M.xor3; setoid_rewrite M.from_xor_eq.
+    intros; constructor; cbn; intros.
+    { hauto l: on. }
+    { sauto lq: on rew: off. }
+  Qed.
+End c_c_prime.
+
+(*
   for y in 0..5 {
       for x in 0..5 {
           let get_bit = |z| {
@@ -143,35 +279,90 @@ Definition eval
           }));
       }
   }
-  *)
-  let* _ :=
+*)
+Module a_a_prime_c_c_prime.
+  Definition get_bit {p} `{Prime p}
+      (local : KeccakCols.t) (y x : Z)
+      (z : Z) :
+      Z :=
+    M.xor3
+      local.(KeccakCols.a_prime).[y].[x].[z]
+      local.(KeccakCols.c).[x].[z]
+      local.(KeccakCols.c_prime).[x].[z].
+
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      let get_bit (z : Z) : Z :=
-        xor3
-          (((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x).(Array.get) z)
-          ((local.(KeccakCols.c).(Array.get) x).(Array.get) z)
-          ((local.(KeccakCols.c_prime).(Array.get) x).(Array.get) z)
-      in
-
-      let* _ := assert_bools ((local.(KeccakCols.a_prime).(Array.get) y).(Array.get) x) in
+      let* _ := M.assert_bools local.(KeccakCols.a_prime).[y].[x] in
 
       M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
-            let l : list Z :=
-              List.rev (List.map
-                (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
-                (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+            let l : list nat :=
+              List.rev (
+                List.seq
+                  (Z.to_nat (limb * BITS_PER_LIMB))%Z
+                  (Z.to_nat BITS_PER_LIMB)
               ) in
-            Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
-          BinOp.sub
-            computed_limb
-            (((local.(KeccakCols.a).(Array.get) y).(Array.get) x).(Array.get) limb)
+            Lists.List.fold_left (fun acc (z : nat) =>
+              let z : Z := Z.of_nat z in
+              (2 *F acc) +F
+              get_bit local y x z
+            ) l 0 in
+          computed_limb -F local.(KeccakCols.a).[y].[x].[limb]
       |}
-    )) in
+    )).
 
-  (*
+  Module Valid.
+    Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
+      a_prime_bools (x y z : Z) :
+        0 <= x < 5 ->
+        0 <= y < 5 ->
+        0 <= z < 64 ->
+        KeccakCols.get_a_prime local x y z =
+        Z.b2z (KeccakCols.Bool.get_a_prime local x y z);
+      a_a_prime_c_c_prime_eq (x y limb : Z) :
+        0 <= x < 5 ->
+        0 <= y < 5 ->
+        0 <= limb < U64_LIMBS ->
+        let a' : Array.t Z U64_LIMBS :=
+          Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_bit local y x z; |} in
+        KeccakCols.get_a local x y limb =
+        UnOp.from a'.[limb]
+    }.
+  End Valid.
+
+  Lemma implies {p} `{Prime p}
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Valid.t local
+    }}.
+  Proof.
+    intros.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    unfold Limbs.of_bools; cbn; rewrite_db field_rewrite.
+    intros H_run; constructor.
+    { intros x y z H_x H_y H_z.
+      unfold KeccakCols.Bool.get_a_prime; cbn.
+      hauto lq: on rew: off.
+    }
+    { intros x y limb H_x H_y H_limb.
+      unfold get_bit in *.
+      cbn in *.
+      pose proof (H_run y H_y x H_x) as [_ H_run_limb].
+      now rewrite (H_run_limb limb H_limb).
+    }
+  Qed.
+End a_a_prime_c_c_prime.
+
+(*
   for x in 0..5 {
       let four = AB::Expr::TWO.double();
       builder.assert_zeros::<64, _>(array::from_fn(|z| {
@@ -180,24 +371,62 @@ Definition eval
           diff.clone() * (diff.clone() - AB::Expr::TWO) * (diff - four.clone())
       }));
   }
-  *)
-  let* _ :=
+*)
+Module a_prime_c_prime.
+  Fixpoint get_sum {p} `{Prime p} (l : list Z) : Z :=
+    match l with
+    | [] => 0
+    | [z] => z
+    | z :: l => z +F get_sum l
+    end.
+
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.for_in_zero_to_n 5 (fun x =>
       let four : Z := 4 in
       M.assert_zeros (N := 64) {|
         Array.get z :=
           let sum : Z :=
-            Lists.List.fold_left (fun acc y =>
-              BinOp.add acc
-                (Array.get (Array.get (Array.get local.(KeccakCols.a_prime) y) x) z)
-            )
-            (List.map Z.of_nat (List.seq 0 5)) 0 in
-          let diff := BinOp.sub sum (Array.get (Array.get local.(KeccakCols.c_prime) x) z) in
-          BinOp.mul (BinOp.mul diff (BinOp.sub diff 2)) (BinOp.sub diff four)
+            get_sum (
+              List.map
+                (fun y => local.(KeccakCols.a_prime).[Z.of_nat y].[x].[z])
+                (List.seq 0 (Z.to_nat 5))
+            ) in
+          let diff := sum -F local.(KeccakCols.c_prime).[x].[z] in
+          (diff *F (diff -F 2)) *F (diff -F four)
         |}
-      ) in
+      ).
 
-  (*
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+    {{ eval local 🔽
+      tt,
+      forall (x z : Z),
+      0 <= x < 5 ->
+      0 <= z < 64 ->
+      let diff :=
+        let sum :=
+          get_sum (
+            List.map
+              (fun y => KeccakCols.get_a_prime local x (Z.of_nat y) z)
+              (List.seq 0 (Z.to_nat 5))
+          ) in
+        sum -F local.(KeccakCols.c_prime).[x].[z] in
+      (diff *F (diff -F 2)) *F (diff -F 4) =
+      0
+    }}.
+  Proof.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    sauto.
+  Qed.
+End a_prime_c_prime.
+
+(*
   for y in 0..5 {
       for x in 0..5 {
           let get_bit = |z| {
@@ -215,35 +444,149 @@ Definition eval
           }));
       }
   }
-  *)
-  let* _ :=
+*)
+Module a_prime_prime.
+  Definition get_bit {p} `{Prime p}
+      (local : KeccakCols.t) (y x : Z)
+      (z : Z) :
+      Z :=
+    let andn :=
+      M.andn
+        (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
+        (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
+    M.xor andn (Impl_KeccakCols.b local x y z).
+
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.for_in_zero_to_n 5 (fun y =>
     M.for_in_zero_to_n 5 (fun x =>
-      let get_bit (z : Z) : Z :=
-        let andn :=
-          andn
-            (Impl_KeccakCols.b local ((x + 1) mod 5) y z)
-            (Impl_KeccakCols.b local ((x + 2) mod 5) y z) in
-          xor
-            andn
-            (Impl_KeccakCols.b local x y z) in
       M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
-            let l : list Z :=
-              List.rev (List.map
-                (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
-                (List.seq 0 (Z.to_nat BITS_PER_LIMB))
+            let l : list nat :=
+              List.rev (
+                List.seq
+                  (Z.to_nat (limb * BITS_PER_LIMB))
+                  (Z.to_nat BITS_PER_LIMB)
               ) in
-            Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_bit z)) l 0 in
-          BinOp.sub
-            computed_limb
-            (((local.(KeccakCols.a_prime_prime).(Array.get) y).(Array.get) x).(Array.get) limb)
+            Lists.List.fold_left (fun acc (z : nat) =>
+              let z : Z := Z.of_nat z in
+              (2 *F acc) +F
+              get_bit local y x z
+            ) l 0 in
+          computed_limb -F local.(KeccakCols.a_prime_prime).[y].[x].[limb]
         |}
-      )) in
+      )).
 
-  (*
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (H_a_prime_is_bool :
+        forall x, 0 <= x < 5 ->
+        forall y, 0 <= y < 5 ->
+        forall z, 0 <= z < 64 ->
+        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
+      ),
+      forall (y x : Z),
+      0 <= y < 5 ->
+      0 <= x < 5 ->
+      let a_prime_prime' : Array.t Z U64_LIMBS :=
+        Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+          {| Array.get z := get_bit local y x z; |} in
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      KeccakCols.get_a_prime_prime local x y limb =
+      a_prime_prime'.[limb].
+  End Post.
+
+  Lemma get_bit_is_bool {p} `{Prime p}
+      (local : KeccakCols.t)
+      (H_a_prime_is_bool :
+        forall x, 0 <= x < 5 ->
+        forall y, 0 <= y < 5 ->
+        forall z, 0 <= z < 64 ->
+        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
+      ) :
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall z, 0 <= z < 64 ->
+    IsBool.t (get_bit local y x z).
+  Proof.
+    intros; unfold get_bit.
+    apply M.xor_is_bool;
+      try apply M.andn_is_bool;
+      apply H_a_prime_is_bool; lia.
+  Qed.
+
+  Lemma implies {p} `{Prime p}
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Post.t local
+    }}.
+  Proof.
+    intros.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    cbn; rewrite_db field_rewrite.
+    intros H_run.
+    unfold Post.t, U64_LIMBS.
+    intros H_a_prime_is_bool y x H_y H_x limb H_limb.
+    cbn.
+    cbn in H_limb.
+    rewrite <- H_run by trivial.
+    epose proof (
+      Limbs.from_of_bools_eq
+        U64_LIMBS BITS_PER_LIMB
+        {| Array.get z := get_bit local y x z; |}
+        _
+        limb H_limb
+    ) as H_from_of_bools_eq.
+    unfold Limbs.of_bools in H_from_of_bools_eq.
+    apply H_from_of_bools_eq.
+    Unshelve.
+    apply get_bit_is_bool; trivial.
+  (* Using an admit as [Qed] is in an infinite loop *)
+  Admitted.
+End a_prime_prime.
+
+(*
   builder.assert_bools(local.a_prime_prime_0_0_bits);
+*)
+Module a_prime_prime_0_0_bits_bools.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
+    M.assert_bools local.(KeccakCols.a_prime_prime_0_0_bits).
+
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (z : Z),
+      0 <= z < 64 ->
+      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits).[z].
+  End Post.
+
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+    {{ eval local 🔽
+      tt,
+      Post.t local
+    }}.
+  Proof.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    unfold Post.t.
+    sfirstorder.
+  Qed.
+End a_prime_prime_0_0_bits_bools.
+
+(*
   builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
       let computed_a_prime_prime_0_0_limb = (limb * BITS_PER_LIMB
           ..(limb + 1) * BITS_PER_LIMB)
@@ -253,24 +596,69 @@ Definition eval
           });
       computed_a_prime_prime_0_0_limb - local.a_prime_prime[0][0][limb]
   }));
-  *)
-  let* _ := assert_bools local.(KeccakCols.a_prime_prime_0_0_bits) in
-  let* _ :=
+*)
+Module a_prime_prime_0_0_limbs.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_0_0_limb : Z :=
-          let l : list Z :=
-            List.rev (List.map
-              (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
-              (List.seq 0 (Z.to_nat BITS_PER_LIMB))
-            ) in
-          Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) z)) l 0 in
-        BinOp.sub
-          computed_a_prime_prime_0_0_limb
-          (((local.(KeccakCols.a_prime_prime).(Array.get) 0).(Array.get) 0).(Array.get) limb)
-    |} in
+          let l : list nat :=
+            List.rev (
+              List.seq
+                (Z.to_nat (limb * BITS_PER_LIMB))
+                (Z.to_nat BITS_PER_LIMB)
+              ) in
+          Lists.List.fold_left (fun acc (z : nat) =>
+            let z : Z := Z.of_nat z in
+            (2 *F acc) +F local.(KeccakCols.a_prime_prime_0_0_bits).[z]
+          ) l 0 in
+        computed_a_prime_prime_0_0_limb -F
+          local.(KeccakCols.a_prime_prime).[0].[0].[limb]
+    |}.
 
-  (*
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      a_prime_prime_0_0_bits_bools.Post.t local ->
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
+      (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+        local.(KeccakCols.a_prime_prime_0_0_bits)
+      ).[limb].
+  End Post.
+
+  Lemma implies {p} `{Prime p}
+      (local' : KeccakCols.t) :
+    let local := M.map_mod local' in
+    {{ eval local 🔽
+      tt,
+      Post.t local
+    }}.
+  Proof.
+    intros; unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    unfold Post.t; cbn - [Z.to_nat].
+    intros H_run **.
+    epose proof (
+      Limbs.from_of_bools_eq U64_LIMBS BITS_PER_LIMB
+        local.(KeccakCols.a_prime_prime_0_0_bits)
+        ltac:(assumption)
+        limb ltac:(assumption)
+    ) as H_from_of_bools_eq.
+    unfold Limbs.of_bools in H_from_of_bools_eq.
+    cbn - [Z.to_nat] in H_from_of_bools_eq.
+    rewrite <- H_from_of_bools_eq.
+    rewrite H_run by assumption.
+    now FieldRewrite.run.
+  (* We also have a non-terminating [Qed] *)
+  Admitted.
+End a_prime_prime_0_0_limbs.
+
+(*
   let get_xored_bit = |i| {
       let mut rc_bit_i = AB::Expr::ZERO;
       for r in 0..NUM_ROUNDS {
@@ -281,20 +669,22 @@ Definition eval
 
       rc_bit_i.xor(&local.a_prime_prime_0_0_bits[i].into())
   };
-  *)
-  let get_xored_bit (i : Z) : Z :=
-    let rc_bit_i : Z :=
-      Lists.List.fold_left (fun acc r =>
-        let this_round := Array.get local.(KeccakCols.step_flags) r in
-        let this_round_constant :=
-          Z.b2z (rc_value_bit r i) in
-        BinOp.add acc
-          (BinOp.mul this_round this_round_constant)
-      )
-      (List.map Z.of_nat (List.seq 0 (Z.to_nat NUM_ROUNDS))) 0 in
-    xor rc_bit_i (Array.get local.(KeccakCols.a_prime_prime_0_0_bits) i) in
+*)
+Definition get_xored_bit {p} `{Prime p}
+    (local : KeccakCols.t)
+    (i : Z) :
+    Z :=
+  let rc_bit_i : Z :=
+    Lists.List.fold_left (fun acc r =>
+      let this_round := local.(KeccakCols.step_flags).[r] in
+      let this_round_constant :=
+        Z.b2z (rc_value_bit r i) in
+      acc +F (this_round *F this_round_constant)
+    )
+    (List.map Z.of_nat (List.seq 0 (Z.to_nat NUM_ROUNDS))) 0 in
+  M.xor rc_bit_i local.(KeccakCols.a_prime_prime_0_0_bits).[i].
 
-  (*
+(*
   builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
       let computed_a_prime_prime_prime_0_0_limb = (limb * BITS_PER_LIMB
           ..(limb + 1) * BITS_PER_LIMB)
@@ -302,23 +692,56 @@ Definition eval
           .fold(AB::Expr::ZERO, |acc, z| acc.double() + get_xored_bit(z));
       computed_a_prime_prime_prime_0_0_limb - local.a_prime_prime_prime_0_0_limbs[limb]
   }));
-  *)
-  let* _ :=
+*)
+Module a_prime_prime_prime_0_0_limbs.
+  Definition eval {p} `{Prime p}
+      (local : KeccakCols.t) :
+      M.t unit :=
     M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_prime_0_0_limb : Z :=
-          let l : list Z :=
-            List.rev (List.map
-              (fun n => limb * BITS_PER_LIMB + Z.of_nat n)
-              (List.seq 0 (Z.to_nat BITS_PER_LIMB))
-            ) in
-          Lists.List.fold_left (fun acc z => BinOp.add (BinOp.mul 2 acc) (get_xored_bit z)) l 0 in
-        BinOp.sub
-          computed_a_prime_prime_prime_0_0_limb
-          (Array.get local.(KeccakCols.a_prime_prime_prime_0_0_limbs) limb)
-    |} in
+          let l : list nat :=
+            List.rev (
+              List.seq
+                (Z.to_nat (limb * BITS_PER_LIMB))
+                (Z.to_nat BITS_PER_LIMB)
+              ) in
+          Lists.List.fold_left (fun acc (z : nat) =>
+            let z : Z := Z.of_nat z in
+            (2 *F acc) +F get_xored_bit local z
+          ) l 0 in
+        computed_a_prime_prime_prime_0_0_limb -F
+          local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb]
+    |}.
 
-  (*
+  Module Post.
+    Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
+      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
+        {| Array.get z := get_xored_bit local z; |}
+      ).[limb].
+  End Post.
+
+  Lemma implies {p} `{Prime p}
+      (local : KeccakCols.t) :
+      let local := M.map_mod local in
+    {{ eval local 🔽
+      tt,
+      Post.t local
+    }}.
+  Proof.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    unfold Post.t; cbn.
+    hauto l: on rew:db: field_rewrite.
+  Qed.
+End a_prime_prime_prime_0_0_limbs.
+
+(*
   for x in 0..5 {
       for y in 0..5 {
           builder
@@ -329,19 +752,99 @@ Definition eval
               }));
       }
   }
-  *)
-  let* _ :=
+*)
+Module a_prime_prime_prime_next_a.
+  Definition eval {p} `{Prime p}
+      (local next : KeccakCols.t)
+      (is_transition : Z) :
+      M.t unit :=
+    let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
+    let not_final_step := 1 -F final_step in
     M.for_in_zero_to_n 5 (fun x =>
     M.for_in_zero_to_n 5 (fun y =>
-      when_bool is_transition (
-      when_bool is_not_final_step (
+      M.when is_transition (
+      M.when not_final_step (
         M.assert_zeros (N := U64_LIMBS) {|
           Array.get limb :=
-            BinOp.sub
-              (Impl_KeccakCols.a_prime_prime_prime local y x limb)
-              (Array.get (Array.get (Array.get next.(KeccakCols.a) y) x) limb)
+            Impl_KeccakCols.a_prime_prime_prime local y x limb -F
+              next.(KeccakCols.a).[y].[x].[limb]
         |}
       ))
-    )) in
+    )).
 
+  Module Post.
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) : Prop :=
+      forall (y x : Z),
+      0 <= y < 5 ->
+      0 <= x < 5 ->
+      forall (limb : Z),
+      0 <= limb < U64_LIMBS ->
+      Impl_KeccakCols.a_prime_prime_prime local y x limb =
+      next.(KeccakCols.a).[y].[x].[limb].
+  End Post.
+
+  Lemma implies {p} `{Prime p}
+      (local' next' : KeccakCols.t)
+      (is_transition : bool) :
+    let local := M.map_mod local' in
+    let next := M.map_mod next' in
+    let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+    let not_final_step := 1 -F final_step in
+    {{ eval local next (Z.b2z is_transition) 🔽
+      tt,
+      if is_transition then
+        not_final_step <> 0 ->
+        Post.t local next
+      else
+        True
+    }}.
+  Proof.
+    intros.
+    unfold eval.
+    eapply Run.Implies. {
+      Run.run.
+    }
+    unfold Post.t; cbn.
+    destruct is_transition.
+    { unfold Impl_KeccakCols.a_prime_prime_prime; cbn in *.
+      intros H_run **.
+      pose proof (H_run x ltac:(lia) y ltac:(lia) ltac:(lia) ltac:(lia) limb ltac:(lia)).
+      hauto q: on rew:db: field_rewrite.
+    }
+    { easy. }
+  Qed.
+End a_prime_prime_prime_next_a.
+
+(* fn eval(&self, builder: &mut AB) *)
+(** Now we assemble all the parts to get the full definition. *)
+Definition eval {p} `{Prime p}
+    (local next : KeccakCols.t)
+    (is_first_row is_transition : Z) :
+    M.t unit :=
+  msg* "eval_round_flags" in
+  let* _ := eval_round_flags local next is_first_row is_transition in
+  msg* "preimage_a" in
+  let* _ := preimage_a.eval local in
+  msg* "preimage_next_preimage" in
+  let* _ := preimage_next_preimage.eval local next is_transition in
+  msg* "export_bool" in
+  let* _ := export_bool.eval local in
+  msg* "export_zero" in
+  let* _ := export_zero.eval local in
+  msg* "c_c_prime" in
+  let* _ := c_c_prime.eval local in
+  msg* "a_a_prime_c_c_prime" in
+  let* _ := a_a_prime_c_c_prime.eval local in
+  msg* "a_prime_c_prime" in
+  let* _ := a_prime_c_prime.eval local in
+  msg* "a_prime_prime" in
+  let* _ := a_prime_prime.eval local in
+  msg* "a_prime_prime_0_0_bits_bools" in
+  let* _ := a_prime_prime_0_0_bits_bools.eval local in
+  msg* "a_prime_prime_0_0_limbs" in
+  let* _ := a_prime_prime_0_0_limbs.eval local in
+  msg* "a_prime_prime_prime_0_0_limbs" in
+  let* _ := a_prime_prime_prime_0_0_limbs.eval local in
+  msg* "a_prime_prime_prime_next_a" in
+  let* _ := a_prime_prime_prime_next_a.eval local next is_transition in
   M.pure tt.
