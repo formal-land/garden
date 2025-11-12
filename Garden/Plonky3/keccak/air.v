@@ -223,11 +223,11 @@ Module c_c_prime.
       c_c_prime_eq (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.get_c_prime local x z =
+        local.(KeccakCols.c_prime).[x].[z] =
         M.xor3
-          (KeccakCols.get_c local x z)
-          (KeccakCols.get_c local ((x + 4) mod 5) z)
-          (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64));
+          (local.(KeccakCols.c).[x].[z])
+          (local.(KeccakCols.c).[(x + 4) mod 5].[z])
+          (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64]);
       c_bools : IsBool.t local.(KeccakCols.c);
     }.
   End Valid.
@@ -416,7 +416,7 @@ Module a_prime_c_prime.
         let sum :=
           get_sum (
             List.map
-              (fun y => KeccakCols.get_a_prime local x (Z.of_nat y) z)
+              (fun y => local.(KeccakCols.a_prime).[Z.of_nat y].[x].[z])
               (List.seq 0 (Z.to_nat 5))
           ) in
         sum -F local.(KeccakCols.c_prime).[x].[z] in
@@ -676,12 +676,7 @@ Module a_prime_prime_prime_0_0_limbs.
       (H_i : 0 <= i < 64) :
     let local := M.map_mod local' in
     IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
-    (
-      forall k,
-      0 <= k < NUM_ROUNDS ->
-      local.(KeccakCols.step_flags).[k] =
-      Z.b2z (k =? round)
-    ) ->
+    step_flags.Valid.t local round ->
     get_xored_bit local i =
     Z.b2z (get_xored_bit_bool local round i).
   Proof.
@@ -689,11 +684,10 @@ Module a_prime_prime_prime_0_0_limbs.
     unfold get_xored_bit, get_xored_bit_bool.
     unfold List.map, List.seq, Z.to_nat, Pos.to_nat.
     cbn - [M.xor rc_value_bit local].
-    repeat rewrite H_step_flags by (unfold NUM_ROUNDS; lia).
-    clear H_step_flags.
+    repeat rewrite H_step_flags by (unfold NUM_ROUNDS; lia); clear H_step_flags.
+    unfold round_flags.array_of_round, Array.get.
     generalize round H_round; clear round H_round.
     apply round_flags.i_in_bounds; cbn [Z.eqb Pos.eqb].
-    change (Z.b2z false) with 0.
     autorewrite with field_rewrite.
     repeat rewrite <- M.xor_eq.
     repeat (split || f_equal).
@@ -716,12 +710,7 @@ Module a_prime_prime_prime_0_0_limbs.
       forall (round : Z),
       0 <= round < NUM_ROUNDS ->
       IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
-      (
-        forall k,
-        0 <= k < NUM_ROUNDS ->
-        local.(KeccakCols.step_flags).[k] =
-        Z.b2z (k =? round)
-      ) ->
+      step_flags.Valid.t local round ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =

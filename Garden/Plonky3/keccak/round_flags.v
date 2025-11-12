@@ -87,6 +87,13 @@ Proof.
   assert (i = 23) by lia; congruence.
 Qed.
 
+Module step_flags.
+  Module Valid.
+    Definition t (local : KeccakCols.t) (round : Z) : Prop :=
+      local.(KeccakCols.step_flags) =F array_of_round round.
+  End Valid.
+End step_flags.
+
 Module Spec.
   Record t (local next : KeccakCols.t) (is_first_row is_transition : bool) : Prop := {
     first :
@@ -97,8 +104,8 @@ Module Spec.
     transition :
       if is_transition then
         forall round, 0 <= round < NUM_ROUNDS ->
-        Equal.t local.(KeccakCols.step_flags) (array_of_round round) ->
-        Equal.t next.(KeccakCols.step_flags) (array_of_round ((round + 1) mod NUM_ROUNDS))
+        step_flags.Valid.t local round ->
+        step_flags.Valid.t next ((round + 1) mod NUM_ROUNDS)
       else
         True;
   }.

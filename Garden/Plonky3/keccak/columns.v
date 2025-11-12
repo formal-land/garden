@@ -80,24 +80,6 @@ Module KeccakCols.
   Global Instance IsEqual : Equal.C KeccakCols.t := {
     Equal.t := Eq.t;
   }.
-
-  Definition get_preimage (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.preimage).[y].[x].[limb].
-
-  Definition get_a (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.a).[y].[x].[limb].
-
-  Definition get_c (local : KeccakCols.t) (x z : Z) : Z :=
-    local.(KeccakCols.c).[x].[z].
-
-  Definition get_c_prime (local : KeccakCols.t) (x z : Z) : Z :=
-    local.(KeccakCols.c_prime).[x].[z].
-
-  Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : Z :=
-    local.(KeccakCols.a_prime).[y].[x].[z].
-
-  Definition get_a_prime_prime (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.a_prime_prime).[y].[x].[limb].
 End KeccakCols.
 
 Module Impl_KeccakCols.

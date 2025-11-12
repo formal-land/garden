@@ -16,11 +16,11 @@ Module FirstRowsFrom_a.
       c_c_prime :
         forall x, 0 <= x < 5 ->
         forall z, 0 <= z < 64 ->
-        KeccakCols.get_c_prime local x z =
+        local.(KeccakCols.c_prime).[x].[z] =
         Z.b2z (xorbs [
-          Z.odd (KeccakCols.get_c local x z);
-          Z.odd (KeccakCols.get_c local ((x + 4) mod 5) z);
-          Z.odd (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64))
+          Z.odd (local.(KeccakCols.c).[x].[z]);
+          Z.odd (local.(KeccakCols.c).[(x + 4) mod 5].[z]);
+          Z.odd (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64])
         ]);
       a_a_prime_c_c_prime (x y z : Z) :
         0 <= x < 5 ->
@@ -28,20 +28,20 @@ Module FirstRowsFrom_a.
         0 <= z < 64 ->
         a.[y].[x].[z] =
         xorbs [
-          Z.odd (KeccakCols.get_a_prime local x y z);
-          Z.odd (KeccakCols.get_c local x z);
-          Z.odd (KeccakCols.get_c_prime local x z)
+          Z.odd (local.(KeccakCols.a_prime).[y].[x].[z]);
+          Z.odd (local.(KeccakCols.c).[x].[z]);
+          Z.odd (local.(KeccakCols.c_prime).[x].[z])
         ];
       a_prime_c_prime (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.get_c_prime local x z =
+        local.(KeccakCols.c_prime).[x].[z] =
         Z.b2z (xorbs [
-          Z.odd (KeccakCols.get_a_prime local x 0 z);
-          Z.odd (KeccakCols.get_a_prime local x 1 z);
-          Z.odd (KeccakCols.get_a_prime local x 2 z);
-          Z.odd (KeccakCols.get_a_prime local x 3 z);
-          Z.odd (KeccakCols.get_a_prime local x 4 z)
+          Z.odd (local.(KeccakCols.a_prime).[0].[x].[z]);
+          Z.odd (local.(KeccakCols.a_prime).[1].[x].[z]);
+          Z.odd (local.(KeccakCols.a_prime).[2].[x].[z]);
+          Z.odd (local.(KeccakCols.a_prime).[3].[x].[z]);
+          Z.odd (local.(KeccakCols.a_prime).[4].[x].[z])
         ]);
     }.
   End From.
@@ -54,7 +54,7 @@ Module FirstRowsFrom_a.
       a_c (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.get_c local x z =
+        local.(KeccakCols.c).[x].[z] =
         Z.b2z (xorbs [
           a.[0].[x].[z];
           a.[1].[x].[z];
@@ -65,21 +65,21 @@ Module FirstRowsFrom_a.
       c_c_prime (x z : Z) :
         0 <= x < 5 ->
         0 <= z < 64 ->
-        KeccakCols.get_c_prime local x z =
+        local.(KeccakCols.c_prime).[x].[z] =
         Z.b2z (xorbs [
-          Z.odd (KeccakCols.get_c local x z);
-          Z.odd (KeccakCols.get_c local ((x + 4) mod 5) z);
-          Z.odd (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64))
+          Z.odd (local.(KeccakCols.c).[x].[z]);
+          Z.odd (local.(KeccakCols.c).[(x + 4) mod 5].[z]);
+          Z.odd (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64])
         ]);
       a_a_prime_c (x y z : Z) :
         0 <= x < 5 ->
         0 <= y < 5 ->
         0 <= z < 64 ->
-        KeccakCols.get_a_prime local x y z =
+        local.(KeccakCols.a_prime).[y].[x].[z] =
         Z.b2z (xorbs [
           a.[y].[x].[z];
-          Z.odd (KeccakCols.get_c local ((x + 4) mod 5) z);
-          Z.odd (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64))
+          Z.odd (local.(KeccakCols.c).[(x + 4) mod 5].[z]);
+          Z.odd (local.(KeccakCols.c).[(x + 1) mod 5].[(z + 63) mod 64])
         ]);
     }.
   End To.
@@ -92,20 +92,16 @@ Module FirstRowsFrom_a.
     intros []; constructor; intros; cbn in *.
     { repeat rewrite a_a_prime_c_c_prime by lia.
       repeat rewrite a_prime_c_prime by lia.
-      unfold KeccakCols.get_c.
-      rewrite c_bools by lia.
-      repeat
-        destruct (Z.odd (KeccakCols.get_a_prime _ _ _ _));
-        destruct (Z.odd (local.(KeccakCols.c).[_].[_]));
-        reflexivity.
+      rewrite c_bools at 1 by lia.
+      repeat rewrite odd_b2z_eq.
+      repeat destruct (Z.odd _); reflexivity.
     }
     { hauto l: on. }
-    { unfold KeccakCols.get_a_prime in *; rewrite a_prime_bools by lia.
+    { rewrite a_prime_bools by lia.
       rewrite a_a_prime_c_c_prime by lia.
       rewrite c_c_prime by lia.
-      destruct (Z.odd (local.(KeccakCols.a_prime).[_].[_].[_]));
-        repeat destruct (Z.odd (KeccakCols.get_c _ _ _));
-        reflexivity.
+      repeat rewrite odd_b2z_eq.
+      repeat destruct (Z.odd _); reflexivity.
     }
   Qed.
 End FirstRowsFrom_a.
@@ -188,18 +184,18 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
       let diff :=
         let sum :=
           a_prime_c_prime.get_sum [
-            KeccakCols.get_a_prime local x 0 z;
-            KeccakCols.get_a_prime local x 1 z;
-            KeccakCols.get_a_prime local x 2 z;
-            KeccakCols.get_a_prime local x 3 z;
-            KeccakCols.get_a_prime local x 4 z
+            local.(KeccakCols.a_prime).[0].[x].[z];
+            local.(KeccakCols.a_prime).[1].[x].[z];
+            local.(KeccakCols.a_prime).[2].[x].[z];
+            local.(KeccakCols.a_prime).[3].[x].[z];
+            local.(KeccakCols.a_prime).[4].[x].[z]
           ] in
-        sum -F (KeccakCols.get_c_prime local x z) in
+        sum -F (local.(KeccakCols.c_prime).[x].[z]) in
       diff *F (diff -F 2) *F (diff -F 4) = 0
     ) :
   0 <= x < 5 ->
   0 <= z < 64 ->
-  KeccakCols.get_c_prime local x z =
+  local.(KeccakCols.c_prime).[x].[z] =
   Z.b2z (xorbs [
     Z.odd (local.(KeccakCols.a_prime).[0].[x].[z]);
     Z.odd (local.(KeccakCols.a_prime).[1].[x].[z]);
@@ -209,7 +205,6 @@ Lemma xor_sum_diff_eq {p} `{Prime p} (H_p : 6 <= p) (local : KeccakCols.t) (x z 
   ]).
 Proof.
   intros.
-  unfold KeccakCols.get_a_prime, KeccakCols.get_c_prime in *.
   repeat (
     (
       (rewrite H_a_prime_bools in H_sum_diff by lia) ||
@@ -231,45 +226,33 @@ Definition p_goldilocks : Z :=
 (** As an experiment, we do the same proof as above but using an explicit value for the prime. The
     proof both happens to be faster and much simpler to write. *)
 Lemma xor_sum_diff_eq_goldilocks `{Prime p_goldilocks} (local : KeccakCols.t) (x z : Z)
-    (H_a_prime_bools :
-      forall x y z,
-        0 <= x < 5 ->
-        0 <= y < 5 ->
-        0 <= z < 64 ->
-        IsBool.t (KeccakCols.get_a_prime local x y z)
-    )
-    (H_c_prime_bools :
-      forall x z,
-        0 <= x < 5 ->
-        0 <= z < 64 ->
-        IsBool.t (KeccakCols.get_c_prime local x z)
-    )
+    (H_a_prime_bools : IsBool.t local.(KeccakCols.a_prime))
+    (H_c_prime_bools : IsBool.t local.(KeccakCols.c_prime))
     (H_sum_diff :
       let diff :=
         let sum :=
           Lists.List.fold_left BinOp.add [
-            KeccakCols.get_a_prime local x 0 z;
-            KeccakCols.get_a_prime local x 1 z;
-            KeccakCols.get_a_prime local x 2 z;
-            KeccakCols.get_a_prime local x 3 z;
-            KeccakCols.get_a_prime local x 4 z
+            local.(KeccakCols.a_prime).[0].[x].[z];
+            local.(KeccakCols.a_prime).[1].[x].[z];
+            local.(KeccakCols.a_prime).[2].[x].[z];
+            local.(KeccakCols.a_prime).[3].[x].[z];
+            local.(KeccakCols.a_prime).[4].[x].[z]
           ] 0 in
-        sum -F (KeccakCols.get_c_prime local x z) in
+        sum -F (local.(KeccakCols.c_prime).[x].[z]) in
       diff *F (diff -F 2) *F (diff -F 4) = 0
     ) :
   0 <= x < 5 ->
   0 <= z < 64 ->
-  KeccakCols.get_c_prime local x z =
+  local.(KeccakCols.c_prime).[x].[z] =
   Z.b2z (xorbs [
-    Z.odd (KeccakCols.get_a_prime local x 0 z);
-    Z.odd (KeccakCols.get_a_prime local x 1 z);
-    Z.odd (KeccakCols.get_a_prime local x 2 z);
-    Z.odd (KeccakCols.get_a_prime local x 3 z);
-    Z.odd (KeccakCols.get_a_prime local x 4 z)
+    Z.odd (local.(KeccakCols.a_prime).[0].[x].[z]);
+    Z.odd (local.(KeccakCols.a_prime).[1].[x].[z]);
+    Z.odd (local.(KeccakCols.a_prime).[2].[x].[z]);
+    Z.odd (local.(KeccakCols.a_prime).[3].[x].[z]);
+    Z.odd (local.(KeccakCols.a_prime).[4].[x].[z])
   ]).
 Proof.
   intros.
-  unfold KeccakCols.get_a_prime, KeccakCols.get_c_prime in *.
   repeat (
     (
       (rewrite H_a_prime_bools in H_sum_diff by lia) ||
@@ -294,13 +277,7 @@ Module Post.
     preimage_next_preimage : preimage_next_preimage.Spec.t local next is_transition;
     to :
       forall a,
-      (
-        forall x, 0 <= x < 5 ->
-        forall y, 0 <= y < 5 ->
-        forall limb, 0 <= limb < U64_LIMBS ->
-        local.(KeccakCols.a).[y].[x].[limb] =
-        Limbs.of_bools BITS_PER_LIMB (Array.get a.[y].[x]) limb
-      ) ->
+      a.Valid.t local a ->
       FirstRowsFrom_a.To.t local a;
     a_prime_is_bool : IsBool.t local.(KeccakCols.a_prime);
     a_prime_prime : a_prime_prime.Post.t local;
@@ -380,7 +357,7 @@ Proof.
   intros [].
   assert (c_prime_bools : IsBool.t local.(KeccakCols.c_prime)). {
     cbn; intros x H_x z H_z.
-    unfold KeccakCols.get_c_prime in c_c_prime_eq; cbn in c_c_prime_eq.
+    cbn in c_c_prime_eq.
     rewrite c_c_prime_eq by lia.
     apply M.xor3_is_bool; apply c_bools; lia.
   }
@@ -397,7 +374,6 @@ Proof.
     { assumption. }
     { assumption. }
     { rewrite c_c_prime_eq by assumption.
-      unfold KeccakCols.get_c.
       repeat (rewrite c_bools by lia; set (Z.odd _)).
       rewrite xor3_eq.
       reflexivity.
@@ -531,12 +507,7 @@ Lemma post_implies_round_computation {p} `{Prime p}
   Post.t local next is_first_row is_transition ->
   a.Valid.t local a ->
   0 <= round < NUM_ROUNDS ->
-  (
-    forall k,
-    0 <= k < NUM_ROUNDS ->
-    local.(KeccakCols.step_flags).[k] =
-    Z.b2z (k =? round)
-  ) ->
+  step_flags.Valid.t local round ->
   let c := ComputeKeccak.compute_c a in
   let c_prime := ComputeKeccak.compute_c_prime c in
   let a_prime := ComputeKeccak.compute_a_prime a c in
@@ -558,7 +529,7 @@ Proof.
   assert (H_c :
     forall x, 0 <= x < 5 ->
     forall z, 0 <= z < 64 ->
-    KeccakCols.get_c local x z =
+    local.(KeccakCols.c).[x].[z] =
     Z.b2z (c.[x].[z])
   ). {
     intros.
@@ -568,7 +539,7 @@ Proof.
   assert (H_c_prime :
     forall x, 0 <= x < 5 ->
     forall z, 0 <= z < 64 ->
-    KeccakCols.get_c_prime local x z =
+    local.(KeccakCols.c_prime).[x].[z] =
     Z.b2z (c_prime.[x].[z])
   ). {
     intros.
@@ -580,7 +551,7 @@ Proof.
     forall x, 0 <= x < 5 ->
     forall y, 0 <= y < 5 ->
     forall z, 0 <= z < 64 ->
-    KeccakCols.get_a_prime local x y z =
+    local.(KeccakCols.a_prime).[y].[x].[z] =
     Z.b2z (a_prime.[y].[x].[z])
   ). {
     intros.
@@ -597,7 +568,6 @@ Proof.
   ). {
     intros.
     unfold Impl_KeccakCols.b, Impl_KeccakCols.b_of_a_prime.
-    unfold KeccakCols.get_a_prime in H_a_prime.
     now rewrite H_a_prime by lia.
   }
   assert (H_a_prime_prime_bits :
@@ -620,7 +590,7 @@ Proof.
   ). {
     intros z H_z.
     unfold a_prime_prime_0_0_limbs.Post.t in a_prime_prime_0_0_limbs.
-    unfold a_prime_prime.Post.t, KeccakCols.get_a_prime_prime in a_prime_prime0.
+    unfold a_prime_prime.Post.t in a_prime_prime0.
     rewrite a_prime_prime_0_0_bits_bools by assumption; f_equal.
     rewrite <- H_a_prime_prime_bits by lia.
     generalize z H_z; clear z H_z.
