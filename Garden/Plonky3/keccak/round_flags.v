@@ -98,7 +98,7 @@ Module Spec.
   Record t (local next : KeccakCols.t) (is_first_row is_transition : bool) : Prop := {
     first :
       if is_first_row then
-        Equal.t local.(KeccakCols.step_flags) (array_of_round 0)
+        step_flags.Valid.t local 0
       else
         True;
     transition :

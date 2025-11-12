@@ -284,6 +284,7 @@ Module Post.
     a_prime_prime_0_0_bits_bools : a_prime_prime_0_0_bits_bools.Post.t local;
     a_prime_prime_0_0_limbs : a_prime_prime_0_0_limbs.Post.t local;
     a_prime_prime_prime_0_0_limbs : a_prime_prime_prime_0_0_limbs.Post.t local;
+    a_prime_prime_prime_next_a : a_prime_prime_prime_next_a.Post.t local next is_transition;
   }.
 End Post.
 
@@ -348,9 +349,9 @@ Proof.
   }
   intros H_eval_assert_a_prime_prime_prime_0_0_limbs.
   apply Run.Message; eapply Run.LetAccumulate. {
-    Run.run.
+    apply a_prime_prime_prime_next_a.implies.
   }
-  intros _.
+  intros H_eval_assert_a_prime_prime_prime_next_a.
   eapply Run.Implies. {
     apply Run.Pure.
   }
@@ -384,6 +385,7 @@ Proof.
       { apply H_eval_assert_a_prime_c_prime; lia. }
     }
   }
+  { assumption. }
   { assumption. }
   { assumption. }
   { assumption. }
@@ -495,6 +497,29 @@ Module ComputeKeccak.
         |}
       |}
     |}.
+
+  Definition compute_round (a : Array.t (Array.t (Array.t bool 64) 5) 5) (round : Z) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    let c := compute_c a in
+    let c_prime := compute_c_prime c in
+    let a_prime := compute_a_prime a c in
+    let b := compute_b a_prime in
+    let a_prime_prime := compute_a_prime_prime b in
+    let a_prime_prime_prime_0_0 := compute_a_prime_prime_prime_0_0 a_prime_prime round in
+    compute_a_prime_prime_prime a_prime_prime a_prime_prime_prime_0_0.
+
+  Fixpoint compute_keccak_aux (a : Array.t (Array.t (Array.t bool 64) 5) 5) (rounds_left : nat) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    match rounds_left with
+    | O => a
+    | S rounds_left =>
+      let a := compute_keccak_aux a rounds_left in
+      compute_round a (Z.of_nat rounds_left)
+    end.
+
+  Definition compute_keccak (a : Array.t (Array.t (Array.t bool 64) 5) 5) :
+      Array.t (Array.t (Array.t bool 64) 5) 5 :=
+    compute_keccak_aux a (Z.to_nat NUM_ROUNDS).
 End ComputeKeccak.
 
 Lemma post_implies_round_computation {p} `{Prime p}
@@ -624,6 +649,176 @@ Proof.
     apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); intros.
     now apply H_a_prime_prime_bits.
   }
+Qed.
+
+Lemma posts_imply {p} `{Prime p} (rows' : Z -> KeccakCols.t)
+    (preimages : Z -> Array.t (Array.t (Array.t bool 64) 5) 5) :
+  let rows i := M.map_mod (rows' i) in
+  (
+    forall i, 0 <= i ->
+    Post.t (rows i) (rows (i + 1)) (i =? 0) true
+  ) ->
+  (
+    forall i, 0 <= i ->
+    i mod NUM_ROUNDS = 0 ->
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall limb, 0 <= limb < U64_LIMBS ->
+    (rows i).(KeccakCols.preimage).[y].[x].[limb] =
+    Limbs.of_bools BITS_PER_LIMB
+      (Array.get (preimages (i / NUM_ROUNDS)).[y].[x])
+      limb
+  ) ->
+  (
+    forall i, 0 <= i ->
+    forall x, 0 <= x < 5 ->
+    forall y, 0 <= y < 5 ->
+    forall limb, 0 <= limb < U64_LIMBS ->
+    let final_index := NUM_ROUNDS * (i / NUM_ROUNDS) + 23 in
+    Impl_KeccakCols.a_prime_prime_prime (rows final_index) y x limb =
+    Limbs.of_bools BITS_PER_LIMB
+      (Array.get (ComputeKeccak.compute_keccak (preimages (i / NUM_ROUNDS))).[y].[x])
+      limb
+  ).
+Proof.
+  intros * H_rows H_preimages.
+  assert (H_round_flags :
+    forall i, 0 <= i ->
+    step_flags.Valid.t (rows i) (i mod NUM_ROUNDS)
+  ). {
+    intros i H_i.
+    replace i with (Z.of_nat (Z.to_nat i)) by lia; clear H_i.
+    set (i_nat := Z.to_nat i); clearbody i_nat; clear i.
+    induction i_nat.
+    { destruct (H_rows 0 ltac:(lia)), round_flags.
+      apply first.
+    }
+    { destruct (H_rows (Z.of_nat i_nat) ltac:(lia)), round_flags.
+      pose proof (
+        transition (Z.of_nat i_nat mod NUM_ROUNDS)
+          ltac:(unfold NUM_ROUNDS; lia)
+          ltac:(assumption)
+      ).
+      replace (Z.of_nat (S i_nat)) with (Z.of_nat i_nat + 1) by lia.
+      replace ((Z.of_nat i_nat + 1) mod NUM_ROUNDS)
+        with ((Z.of_nat i_nat mod NUM_ROUNDS + 1) mod NUM_ROUNDS)
+        by (unfold NUM_ROUNDS; lia).
+      assumption.
+    }
+  }
+  assert (H_iter_rounds :
+    forall i, 0 <= i ->
+    let a :=
+      ComputeKeccak.compute_keccak_aux (preimages (i / NUM_ROUNDS)) (Z.to_nat (i mod NUM_ROUNDS)) in
+    a.Valid.t (rows i) a
+  ). {
+    intros i H_i.
+    intros a.
+    replace ( i)
+      with ( (NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat (Z.to_nat (i mod NUM_ROUNDS))))
+      by (unfold NUM_ROUNDS; lia).
+    assert (H_i_mod : Z.of_nat (Z.to_nat (i mod NUM_ROUNDS)) < NUM_ROUNDS)
+      by (unfold NUM_ROUNDS; lia).
+    set (i_mod := Z.to_nat (i mod NUM_ROUNDS)) in *; clearbody i_mod.
+    induction i_mod; unfold a.Valid.t.
+    { match goal with
+      | |- context [rows ?i] => destruct (H_rows i ltac:(unfold NUM_ROUNDS; lia))
+      end.
+      unfold preimage_a.Spec.t in preimage_a.
+      rewrite H_round_flags in preimage_a by (unfold NUM_ROUNDS; lia).
+      intros.
+      rewrite <- preimage_a; try assumption. 2: {
+        unfold array_of_round, Array.get.
+        match goal with
+        |- context[0 =? ?e] => replace e with 0 by (unfold NUM_ROUNDS; lia)
+        end.
+        easy.
+      }
+      rewrite H_preimages by (unfold NUM_ROUNDS; lia).
+      apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB).
+      intros z H_z.
+      cbn - [Z.mul ComputeKeccak.compute_round].
+      now match goal with
+      | |- context[preimages ?index] =>
+        replace index with (i / NUM_ROUNDS) by (unfold NUM_ROUNDS; lia)
+      end.
+    }
+    { intros.
+      unfold a, ComputeKeccak.compute_keccak_aux.
+      fold ComputeKeccak.compute_keccak_aux.
+      destruct (H_rows
+        (NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat i_mod)
+        ltac:(unfold NUM_ROUNDS; lia)
+      ).
+      unfold a_prime_prime_prime_next_a.Post.t in a_prime_prime_prime_next_a.
+      unshelve epose proof (a_prime_prime_prime_next_a
+        eq_refl
+        _
+        x ltac:(assumption)
+        y ltac:(assumption)
+        limb ltac:(assumption)
+      ) as H_a_prime_prime_prime_next_a; clear a_prime_prime_prime_next_a. {
+        rewrite H_round_flags by (unfold NUM_ROUNDS; lia).
+        unfold round_flags.array_of_round, Array.get.
+        replace ((NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat i_mod) mod NUM_ROUNDS)
+          with (Z.of_nat i_mod mod NUM_ROUNDS)
+          by (unfold NUM_ROUNDS; lia).
+        replace (NUM_ROUNDS - 1 =? Z.of_nat i_mod mod NUM_ROUNDS)
+          with false
+          by (unfold NUM_ROUNDS in *; lia).
+        now autorewrite with field_rewrite.
+      }
+      replace (NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat (S i_mod))
+        with (NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat i_mod + 1)
+        by (unfold NUM_ROUNDS; lia).
+      rewrite <- H_a_prime_prime_prime_next_a by assumption.
+      set (index := (NUM_ROUNDS * (i / NUM_ROUNDS) + Z.of_nat i_mod)).
+      pose proof (
+        post_implies_round_computation
+          (rows' index)
+          (rows' (index + 1))
+          (index =? 0)
+          true
+          _
+          (Z.of_nat i_mod)
+          (H_rows index ltac:(unfold NUM_ROUNDS in *; lia))
+          (IHi_mod ltac:(unfold NUM_ROUNDS in *; lia))
+          ltac:(unfold NUM_ROUNDS in *; lia)
+      ) as H_current_row_computation.
+      apply H_current_row_computation; try assumption.
+      unfold rows in H_round_flags.
+      pose proof (H_round_flags index ltac:(unfold NUM_ROUNDS in *; lia)) as H_round_flags_index.
+      replace (index mod NUM_ROUNDS)
+        with (Z.of_nat i_mod)
+        in H_round_flags_index
+        by (unfold NUM_ROUNDS in *; lia).
+      apply H_round_flags_index.
+    }
+  }
+  intros i H_i x H_x y H_y limb H_limb *.
+  assert (0 <= final_index) by (unfold final_index, NUM_ROUNDS; lia).
+  pose proof (post_implies_round_computation
+    (rows' final_index)
+    (rows' (final_index + 1))
+    (final_index =? 0)
+    true
+    _
+    23
+    (H_rows final_index ltac:(assumption))
+    (H_iter_rounds final_index ltac:(assumption))
+    ltac:(unfold NUM_ROUNDS; lia)
+  ) as H_current_row_computation.
+  rewrite H_current_row_computation; try assumption. 2: {
+    replace 23 with (final_index mod NUM_ROUNDS) by (unfold final_index, NUM_ROUNDS; lia).
+    now apply H_round_flags.
+  }
+  apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); intros z H_z.
+  unfold ComputeKeccak.compute_keccak.
+  replace (final_index mod NUM_ROUNDS) with 23 by (unfold final_index, NUM_ROUNDS; lia).
+  replace (Z.to_nat NUM_ROUNDS) with (S (Z.to_nat 23)) by reflexivity.
+  unfold ComputeKeccak.compute_keccak_aux; fold ComputeKeccak.compute_keccak_aux.
+  replace (final_index / NUM_ROUNDS) with (i / NUM_ROUNDS) by (unfold final_index, NUM_ROUNDS; lia).
+  reflexivity.
 Qed.
 
 (*

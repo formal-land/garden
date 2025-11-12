@@ -1098,7 +1098,6 @@ Lemma mod_0_range (k : Z) (x : Z) :
 Proof.
 Admitted.
 
-
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
   | xH => (acc * base) mod modulus
@@ -1114,7 +1113,6 @@ Definition mod_inverse (a p : Z) : Z :=
   | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
   | _ => 0 (* We will always have 1 <= p *)
   end.
-
 
 Module Test_mod_inverse.
   Definition test1 : Z := mod_inverse 3 7.

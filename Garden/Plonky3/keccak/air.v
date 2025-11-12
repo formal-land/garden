@@ -778,12 +778,14 @@ Module a_prime_prime_prime_next_a.
     )).
 
   Module Post.
-    Definition t {p} `{Prime p} (local next : KeccakCols.t) : Prop :=
-      forall (y x : Z),
-      0 <= y < 5 ->
-      0 <= x < 5 ->
-      forall (limb : Z),
-      0 <= limb < U64_LIMBS ->
+    Definition t {p} `{Prime p} (local next : KeccakCols.t) (is_transition : bool): Prop :=
+      let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
+      let not_final_step := 1 -F final_step in
+      is_transition = true ->
+      not_final_step <> 0 ->
+      forall x, 0 <= x < 5 ->
+      forall y, 0 <= y < 5 ->
+      forall limb, 0 <= limb < U64_LIMBS ->
       Impl_KeccakCols.a_prime_prime_prime local y x limb =
       next.(KeccakCols.a).[y].[x].[limb].
   End Post.
@@ -793,15 +795,9 @@ Module a_prime_prime_prime_next_a.
       (is_transition : bool) :
     let local := M.map_mod local' in
     let next := M.map_mod next' in
-    let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
-    let not_final_step := 1 -F final_step in
     {{ eval local next (Z.b2z is_transition) 🔽
       tt,
-      if is_transition then
-        not_final_step <> 0 ->
-        Post.t local next
-      else
-        True
+      Post.t local next is_transition
     }}.
   Proof.
     intros.
