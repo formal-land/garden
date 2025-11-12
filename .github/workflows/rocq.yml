@@ -48,6 +48,7 @@ jobs:
           startGroup "Compile the Rocq project"
             cd Garden
             make
+            make snapshot
             cd ..
           endGroup
           startGroup "Check that the diff is empty (excluding submodules)"

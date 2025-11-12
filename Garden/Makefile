@@ -18,7 +18,6 @@ MAKECOQ := +$(MAKE) -f CoqMakefile
 
 all: CoqMakefile
 	$(MAKECOQ) all
-	$(MAKE) snapshot
 
 # Detect OS and set appropriate commands
 UTILHEADNAME_S := $(shell uname -s)
