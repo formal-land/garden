@@ -704,30 +704,6 @@ Qed.
 
 (** Utilities around the manipulation of limbs *)
 Module Limbs.
-  (* Definition sum_bools {p} `{Prime p} (BITS_PER_LIMB : nat)
-      (a : Array.t Z (Z.of_nat BITS_PER_LIMB)) :
-      Z :=
-    let l : list nat := List.rev (List.seq 0 BITS_PER_LIMB) in
-    Lists.List.fold_left (fun acc (z : nat) =>
-      let z : Z := Z.of_nat z in
-      (2 *F acc) +F a.[z]
-    ) l 0.
-
-  Lemma testbit_sum_bools_eq {p} `{Prime p} (BITS_PER_LIMB : nat)
-      (a : Array.t Z (Z.of_nat BITS_PER_LIMB))
-      (bit : Z)
-      (H_bit : 0 <= bit < Z.of_nat BITS_PER_LIMB) :
-    Z.testbit (sum_bools BITS_PER_LIMB a) bit =
-    Z.odd a.[bit].
-  Proof.
-    unfold sum_bools.
-    induction BITS_PER_LIMB; cbn; [lia|].
-    set (n := Z.to_nat BITS_PER_LIMB).
-    replace BITS_PER_LIMB with (Z.of_nat n) in * by lia.
-    clearbody n.
-    rewrite List.rev_seq.
-  Qed. *)
-
   (** Sometimes we do not know yet that we are adding booleans, so we go through this step. *)
   Definition of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
       (f : Z -> Z)
@@ -810,77 +786,6 @@ Module Limbs.
     of_bools BITS_PER_LIMB f1 limb =
     of_bools BITS_PER_LIMB f2 limb.
   Admitted.
-
-  (* Lemma of_Z_bools_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (f : Z -> Z)
-      (H_f_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (f z)  
-      )
-      (limb : Z)
-      (H_limb : 0 <= limb < NB_LIMBS) :
-    of_Z_bools BITS_PER_LIMB f limb =
-    of_bools BITS_PER_LIMB (fun z => Z.odd (f z)) limb.
-  Proof.
-    unfold of_bools.
-    apply (of_Z_bools_eq NB_LIMBS); assumption.
-  Qed. *)
-
-  (* As a change, we will not do that, to only go "from the bool" direction *)
-  (*
-  (** Extract a single bit from an array of limbs. *)
-  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
-      (a : Array.t Z NB_LIMBS)
-      (bit : Z) :
-      bool :=
-    let limb := bit / BITS_PER_LIMB in
-    let bit_in_limb := bit mod BITS_PER_LIMB in
-    let limb_value := a.[limb] in
-    Z.testbit limb_value bit_in_limb.
-
-  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (bit : Z)
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a.[z]
-      ) :
-    Z.b2z (get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit) =
-    a.[bit].
-  Proof.
-    unfold get_bit, of_bools.
-  Admitted.
-
-  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a_limbs : Array.t Z NB_LIMBS)
-      (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a_bools.[z]
-      )
-      (H_limbs :
-        forall (limb : Z),
-        0 <= limb < NB_LIMBS ->
-        a_limbs.[limb] =
-        UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a_bools).[limb]
-      ) :
-    0 <= NB_LIMBS ->
-    forall (bit : Z),
-    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
-    get_bit BITS_PER_LIMB a_limbs bit =
-    Z.odd (a_bools.(Array.get) bit).
-  Proof.
-    intros.
-    unfold get_bit.
-    rewrite H_limbs by nia.
-    rewrite <- get_bit_of_bools_eq by assumption.
-    rewrite from_of_bools_eq by (trivial; nia).
-    now rewrite odd_b2z_eq.
-  Qed.
-  *)
 
   Lemma limbs_eq_implies_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
       (f1 f2 : Z -> bool)
