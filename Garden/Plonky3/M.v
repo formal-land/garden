@@ -69,6 +69,25 @@ Module Mappable.
   }.
 End Mappable.
 
+Module IsBool.
+  Class C (A : Set) : Type := {
+    t : A -> Prop;
+  }.
+
+  Global Instance ZIsBool : C Z := {
+    t x := x = Z.b2z (Z.odd x);
+  }.
+End IsBool.
+
+Module InField.
+  Class C {p} `{Prime p} (z : Z) : Prop := {
+    make : z = z mod p;
+  }.
+
+  Global Instance mod_is_in_field {p} `{Prime p} (z : Z) : InField.C (z mod p).
+  Admitted.
+End InField.
+
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
     get : Z -> A;
@@ -148,6 +167,13 @@ Module Array.
   {
     Mappable.map f x := map (Mappable.map f) x;
   }.
+
+  Global Instance IsIsBool (A : Set) (N : Z) `{IsBool.C A} : IsBool.C (t A N) := {
+    t array :=
+      forall (i : Z),
+      0 <= i < N ->
+      IsBool.t (array.(get) i);
+  }.
 End Array.
 
 Notation "x .[ i ]" := (Array.get x i) (at level 9).
@@ -186,6 +212,29 @@ Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
 Global Instance ZIsMapMod {p} `{Prime p} : MapMod Z := {
   map_mod := UnOp.from;
 }.
+
+Module IsInField.
+  Global Instance from_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.from x).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance opp_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.opp x).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance add_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.add x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance sub_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.sub x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance mul_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mul x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance div_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.div x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance mod_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mod_ x y).
+  Proof. typeclasses eauto. Qed.
+End IsInField.
 
 Module Trace.
   Module Event.
@@ -306,11 +355,6 @@ Definition collapsing_let {A B : Set} (e : M.t A) (k : A -> M.t B) : M.t B :=
   | e, k => M.Let e k
   end.
 
-Module IsBool.
-  Definition t (x : Z) : Prop :=
-    x = Z.b2z (Z.odd x).
-End IsBool.
-
 Lemma odd_b2z_eq (b : bool) :
   Z.odd (Z.b2z b) = b.
 Proof.
@@ -368,7 +412,7 @@ Lemma xor_is_bool {p} `{Prime p} (x y : Z) :
 Proof.
   intros -> ->.
   rewrite xor_eq.
-  unfold IsBool.t.
+  cbn.
   now rewrite odd_b2z_eq.
 Qed.
 
@@ -654,7 +698,7 @@ Lemma andn_is_bool {p} `{Prime p} (x y : Z) :
 Proof.
   intros -> ->.
   rewrite andn_eq.
-  unfold IsBool.t.
+  cbn.
   now rewrite odd_b2z_eq.
 Qed.
 
@@ -684,39 +728,30 @@ Module Limbs.
     rewrite List.rev_seq.
   Qed. *)
 
-  (** Convert an array of bools to an array of limbs. *)
-  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
-      Array.t Z NB_LIMBS :=
-    {|
-      Array.get limb :=
-        let l : list nat :=
-          List.rev (
-            List.seq
-              (Z.to_nat (limb * BITS_PER_LIMB))%Z
-              (Z.to_nat BITS_PER_LIMB)
-          ) in
-        (* We sum all the bits times 2 to the n *)
-        Lists.List.fold_left (fun acc (z : nat) =>
-          let z : Z := Z.of_nat z in
-          (2 *F acc) +F a.[z]
-        ) l 0
-    |}.
+  (** Sometimes we do not know yet that we are adding booleans, so we go through this step. *)
+  Definition of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (f : Z -> Z)
+      (limb : Z) :
+      Z :=
+    let l : list nat :=
+      List.rev (
+        List.seq
+          (Z.to_nat (limb * BITS_PER_LIMB))
+          (Z.to_nat BITS_PER_LIMB)
+        ) in
+    Lists.List.fold_left (fun acc (z : nat) =>
+      let z : Z := Z.of_nat z in
+      (2 *F acc) +F f z
+    ) l 0.
 
-  (** We have taken the modulo of the result. *)
-  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a.[z]
-      )
-      (limb : Z)
-      (H_limb : 0 <= limb < NB_LIMBS) :
-    UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a).[limb] =
-    (of_bools NB_LIMBS BITS_PER_LIMB a).[limb].
+  (** We have already taken the modulo of the result. *)
+  Lemma unop_from_of_Z_bools_eq {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (f : Z -> Z)
+      (limb : Z) :
+    UnOp.from (of_Z_bools BITS_PER_LIMB f limb) =
+    of_Z_bools BITS_PER_LIMB f limb.
   Proof.
-    cbn.
+    unfold of_Z_bools.
     set (l := List.rev _); clearbody l.
     assert (H_acc : UnOp.from 0 = 0) by trivial; revert H_acc.
     generalize 0 as acc.
@@ -725,6 +760,75 @@ Module Limbs.
     now FieldRewrite.run.
   Qed.
 
+  Lemma of_Z_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> Z)
+      (H_f1_f2_eq :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        f1 z = f2 z
+      )
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
+    of_Z_bools BITS_PER_LIMB f1 limb =
+    of_Z_bools BITS_PER_LIMB f2 limb.
+  Proof.
+  Admitted.
+
+  (** Convert an array of bools to an array of limbs. *)
+  Definition of_bools (BITS_PER_LIMB : Z)
+      (f : Z -> bool)
+      (limb : Z) :
+      Z :=
+    let l : list nat :=
+      List.rev (
+        List.seq
+          (Z.to_nat (limb * BITS_PER_LIMB))
+          (Z.to_nat BITS_PER_LIMB)
+        ) in
+    Lists.List.fold_left (fun acc (z : nat) =>
+      let z : Z := Z.of_nat z in
+      (2 * acc) + Z.b2z (f z)
+    ) l 0.
+
+  Lemma of_bools_eq_of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (H_p : 2 ^ BITS_PER_LIMB < p)
+      (f : Z -> bool)
+      (limb : Z) :
+    of_bools BITS_PER_LIMB f limb =
+    of_Z_bools BITS_PER_LIMB (fun z => Z.b2z (f z)) limb.
+  Proof.
+  Admitted.
+
+  Lemma of_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> bool)
+      (H_f1_f2_eq :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        f1 z = f2 z
+      )
+      (limb : Z) :
+    of_bools BITS_PER_LIMB f1 limb =
+    of_bools BITS_PER_LIMB f2 limb.
+  Admitted.
+
+  (* Lemma of_Z_bools_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (f : Z -> Z)
+      (H_f_bools :
+        forall (z : Z),
+        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+        IsBool.t (f z)  
+      )
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
+    of_Z_bools BITS_PER_LIMB f limb =
+    of_bools BITS_PER_LIMB (fun z => Z.odd (f z)) limb.
+  Proof.
+    unfold of_bools.
+    apply (of_Z_bools_eq NB_LIMBS); assumption.
+  Qed. *)
+
+  (* As a change, we will not do that, to only go "from the bool" direction *)
+  (*
   (** Extract a single bit from an array of limbs. *)
   Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
       (a : Array.t Z NB_LIMBS)
@@ -776,28 +880,19 @@ Module Limbs.
     rewrite from_of_bools_eq by (trivial; nia).
     now rewrite odd_b2z_eq.
   Qed.
+  *)
 
-  Lemma limbs_eq_implies_bits_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a_bits1 a_bits2 : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bits1_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a_bits1.[z]
-      )
-      (H_bits2_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a_bits2.[z]
-      )
+  Lemma limbs_eq_implies_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> bool)
       (H_limbs :
         forall (limb : Z),
         0 <= limb < NB_LIMBS ->
-        (of_bools NB_LIMBS BITS_PER_LIMB a_bits1).[limb] =
-        (of_bools NB_LIMBS BITS_PER_LIMB a_bits2).[limb]
+        of_bools BITS_PER_LIMB f1 limb =
+        of_bools BITS_PER_LIMB f2 limb
       ) :
-    forall (bit : Z),
-    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
-    a_bits1.[bit] = a_bits2.[bit].
+    forall (z : Z),
+    0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+    f1 z = f2 z.
   Admitted.
 End Limbs.
 
@@ -911,7 +1006,7 @@ Module Run.
   Global Opaque M.for_in_zero_to_n.
 
   Lemma AssertZeros {N : Z} (array : Array.t Z N) :
-    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}.
+    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.[i] = 0 }}.
   Proof.
     eapply Run.Implies. {
       unfold M.assert_zeros.
@@ -922,12 +1017,14 @@ Module Run.
     trivial.
   Qed.
 
-  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) 
+      (H_f : forall (i : Z), 0 <= i < N -> InField.C (f i))
+      (H_g : forall (i : Z), 0 <= i < N -> InField.C (g i)) :
     {{ M.assert_zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt,
       forall (i : Z),
       0 <= i < N ->
-      UnOp.from (f i) = UnOp.from (g i)
+      f i = g i
     }}.
   Proof.
     intros.
@@ -935,6 +1032,8 @@ Module Run.
       eapply Run.AssertZeros.
     }
     cbn; intros H_zeros i H_i.
+    rewrite (H_f i H_i).(InField.make).
+    rewrite (H_g i H_i).(InField.make).
     apply sub_zero_equiv.
     now apply H_zeros.
   Qed.
@@ -956,7 +1055,7 @@ Module Run.
       better handled as whole primitives. *)
   Ltac run_step :=
     (apply AssertBool) ||
-    (apply AssertZerosFromFnSub) ||
+    (apply AssertZerosFromFnSub; try typeclasses eauto) ||
     (apply AssertZeros) ||
     (eapply Run.ForInZeroToN) ||
     (apply Run.Pure) ||

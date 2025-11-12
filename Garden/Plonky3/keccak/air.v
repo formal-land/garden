@@ -6,6 +6,9 @@ Require Import Garden.Plonky3.keccak.round_flags.
 (** We define the AIR function by chunks, so that we can verify them independently. It makes the
     proof a bit easier to handle. *)
 
+Definition xorbs (bs : list bool) : bool :=
+  Lists.List.fold_left xorb bs false.
+
 (*
   for y in 0..5 {
       for x in 0..5 {
@@ -49,7 +52,6 @@ Module preimage_a.
         Run.run.
       }
       unfold Spec.t; cbn.
-      FieldRewrite.run.
       hauto l: on.
     }
   Qed.
@@ -226,11 +228,7 @@ Module c_c_prime.
           (KeccakCols.get_c local x z)
           (KeccakCols.get_c local ((x + 4) mod 5) z)
           (KeccakCols.get_c local ((x + 1) mod 5) ((z + 63) mod 64));
-      c_bools (x z : Z) :
-        0 <= x < 5 ->
-        0 <= z < 64 ->
-        KeccakCols.get_c local x z =
-        Z.b2z (KeccakCols.Bool.get_c local x z)
+      c_bools : IsBool.t local.(KeccakCols.c);
     }.
   End Valid.
 
@@ -247,11 +245,7 @@ Module c_c_prime.
     eapply Run.Implies. {
       Run.run.
     }
-    cbn; rewrite_db field_rewrite.
-    unfold M.xor3; setoid_rewrite M.from_xor_eq.
-    intros; constructor; cbn; intros.
-    { hauto l: on. }
-    { sauto lq: on rew: off. }
+    intros; constructor; cbn; hauto l: on.
   Qed.
 End c_c_prime.
 
@@ -300,64 +294,76 @@ Module a_a_prime_c_c_prime.
       M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
-            let l : list nat :=
-              List.rev (
-                List.seq
-                  (Z.to_nat (limb * BITS_PER_LIMB))%Z
-                  (Z.to_nat BITS_PER_LIMB)
-              ) in
-            Lists.List.fold_left (fun acc (z : nat) =>
-              let z : Z := Z.of_nat z in
-              (2 *F acc) +F
-              get_bit local y x z
-            ) l 0 in
+            Limbs.of_Z_bools BITS_PER_LIMB (get_bit local y x) limb in
           computed_limb -F local.(KeccakCols.a).[y].[x].[limb]
       |}
     )).
 
+  Definition get_bit_bool
+      (local : KeccakCols.t) (y x : Z)
+      (z : Z) :
+      bool :=
+    xorbs [
+      Z.odd (local.(KeccakCols.a_prime).[y].[x].[z]);
+      Z.odd (local.(KeccakCols.c).[x].[z]);
+      Z.odd (local.(KeccakCols.c_prime).[x].[z])
+    ].
+
   Module Valid.
     Record t {p} `{Prime p} (local : KeccakCols.t) : Prop := {
-      a_prime_bools (x y z : Z) :
-        0 <= x < 5 ->
-        0 <= y < 5 ->
-        0 <= z < 64 ->
-        KeccakCols.get_a_prime local x y z =
-        Z.b2z (KeccakCols.Bool.get_a_prime local x y z);
-      a_a_prime_c_c_prime_eq (x y limb : Z) :
-        0 <= x < 5 ->
-        0 <= y < 5 ->
-        0 <= limb < U64_LIMBS ->
-        let a' : Array.t Z U64_LIMBS :=
-          Limbs.of_bools U64_LIMBS BITS_PER_LIMB {| Array.get z := get_bit local y x z; |} in
-        KeccakCols.get_a local x y limb =
-        UnOp.from a'.[limb]
+      a_prime_bools : IsBool.t local.(KeccakCols.a_prime);
+      a_a_prime_c_c_prime_eq :
+        forall a, a.Valid.t local a ->
+        IsBool.t local.(KeccakCols.c) ->
+        IsBool.t local.(KeccakCols.c_prime) ->
+        forall x, 0 <= x < 5 ->
+        forall y, 0 <= y < 5 ->
+        forall z, 0 <= z < 64 ->
+        get_bit_bool local y x z =
+        a.[y].[x].[z];
     }.
   End Valid.
 
-  Lemma implies {p} `{Prime p}
+  Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
     let local := M.map_mod local' in
-    {{ eval local 🔽
-      tt,
-      Valid.t local
-    }}.
+    {{ eval local 🔽 tt, Valid.t local }}.
   Proof.
     intros.
     unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Limbs.of_bools; cbn; rewrite_db field_rewrite.
-    intros H_run; constructor.
-    { intros x y z H_x H_y H_z.
-      unfold KeccakCols.Bool.get_a_prime; cbn.
-      hauto lq: on rew: off.
+    cbn - [Limbs.of_bools].
+    intros H_run.
+    assert (H_a_prime_bools : IsBool.t local.(KeccakCols.a_prime)). {
+      cbn; apply H_run.
     }
-    { intros x y limb H_x H_y H_limb.
-      unfold get_bit in *.
-      cbn in *.
-      pose proof (H_run y H_y x H_x) as [_ H_run_limb].
-      now rewrite (H_run_limb limb H_limb).
+    constructor.
+    { assumption. }
+    { intros a H_a H_c_bools H_c_prime_bools x H_x y H_y z H_z.
+      cbn - [Limbs.of_bools] in *.
+      pose proof (H_run y H_y x H_x) as [_ H_run_x_y]; clear H_run.
+      pose proof (H_a x ltac:(assumption) y ltac:(assumption)) as H_a_x_y; clear H_a.
+      generalize z H_z; clear z H_z.
+      apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); trivial.
+      intros limb H_limb.
+      rewrite <- H_a_x_y by assumption; clear H_a_x_y.
+      cbn - [Limbs.of_bools].
+      rewrite <- H_run_x_y by assumption; clear H_run_x_y.
+      match goal with
+      | |- _ = ?e =>
+        replace e
+          with (Limbs.of_Z_bools BITS_PER_LIMB (get_bit local y x) limb)
+          by reflexivity
+      end.
+      rewrite Limbs.of_bools_eq_of_Z_bools by assumption.
+      apply (Limbs.of_Z_bools_eq U64_LIMBS); try assumption.
+      intros; unfold get_bit; cbn.
+      rewrite H_a_prime_bools, H_c_bools, H_c_prime_bools by assumption.
+      rewrite M.xor3_eq.
+      repeat rewrite odd_b2z_eq.
+      reflexivity.
     }
   Qed.
 End a_a_prime_c_c_prime.
@@ -464,61 +470,35 @@ Module a_prime_prime.
       M.assert_zeros (N := U64_LIMBS) {|
         Array.get limb :=
           let computed_limb : Z :=
-            let l : list nat :=
-              List.rev (
-                List.seq
-                  (Z.to_nat (limb * BITS_PER_LIMB))
-                  (Z.to_nat BITS_PER_LIMB)
-              ) in
-            Lists.List.fold_left (fun acc (z : nat) =>
-              let z : Z := Z.of_nat z in
-              (2 *F acc) +F
-              get_bit local y x z
-            ) l 0 in
+            Limbs.of_Z_bools BITS_PER_LIMB (get_bit local y x) limb in
           computed_limb -F local.(KeccakCols.a_prime_prime).[y].[x].[limb]
         |}
       )).
 
+  Definition get_bit_bool
+      (local : KeccakCols.t) (y x : Z)
+      (z : Z) :
+      bool :=
+    xorbs [
+      andb
+        (negb (Z.odd ((Impl_KeccakCols.b local ((x + 1) mod 5) y z))))
+        (Z.odd ((Impl_KeccakCols.b local ((x + 2) mod 5) y z)));
+      Z.odd ((Impl_KeccakCols.b local x y z))
+    ].
+
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
-      forall (H_a_prime_is_bool :
-        forall x, 0 <= x < 5 ->
-        forall y, 0 <= y < 5 ->
-        forall z, 0 <= z < 64 ->
-        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
-      ),
+      forall (H_a_prime_is_bool : IsBool.t local.(KeccakCols.a_prime)),
       forall (y x : Z),
       0 <= y < 5 ->
       0 <= x < 5 ->
-      let a_prime_prime' : Array.t Z U64_LIMBS :=
-        Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-          {| Array.get z := get_bit local y x z; |} in
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
-      KeccakCols.get_a_prime_prime local x y limb =
-      a_prime_prime'.[limb].
+      local.(KeccakCols.a_prime_prime).[y].[x].[limb] =
+      Limbs.of_bools BITS_PER_LIMB (get_bit_bool local y x) limb.
   End Post.
 
-  Lemma get_bit_is_bool {p} `{Prime p}
-      (local : KeccakCols.t)
-      (H_a_prime_is_bool :
-        forall x, 0 <= x < 5 ->
-        forall y, 0 <= y < 5 ->
-        forall z, 0 <= z < 64 ->
-        IsBool.t (local.(KeccakCols.a_prime).[y].[x].[z])
-      ) :
-    forall x, 0 <= x < 5 ->
-    forall y, 0 <= y < 5 ->
-    forall z, 0 <= z < 64 ->
-    IsBool.t (get_bit local y x z).
-  Proof.
-    intros; unfold get_bit.
-    apply M.xor_is_bool;
-      try apply M.andn_is_bool;
-      apply H_a_prime_is_bool; lia.
-  Qed.
-
-  Lemma implies {p} `{Prime p}
+  Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
     let local := M.map_mod local' in
     {{ eval local 🔽
@@ -531,26 +511,27 @@ Module a_prime_prime.
     eapply Run.Implies. {
       Run.run.
     }
-    cbn; rewrite_db field_rewrite.
+    cbn.
     intros H_run.
     unfold Post.t, U64_LIMBS.
     intros H_a_prime_is_bool y x H_y H_x limb H_limb.
-    cbn.
-    cbn in H_limb.
-    rewrite <- H_run by trivial.
-    epose proof (
-      Limbs.from_of_bools_eq
-        U64_LIMBS BITS_PER_LIMB
-        {| Array.get z := get_bit local y x z; |}
-        _
-        limb H_limb
-    ) as H_from_of_bools_eq.
-    unfold Limbs.of_bools in H_from_of_bools_eq.
-    apply H_from_of_bools_eq.
-    Unshelve.
-    apply get_bit_is_bool; trivial.
-  (* Using an admit as [Qed] is in an infinite loop *)
-  Admitted.
+    cbn in H_a_prime_is_bool, H_limb.
+    cbn - [Limbs.of_bools].
+    rewrite <- H_run by trivial; clear H_run.
+    match goal with
+    | |- ?e = _ =>
+      replace e
+        with (Limbs.of_Z_bools BITS_PER_LIMB (get_bit local y x) limb)
+        by reflexivity
+    end.
+    rewrite Limbs.of_bools_eq_of_Z_bools by assumption.
+    apply (Limbs.of_Z_bools_eq U64_LIMBS); try assumption.
+    intros.
+    unfold get_bit, get_bit_bool.
+    cbn - [Z.add Z.sub Z.mul Z.modulo R].
+    rewrite <- M.xor_eq; rewrite <- M.andn_eq.
+    repeat f_equal; apply H_a_prime_is_bool; lia.
+  Qed.
 End a_prime_prime.
 
 (*
@@ -564,9 +545,7 @@ Module a_prime_prime_0_0_bits_bools.
 
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
-      forall (z : Z),
-      0 <= z < 64 ->
-      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits).[z].
+      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits).
   End Post.
 
   Lemma implies {p} `{Prime p}
@@ -604,32 +583,25 @@ Module a_prime_prime_0_0_limbs.
     M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_0_0_limb : Z :=
-          let l : list nat :=
-            List.rev (
-              List.seq
-                (Z.to_nat (limb * BITS_PER_LIMB))
-                (Z.to_nat BITS_PER_LIMB)
-              ) in
-          Lists.List.fold_left (fun acc (z : nat) =>
-            let z : Z := Z.of_nat z in
-            (2 *F acc) +F local.(KeccakCols.a_prime_prime_0_0_bits).[z]
-          ) l 0 in
+          Limbs.of_Z_bools BITS_PER_LIMB
+            (fun z => local.(KeccakCols.a_prime_prime_0_0_bits).[z])
+            limb in
         computed_a_prime_prime_0_0_limb -F
           local.(KeccakCols.a_prime_prime).[0].[0].[limb]
     |}.
 
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
-      a_prime_prime_0_0_bits_bools.Post.t local ->
+      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       local.(KeccakCols.a_prime_prime).[0].[0].[limb] =
-      (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-        local.(KeccakCols.a_prime_prime_0_0_bits)
-      ).[limb].
+      Limbs.of_bools BITS_PER_LIMB
+        (fun z => Z.odd (local.(KeccakCols.a_prime_prime_0_0_bits).[z]))
+        limb.
   End Post.
 
-  Lemma implies {p} `{Prime p}
+  Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
     let local := M.map_mod local' in
     {{ eval local 🔽
@@ -642,47 +614,13 @@ Module a_prime_prime_0_0_limbs.
       Run.run.
     }
     unfold Post.t; cbn - [Z.to_nat].
+    FieldRewrite.run.
     intros H_run **.
-    epose proof (
-      Limbs.from_of_bools_eq U64_LIMBS BITS_PER_LIMB
-        local.(KeccakCols.a_prime_prime_0_0_bits)
-        ltac:(assumption)
-        limb ltac:(assumption)
-    ) as H_from_of_bools_eq.
-    unfold Limbs.of_bools in H_from_of_bools_eq.
-    cbn - [Z.to_nat] in H_from_of_bools_eq.
-    rewrite <- H_from_of_bools_eq.
-    rewrite H_run by assumption.
-    now FieldRewrite.run.
-  (* We also have a non-terminating [Qed] *)
-  Admitted.
+    rewrite <- H_run by assumption.
+    rewrite Limbs.of_bools_eq_of_Z_bools by assumption.
+    apply (Limbs.of_Z_bools_eq U64_LIMBS); assumption.
+  Qed.
 End a_prime_prime_0_0_limbs.
-
-(*
-  let get_xored_bit = |i| {
-      let mut rc_bit_i = AB::Expr::ZERO;
-      for r in 0..NUM_ROUNDS {
-          let this_round = local.step_flags[r];
-          let this_round_constant = AB::Expr::from_bool(rc_value_bit(r, i) != 0);
-          rc_bit_i += this_round * this_round_constant;
-      }
-
-      rc_bit_i.xor(&local.a_prime_prime_0_0_bits[i].into())
-  };
-*)
-Definition get_xored_bit {p} `{Prime p}
-    (local : KeccakCols.t)
-    (i : Z) :
-    Z :=
-  let rc_bit_i : Z :=
-    Lists.List.fold_left (fun acc r =>
-      let this_round := local.(KeccakCols.step_flags).[r] in
-      let this_round_constant :=
-        Z.b2z (rc_value_bit r i) in
-      acc +F (this_round *F this_round_constant)
-    )
-    (List.map Z.of_nat (List.seq 0 (Z.to_nat NUM_ROUNDS))) 0 in
-  M.xor rc_bit_i local.(KeccakCols.a_prime_prime_0_0_bits).[i].
 
 (*
   builder.assert_zeros::<U64_LIMBS, _>(array::from_fn(|limb| {
@@ -694,50 +632,128 @@ Definition get_xored_bit {p} `{Prime p}
   }));
 *)
 Module a_prime_prime_prime_0_0_limbs.
+  (*
+    let get_xored_bit = |i| {
+        let mut rc_bit_i = AB::Expr::ZERO;
+        for r in 0..NUM_ROUNDS {
+            let this_round = local.step_flags[r];
+            let this_round_constant = AB::Expr::from_bool(rc_value_bit(r, i) != 0);
+            rc_bit_i += this_round * this_round_constant;
+        }
+
+        rc_bit_i.xor(&local.a_prime_prime_0_0_bits[i].into())
+    };
+  *)
+  Definition get_xored_bit {p} `{Prime p}
+      (local : KeccakCols.t)
+      (i : Z) :
+      Z :=
+    let rc_bit_i : Z :=
+    Lists.List.fold_left (fun acc r =>
+      let this_round := local.(KeccakCols.step_flags).[r] in
+      let this_round_constant :=
+        Z.b2z (rc_value_bit r i) in
+      acc +F (this_round *F this_round_constant)
+    )
+    (List.map Z.of_nat (List.seq 0 (Z.to_nat NUM_ROUNDS))) 0 in
+    M.xor rc_bit_i local.(KeccakCols.a_prime_prime_0_0_bits).[i].
+
+  Definition get_xored_bit_bool
+      (local : KeccakCols.t)
+      (round : Z)
+      (i : Z) :
+      bool :=
+    xorbs [
+      rc_value_bit round i;
+      Z.odd (local.(KeccakCols.a_prime_prime_0_0_bits).[i])
+    ].
+
+  Lemma get_xored_bit_eq {p} `{Prime p}
+      (local' : KeccakCols.t)
+      (round : Z)
+      (H_round : 0 <= round < NUM_ROUNDS)
+      (i : Z)
+      (H_i : 0 <= i < 64) :
+    let local := M.map_mod local' in
+    IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
+    (
+      forall k,
+      0 <= k < NUM_ROUNDS ->
+      local.(KeccakCols.step_flags).[k] =
+      Z.b2z (k =? round)
+    ) ->
+    get_xored_bit local i =
+    Z.b2z (get_xored_bit_bool local round i).
+  Proof.
+    intros * H_a_prime_prime_0_0_bits_bools H_step_flags.
+    unfold get_xored_bit, get_xored_bit_bool.
+    unfold List.map, List.seq, Z.to_nat, Pos.to_nat.
+    cbn - [M.xor rc_value_bit local].
+    repeat rewrite H_step_flags by (unfold NUM_ROUNDS; lia).
+    clear H_step_flags.
+    generalize round H_round; clear round H_round.
+    apply round_flags.i_in_bounds; cbn [Z.eqb Pos.eqb].
+    change (Z.b2z false) with 0.
+    autorewrite with field_rewrite.
+    repeat rewrite <- M.xor_eq.
+    repeat (split || f_equal).
+    all: now apply H_a_prime_prime_0_0_bits_bools.
+  Qed.
+
   Definition eval {p} `{Prime p}
       (local : KeccakCols.t) :
       M.t unit :=
     M.assert_zeros (N := U64_LIMBS) {|
       Array.get limb :=
         let computed_a_prime_prime_prime_0_0_limb : Z :=
-          let l : list nat :=
-            List.rev (
-              List.seq
-                (Z.to_nat (limb * BITS_PER_LIMB))
-                (Z.to_nat BITS_PER_LIMB)
-              ) in
-          Lists.List.fold_left (fun acc (z : nat) =>
-            let z : Z := Z.of_nat z in
-            (2 *F acc) +F get_xored_bit local z
-          ) l 0 in
+          Limbs.of_Z_bools BITS_PER_LIMB (get_xored_bit local) limb in
         computed_a_prime_prime_prime_0_0_limb -F
           local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb]
     |}.
 
   Module Post.
     Definition t {p} `{Prime p} (local : KeccakCols.t) : Prop :=
+      forall (round : Z),
+      0 <= round < NUM_ROUNDS ->
+      IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
+      (
+        forall k,
+        0 <= k < NUM_ROUNDS ->
+        local.(KeccakCols.step_flags).[k] =
+        Z.b2z (k =? round)
+      ) ->
       forall (limb : Z),
       0 <= limb < U64_LIMBS ->
       local.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb] =
-      UnOp.from (Limbs.of_bools U64_LIMBS BITS_PER_LIMB
-        {| Array.get z := get_xored_bit local z; |}
-      ).[limb].
+      Limbs.of_bools BITS_PER_LIMB (get_xored_bit_bool local round) limb.
   End Post.
 
-  Lemma implies {p} `{Prime p}
-      (local : KeccakCols.t) :
-      let local := M.map_mod local in
+  Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
+      (local' : KeccakCols.t) :
+      let local := M.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
     }}.
   Proof.
-    unfold eval.
+    intros; unfold eval.
     eapply Run.Implies. {
       Run.run.
     }
-    unfold Post.t; cbn.
-    hauto l: on rew:db: field_rewrite.
+    unfold Post.t; cbn - [Limbs.of_bools].
+    FieldRewrite.run.
+    intros H_run round H_round H_a_prime_prime_0_0_bits_bools H_step_flags limb H_limb.
+    rewrite <- H_run by assumption; clear H_run.
+    match goal with
+    | |- ?e = _ =>
+      replace e
+        with (Limbs.of_Z_bools BITS_PER_LIMB (get_xored_bit local) limb)
+        by reflexivity
+    end.
+    rewrite Limbs.of_bools_eq_of_Z_bools by assumption.
+    apply (Limbs.of_Z_bools_eq U64_LIMBS); try assumption.
+    intros.
+    now apply get_xored_bit_eq.
   Qed.
 End a_prime_prime_prime_0_0_limbs.
 
@@ -809,7 +825,7 @@ Module a_prime_prime_prime_next_a.
     { unfold Impl_KeccakCols.a_prime_prime_prime; cbn in *.
       intros H_run **.
       pose proof (H_run x ltac:(lia) y ltac:(lia) ltac:(lia) ltac:(lia) limb ltac:(lia)).
-      hauto q: on rew:db: field_rewrite.
+      scongruence.
     }
     { easy. }
   Qed.
