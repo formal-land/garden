@@ -31,6 +31,14 @@ We handle circuits at the implementation level in:
 - [LLZK](https://github.com/Veridise/llzk-lib)
 - [Circom](https://github.com/iden3/circom)
 
+## Keccak in Plonky3
+
+Our biggest example is the formal verification of the implementation of Keccak in Plonky3. You can find:
+
+- The verification in [Garden/Plonky3/keccak/proofs/air.v](Garden/Plonky3/keccak/proofs/air.v)
+- The constraints snapshot in [Garden/Plonky3/keccak/air.snapshot](Garden/Plonky3/keccak/air.snapshot), that we generate to make sure we have the same definition as in the implementation in Plonky3
+- The source implementation of Keccak in Plonky3: https://github.com/Plonky3/Plonky3/tree/main/keccak-air/src
+
 ## Install
 
 You can look at the build instructions in the [BUILD.md](docs/BUILD.md) file.
