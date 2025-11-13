@@ -274,7 +274,6 @@ Module Post.
   {
     round_flags : round_flags.Spec.t local next is_first_row is_transition;
     preimage_a : preimage_a.Spec.t local;
-    preimage_next_preimage : preimage_next_preimage.Spec.t local next is_transition;
     to :
       forall a,
       a.Valid.t local a ->
@@ -311,7 +310,8 @@ Proof.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply preimage_next_preimage.implies.
   }
-  intros H_eval_preimage_next_preimage.
+  (* Note that we discard these constraints, hinting it could probably be optimized away. *)
+  intros _.
   apply Run.Message; eapply Run.LetAccumulate. {
     apply export_bool.implies.
   }
@@ -363,9 +363,8 @@ Proof.
     apply M.xor3_is_bool; apply c_bools; lia.
   }
   constructor.
-  { trivial. }
-  { trivial. }
-  { trivial. }
+  { assumption. }
+  { assumption. }
   { intros a H_a.
     pose proof (
       a_a_prime_c_c_prime_eq a H_a ltac:(assumption) ltac:(assumption)
@@ -522,6 +521,7 @@ Module ComputeKeccak.
     compute_keccak_aux a (Z.to_nat NUM_ROUNDS).
 End ComputeKeccak.
 
+(** We are computing the rounds of the boolean definition of Keccak on each row. *)
 Lemma post_implies_round_computation {p} `{Prime p}
     (local' next' : KeccakCols.t)
     (is_first_row is_transition : bool)
@@ -651,14 +651,17 @@ Proof.
   }
 Qed.
 
+(** We are computing a full round of Keccak every [NUM_ROUNDS] rows. *)
 Lemma posts_imply {p} `{Prime p} (rows' : Z -> KeccakCols.t)
     (preimages : Z -> Array.t (Array.t (Array.t bool 64) 5) 5) :
   let rows i := M.map_mod (rows' i) in
-  (
+  ( (* We assume we validated the circuit on all the rows. Note that we assume here that we are
+       always transitioning. *)
     forall i, 0 <= i ->
     Post.t (rows i) (rows (i + 1)) (i =? 0) true
   ) ->
-  (
+  ( (* We assume the preimages are given by the [preimages] function at the beginning of
+       each round. *)
     forall i, 0 <= i ->
     i mod NUM_ROUNDS = 0 ->
     forall x, 0 <= x < 5 ->
@@ -669,7 +672,8 @@ Lemma posts_imply {p} `{Prime p} (rows' : Z -> KeccakCols.t)
       (Array.get (preimages (i / NUM_ROUNDS)).[y].[x])
       limb
   ) ->
-  (
+  ( (* We prove that we get the Keccak output in the [a_prime_prime_prime] array of the
+       last round. *)
     forall i, 0 <= i ->
     forall x, 0 <= x < 5 ->
     forall y, 0 <= y < 5 ->
