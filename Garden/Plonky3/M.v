@@ -37,6 +37,10 @@ Module Default.
   Global Instance ZIsDefault : C Z := {
     default := 0;
   }.
+
+  Global Instance BoolIsDefault : C bool := {
+    default := false;
+  }.
 End Default.
 
 Module Equal.
@@ -45,9 +49,44 @@ Module Equal.
   }.
 End Equal.
 
+Notation "x =F y" := (Equal.t x y) (at level 70, no associativity).
+
 Global Instance ZIsEqual : Equal.C Z := {
   Equal.t := eq;
 }.
+
+Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
+  map_mod : A -> A;
+}.
+
+Module Mappable.
+  Class C (Self : Set -> Set) (A B : Set) : Set := {
+    map : (A -> B) -> Self A -> Self B;
+  }.
+
+  Global Instance IdIsMappable (A : Set) : C (fun (X : Set) => X) A A := {
+    map f x := f x;
+  }.
+End Mappable.
+
+Module IsBool.
+  Class C (A : Set) : Type := {
+    t : A -> Prop;
+  }.
+
+  Global Instance ZIsBool : C Z := {
+    t x := x = Z.b2z (Z.odd x);
+  }.
+End IsBool.
+
+Module InField.
+  Class C {p} `{Prime p} (z : Z) : Prop := {
+    make : z = z mod p;
+  }.
+
+  Global Instance mod_is_in_field {p} `{Prime p} (z : Z) : InField.C (z mod p).
+  Admitted.
+End InField.
 
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -117,6 +156,24 @@ Module Array.
 
     Axiom dec : forall {N : Z} (x y : Array.t Z N), {Equal.t x y} + {~ Equal.t x y}.
   End Eq.
+
+  Global Instance IsMapMod  {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} : MapMod (t A N) := {
+    map_mod := map map_mod;
+  }.
+
+  Global Instance IsMappable (N : Z) (T : Set -> Set) (A B : Set)
+      `{Mappable.C T A B} :
+      Mappable.C (fun (X : Set) => t (T X) N) A B :=
+  {
+    Mappable.map f x := map (Mappable.map f) x;
+  }.
+
+  Global Instance IsIsBool (A : Set) (N : Z) `{IsBool.C A} : IsBool.C (t A N) := {
+    t array :=
+      forall (i : Z),
+      0 <= i < N ->
+      IsBool.t (array.(get) i);
+  }.
 End Array.
 
 Notation "x .[ i ]" := (Array.get x i) (at level 9).
@@ -151,6 +208,33 @@ Notation "x +F y" := (BinOp.add x y) (at level 50, left associativity).
 Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
 Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
 Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
+
+Global Instance ZIsMapMod {p} `{Prime p} : MapMod Z := {
+  map_mod := UnOp.from;
+}.
+
+Module IsInField.
+  Global Instance from_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.from x).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance opp_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.opp x).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance add_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.add x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance sub_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.sub x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance mul_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mul x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance div_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.div x y).
+  Proof. typeclasses eauto. Qed.
+
+  Global Instance mod_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mod_ x y).
+  Proof. typeclasses eauto. Qed.
+End IsInField.
 
 Module Trace.
   Module Event.
@@ -271,11 +355,6 @@ Definition collapsing_let {A B : Set} (e : M.t A) (k : A -> M.t B) : M.t B :=
   | e, k => M.Let e k
   end.
 
-Module IsBool.
-  Definition t (x : Z) : Prop :=
-    x = Z.b2z (Z.odd x).
-End IsBool.
-
 Lemma odd_b2z_eq (b : bool) :
   Z.odd (Z.b2z b) = b.
 Proof.
@@ -333,7 +412,7 @@ Lemma xor_is_bool {p} `{Prime p} (x y : Z) :
 Proof.
   intros -> ->.
   rewrite xor_eq.
-  unfold IsBool.t.
+  cbn.
   now rewrite odd_b2z_eq.
 Qed.
 
@@ -361,9 +440,6 @@ Qed.
 Definition double {p} `{Prime p} (x : Z) : Z :=
   BinOp.mul x 2.
 
-Definition andn {p} `{Prime p} (x y : Z) : Z :=
-  (1 -F x) *F y.
-
 Module List.
   Fixpoint fold_left {A B : Set} (f : A -> B -> M.t A) (acc : A) (l : list B) : M.t A :=
     match l with
@@ -381,20 +457,6 @@ Module List.
       f x acc
     end.
 End List.
-
-Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
-  map_mod : A -> A;
-}.
-
-Global Instance MapMod_Felt {p} `{Prime p} : MapMod Z := {
-  map_mod := UnOp.from;
-}.
-
-Global Instance IsMapMod_Array {p} `{Prime p} (A : Set) (N : Z) `{MapMod p A} :
-    MapMod (Array.t A N) :=
-{
-  map_mod := Array.map map_mod;
-}.
 
 Ltac show_equality_modulo :=
   unfold
@@ -470,6 +532,14 @@ Module FieldRewrite.
   Proof.
   Admitted.
   Global Hint Rewrite @from_one : field_rewrite.
+
+  Lemma from_bool {p} `{Prime p} (x : bool) :
+    UnOp.from (Z.b2z x) = Z.b2z x.
+  Proof.
+    unfold UnOp.from.
+    destruct x; [apply from_one | apply from_zero].
+  Qed.
+  Global Hint Rewrite @from_bool : field_rewrite.
 
   Lemma from_from {p} `{Prime p} (x : Z) :
     UnOp.from (UnOp.from x) = UnOp.from x.
@@ -610,41 +680,54 @@ Module FieldRewrite.
     end.
 End FieldRewrite.
 
+Definition andn {p} `{Prime p} (x y : Z) : Z :=
+  (1 -F x) *F y.
+
+Lemma andn_eq {p} `{Prime p} (x y : bool) :
+  andn (Z.b2z x) (Z.b2z y) = Z.b2z (andb (negb x) y).
+Proof.
+  intros.
+  unfold andn.
+  now destruct x, y; cbn; FieldRewrite.run.
+Qed.
+
+Lemma andn_is_bool {p} `{Prime p} (x y : Z) :
+  IsBool.t x ->
+  IsBool.t y ->
+  IsBool.t (andn x y).
+Proof.
+  intros -> ->.
+  rewrite andn_eq.
+  cbn.
+  now rewrite odd_b2z_eq.
+Qed.
+
 (** Utilities around the manipulation of limbs *)
 Module Limbs.
-  (** Convert an array of bools to an array of limbs. *)
-  Definition of_bools {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB)) :
-      Array.t Z NB_LIMBS :=
-    {|
-      Array.get limb :=
-        let l : list nat :=
-          List.rev (
-            List.seq
-              (Z.to_nat (limb * BITS_PER_LIMB))%Z
-              (Z.to_nat BITS_PER_LIMB)
-          ) in
-        (* We sum all the bits times 2 to the n *)
-        Lists.List.fold_left (fun acc (z : nat) =>
-          let z : Z := Z.of_nat z in
-          (2 *F acc) +F a.[z]
-        ) l 0
-    |}.
+  (** Sometimes we do not know yet that we are adding booleans, so we go through this step. *)
+  Definition of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (f : Z -> Z)
+      (limb : Z) :
+      Z :=
+    let l : list nat :=
+      List.rev (
+        List.seq
+          (Z.to_nat (limb * BITS_PER_LIMB))
+          (Z.to_nat BITS_PER_LIMB)
+        ) in
+    Lists.List.fold_left (fun acc (z : nat) =>
+      let z : Z := Z.of_nat z in
+      (2 *F acc) +F f z
+    ) l 0.
 
-  (** We have taken the modulo of the result. *)
-  Lemma from_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
-        forall (z : Z),
-        0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a.[z]
-      )
-      (limb : Z)
-      (H_limb : 0 <= limb < NB_LIMBS) :
-    UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a).[limb] =
-    (of_bools NB_LIMBS BITS_PER_LIMB a).[limb].
+  (** We have already taken the modulo of the result. *)
+  Lemma unop_from_of_Z_bools_eq {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (f : Z -> Z)
+      (limb : Z) :
+    UnOp.from (of_Z_bools BITS_PER_LIMB f limb) =
+    of_Z_bools BITS_PER_LIMB f limb.
   Proof.
-    cbn.
+    unfold of_Z_bools.
     set (l := List.rev _); clearbody l.
     assert (H_acc : UnOp.from 0 = 0) by trivial; revert H_acc.
     generalize 0 as acc.
@@ -653,55 +736,69 @@ Module Limbs.
     now FieldRewrite.run.
   Qed.
 
-  (** Extract a single bit from an array of limbs. *)
-  Definition get_bit {NB_LIMBS : Z} (BITS_PER_LIMB : Z)
-      (a : Array.t Z NB_LIMBS)
-      (bit : Z) :
-      bool :=
-    let limb := bit / BITS_PER_LIMB in
-    let bit_in_limb := bit mod BITS_PER_LIMB in
-    let limb_value := a.(Array.get) limb in
-    Z.testbit limb_value bit_in_limb.
-
-  Lemma get_bit_of_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (bit : Z)
-      (H_bools :
+  Lemma of_Z_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> Z)
+      (H_f1_f2_eq :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t (a.(Array.get) z)
-      ) :
-    get_bit BITS_PER_LIMB (of_bools NB_LIMBS BITS_PER_LIMB a) bit =
-    Z.odd a.[bit].
+        f1 z = f2 z
+      )
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
+    of_Z_bools BITS_PER_LIMB f1 limb =
+    of_Z_bools BITS_PER_LIMB f2 limb.
+  Proof.
   Admitted.
 
-  Lemma get_bit_of_bools_eqs {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
-      (a_limbs : Array.t Z NB_LIMBS)
-      (a_bools : Array.t Z (NB_LIMBS * BITS_PER_LIMB))
-      (H_bools :
+  (** Convert an array of bools to an array of limbs. *)
+  Definition of_bools (BITS_PER_LIMB : Z)
+      (f : Z -> bool)
+      (limb : Z) :
+      Z :=
+    let l : list nat :=
+      List.rev (
+        List.seq
+          (Z.to_nat (limb * BITS_PER_LIMB))
+          (Z.to_nat BITS_PER_LIMB)
+        ) in
+    Lists.List.fold_left (fun acc (z : nat) =>
+      let z : Z := Z.of_nat z in
+      (2 * acc) + Z.b2z (f z)
+    ) l 0.
+
+  Lemma of_bools_eq_of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
+      (H_p : 2 ^ BITS_PER_LIMB < p)
+      (f : Z -> bool)
+      (limb : Z) :
+    of_bools BITS_PER_LIMB f limb =
+    of_Z_bools BITS_PER_LIMB (fun z => Z.b2z (f z)) limb.
+  Proof.
+  Admitted.
+
+  Lemma of_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> bool)
+      (H_f1_f2_eq :
         forall (z : Z),
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
-        IsBool.t a_bools.[z]
+        f1 z = f2 z
       )
+      (limb : Z) :
+    of_bools BITS_PER_LIMB f1 limb =
+    of_bools BITS_PER_LIMB f2 limb.
+  Admitted.
+
+  Lemma limbs_eq_implies_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (f1 f2 : Z -> bool)
       (H_limbs :
         forall (limb : Z),
         0 <= limb < NB_LIMBS ->
-        a_limbs.[limb] =
-        UnOp.from (of_bools NB_LIMBS BITS_PER_LIMB a_bools).[limb]
+        of_bools BITS_PER_LIMB f1 limb =
+        of_bools BITS_PER_LIMB f2 limb
       ) :
-    0 <= NB_LIMBS ->
-    forall (bit : Z),
-    0 <= bit < NB_LIMBS * BITS_PER_LIMB ->
-    get_bit BITS_PER_LIMB a_limbs bit =
-    Z.odd (a_bools.(Array.get) bit).
-  Proof.
-    intros.
-    unfold get_bit.
-    rewrite H_limbs by nia.
-    rewrite <- get_bit_of_bools_eq by assumption.
-    rewrite from_of_bools_eq; trivial.
-    nia.
-  Qed.
+    forall (z : Z),
+    0 <= z < NB_LIMBS * BITS_PER_LIMB ->
+    f1 z = f2 z.
+  Admitted.
 End Limbs.
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
@@ -814,7 +911,7 @@ Module Run.
   Global Opaque M.for_in_zero_to_n.
 
   Lemma AssertZeros {N : Z} (array : Array.t Z N) :
-    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.(Array.get) i = 0 }}.
+    {{ M.assert_zeros array 🔽 tt, forall i, 0 <= i < N -> array.[i] = 0 }}.
   Proof.
     eapply Run.Implies. {
       unfold M.assert_zeros.
@@ -825,12 +922,14 @@ Module Run.
     trivial.
   Qed.
 
-  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) :
+  Lemma AssertZerosFromFnSub {p} `{Prime p} {N : Z} (f g : Z -> Z) 
+      (H_f : forall (i : Z), 0 <= i < N -> InField.C (f i))
+      (H_g : forall (i : Z), 0 <= i < N -> InField.C (g i)) :
     {{ M.assert_zeros (N := N) {| Array.get i := BinOp.sub (f i) (g i) |} 🔽
       tt,
       forall (i : Z),
       0 <= i < N ->
-      UnOp.from (f i) = UnOp.from (g i)
+      f i = g i
     }}.
   Proof.
     intros.
@@ -838,6 +937,8 @@ Module Run.
       eapply Run.AssertZeros.
     }
     cbn; intros H_zeros i H_i.
+    rewrite (H_f i H_i).(InField.make).
+    rewrite (H_g i H_i).(InField.make).
     apply sub_zero_equiv.
     now apply H_zeros.
   Qed.
@@ -859,7 +960,7 @@ Module Run.
       better handled as whole primitives. *)
   Ltac run_step :=
     (apply AssertBool) ||
-    (apply AssertZerosFromFnSub) ||
+    (apply AssertZerosFromFnSub; try typeclasses eauto) ||
     (apply AssertZeros) ||
     (eapply Run.ForInZeroToN) ||
     (apply Run.Pure) ||
@@ -997,7 +1098,6 @@ Lemma mod_0_range (k : Z) (x : Z) :
 Proof.
 Admitted.
 
-
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
   | xH => (acc * base) mod modulus
@@ -1013,7 +1113,6 @@ Definition mod_inverse (a p : Z) : Z :=
   | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
   | _ => 0 (* We will always have 1 <= p *)
   end.
-
 
 Module Test_mod_inverse.
   Definition test1 : Z := mod_inverse 3 7.

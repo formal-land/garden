@@ -5,4 +5,4 @@ LLZK/mastermind.v
 # We ignore these files as they are run again to pretty-print the circuits
 OpenVM/BranchEq/pretty_print.v
 OpenVM/Sha256/pretty_print.v
-Plonky3/keccak/proofs/pretty_print.v
+Plonky3/keccak/pretty_print.v

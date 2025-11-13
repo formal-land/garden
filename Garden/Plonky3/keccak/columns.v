@@ -80,38 +80,6 @@ Module KeccakCols.
   Global Instance IsEqual : Equal.C KeccakCols.t := {
     Equal.t := Eq.t;
   }.
-
-  Definition get_preimage (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.preimage).[y].[x].[limb].
-
-  Definition get_a (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.a).[y].[x].[limb].
-
-  Definition get_c (local : KeccakCols.t) (x z : Z) : Z :=
-    local.(KeccakCols.c).[x].[z].
-
-  Definition get_c_prime (local : KeccakCols.t) (x z : Z) : Z :=
-    local.(KeccakCols.c_prime).[x].[z].
-
-  Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : Z :=
-    local.(KeccakCols.a_prime).[y].[x].[z].
-
-  Definition get_a_prime_prime (local : KeccakCols.t) (x y limb : Z) : Z :=
-    local.(KeccakCols.a_prime_prime).[y].[x].[limb].
-
-  Module Bool.
-    Definition get_a (local : KeccakCols.t) (x y z : Z) : bool :=
-      Limbs.get_bit BITS_PER_LIMB (local.(KeccakCols.a).[y].[x]) z.
-
-    Definition get_c (local : KeccakCols.t) (x z : Z) : bool :=
-      Z.odd ((get_c local x z)).
-
-    Definition get_c_prime (local : KeccakCols.t) (x z : Z) : bool :=
-      Z.odd ((get_c_prime local x z)).
-
-    Definition get_a_prime (local : KeccakCols.t) (x y z : Z) : bool :=
-      Z.odd ((get_a_prime local x y z)).
-  End Bool.
 End KeccakCols.
 
 Module Impl_KeccakCols.
@@ -163,14 +131,23 @@ Module Impl_KeccakCols.
       self.(KeccakCols.a_prime_prime_prime_0_0_limbs).[limb]
     else
       self.(KeccakCols.a_prime_prime).[y].[x].[limb].
+
+  Global Instance IsInField {p} `{Prime p} (self' : KeccakCols.t) (y x limb : Z) :
+    let self := M.map_mod self' in
+    InField.C (a_prime_prime_prime self y x limb).
+  Proof.
+    unfold a_prime_prime_prime; cbn.
+    destruct (_ && _); typeclasses eauto.
+  Qed.
 End Impl_KeccakCols.
 
-Module U64.
-  Definition t : Set :=
-    Z.
-
-  Definition to_bits (x : t) : Array.t Z 64 :=
-    {|
-      Array.get i := Z.b2z (Z.testbit x i)
-    |}.
-End U64.
+Module a.
+  Module Valid.
+    Definition t (local : KeccakCols.t) (a : Array.t (Array.t (Array.t bool 64) 5) 5): Prop :=
+      forall x, 0 <= x < 5 ->
+      forall y, 0 <= y < 5 ->
+      forall limb, 0 <= limb < U64_LIMBS ->
+      local.(KeccakCols.a).[y].[x].[limb] =
+      Limbs.of_bools BITS_PER_LIMB (Array.get a.[y].[x]) limb.
+  End Valid.
+End a.
