@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/chips/gadgets/field/field_inner_product.rs

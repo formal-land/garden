@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/chips/gadgets/field_range_check/word_range.rs

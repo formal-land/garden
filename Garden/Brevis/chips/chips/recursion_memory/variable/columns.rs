@@ -1,0 +1,1 @@
+../../../../../../third-party/brevis/vm/src/chips/chips/recursion_memory/variable/columns.rs

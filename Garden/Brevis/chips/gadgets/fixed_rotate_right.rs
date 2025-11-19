@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/chips/gadgets/fixed_rotate_right.rs
