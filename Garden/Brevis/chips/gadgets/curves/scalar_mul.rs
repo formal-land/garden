@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/chips/gadgets/curves/scalar_mul.rs
