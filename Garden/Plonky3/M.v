@@ -1244,11 +1244,15 @@ Notation "'let*g' x ':=' e 'in' k" :=
   (MGenerate.bind e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
+Global Instance GenerateIsDefault {T : Set} `{MGenerate.C T} : Default.C T := {
+  Default.default := fst (MGenerate.generate 0);
+}.
+
 Global Instance VarIsGenerate : MGenerate.C Z := {
   generate := MGenerate.generate_var;
 }.
 
-Global Instance ArrayIsGenerate {T : Set} `{MGenerate.C T} `{Default.C T} {N : Z} :
+Global Instance ArrayIsGenerate {T : Set} `{MGenerate.C T} {N : Z} :
     MGenerate.C (Array.t T N) := {
   generate :=
     MGenerate.bind (MGenerate.generate_list (Z.to_nat N)) (fun l =>

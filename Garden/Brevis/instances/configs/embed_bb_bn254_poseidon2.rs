@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/instances/configs/embed_bb_bn254_poseidon2.rs

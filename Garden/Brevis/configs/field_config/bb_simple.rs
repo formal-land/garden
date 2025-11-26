@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/configs/field_config/bb_simple.rs

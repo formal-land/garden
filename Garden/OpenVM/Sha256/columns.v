@@ -74,7 +74,10 @@ Module Sha256WorkVarsCols.
     generate :=
       [[
         {|
-          Sha256WorkVarsCols.a := MGenerate.generate (||);
+          Sha256WorkVarsCols.a := (
+            MGenerate.generate (||) :
+            Array.t (Array.t Var.t _) _
+          );
           Sha256WorkVarsCols.e := MGenerate.generate (||);
           Sha256WorkVarsCols.carry_a := MGenerate.generate (||);
           Sha256WorkVarsCols.carry_e := MGenerate.generate (||);
@@ -104,7 +107,10 @@ Module Sha256MessageHelperCols.
     generate :=
       [[
         {|
-          Sha256MessageHelperCols.w_3 := MGenerate.generate (||);
+          Sha256MessageHelperCols.w_3 := (
+            MGenerate.generate (||) :
+            Array.t (Array.t Var.t _) _
+          );
           Sha256MessageHelperCols.intermed_4 := MGenerate.generate (||);
           Sha256MessageHelperCols.intermed_8 := MGenerate.generate (||);
           Sha256MessageHelperCols.intermed_12 := MGenerate.generate (||);
@@ -162,7 +168,10 @@ Module Sha256MessageScheduleCols.
     generate :=
       [[
         {|
-          Sha256MessageScheduleCols.w := MGenerate.generate (||);
+          Sha256MessageScheduleCols.w := (
+            MGenerate.generate (||) :
+            Array.t (Array.t Var.t _) _
+          );
           Sha256MessageScheduleCols.carry_or_buffer := MGenerate.generate (||);
         |}
       ]];

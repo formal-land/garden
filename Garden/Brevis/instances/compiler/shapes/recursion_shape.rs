@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/instances/compiler/shapes/recursion_shape.rs

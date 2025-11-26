@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/instances/chiptype/chiptype_macros/enum_chip_type.rs

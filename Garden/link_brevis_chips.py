@@ -1,8 +1,7 @@
 import os
-import glob
 
-SOURCE_DIR = "../third-party/brevis/vm/src/chips"
-DEST_DIR = "Brevis/chips"
+SOURCE_DIR = "../third-party/brevis/vm/src"
+DEST_DIR = "Brevis"
 
 def main():
     # Ensure destination directory exists
@@ -11,30 +10,30 @@ def main():
         os.makedirs(DEST_DIR)
 
     print(f"Scanning {SOURCE_DIR} for Rust files...")
-    
+
     count = 0
     for root, dirs, files in os.walk(SOURCE_DIR):
         for file_name in files:
             if file_name.endswith(".rs"):
                 # Source file path
                 source_path = os.path.join(root, file_name)
-                
+ 
                 # Calculate relative path from SOURCE_DIR to current file
                 rel_path_from_source_root = os.path.relpath(source_path, SOURCE_DIR)
-                
+
                 # Destination path
                 dest_path = os.path.join(DEST_DIR, rel_path_from_source_root)
-                
+
                 # Ensure destination subdirectory exists
                 dest_subdir = os.path.dirname(dest_path)
                 if not os.path.exists(dest_subdir):
                     os.makedirs(dest_subdir)
-                
+
                 # Calculate relative path for the symlink
                 # We want the link to be relative so it works if the repo is moved
                 abs_source = os.path.abspath(source_path)
                 abs_dest_dir = os.path.abspath(os.path.dirname(dest_path))
-                
+
                 rel_source = os.path.relpath(abs_source, abs_dest_dir)
 
                 try:
@@ -43,7 +42,7 @@ def main():
                     elif os.path.exists(dest_path):
                         print(f"Warning: {dest_path} exists and is not a symlink. Skipping.")
                         continue
-                        
+
                     os.symlink(rel_source, dest_path)
                     # print(f"Linked {rel_path_from_source_root} -> {rel_source}")
                     count += 1

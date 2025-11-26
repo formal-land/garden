@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/instances/configs/riscv_bb_poseidon2.rs

@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/configs/stark_config/bb_bn254_poseidon2.rs
