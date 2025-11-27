@@ -1,0 +1,1 @@
+../../../../../third-party/brevis/vm/src/instances/compiler/recursion_circuit/stdin.rs

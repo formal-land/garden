@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/chips/gadgets/is_zero_word.rs

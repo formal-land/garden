@@ -1,0 +1,1 @@
+../../../../third-party/brevis/vm/src/instances/configs/recur_bb_poseidon2.rs
