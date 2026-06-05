@@ -1,7 +1,15 @@
 Require Import Garden.Plonky3.M.
 Require Import Garden.Plonky3.Util.
-Require Import Coq.omega.PreOmega.
-Require Import Coqtail.Arith.Zeqm.
+Require Import Stdlib.omega.PreOmega.
+Require Import Stdlib.ZArith.Znumtheory.
+
+Lemma eqm_minus_0 : forall a b m, eqm m a b <-> eqm m (a - b) 0.
+Proof.
+  intros a b m.
+  unfold eqm.
+  rewrite Zmod_0_l.
+  apply Z.cong_iff_0.
+Qed.
 
 (* TODO: these are to be declared as shared constants / methods, copied from blake3/constants.v *)
 Definition BITS_PER_LIMB : Z := 16.

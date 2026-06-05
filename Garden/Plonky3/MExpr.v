@@ -1,6 +1,6 @@
 Require Import Garden.Plonky3.M.
-Require Import Coq.Numbers.Cyclic.Int63.PrimInt63.
-Require Export Coq.Strings.PrimString.
+Require Import Stdlib.Numbers.Cyclic.Int63.PrimInt63.
+Require Export Stdlib.Strings.PrimString.
 
 Export PStringNotations.
 Global Open Scope pstring_scope.

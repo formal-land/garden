@@ -1,6 +1,6 @@
-Require Import Coq.ZArith.ZArith.
+Require Import Stdlib.ZArith.ZArith.
 Require Import Plonky3.M.
-Require Import Coq.ZArith.Znumtheory.
+Require Import Stdlib.ZArith.Znumtheory.
 Open Scope Z_scope.
 
 

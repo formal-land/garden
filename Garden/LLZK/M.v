@@ -1,9 +1,9 @@
-Require Export Coq.Strings.Ascii.
-Require Export Coq.Strings.String.
-Require Export Coq.ZArith.ZArith.
+Require Export Stdlib.Strings.Ascii.
+Require Export Stdlib.Strings.String.
+Require Export Stdlib.ZArith.ZArith.
 Require Export RecordUpdate.
 
-Require Export Lia.
+From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 Require Export smpl.Smpl.
 

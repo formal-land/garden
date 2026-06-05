@@ -9,7 +9,7 @@ CoqMakefile: $(VFILES) blacklist.txt
 	echo "-arg -impredicative-set -arg -w -arg -stdlib-vector" >> _CoqProject
 	# We copy & paste the command to find files as this variable is too long on command line
 	find -L . -name "*.v" | grep -v -f blacklist.txt | sort >> _CoqProject
-	coq_makefile -f _CoqProject -o $@
+	rocq makefile -f _CoqProject -o $@
 
 MAKECOQ := +$(MAKE) -f CoqMakefile
 
@@ -28,9 +28,9 @@ else
 endif
 
 snapshot:
-	coqc -R . Garden OpenVM/BranchEq/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/BranchEq/core_expr.snapshot
-	coqc -R . Garden OpenVM/Sha256/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/Sha256/air_expr.snapshot
-	coqc -R . Garden Plonky3/keccak/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > Plonky3/keccak/air.snapshot
+	rocq compile -R . Garden OpenVM/BranchEq/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/BranchEq/core_expr.snapshot
+	rocq compile -R . Garden OpenVM/Sha256/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > OpenVM/Sha256/air_expr.snapshot
+	rocq compile -R . Garden Plonky3/keccak/pretty_print.v | tail -n +2 | $(HEAD_CMD) -n -2 > Plonky3/keccak/air.snapshot
 
 clean-coq: CoqMakefile
 	$(MAKECOQ) clean

@@ -1,10 +1,10 @@
-Require Export Coq.PArith.BinPosDef.
-Require Export Coq.Strings.PrimString.
-Require Export Coq.ZArith.ZArith.
+Require Export Stdlib.PArith.BinPosDef.
+Require Export Stdlib.Strings.PrimString.
+Require Export Stdlib.ZArith.ZArith.
 
 Require Export RecordUpdate.
 
-Require Export Lia.
+From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 Require Export smpl.Smpl.
 
@@ -22,7 +22,7 @@ Export List.ListNotations.
 
 (** We will need later to make the field reasoning. For now we axiomatize it. *)
 Parameter IsPrime : Z -> Prop.
-Require Export Coq.Strings.PrimString.
+Require Export Stdlib.Strings.PrimString.
 Class Prime (p : Z) : Prop := {
   is_prime : IsPrime p;
 }.
@@ -507,7 +507,7 @@ Proof.
   { rewrite <- (Z.mod_unique x p 0 x) in *; lia. }
 Qed.
 
-(* TODO: prove with Coqtail *)
+(* TODO: prove directly from standard-library modular arithmetic facts. *)
 Lemma sub_zero_equiv {p} `{Prime p} (x y : Z) :
   BinOp.sub x y = 0 <->
   UnOp.from x = UnOp.from y.

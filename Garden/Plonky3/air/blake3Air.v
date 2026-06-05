@@ -1,5 +1,5 @@
-Require Export Coq.ZArith.ZArith.
-Require Export List.
+Require Export Stdlib.ZArith.ZArith.
+From Stdlib Require Export List.
 Import ListNotations.
 Require Export AirStructure.
 Open Scope Z_scope.

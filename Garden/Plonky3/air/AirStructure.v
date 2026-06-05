@@ -1,5 +1,5 @@
-Require Export Coq.ZArith.ZArith.
-Require Export Coq.Lists.List.
+Require Export Stdlib.ZArith.ZArith.
+Require Export Stdlib.Lists.List.
 Import ListNotations.
 Require Export primefield.  
 Open Scope Z_scope.
