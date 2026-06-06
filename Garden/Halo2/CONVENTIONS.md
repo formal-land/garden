@@ -23,7 +23,14 @@ orchard/src/circuit/gadget/add_chip.rs
 
 halo2_gadgets/src/utilities/lookup_range_check.rs
   -> Garden/Halo2/Gadgets/LookupRangeCheck.v
+
+halo2_gadgets/src/ecc/chip/*.rs
+  -> Garden/Halo2/Gadgets/Ecc/chip/*.v
 ```
+
+When Rust submodules need to share translated column bundles without creating
+cycles, put those bundles in a small local `common.v` file under the mirrored
+directory.
 
 ## Imports
 
@@ -59,7 +66,17 @@ Lookup
 
 `Instance_` is used instead of `Instance` because `Instance` is reserved.
 
-Concrete circuits group their column families with `Columns.t`:
+Concrete circuits group their column families with `Columns.t`. For Orchard,
+the physical columns live in:
+
+```text
+Garden/Orchard/columns.v
+```
+
+That file defines the absolute constructors used by the Orchard circuit and by
+Orchard-specialized gadgets such as ECC.
+
+Concrete circuit column files group their column families with `Columns.t`:
 
 ```coq
 Definition columns : Columns.t := {|
@@ -111,6 +128,19 @@ Definition configure {columns : Columns.t}
 
 The caller chooses whether to keep the returned configuration data. For now, we
 only thread and return the updated `meta`.
+
+For Orchard-only gadgets, use the absolute Orchard columns directly:
+
+```coq
+Require Import Garden.Orchard.columns.
+
+Definition configure
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns := ...
+```
+
+This is the current style for the ECC translation, because the active proof
+target is Orchard rather than a reusable generic ECC gadget.
 
 `meta.enable_equality(...)` is currently omitted from the Rocq semantics. Do not
 add a placeholder event for it unless the shared DSL starts tracking equality
@@ -207,3 +237,13 @@ Constraints.with_selector selector constraints
 ```
 
 This represents multiplying each constraint by the selector expression.
+
+Shared algebraic helpers that correspond to `halo2_gadgets/src/utilities.rs`
+live in:
+
+```text
+Garden/Halo2/Gadgets/Utilities.v
+```
+
+Examples include `square`, `range_check`, `bool_check`, `ternary`, and
+`pow_expr`.

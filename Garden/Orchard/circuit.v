@@ -1,66 +1,12 @@
 Require Import Garden.Halo2.main.
 Require Garden.Halo2.Gadgets.LookupRangeCheck.
+Require Garden.Halo2.Gadgets.Ecc.chip.
+Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.gadget.add_chip.
 
 Import ListNotations.
 Global Open Scope pstring_scope.
 Global Open Scope Z_scope.
-
-Module Advice.
-  Inductive t : Set :=
-  | A0
-  | A1
-  | A2
-  | A3
-  | A4
-  | A5
-  | A6
-  | A7
-  | A8
-  | A9.
-End Advice.
-
-Module Lookup.
-  Inductive t : Set :=
-  | TableIdx
-  | TableX
-  | TableY.
-End Lookup.
-
-Module Fixed.
-  Inductive t : Set :=
-  | LagrangeCoeffs0
-  | LagrangeCoeffs1
-  | LagrangeCoeffs2
-  | LagrangeCoeffs3
-  | LagrangeCoeffs4
-  | LagrangeCoeffs5
-  | LagrangeCoeffs6
-  | LagrangeCoeffs7
-  | Lookup (lookup : Lookup.t).
-End Fixed.
-
-Module Instance_.
-  Inductive t : Set :=
-  | Primary.
-End Instance_.
-
-Module Selector.
-  Inductive t : Set :=
-  | QOrchard
-  | QAdd
-  | QLookup
-  | QRunning
-  | QBitshift.
-End Selector.
-
-Definition columns : Columns.t := {|
-  Columns.Selector := Selector.t;
-  Columns.Fixed := Fixed.t;
-  Columns.Advice := Advice.t;
-  Columns.Instance_ := Instance_.t;
-|}.
-Canonical columns.
 
 Definition configure
     (meta : ConstraintSystem.t columns)
@@ -89,11 +35,7 @@ Definition configure
   |} in
   let meta :=
     Garden.Orchard.circuit.gadget.add_chip.configure
-      meta
-      Selector.QAdd
-      Advice.A7
-      Advice.A8
-      Advice.A6 in
+      meta in
   let meta :=
     Garden.Halo2.Gadgets.LookupRangeCheck.configure
       10
@@ -103,4 +45,7 @@ Definition configure
       Selector.QBitshift
       Advice.A9
       (Fixed.Lookup Lookup.TableIdx) in
+  let meta :=
+    Garden.Halo2.Gadgets.Ecc.chip.configure
+      meta in
   meta.

@@ -1,0 +1,28 @@
+Require Import Garden.Halo2.main.
+Require Garden.Halo2.Gadgets.Utilities.
+
+Import ListNotations.
+Global Open Scope pstring_scope.
+Global Open Scope Z_scope.
+
+Definition configure {columns : Columns.t}
+    (window_num_bits : Z)
+    (meta : ConstraintSystem.t columns)
+    (q_range_check : columns.(Columns.Selector))
+    (z : columns.(Columns.Advice))
+    : ConstraintSystem.t columns :=
+  let meta := ConstraintSystem.create_gate meta {|
+    Gate.name := "range check";
+    Gate.constraints :=
+      let z_cur := Expression.Advice z Rotation.cur in
+      let z_next := Expression.Advice z Rotation.next in
+      let two_pow_k := 2 ^ window_num_bits in
+      let word := z_cur -E (z_next *Z two_pow_k) in
+      Constraints.with_selector q_range_check [
+        (None,
+          Garden.Halo2.Gadgets.Utilities.range_check
+            word
+            (Z.to_nat two_pow_k))
+      ];
+  |} in
+  meta.
