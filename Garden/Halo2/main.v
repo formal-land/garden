@@ -24,6 +24,14 @@ Module Rotation.
   Definition cur : t := {|
     offset := 0;
   |}.
+
+  Definition prev : t := {|
+    offset := -1;
+  |}.
+
+  Definition next : t := {|
+    offset := 1;
+  |}.
 End Rotation.
 
 Module Expression.
@@ -93,23 +101,40 @@ Module Gate.
   }.
 End Gate.
 
+Module LookupArgument.
+  Record t (columns : Columns.t) : Set := {
+    pairs : list (Expression.t columns * columns.(Columns.Fixed));
+  }.
+End LookupArgument.
+
 Module ConstraintSystem.
   Record t (columns : Columns.t) : Set := {
     gates : list (Gate.t columns);
+    lookups : list (LookupArgument.t columns);
   }.
 
   Definition empty {columns : Columns.t} : t columns := {|
     gates := [];
+    lookups := [];
   |}.
 
   Definition concat {columns : Columns.t}
       (left right : t columns) : t columns := {|
     gates := left.(gates columns) ++ right.(gates columns);
+    lookups := left.(lookups columns) ++ right.(lookups columns);
   |}.
 
   Definition create_gate {columns : Columns.t}
       (self : t columns)
       (gate : Gate.t columns) : t columns := {|
     gates := self.(gates columns) ++ [gate];
+    lookups := self.(lookups columns);
+  |}.
+
+  Definition create_lookup {columns : Columns.t}
+      (self : t columns)
+      (lookup : LookupArgument.t columns) : t columns := {|
+    gates := self.(gates columns);
+    lookups := self.(lookups columns) ++ [lookup];
   |}.
 End ConstraintSystem.

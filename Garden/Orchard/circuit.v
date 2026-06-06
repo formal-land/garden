@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Garden.Halo2.Gadgets.LookupRangeCheck.
 Require Garden.Orchard.circuit.gadget.add_chip.
 
 Import ListNotations.
@@ -17,20 +18,6 @@ Module Advice.
   | A7
   | A8
   | A9.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | A0 => 0
-    | A1 => 1
-    | A2 => 2
-    | A3 => 3
-    | A4 => 4
-    | A5 => 5
-    | A6 => 6
-    | A7 => 7
-    | A8 => 8
-    | A9 => 9
-    end.
 End Advice.
 
 Module Lookup.
@@ -38,13 +25,6 @@ Module Lookup.
   | TableIdx
   | TableX
   | TableY.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | TableIdx => 0
-    | TableX => 1
-    | TableY => 2
-    end.
 End Lookup.
 
 Module Fixed.
@@ -56,41 +36,22 @@ Module Fixed.
   | LagrangeCoeffs4
   | LagrangeCoeffs5
   | LagrangeCoeffs6
-  | LagrangeCoeffs7.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | LagrangeCoeffs0 => 0
-    | LagrangeCoeffs1 => 1
-    | LagrangeCoeffs2 => 2
-    | LagrangeCoeffs3 => 3
-    | LagrangeCoeffs4 => 4
-    | LagrangeCoeffs5 => 5
-    | LagrangeCoeffs6 => 6
-    | LagrangeCoeffs7 => 7
-    end.
+  | LagrangeCoeffs7
+  | Lookup (lookup : Lookup.t).
 End Fixed.
 
 Module Instance_.
   Inductive t : Set :=
   | Primary.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | Primary => 0
-    end.
 End Instance_.
 
 Module Selector.
   Inductive t : Set :=
   | QOrchard
-  | QAdd.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | QOrchard => 0
-    | QAdd => 1
-    end.
+  | QAdd
+  | QLookup
+  | QRunning
+  | QBitshift.
 End Selector.
 
 Definition columns : Columns.t := {|
@@ -133,4 +94,13 @@ Definition configure
       Advice.A7
       Advice.A8
       Advice.A6 in
+  let meta :=
+    Garden.Halo2.Gadgets.LookupRangeCheck.configure
+      10
+      meta
+      Selector.QLookup
+      Selector.QRunning
+      Selector.QBitshift
+      Advice.A9
+      (Fixed.Lookup Lookup.TableIdx) in
   meta.

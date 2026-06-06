@@ -20,6 +20,9 @@ orchard/src/circuit.rs
 
 orchard/src/circuit/gadget/add_chip.rs
   -> Garden/Orchard/circuit/gadget/add_chip.v
+
+halo2_gadgets/src/utilities/lookup_range_check.rs
+  -> Garden/Halo2/Gadgets/LookupRangeCheck.v
 ```
 
 ## Imports
@@ -41,12 +44,6 @@ Module Advice.
   Inductive t : Set :=
   | A0
   | A1.
-
-  Definition to_index (self : t) : Z :=
-    match self with
-    | A0 => 0
-    | A1 => 1
-    end.
 End Advice.
 ```
 
@@ -77,6 +74,18 @@ Canonical columns.
 Use `Empty_set` for a column family that is not present in the translated
 component.
 
+Halo2 `TableColumn`s are represented through the fixed-column family for now.
+When a circuit has an explicit lookup-table column type, wrap it in the fixed
+column type:
+
+```coq
+Module Fixed.
+  Inductive t : Set :=
+  | LagrangeCoeffs0
+  | Lookup (lookup : Lookup.t).
+End Fixed.
+```
+
 ## Configure Functions
 
 Rust `configure` mutates `meta`. In Rocq, we thread a pure value:
@@ -102,6 +111,10 @@ Definition configure {columns : Columns.t}
 
 The caller chooses whether to keep the returned configuration data. For now, we
 only thread and return the updated `meta`.
+
+`meta.enable_equality(...)` is currently omitted from the Rocq semantics. Do not
+add a placeholder event for it unless the shared DSL starts tracking equality
+state.
 
 ## Gates
 
@@ -132,6 +145,37 @@ meta
 
 Put query-like `let` bindings inside `Gate.constraints`, matching the Rust gate
 closure body.
+
+## Lookups
+
+Rust:
+
+```rust
+meta.lookup(|meta| {
+    let q = meta.query_selector(q);
+    let value = meta.query_advice(advice, Rotation::cur());
+
+    vec![(q * value, table_idx)]
+});
+```
+
+Rocq:
+
+```coq
+let meta := ConstraintSystem.create_lookup meta {|
+  LookupArgument.pairs :=
+    let q := Expression.Selector q in
+    let value := Expression.Advice advice Rotation.cur in
+    [
+      (q *E value, table_idx)
+    ];
+|} in
+meta
+```
+
+Lookup arguments are stored separately from gates in `ConstraintSystem.t`.
+`LookupArgument.pairs` contains expression/table-column pairs, where the table
+column is represented as a fixed column.
 
 ## Constraint Names
 
