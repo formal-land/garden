@@ -20,6 +20,8 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `Garden/Orchard/columns.v`: absolute Orchard column constructors used by the
   Orchard-specialized translation.
 - `Garden/Orchard/circuit.v`: top-level Orchard configure translation.
+- `Garden/Orchard/circuit_generated.v`: generated numeric-index Orchard
+  configure snapshot emitted by the Rust generator in Orchard/Halo2.
 
 ## Maintenance Rules
 

@@ -18,6 +18,9 @@ Orchard files mirror the Rust module path where practical:
 orchard/src/circuit.rs
   -> Garden/Orchard/circuit.v
 
+orchard/src/circuit_data/action_circuit.highlevel.json
+  -> Garden/Orchard/circuit_generated.v
+
 orchard/src/circuit/gadget/add_chip.rs
   -> Garden/Orchard/circuit/gadget/add_chip.v
 
@@ -167,6 +170,42 @@ generic gadgets.
 `meta.enable_equality(...)` is currently omitted from the Rocq semantics. Do not
 add a placeholder event for it unless the shared DSL starts tracking equality
 state.
+
+## Generated Configure Snapshot
+
+`Garden/Orchard/circuit_generated.v` is generated from the Halo2
+`ConstraintSystem` data by Rust code in `halo2_proofs::dev`, through an ignored
+Orchard test:
+
+```sh
+cd orchard
+cargo +1.85.1 test generate_action_circuit_configure_rocq -- --ignored --nocapture
+```
+
+The generated file defines:
+
+```coq
+Definition indexed_columns : Columns.t := {|
+  Columns.Selector := Z;
+  Columns.Fixed := Z;
+  Columns.Advice := Z;
+  Columns.Instance_ := Z;
+|}.
+Canonical indexed_columns.
+
+Definition configure : ConstraintSystem.t indexed_columns := ...
+```
+
+This snapshot currently contains only configure-time gates and lookups, using
+numeric Halo2 column and selector indices. It intentionally does not encode the
+extra Halo2 metadata such as query tables, equality/permutation columns,
+constants, or minimum degree; those remain available in the high-level JSON
+artifact.
+
+The generated file declares `indexed_columns` as a canonical structure so Rocq
+can infer the `Columns.t` parameter from numeric `Z` column arguments. This
+keeps generated expressions readable, for example `Expression.Selector 0`
+instead of `@Expression.Selector indexed_columns 0`.
 
 ## Gates
 
