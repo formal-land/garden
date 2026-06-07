@@ -73,193 +73,251 @@ Lemma mds_inv_mul_mds_identity (state : State.t) :
       M.map_mod state.
 Admitted.
 
-Lemma mds_inv_mul_injective (left right : State.t) :
-    mds_inv_mul (M.map_mod left) = mds_inv_mul (M.map_mod right) ->
+Lemma mds_inv_mul_injective
+    (left right : State.t)
+    (H : mds_inv_mul (M.map_mod left) = mds_inv_mul (M.map_mod right)) :
     M.map_mod left = M.map_mod right.
 Proof.
-  intros H.
   rewrite <- (mds_mul_mds_inv_identity left).
   rewrite <- (mds_mul_mds_inv_identity right).
   now rewrite H.
 Qed.
 
 Definition pow5 (value : Z) : Z :=
-  (((value *F value) *F value) *F value) *F value.
+  let value_2 := value *F value in
+  let value_4 := value_2 *F value_2 in
+  value_4 *F value.
 
 Module FullRound.
-  Theorem deterministic_from_evaluation
-      (assignment : Assignment.t columns)
-      (row nb_rows : Z) :
-      eval_selector assignment row Selector.QPoseidonFull <> 0 ->
-      eval_gate assignment row nb_rows Pow5.full_round_gate ->
-      eval_expression
-        assignment
-        row
-        nb_rows
-        (Expression.Advice Advice.A6 Rotation.next) =
-        eval_expression assignment row nb_rows (Pow5.full_round_sum 0) /\
-      eval_expression
-        assignment
-        row
-        nb_rows
-        (Expression.Advice Advice.A7 Rotation.next) =
-        eval_expression assignment row nb_rows (Pow5.full_round_sum 1) /\
-      eval_expression
-        assignment
-        row
-        nb_rows
-        (Expression.Advice Advice.A8 Rotation.next) =
-        eval_expression assignment row nb_rows (Pow5.full_round_sum 2).
-  Admitted.
-
-  Definition sbox_state
-      (state round_constants : State.t)
-      : State.t := {|
-    State.x0 :=
-      pow5
-        (state.(State.x0) +F round_constants.(State.x0));
-    State.x1 :=
-      pow5
-        (state.(State.x1) +F round_constants.(State.x1));
-    State.x2 :=
-      pow5
-        (state.(State.x2) +F round_constants.(State.x2));
-  |}.
+  Definition output_coordinate
+      (row : nat)
+      (state_0 state_1 state_2 : Z)
+      (round_constant_0 round_constant_1 round_constant_2 : Z)
+      : Z :=
+    let state_0_sbox := pow5 (state_0 +F round_constant_0) in
+    let state_1_sbox := pow5 (state_1 +F round_constant_1) in
+    let state_2_sbox := pow5 (state_2 +F round_constant_2) in
+    state_0_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 0) +F
+    state_1_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 1) +F
+    state_2_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 2).
 
   Definition output
-      (state round_constants : State.t)
-      : State.t :=
-    mds_mul (sbox_state state round_constants).
+      (state_0 state_1 state_2 : Z)
+      (round_constant_0 round_constant_1 round_constant_2 : Z)
+      : State.t := {|
+    State.x0 :=
+      output_coordinate
+        0
+        state_0
+        state_1
+        state_2
+        round_constant_0
+        round_constant_1
+        round_constant_2;
+    State.x1 :=
+      output_coordinate
+        1
+        state_0
+        state_1
+        state_2
+        round_constant_0
+        round_constant_1
+        round_constant_2;
+    State.x2 :=
+      output_coordinate
+        2
+        state_0
+        state_1
+        state_2
+        round_constant_0
+        round_constant_1
+        round_constant_2;
+  |}.
 
-  Definition constraints
-      (state round_constants next_state : State.t)
-      : Prop :=
-    next_state = output state round_constants.
-
-  Theorem deterministic (state round_constants left right : State.t) :
-      constraints state round_constants left ->
-      constraints state round_constants right ->
-      left = right.
+  Theorem deterministic
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QPoseidonFull ⟧ ρ <> 0)
+      (Hgate : ⟦ Pow5.full_round_gate ⟧ ρ) :
+      {|
+        State.x0 := ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ ρ;
+        State.x1 := ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ ρ;
+        State.x2 := ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ ρ;
+      |} =
+        output
+          (⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ ρ).
   Proof.
-    intros Hleft Hright.
-    transitivity (output state round_constants).
-    { exact Hleft. }
-    now symmetry.
+    unfold output, output_coordinate, pow5.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
+      cbn in *.
+    hauto lq: on.
   Qed.
+
 End FullRound.
 
 Module PartialRound.
-  Definition first_sbox_value
-      (state rc_a : State.t)
-      : Z :=
-    pow5 (state.(State.x0) +F rc_a.(State.x0)).
-
-  Definition pre_mix
-      (state rc_a : State.t)
-      (mid_0 : Z)
-      : State.t := {|
-    State.x0 := UnOp.from mid_0;
-    State.x1 := state.(State.x1) +F rc_a.(State.x1);
-    State.x2 := state.(State.x2) +F rc_a.(State.x2);
-  |}.
-
-  Definition mid
-      (state rc_a : State.t)
-      (mid_0 : Z)
-      : State.t :=
-    mds_mul (pre_mix state rc_a mid_0).
-
-  Definition target_after_inverse
-      (state rc_a rc_b : State.t)
-      (mid_0 : Z)
-      : State.t :=
-    let mixed := mid state rc_a mid_0 in {|
-      State.x0 :=
-        pow5
-          (mixed.(State.x0) +F rc_b.(State.x0));
-      State.x1 := mixed.(State.x1) +F rc_b.(State.x1);
-      State.x2 := mixed.(State.x2) +F rc_b.(State.x2);
-    |}.
-
   Definition output
-      (state rc_a rc_b : State.t)
-      : State.t :=
-    mds_mul
-      (target_after_inverse
-        state
-        rc_a
-        rc_b
-        (first_sbox_value state rc_a)).
-
-  Definition constraints
-      (state rc_a rc_b : State.t)
-      (mid_0 : Z)
-      (next_state : State.t)
-      : Prop :=
-    mid_0 = first_sbox_value state rc_a /\
-    mds_inv_mul next_state =
-      target_after_inverse state rc_a rc_b mid_0.
-
-  Lemma constraints_imply_output
-      (state rc_a rc_b : State.t)
-      (mid_0 : Z)
-      (next_state : State.t) :
-      constraints state rc_a rc_b mid_0 next_state ->
-      M.map_mod next_state = M.map_mod (output state rc_a rc_b).
+      (state_0 state_1 state_2 : Z)
+      (round_constant_a_0 round_constant_a_1 round_constant_a_2 : Z)
+      (round_constant_b_0 round_constant_b_1 round_constant_b_2 : Z)
+      : State.t.
   Admitted.
 
   Theorem deterministic
-      (state rc_a rc_b : State.t)
-      (left_mid_0 right_mid_0 : Z)
-      (left_next right_next : State.t) :
-      constraints state rc_a rc_b left_mid_0 left_next ->
-      constraints state rc_a rc_b right_mid_0 right_next ->
-      left_mid_0 = right_mid_0 /\
-      M.map_mod left_next = M.map_mod right_next.
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QPoseidonPartial ⟧ ρ <> 0)
+      (Hgate : ⟦ Pow5.partial_rounds_gate ⟧ ρ) :
+      {|
+        State.x0 := ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ ρ;
+        State.x1 := ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ ρ;
+        State.x2 := ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ ρ;
+      |} =
+        output
+          (⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ).
+  Admitted.
+
+  Theorem deterministic_from_evaluation
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QPoseidonPartial ⟧ ρ <> 0)
+      (Hgate : ⟦ Pow5.partial_rounds_gate ⟧ ρ) :
+      ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ ρ =
+        ⟦
+          Pow5.pow_5
+            (Expression.Advice Advice.A6 Rotation.cur
+              ➕ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur)
+        ⟧ ρ /\
+      {|
+        State.x0 := ⟦ Pow5.next 0 ⟧ ρ;
+        State.x1 := ⟦ Pow5.next 1 ⟧ ρ;
+        State.x2 := ⟦ Pow5.next 2 ⟧ ρ;
+      |} =
+        {|
+          State.x0 :=
+            ⟦
+              Pow5.pow_5
+                (Pow5.mid 0
+                  ➕ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur)
+            ⟧ ρ;
+          State.x1 :=
+            ⟦
+              Pow5.mid 1
+                ➕ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur
+            ⟧ ρ;
+          State.x2 :=
+            ⟦
+              Pow5.mid 2
+                ➕ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur
+            ⟧ ρ;
+        |}.
   Proof.
-    intros Hleft Hright.
-    destruct Hleft as [Hleft_mid Hleft_next].
-    destruct Hright as [Hright_mid Hright_next].
+    change
+      (eval_selector
+        ρ.(Evaluation.assignment)
+        ρ.(Evaluation.row)
+        ρ.(Evaluation.nb_rows)
+        Selector.QPoseidonPartial <> 0) in Hselector.
+    change
+      (eval_gate
+        ρ.(Evaluation.assignment)
+        ρ.(Evaluation.row)
+        ρ.(Evaluation.nb_rows)
+        Pow5.partial_rounds_gate) in Hgate.
+    unfold Pow5.partial_rounds_gate in Hgate.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
+      cbn in Hgate.
+    destruct Hgate as [Hmid_0 Hgate].
+    destruct Hgate as [Hnext_0 Hgate].
+    destruct Hgate as [Hnext_1 Hnext_2].
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
+      cbn in Hmid_0, Hnext_0, Hnext_1, Hnext_2.
     split.
     {
-      now rewrite Hleft_mid, Hright_mid.
+      symmetry.
+      apply Hmid_0.
+      exact Hselector.
     }
-    transitivity
-      (M.map_mod (output state rc_a rc_b)).
+    assert
+      (Hnext_0_eq :
+        ⟦ Pow5.next 0 ⟧ ρ =
+          ⟦
+            Pow5.pow_5
+              (Pow5.mid 0
+                ➕ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur)
+          ⟧ ρ).
     {
-      apply (constraints_imply_output state rc_a rc_b left_mid_0 left_next).
-      split; assumption.
+      symmetry.
+      apply Hnext_0.
+      exact Hselector.
     }
-    symmetry.
-    apply (constraints_imply_output state rc_a rc_b right_mid_0 right_next).
-    split; assumption.
+    assert
+      (Hnext_1_eq :
+        ⟦ Pow5.next 1 ⟧ ρ =
+          ⟦
+            Pow5.mid 1
+              ➕ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur
+          ⟧ ρ).
+    {
+      symmetry.
+      apply Hnext_1.
+      exact Hselector.
+    }
+    assert
+      (Hnext_2_eq :
+        ⟦ Pow5.next 2 ⟧ ρ =
+          ⟦
+            Pow5.mid 2
+              ➕ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur
+          ⟧ ρ).
+    {
+      symmetry.
+      apply Hnext_2.
+      exact Hselector.
+    }
+    now rewrite Hnext_0_eq, Hnext_1_eq, Hnext_2_eq.
   Qed.
 End PartialRound.
 
 Module PadAndAdd.
   Definition output
-      (previous input : State.t)
+      (previous_state_0 previous_state_1 previous_state_2 : Z)
+      (current_state_0 current_state_1 : Z)
       : State.t := {|
-    State.x0 :=
-      previous.(State.x0) +F input.(State.x0);
-    State.x1 :=
-      previous.(State.x1) +F input.(State.x1);
-    State.x2 := UnOp.from previous.(State.x2);
+    State.x0 := previous_state_0 +F current_state_0;
+    State.x1 := previous_state_1 +F current_state_1;
+    State.x2 := previous_state_2;
   |}.
 
-  Definition constraints
-      (previous input next_state : State.t)
-      : Prop :=
-    next_state = output previous input.
-
-  Theorem deterministic (previous input left right : State.t) :
-      constraints previous input left ->
-      constraints previous input right ->
-      left = right.
+  Theorem deterministic
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QPoseidonPadAndAdd ⟧ ρ <> 0)
+      (Hgate : ⟦ Pow5.pad_and_add_gate ⟧ ρ) :
+      {|
+        State.x0 := ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ ρ;
+        State.x1 := ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ ρ;
+        State.x2 := ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ ρ;
+      |} =
+        output
+          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ).
   Proof.
-    intros Hleft Hright.
-    transitivity (output previous input).
-    { exact Hleft. }
-    now symmetry.
+    unfold output.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
+      cbn in *.
+    hauto lq: on.
   Qed.
 End PadAndAdd.

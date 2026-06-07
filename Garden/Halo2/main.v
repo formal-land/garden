@@ -107,6 +107,7 @@ Module Constraints.
         let '(name, constraint) := constraint in
         (name, Constraint.Select selector constraint))
       constraints.
+  Arguments with_selector {_} _ _ /.
 End Constraints.
 
 Module Gate.
