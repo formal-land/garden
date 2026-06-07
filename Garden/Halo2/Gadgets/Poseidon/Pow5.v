@@ -1,5 +1,6 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Orchard.columns.
+Require Garden.Halo2.Gadgets.Poseidon.P128Pow5T3.
 Require Garden.Halo2.Gadgets.Utilities.
 
 Import ListNotations.
@@ -10,16 +11,11 @@ Definition pow_5
     (value : Expression.t columns)
     : Expression.t columns :=
   let value_2 := Garden.Halo2.Gadgets.Utilities.square value in
-  Garden.Halo2.Gadgets.Utilities.square value_2 *E value.
-
-Definition matrix_coeff (_row column : nat) : Z :=
-  match column with
-  | O => 1
-  | S O => 1
-  | _ => 1
-  end.
+  let value_4 := Garden.Halo2.Gadgets.Utilities.square value_2 in
+  value_4 *E value.
 
 Definition full_round_sum
+    (row : nat)
     : Expression.t columns :=
   let state_0 := Expression.Advice Advice.A6 Rotation.cur in
   let state_1 := Expression.Advice Advice.A7 Rotation.cur in
@@ -27,9 +23,12 @@ Definition full_round_sum
   let rc_a_0 := Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur in
   let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
   let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
-  (pow_5 (state_0 +E rc_a_0) *Z matrix_coeff 0 0)
-    +E (pow_5 (state_1 +E rc_a_1) *Z matrix_coeff 0 1)
-    +E (pow_5 (state_2 +E rc_a_2) *Z matrix_coeff 0 2).
+  let state_0_sbox := pow_5 (state_0 +E rc_a_0) in
+  let state_1_sbox := pow_5 (state_1 +E rc_a_1) in
+  let state_2_sbox := pow_5 (state_2 +E rc_a_2) in
+  (state_0_sbox *Z (P128Pow5T3.mds_coeff row 0))
+    +E (state_1_sbox *Z (P128Pow5T3.mds_coeff row 1))
+    +E (state_2_sbox *Z (P128Pow5T3.mds_coeff row 2)).
 
 Definition mid
     (row : nat)
@@ -39,9 +38,9 @@ Definition mid
   let state_2 := Expression.Advice Advice.A8 Rotation.cur in
   let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
   let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
-  (mid_0 *Z matrix_coeff row 0)
-    +E ((state_1 +E rc_a_1) *Z matrix_coeff row 1)
-    +E ((state_2 +E rc_a_2) *Z matrix_coeff row 2).
+  (mid_0 *Z (P128Pow5T3.mds_coeff row 0))
+    +E ((state_1 +E rc_a_1) *Z (P128Pow5T3.mds_coeff row 1))
+    +E ((state_2 +E rc_a_2) *Z (P128Pow5T3.mds_coeff row 2)).
 
 Definition next
     (row : nat)
@@ -49,9 +48,9 @@ Definition next
   let state_0 := Expression.Advice Advice.A6 Rotation.next in
   let state_1 := Expression.Advice Advice.A7 Rotation.next in
   let state_2 := Expression.Advice Advice.A8 Rotation.next in
-  (state_0 *Z matrix_coeff row 0)
-    +E (state_1 *Z matrix_coeff row 1)
-    +E (state_2 *Z matrix_coeff row 2).
+  (state_0 *Z (P128Pow5T3.mds_inv_coeff row 0))
+    +E (state_1 *Z (P128Pow5T3.mds_inv_coeff row 1))
+    +E (state_2 *Z (P128Pow5T3.mds_inv_coeff row 2)).
 
 Definition configure
     (meta : ConstraintSystem.t columns)
@@ -63,9 +62,9 @@ Definition configure
       let state_1_next := Expression.Advice Advice.A7 Rotation.next in
       let state_2_next := Expression.Advice Advice.A8 Rotation.next in
       Constraints.with_selector Selector.QPoseidonFull [
-        (None, full_round_sum -E state_0_next);
-        (None, full_round_sum -E state_1_next);
-        (None, full_round_sum -E state_2_next)
+        (None, full_round_sum 0 -E state_0_next);
+        (None, full_round_sum 1 -E state_1_next);
+        (None, full_round_sum 2 -E state_2_next)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|

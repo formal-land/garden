@@ -36,6 +36,9 @@ halo2_gadgets/src/ecc/chip/*.rs
 halo2_gadgets/src/poseidon/pow5.rs
   -> Garden/Halo2/Gadgets/Poseidon/Pow5.v
 
+halo2_poseidon/src/p128pow5t3.rs and halo2_poseidon/src/fp.rs
+  -> Garden/Halo2/Gadgets/Poseidon/P128Pow5T3.v
+
 halo2_gadgets/src/sinsemilla/chip.rs
   -> Garden/Halo2/Gadgets/Sinsemilla/chip.v
 
