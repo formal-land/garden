@@ -52,10 +52,7 @@ Definition next
     ➕ (state_1 ● (P128Pow5T3.mds_inv_coeff row 1))
     ➕ (state_2 ● (P128Pow5T3.mds_inv_coeff row 2)).
 
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
+Definition full_round_gate : Gate.t columns := {|
     Gate.name := "full round";
     Gate.constraints :=
       let state_0_next := Expression.Advice Advice.A6 Rotation.next in
@@ -66,8 +63,9 @@ Definition configure
         (None, Constraint.Equal (full_round_sum 1) state_1_next);
         (None, Constraint.Equal (full_round_sum 2) state_2_next)
       ];
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
+  |}.
+
+Definition partial_rounds_gate : Gate.t columns := {|
     Gate.name := "partial rounds";
     Gate.constraints :=
       let cur_0 := Expression.Advice Advice.A6 Rotation.cur in
@@ -82,8 +80,9 @@ Definition configure
         (None, Constraint.Equal (mid 1 ➕ rc_b_1) (next 1));
         (None, Constraint.Equal (mid 2 ➕ rc_b_2) (next 2))
       ];
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
+  |}.
+
+Definition pad_and_add_gate : Gate.t columns := {|
     Gate.name := "pad-and-add";
     Gate.constraints :=
       let state_0_prev := Expression.Advice Advice.A6 Rotation.prev in
@@ -99,5 +98,12 @@ Definition configure
         (None, Constraint.Equal (state_1_prev ➕ state_1_cur) state_1_next);
         (None, Constraint.Equal state_2_prev state_2_next)
       ];
-  |} in
+  |}.
+
+Definition configure
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  let meta := ConstraintSystem.create_gate meta full_round_gate in
+  let meta := ConstraintSystem.create_gate meta partial_rounds_gate in
+  let meta := ConstraintSystem.create_gate meta pad_and_add_gate in
   meta.

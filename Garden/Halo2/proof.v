@@ -84,10 +84,8 @@ Section Semantics.
       : Prop :=
     match constraint with
     | Constraint.Select selector constraint =>
-        if Z.odd (eval_selector assignment row selector) then
+        eval_selector assignment row selector <> 0 ->
           eval_constraint assignment row nb_rows constraint
-        else
-          True
     | Constraint.Equal lhs rhs =>
         eval_expression assignment row nb_rows lhs =
           eval_expression assignment row nb_rows rhs
