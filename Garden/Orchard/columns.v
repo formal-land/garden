@@ -32,6 +32,8 @@ Module Fixed.
   | LagrangeCoeffs6
   | LagrangeCoeffs7
   | FixedZ
+  | QSinsemilla2_1
+  | QSinsemilla2_2
   | Lookup (lookup : Lookup.t).
 End Fixed.
 
@@ -63,7 +65,18 @@ Module Selector.
   | QMulFixedRunningSum
   | QMulFixedFull
   | QMulFixedShort
-  | QMulFixedBaseField.
+  | QMulFixedBaseField
+  | QPoseidonFull
+  | QPoseidonPartial
+  | QPoseidonPadAndAdd
+  | QSinsemilla1_1
+  | QSinsemilla4_1
+  | QSinsemilla1_2
+  | QSinsemilla4_2
+  | QCondSwap1
+  | QCondSwap2
+  | QMerkleDecompose1
+  | QMerkleDecompose2.
 End Selector.
 
 Definition columns : Columns.t := {|

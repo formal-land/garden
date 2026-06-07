@@ -26,6 +26,18 @@ halo2_gadgets/src/utilities/lookup_range_check.rs
 
 halo2_gadgets/src/ecc/chip/*.rs
   -> Garden/Halo2/Gadgets/Ecc/chip/*.v
+
+halo2_gadgets/src/poseidon/pow5.rs
+  -> Garden/Halo2/Gadgets/Poseidon/Pow5.v
+
+halo2_gadgets/src/sinsemilla/chip.rs
+  -> Garden/Halo2/Gadgets/Sinsemilla/chip.v
+
+halo2_gadgets/src/sinsemilla/merkle/chip.rs
+  -> Garden/Halo2/Gadgets/Sinsemilla/merkle/chip.v
+
+halo2_gadgets/src/utilities/cond_swap.rs
+  -> Garden/Halo2/Gadgets/Utilities/CondSwap.v
 ```
 
 When Rust submodules need to share translated column bundles without creating
@@ -139,8 +151,9 @@ Definition configure
     : ConstraintSystem.t columns := ...
 ```
 
-This is the current style for the ECC translation, because the active proof
-target is Orchard rather than a reusable generic ECC gadget.
+This is the current style for the ECC, Poseidon, Sinsemilla, and Merkle
+translations, because the active proof target is Orchard rather than reusable
+generic gadgets.
 
 `meta.enable_equality(...)` is currently omitted from the Rocq semantics. Do not
 add a placeholder event for it unless the shared DSL starts tracking equality

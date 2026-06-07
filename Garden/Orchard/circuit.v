@@ -1,6 +1,9 @@
 Require Import Garden.Halo2.main.
 Require Garden.Halo2.Gadgets.LookupRangeCheck.
 Require Garden.Halo2.Gadgets.Ecc.chip.
+Require Garden.Halo2.Gadgets.Poseidon.Pow5.
+Require Garden.Halo2.Gadgets.Sinsemilla.chip.
+Require Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.
 Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.gadget.add_chip.
 
@@ -47,5 +50,20 @@ Definition configure
       (Fixed.Lookup Lookup.TableIdx) in
   let meta :=
     Garden.Halo2.Gadgets.Ecc.chip.configure
+      meta in
+  let meta :=
+    Garden.Halo2.Gadgets.Poseidon.Pow5.configure
+      meta in
+  let meta :=
+    Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1
+      meta in
+  let meta :=
+    Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1
+      meta in
+  let meta :=
+    Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2
+      meta in
+  let meta :=
+    Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2
       meta in
   meta.
