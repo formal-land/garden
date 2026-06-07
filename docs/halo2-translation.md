@@ -291,3 +291,16 @@ Garden/Halo2/Gadgets/Utilities.v
 
 Examples include `square`, `range_check`, `bool_check`, `ternary`, and
 `pow_expr`.
+
+## Proof Workflow
+
+The detailed proof-facing conventions live in:
+
+```text
+docs/halo2-proof.md
+```
+
+Use that document for the current patterns around `Evaluation.t`,
+`⟦ x ⟧ ρ`, selector-active determinism theorems, Poseidon output functions,
+`with_strategy opaque [...] cbn`, Hammer replacement tactics, and local proof
+timing with Rocq `Time`.
