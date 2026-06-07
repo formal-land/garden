@@ -1,8 +1,8 @@
 # Halo2 Translation Conventions
 
 This file records the current conventions for translating Halo2 Rust circuit
-code into Garden/Rocq. Keep it close to the code: update this when the Rocq DSL
-or translation style changes.
+code into Garden/Rocq. Keep it current with the code: update this when the Rocq
+DSL or translation style changes.
 
 ## File Layout
 
