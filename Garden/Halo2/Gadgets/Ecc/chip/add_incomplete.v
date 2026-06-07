@@ -18,13 +18,13 @@ Definition configure
       let x_r := Expression.Advice Advice.A2 Rotation.next in
       let y_r := Expression.Advice Advice.A3 Rotation.next in
       let poly1 :=
-        (x_r +E x_q +E x_p)
-          *E (x_p -E x_q)
-          *E (x_p -E x_q)
-          -E Garden.Halo2.Gadgets.Utilities.square (y_p -E y_q) in
+        (x_r ➕ x_q ➕ x_p)
+          ✖️ (x_p ➖ x_q)
+          ✖️ (x_p ➖ x_q)
+          ➖ Garden.Halo2.Gadgets.Utilities.square (y_p ➖ y_q) in
       let poly2 :=
-        (y_r +E y_q) *E (x_p -E x_q)
-          -E (y_p -E y_q) *E (x_q -E x_r) in
+        (y_r ➕ y_q) ✖️ (x_p ➖ x_q)
+          ➖ (y_p ➖ y_q) ✖️ (x_q ➖ x_r) in
       Constraints.with_selector Selector.QAddIncomplete [
         (Some "x_r", Constraint.EqualZeroToPrecise poly1);
         (Some "y_r", Constraint.EqualZeroToPrecise poly2)

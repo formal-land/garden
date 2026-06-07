@@ -14,7 +14,7 @@ Definition configure
       let b := Expression.Advice Advice.A8 Rotation.cur in
       let c := Expression.Advice Advice.A6 Rotation.cur in
       Constraints.with_selector Selector.QAdd [
-        (None, Constraint.EqualZeroToPrecise (a +E b -E c))
+        (None, Constraint.EqualZeroToPrecise (a ➕ b ➖ c))
       ];
   |} in
   meta.

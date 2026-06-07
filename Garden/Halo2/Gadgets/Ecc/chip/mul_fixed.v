@@ -25,9 +25,9 @@ Definition interpolated_x
     : Expression.t columns :=
   List.fold_left
     (fun acc '(power, coeff) =>
-      acc +E
+      acc ➕
         (Garden.Halo2.Gadgets.Utilities.pow_expr window power
-          *E Expression.Fixed coeff Rotation.cur))
+          ✖️ Expression.Fixed coeff Rotation.cur))
     (List.combine
       (List.seq 0 Garden.Halo2.Gadgets.Ecc.chip.constants.h_nat)
       lagrange_coeffs)
@@ -40,13 +40,13 @@ Definition coords_check
   let x_p := Expression.Advice Advice.A0 Rotation.cur in
   let z := Expression.Fixed Fixed.FixedZ Rotation.cur in
   let u := Expression.Advice Advice.A5 Rotation.cur in
-  let x_check := interpolated_x window -E x_p in
+  let x_check := interpolated_x window ➖ x_p in
   let y_check :=
-    Garden.Halo2.Gadgets.Utilities.square u -E y_p -E z in
+    Garden.Halo2.Gadgets.Utilities.square u ➖ y_p ➖ z in
   let on_curve :=
     Garden.Halo2.Gadgets.Utilities.square y_p
-      -E Garden.Halo2.Gadgets.Utilities.square x_p *E x_p
-      -E Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b in
+      ➖ Garden.Halo2.Gadgets.Utilities.square x_p ✖️ x_p
+      ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b in
   [
     (Some "check x", Constraint.EqualZeroToPrecise x_check);
     (Some "check y", Constraint.EqualZeroToPrecise y_check);
@@ -68,8 +68,8 @@ Definition configure
       let z_cur := Expression.Advice Advice.A4 Rotation.cur in
       let z_next := Expression.Advice Advice.A4 Rotation.next in
       let word :=
-        z_cur -E
-          (z_next *Z Garden.Halo2.Gadgets.Ecc.chip.constants.h) in
+        z_cur ➖
+          (z_next ● Garden.Halo2.Gadgets.Ecc.chip.constants.h) in
       Constraints.with_selector
         Selector.QMulFixedRunningSum
         (coords_check word);

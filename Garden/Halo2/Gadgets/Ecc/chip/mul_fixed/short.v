@@ -20,9 +20,9 @@ Definition configure
       let last_window_check :=
         Garden.Halo2.Gadgets.Utilities.bool_check last_window in
       let sign_check :=
-        Garden.Halo2.Gadgets.Utilities.square sign -E one in
-      let y_check := (y_p -E y_a) *E (y_p +E y_a) in
-      let negation_check := sign *E y_p -E y_a in
+        Garden.Halo2.Gadgets.Utilities.square sign ➖ one in
+      let y_check := (y_p ➖ y_a) ✖️ (y_p ➕ y_a) in
+      let negation_check := sign ✖️ y_p ➖ y_a in
       Constraints.with_selector
         Selector.QMulFixedShort
         [

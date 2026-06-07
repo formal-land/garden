@@ -20,14 +20,14 @@ Definition configure {columns : Columns.t}
       let one := Expression.Constant 1 in
       let running_sum_lookup :=
         let z_next := Expression.Advice running_sum Rotation.next in
-        let running_sum_word := z_cur -E (z_next *Z two_pow_k) in
-        q_running *E running_sum_word in
+        let running_sum_word := z_cur ➖ (z_next ● two_pow_k) in
+        q_running ✖️ running_sum_word in
       let short_lookup :=
         let short_word := z_cur in
-        let q_short := one -E q_running in
-        q_short *E short_word in
+        let q_short := one ➖ q_running in
+        q_short ✖️ short_word in
       [
-        (q_lookup *E (running_sum_lookup +E short_lookup), table_idx)
+        (q_lookup ✖️ (running_sum_lookup ➕ short_lookup), table_idx)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -39,7 +39,7 @@ Definition configure {columns : Columns.t}
       Constraints.with_selector q_bitshift [
         (None,
           Constraint.EqualZeroToPrecise
-            (word *Z two_pow_k *E inv_two_pow_s -E shifted_word))
+            (word ● two_pow_k ✖️ inv_two_pow_s ➖ shifted_word))
       ];
   |} in
   meta.

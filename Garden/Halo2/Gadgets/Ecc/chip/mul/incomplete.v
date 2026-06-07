@@ -14,7 +14,7 @@ Definition x_r
   let x_a := Expression.Advice x_a rotation in
   let x_p := Expression.Advice x_p rotation in
   let lambda_1 := Expression.Advice lambda_1 rotation in
-  Garden.Halo2.Gadgets.Utilities.square lambda_1 -E x_a -E x_p.
+  Garden.Halo2.Gadgets.Utilities.square lambda_1 ➖ x_a ➖ x_p.
 
 Definition y_a
     (x_a x_p lambda_1 lambda_2 : Advice.t)
@@ -23,9 +23,9 @@ Definition y_a
   let x_a_expr := Expression.Advice x_a rotation in
   let lambda_1_expr := Expression.Advice lambda_1 rotation in
   let lambda_2_expr := Expression.Advice lambda_2 rotation in
-  ((lambda_1_expr +E lambda_2_expr)
-    *E (x_a_expr -E x_r x_a x_p lambda_1 rotation))
-    *Z Garden.Halo2.Gadgets.Ecc.chip.constants.two_inv.
+  ((lambda_1_expr ➕ lambda_2_expr)
+    ✖️ (x_a_expr ➖ x_r x_a x_p lambda_1 rotation))
+    ● Garden.Halo2.Gadgets.Ecc.chip.constants.two_inv.
 
 Definition for_loop
     (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
@@ -40,19 +40,19 @@ Definition for_loop
   let lambda1_cur := Expression.Advice lambda_1 Rotation.cur in
   let lambda2_cur := Expression.Advice lambda_2 Rotation.cur in
   let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
-  let k := z_cur -E (z_prev *Z 2) in
+  let k := z_cur ➖ (z_prev ● 2) in
   let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check k in
   let gradient_1 :=
-    lambda1_cur *E (x_a_cur -E x_p_cur)
-      -E y_a_cur
-      +E ((k *Z 2 -E Expression.Constant 1) *E y_p_cur) in
+    lambda1_cur ✖️ (x_a_cur ➖ x_p_cur)
+      ➖ y_a_cur
+      ➕ ((k ● 2 ➖ Expression.Constant 1) ✖️ y_p_cur) in
   let secant_line :=
     Garden.Halo2.Gadgets.Utilities.square lambda2_cur
-      -E x_a_next
-      -E x_r x_a x_p lambda_1 Rotation.cur
-      -E x_a_cur in
+      ➖ x_a_next
+      ➖ x_r x_a x_p lambda_1 Rotation.cur
+      ➖ x_a_cur in
   let gradient_2 :=
-    lambda2_cur *E (x_a_cur -E x_a_next) -E y_a_cur -E y_a_next in
+    lambda2_cur ✖️ (x_a_cur ➖ x_a_next) ➖ y_a_cur ➖ y_a_next in
   [
     (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
     (Some "gradient_1", Constraint.EqualZeroToPrecise gradient_1);
@@ -72,7 +72,7 @@ Definition configure
       let y_a_witnessed := Expression.Advice lambda_1 Rotation.cur in
       Constraints.with_selector q_mul_1 [
         (Some "init y_a",
-          Constraint.EqualZeroToPrecise (y_a_witnessed -E y_a_next))
+          Constraint.EqualZeroToPrecise (y_a_witnessed ➖ y_a_next))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -83,8 +83,8 @@ Definition configure
       let x_p_next := Expression.Advice x_p Rotation.next in
       let y_p_cur := Expression.Advice y_p Rotation.cur in
       let y_p_next := Expression.Advice y_p Rotation.next in
-      let x_p_check := x_p_cur -E x_p_next in
-      let y_p_check := y_p_cur -E y_p_next in
+      let x_p_check := x_p_cur ➖ x_p_next in
+      let y_p_check := y_p_cur ➖ y_p_next in
       Constraints.with_selector q_mul_2 (
         [
           (Some "x_p_check", Constraint.EqualZeroToPrecise x_p_check);

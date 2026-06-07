@@ -12,7 +12,7 @@ Definition pow_5
     : Expression.t columns :=
   let value_2 := Garden.Halo2.Gadgets.Utilities.square value in
   let value_4 := Garden.Halo2.Gadgets.Utilities.square value_2 in
-  value_4 *E value.
+  value_4 ✖️ value.
 
 Definition full_round_sum
     (row : nat)
@@ -23,12 +23,12 @@ Definition full_round_sum
   let rc_a_0 := Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur in
   let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
   let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
-  let state_0_sbox := pow_5 (state_0 +E rc_a_0) in
-  let state_1_sbox := pow_5 (state_1 +E rc_a_1) in
-  let state_2_sbox := pow_5 (state_2 +E rc_a_2) in
-  (state_0_sbox *Z (P128Pow5T3.mds_coeff row 0))
-    +E (state_1_sbox *Z (P128Pow5T3.mds_coeff row 1))
-    +E (state_2_sbox *Z (P128Pow5T3.mds_coeff row 2)).
+  let state_0_sbox := pow_5 (state_0 ➕ rc_a_0) in
+  let state_1_sbox := pow_5 (state_1 ➕ rc_a_1) in
+  let state_2_sbox := pow_5 (state_2 ➕ rc_a_2) in
+  (state_0_sbox ● (P128Pow5T3.mds_coeff row 0))
+    ➕ (state_1_sbox ● (P128Pow5T3.mds_coeff row 1))
+    ➕ (state_2_sbox ● (P128Pow5T3.mds_coeff row 2)).
 
 Definition mid
     (row : nat)
@@ -38,9 +38,9 @@ Definition mid
   let state_2 := Expression.Advice Advice.A8 Rotation.cur in
   let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
   let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
-  (mid_0 *Z (P128Pow5T3.mds_coeff row 0))
-    +E ((state_1 +E rc_a_1) *Z (P128Pow5T3.mds_coeff row 1))
-    +E ((state_2 +E rc_a_2) *Z (P128Pow5T3.mds_coeff row 2)).
+  (mid_0 ● (P128Pow5T3.mds_coeff row 0))
+    ➕ ((state_1 ➕ rc_a_1) ● (P128Pow5T3.mds_coeff row 1))
+    ➕ ((state_2 ➕ rc_a_2) ● (P128Pow5T3.mds_coeff row 2)).
 
 Definition next
     (row : nat)
@@ -48,9 +48,9 @@ Definition next
   let state_0 := Expression.Advice Advice.A6 Rotation.next in
   let state_1 := Expression.Advice Advice.A7 Rotation.next in
   let state_2 := Expression.Advice Advice.A8 Rotation.next in
-  (state_0 *Z (P128Pow5T3.mds_inv_coeff row 0))
-    +E (state_1 *Z (P128Pow5T3.mds_inv_coeff row 1))
-    +E (state_2 *Z (P128Pow5T3.mds_inv_coeff row 2)).
+  (state_0 ● (P128Pow5T3.mds_inv_coeff row 0))
+    ➕ (state_1 ● (P128Pow5T3.mds_inv_coeff row 1))
+    ➕ (state_2 ● (P128Pow5T3.mds_inv_coeff row 2)).
 
 Definition configure
     (meta : ConstraintSystem.t columns)
@@ -63,11 +63,11 @@ Definition configure
       let state_2_next := Expression.Advice Advice.A8 Rotation.next in
       Constraints.with_selector Selector.QPoseidonFull [
         (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 0 -E state_0_next));
+          (full_round_sum 0 ➖ state_0_next));
         (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 1 -E state_1_next));
+          (full_round_sum 1 ➖ state_1_next));
         (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 2 -E state_2_next))
+          (full_round_sum 2 ➖ state_2_next))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -81,13 +81,13 @@ Definition configure
       let rc_b_2 := Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur in
       Constraints.with_selector Selector.QPoseidonPartial [
         (None, Constraint.EqualZeroToPrecise
-          (pow_5 (cur_0 +E rc_a_0) -E mid_0));
+          (pow_5 (cur_0 ➕ rc_a_0) ➖ mid_0));
         (None, Constraint.EqualZeroToPrecise
-          (pow_5 (mid 0 +E rc_b_0) -E next 0));
+          (pow_5 (mid 0 ➕ rc_b_0) ➖ next 0));
         (None, Constraint.EqualZeroToPrecise
-          (mid 1 +E rc_b_1 -E next 1));
+          (mid 1 ➕ rc_b_1 ➖ next 1));
         (None, Constraint.EqualZeroToPrecise
-          (mid 2 +E rc_b_2 -E next 2))
+          (mid 2 ➕ rc_b_2 ➖ next 2))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -103,11 +103,11 @@ Definition configure
       let state_2_next := Expression.Advice Advice.A8 Rotation.next in
       Constraints.with_selector Selector.QPoseidonPadAndAdd [
         (None, Constraint.EqualZeroToPrecise
-          (state_0_prev +E state_0_cur -E state_0_next));
+          (state_0_prev ➕ state_0_cur ➖ state_0_next));
         (None, Constraint.EqualZeroToPrecise
-          (state_1_prev +E state_1_cur -E state_1_next));
+          (state_1_prev ➕ state_1_cur ➖ state_1_next));
         (None, Constraint.EqualZeroToPrecise
-          (state_2_prev -E state_2_next))
+          (state_2_prev ➖ state_2_next))
       ];
   |} in
   meta.

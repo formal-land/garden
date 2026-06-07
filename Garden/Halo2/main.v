@@ -67,15 +67,15 @@ Module Expression.
   Arguments Product {_}.
   Arguments Scaled {_}.
 
-  Notation "-E x" := (Negated x)
+  Notation "➖ x" := (Negated x)
     (at level 35, right associativity).
-  Notation "x +E y" := (Sum x y)
+  Notation "x ➕ y" := (Sum x y)
     (at level 50, left associativity).
-  Notation "x -E y" := (Sum x (Negated y))
+  Notation "x ➖ y" := (Sum x (Negated y))
     (at level 50, left associativity).
-  Notation "x *E y" := (Product x y)
+  Notation "x ✖️ y" := (Product x y)
     (at level 40, left associativity).
-  Notation "x *Z y" := (Scaled x y)
+  Notation "x ● y" := (Scaled x y)
     (at level 40, left associativity).
 End Expression.
 Export (notations) Expression.

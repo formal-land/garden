@@ -20,7 +20,7 @@ Definition x_r
   let x_a := Expression.Advice x_a rotation in
   let x_p := Expression.Advice x_p rotation in
   let lambda_1 := Expression.Advice lambda_1 rotation in
-  Garden.Halo2.Gadgets.Utilities.square lambda_1 -E x_a -E x_p.
+  Garden.Halo2.Gadgets.Utilities.square lambda_1 ➖ x_a ➖ x_p.
 
 Definition y_a
     (x_a x_p lambda_1 lambda_2 : Advice.t)
@@ -29,14 +29,14 @@ Definition y_a
   let x_a_expr := Expression.Advice x_a rotation in
   let lambda_1_expr := Expression.Advice lambda_1 rotation in
   let lambda_2_expr := Expression.Advice lambda_2 rotation in
-  (lambda_1_expr +E lambda_2_expr)
-    *E (x_a_expr -E x_r x_a x_p lambda_1 rotation).
+  (lambda_1_expr ➕ lambda_2_expr)
+    ✖️ (x_a_expr ➖ x_r x_a x_p lambda_1 rotation).
 
 Definition q_s3
     (q_sinsemilla2 : Fixed.t)
     : Expression.t columns :=
   let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
-  q_s2 *E (q_s2 -E Expression.Constant 1).
+  q_s2 ✖️ (q_s2 ➖ Expression.Constant 1).
 
 Definition configure_generator_table
     (meta : ConstraintSystem.t columns)
@@ -49,23 +49,23 @@ Definition configure_generator_table
       let q_s1 := Expression.Selector q_sinsemilla1 in
       let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
       let q_s3 := q_s3 q_sinsemilla2 in
-      let q_run := q_s2 -E q_s3 in
+      let q_run := q_s2 ➖ q_s3 in
       let z_cur := Expression.Advice bits Rotation.cur in
       let z_next := Expression.Advice bits Rotation.next in
-      let word := z_cur -E (q_run *E z_next *Z (2 ^ sinsemilla_k)) in
+      let word := z_cur ➖ (q_run ✖️ z_next ● (2 ^ sinsemilla_k)) in
       let x_p_expr := Expression.Advice x_p Rotation.cur in
       let lambda1 := Expression.Advice lambda_1 Rotation.cur in
       let x_a_expr := Expression.Advice x_a Rotation.cur in
       let y_p :=
         (y_a x_a x_p lambda_1 lambda_2 Rotation.cur
-          *Z Garden.Halo2.Gadgets.Ecc.chip.constants.two_inv)
-          -E (lambda1 *E (x_a_expr -E x_p_expr)) in
-      let not_q_s1 := Expression.Constant 1 -E q_s1 in
+          ● Garden.Halo2.Gadgets.Ecc.chip.constants.two_inv)
+          ➖ (lambda1 ✖️ (x_a_expr ➖ x_p_expr)) in
+      let not_q_s1 := Expression.Constant 1 ➖ q_s1 in
       [
-        (q_s1 *E word, Fixed.Lookup Lookup.TableIdx);
-        (q_s1 *E x_p_expr +E not_q_s1 *E Expression.Constant sinsemilla_s0_x,
+        (q_s1 ✖️ word, Fixed.Lookup Lookup.TableIdx);
+        (q_s1 ✖️ x_p_expr ➕ not_q_s1 ✖️ Expression.Constant sinsemilla_s0_x,
           Fixed.Lookup Lookup.TableX);
-        (q_s1 *E y_p +E not_q_s1 *E Expression.Constant sinsemilla_s0_y,
+        (q_s1 ✖️ y_p ➕ not_q_s1 ✖️ Expression.Constant sinsemilla_s0_y,
           Fixed.Lookup Lookup.TableY)
       ];
   |} in
@@ -94,7 +94,7 @@ Definition configure_instance
       let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
       Constraints.with_selector q_sinsemilla4 [
         (Some "init_y_q_check",
-          Constraint.EqualZeroToPrecise (y_q *Z 2 -E y_a_cur))
+          Constraint.EqualZeroToPrecise (y_q ● 2 ➖ y_a_cur))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -110,13 +110,13 @@ Definition configure_instance
       let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
       let secant_line :=
         Garden.Halo2.Gadgets.Utilities.square lambda_2_cur
-          -E (x_a_next +E x_r_cur +E x_a_cur) in
-      let lhs := lambda_2_cur *Z 4 *E (x_a_cur -E x_a_next) in
+          ➖ (x_a_next ➕ x_r_cur ➕ x_a_cur) in
+      let lhs := lambda_2_cur ● 4 ✖️ (x_a_cur ➖ x_a_next) in
       let rhs :=
-        (y_a_cur *Z 2)
-          +E ((Expression.Constant 2 -E q_s3) *E y_a_next)
-          +E (q_s3 *E Expression.Constant 2 *E lambda_1_next) in
-      let y_check := lhs -E rhs in
+        (y_a_cur ● 2)
+          ➕ ((Expression.Constant 2 ➖ q_s3) ✖️ y_a_next)
+          ➕ (q_s3 ✖️ Expression.Constant 2 ✖️ lambda_1_next) in
+      let y_check := lhs ➖ rhs in
       Constraints.with_selector q_sinsemilla1 [
         (Some "Secant line", Constraint.EqualZeroToPrecise secant_line);
         (Some "y check", Constraint.EqualZeroToPrecise y_check)

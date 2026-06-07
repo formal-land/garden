@@ -19,10 +19,10 @@ Definition configure_instance
       let b_swapped := Expression.Advice b_swapped Rotation.cur in
       let swap := Expression.Advice swap Rotation.cur in
       let a_check :=
-        a_swapped -E
+        a_swapped ➖
           Garden.Halo2.Gadgets.Utilities.ternary swap b a in
       let b_check :=
-        b_swapped -E
+        b_swapped ➖
           Garden.Halo2.Gadgets.Utilities.ternary swap a b in
       let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check swap in
       Constraints.with_selector q_swap [

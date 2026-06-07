@@ -219,7 +219,7 @@ let meta := ConstraintSystem.create_lookup meta {|
     let q := Expression.Selector q in
     let value := Expression.Advice advice Rotation.cur in
     [
-      (q *E value, table_idx)
+      (q ✖️ value, table_idx)
     ];
 |} in
 meta
@@ -256,9 +256,10 @@ Use the shared expression constructors and notations from `Garden.Halo2.main`:
 ```coq
 Expression.Advice Advice.A0 Rotation.cur
 Expression.Constant 1
-x +E y
-x -E y
-x *E y
+x ➕ y
+x ➖ y
+x ✖️ y
+x ● y
 ```
 
 For selected constraints, use:

@@ -30,15 +30,15 @@ Definition configure
       Constraints.with_selector Selector.QOrchard [
         (Some "v_old - v_new = magnitude * sign",
           Constraint.EqualZeroToPrecise
-            (v_old -E v_new -E (magnitude *E sign)));
+            (v_old ➖ v_new ➖ (magnitude ✖️ sign)));
         (Some "Either v_old = 0, or root = anchor",
-          Constraint.EqualZeroToPrecise (v_old *E (root -E anchor)));
+          Constraint.EqualZeroToPrecise (v_old ✖️ (root ➖ anchor)));
         (Some "v_old = 0 or enable_spends = 1",
           Constraint.EqualZeroToPrecise
-            (v_old *E (Expression.Constant 1 -E enable_spends)));
+            (v_old ✖️ (Expression.Constant 1 ➖ enable_spends)));
         (Some "v_new = 0 or enable_outputs = 1",
           Constraint.EqualZeroToPrecise
-            (v_new *E (Expression.Constant 1 -E enable_outputs)))
+            (v_new ✖️ (Expression.Constant 1 ➖ enable_outputs)))
       ];
   |} in
   let meta :=

@@ -17,7 +17,7 @@ Definition configure {columns : Columns.t}
       let z_cur := Expression.Advice z Rotation.cur in
       let z_next := Expression.Advice z Rotation.next in
       let two_pow_k := 2 ^ window_num_bits in
-      let word := z_cur -E (z_next *Z two_pow_k) in
+      let word := z_cur ➖ (z_next ● two_pow_k) in
       Constraints.with_selector q_range_check [
         (None,
           Constraint.EqualZeroToPrecise

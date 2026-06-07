@@ -51,18 +51,18 @@ Definition configure
       let y_p := Expression.Advice Advice.A1 Rotation.cur in
       let base_x := Expression.Advice Advice.A0 Rotation.next in
       let base_y := Expression.Advice Advice.A1 Rotation.next in
-      let lsb := z_0 -E (z_1 *Z 2) in
+      let lsb := z_0 ➖ (z_1 ● 2) in
       let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check lsb in
       let lsb_x :=
         Garden.Halo2.Gadgets.Utilities.ternary
           lsb
           x_p
-          (x_p -E base_x) in
+          (x_p ➖ base_x) in
       let lsb_y :=
         Garden.Halo2.Gadgets.Utilities.ternary
           lsb
           y_p
-          (y_p +E base_y) in
+          (y_p ➕ base_y) in
       Constraints.with_selector
         Selector.QMulLsb
         [

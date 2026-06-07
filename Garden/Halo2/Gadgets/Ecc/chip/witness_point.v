@@ -13,8 +13,8 @@ Definition curve_eqn
   let x := Expression.Advice x Rotation.cur in
   let y := Expression.Advice y Rotation.cur in
   Garden.Halo2.Gadgets.Utilities.square y
-    -E (Garden.Halo2.Gadgets.Utilities.square x *E x)
-    -E Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b.
+    ➖ (Garden.Halo2.Gadgets.Utilities.square x ✖️ x)
+    ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b.
 
 Definition configure
     (meta : ConstraintSystem.t columns)
@@ -27,10 +27,10 @@ Definition configure
       Constraints.with_selector Selector.QWitnessPoint [
         (Some "x == 0 v on_curve",
           Constraint.EqualZeroToPrecise
-            (x_cur *E curve_eqn Advice.A0 Advice.A1));
+            (x_cur ✖️ curve_eqn Advice.A0 Advice.A1));
         (Some "y == 0 v on_curve",
           Constraint.EqualZeroToPrecise
-            (y_cur *E curve_eqn Advice.A0 Advice.A1))
+            (y_cur ✖️ curve_eqn Advice.A0 Advice.A1))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
