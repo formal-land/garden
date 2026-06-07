@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.
 
@@ -14,12 +15,12 @@ Definition num_windows_short : Z := 22.
 
 Definition l_scalar_short : Z := 64.
 
-Definition t_q : Z := 45560315531506369815346746415080538113.
+Definition t_q : Z := Primes.t_q.
 
-Definition t_p : Z := 45560315531419706090280762371685220353.
+Definition t_p : Z := Primes.t_p.
 
 Definition pallas_b : Z := 5.
 
-Definition pallas_p : Z := 2 ^ 254 + t_p.
+Definition pallas_p : Z := Primes.pallas_p.
 
 Definition two_inv : Z := (pallas_p + 1) / 2.

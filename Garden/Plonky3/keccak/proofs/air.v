@@ -221,7 +221,7 @@ Proof.
 Qed.
 
 Definition p_goldilocks : Z :=
-  2^64 - 2^32 + 1.
+  Primes.goldilocks.
 
 (** As an experiment, we do the same proof as above but using an explicit value for the prime. The
     proof both happens to be faster and much simpler to write. *)

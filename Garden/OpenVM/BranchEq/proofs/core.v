@@ -19,7 +19,7 @@ Proof.
 Qed.
 
 Definition goldilocks_prime : Z :=
-  2^64 - 2^32 + 1.
+  Primes.goldilocks.
 
 Definition get_local_with_opcode {NUM_LIMBS : Z}
     (branch_equal_opcode : BranchEqualOpcode.t)

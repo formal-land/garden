@@ -139,40 +139,40 @@ End MakePrimeField.
 
 (* Define Mersenne31 prime as the prime parameter module *)
 Module Mersenne31Parameter <: PrimeParameter.
-  Definition p : Z := 2147483647.  (* 2^31 - 1 *)
+  Definition p : Z := Primes.mersenne31.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.mersenne31_prime. Qed.
 End Mersenne31Parameter.
 
 Module Mersenne31 := MakePrimeField(Mersenne31Parameter).
 
 (* Define BabyBear prime, 2^31 - 2^27 + 1, as the prime parameter module *)
 Module BabyBearParameter <: PrimeParameter.
-  Definition p : Z := 2^31 - 2^27 + 1.
+  Definition p : Z := Primes.baby_bear.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.baby_bear_prime. Qed.
 End BabyBearParameter.
 
 Module BabyBear := MakePrimeField(BabyBearParameter).
 
 
-(* Define KoalaBear prime field, 2^31 - 2^24 + 1 *)
+(* Define KoalaBear prime field. *)
 Module KoalaBearParameter <: PrimeParameter.
-  Definition p : Z := 2^31 - 2^27 + 1.
+  Definition p : Z := Primes.koala_bear.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.koala_bear_prime. Qed.
 End KoalaBearParameter.
 
 Module KoalaBear := MakePrimeField(KoalaBearParameter).
 
 (* Define Goldilocks prime field, which is 2^64 - 2^32 + 1 *)
 Module GoldilocksParameter <: PrimeParameter.
-  Definition p : Z := 2^64 - 2^32 + 1.
+  Definition p : Z := Primes.goldilocks.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.goldilocks_prime. Qed.
 End GoldilocksParameter.
 Module Goldilocks := MakePrimeField(GoldilocksParameter).
