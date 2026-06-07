@@ -1,0 +1,75 @@
+Require Import Garden.Halo2.main.
+Require Import Garden.Orchard.columns.
+Require Garden.Halo2.Gadgets.Utilities.
+Require Garden.Halo2.Gadgets.Ecc.chip.constants.
+
+Import ListNotations.
+Global Open Scope pstring_scope.
+Global Open Scope Z_scope.
+
+Definition configure
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  let meta := ConstraintSystem.create_gate meta {|
+    Gate.name := "CommitIvk canonicity check";
+    Gate.constraints :=
+      let ak := Expression.Advice Advice.A0 Rotation.cur in
+      let nk := Expression.Advice Advice.A0 Rotation.next in
+      let a := Expression.Advice Advice.A1 Rotation.cur in
+      let b_whole := Expression.Advice Advice.A2 Rotation.cur in
+      let c := Expression.Advice Advice.A1 Rotation.next in
+      let d_whole := Expression.Advice Advice.A2 Rotation.next in
+      let b_0 := Expression.Advice Advice.A3 Rotation.cur in
+      let b_1 := Expression.Advice Advice.A4 Rotation.cur in
+      let b_2 := Expression.Advice Advice.A5 Rotation.cur in
+      let d_0 := Expression.Advice Advice.A3 Rotation.next in
+      let d_1 := Expression.Advice Advice.A4 Rotation.next in
+      let b_decomposition_check :=
+        b_whole -E (b_0 +E (b_1 *Z (2 ^ 4)) +E (b_2 *Z (2 ^ 5))) in
+      let d_decomposition_check :=
+        d_whole -E (d_0 +E (d_1 *Z (2 ^ 9))) in
+      let b1_bool_check := Garden.Halo2.Gadgets.Utilities.bool_check b_1 in
+      let d1_bool_check := Garden.Halo2.Gadgets.Utilities.bool_check d_1 in
+      let ak_decomposition_check :=
+        a +E (b_0 *Z (2 ^ 250)) +E (b_1 *Z (2 ^ 254)) -E ak in
+      let nk_decomposition_check :=
+        b_2 +E (c *Z (2 ^ 5)) +E (d_0 *Z (2 ^ 245))
+          +E (d_1 *Z (2 ^ 254)) -E nk in
+      let z13_a := Expression.Advice Advice.A6 Rotation.cur in
+      let a_prime := Expression.Advice Advice.A7 Rotation.cur in
+      let z13_a_prime := Expression.Advice Advice.A8 Rotation.cur in
+      let b0_canon_check := b_1 *E b_0 in
+      let z13_a_check := b_1 *E z13_a in
+      let a_prime_check :=
+        a +E Expression.Constant (2 ^ 130)
+          -E Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p
+          -E a_prime in
+      let z13_a_prime := b_1 *E z13_a_prime in
+      let z13_c := Expression.Advice Advice.A6 Rotation.next in
+      let b2_c_prime := Expression.Advice Advice.A7 Rotation.next in
+      let z14_b2_c_prime := Expression.Advice Advice.A8 Rotation.next in
+      let c0_canon_check := d_1 *E d_0 in
+      let z13_c_check := d_1 *E z13_c in
+      let b2_c_prime_check :=
+        b_2 +E (c *Z (2 ^ 5)) +E Expression.Constant (2 ^ 140)
+          -E Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p
+          -E b2_c_prime in
+      let z14_b2_c_prime := d_1 *E z14_b2_c_prime in
+      Constraints.with_selector Selector.QCommitIvk [
+        (Some "b1_bool_check", b1_bool_check);
+        (Some "d1_bool_check", d1_bool_check);
+        (Some "b_decomposition_check", b_decomposition_check);
+        (Some "d_decomposition_check", d_decomposition_check);
+        (Some "ak_decomposition_check", ak_decomposition_check);
+        (Some "nk_decomposition_check", nk_decomposition_check);
+        (Some "b0_canon_check", b0_canon_check);
+        (Some "z13_a_check", z13_a_check);
+        (Some "a_prime_check", a_prime_check);
+        (Some "z13_a_prime", z13_a_prime);
+        (Some "c0_canon_check", c0_canon_check);
+        (Some "z13_c_check", z13_c_check);
+        (Some "b2_c_prime_check", b2_c_prime_check);
+        (Some "z14_b2_c_prime", z14_b2_c_prime)
+      ];
+  |} in
+  meta.

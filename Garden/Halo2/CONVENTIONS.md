@@ -21,6 +21,12 @@ orchard/src/circuit.rs
 orchard/src/circuit/gadget/add_chip.rs
   -> Garden/Orchard/circuit/gadget/add_chip.v
 
+orchard/src/circuit/commit_ivk.rs
+  -> Garden/Orchard/circuit/commit_ivk.v
+
+orchard/src/circuit/note_commit.rs
+  -> Garden/Orchard/circuit/note_commit.v
+
 halo2_gadgets/src/utilities/lookup_range_check.rs
   -> Garden/Halo2/Gadgets/LookupRangeCheck.v
 

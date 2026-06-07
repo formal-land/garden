@@ -76,7 +76,30 @@ Module Selector.
   | QCondSwap1
   | QCondSwap2
   | QMerkleDecompose1
-  | QMerkleDecompose2.
+  | QMerkleDecompose2
+  | QCommitIvk
+  | QNoteCommitOldB
+  | QNoteCommitOldD
+  | QNoteCommitOldE
+  | QNoteCommitOldG
+  | QNoteCommitOldH
+  | QNoteCommitOldGd
+  | QNoteCommitOldPkd
+  | QNoteCommitOldValue
+  | QNoteCommitOldRho
+  | QNoteCommitOldPsi
+  | QNoteCommitOldYCanon
+  | QNoteCommitNewB
+  | QNoteCommitNewD
+  | QNoteCommitNewE
+  | QNoteCommitNewG
+  | QNoteCommitNewH
+  | QNoteCommitNewGd
+  | QNoteCommitNewPkd
+  | QNoteCommitNewValue
+  | QNoteCommitNewRho
+  | QNoteCommitNewPsi
+  | QNoteCommitNewYCanon.
 End Selector.
 
 Definition columns : Columns.t := {|

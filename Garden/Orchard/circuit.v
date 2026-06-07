@@ -5,7 +5,9 @@ Require Garden.Halo2.Gadgets.Poseidon.Pow5.
 Require Garden.Halo2.Gadgets.Sinsemilla.chip.
 Require Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.
 Require Import Garden.Orchard.columns.
+Require Garden.Orchard.circuit.commit_ivk.
 Require Garden.Orchard.circuit.gadget.add_chip.
+Require Garden.Orchard.circuit.note_commit.
 
 Import ListNotations.
 Global Open Scope pstring_scope.
@@ -65,5 +67,14 @@ Definition configure
       meta in
   let meta :=
     Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2
+      meta in
+  let meta :=
+    Garden.Orchard.circuit.commit_ivk.configure
+      meta in
+  let meta :=
+    Garden.Orchard.circuit.note_commit.configure_old
+      meta in
+  let meta :=
+    Garden.Orchard.circuit.note_commit.configure_new
       meta in
   meta.
