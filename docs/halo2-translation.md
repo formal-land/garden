@@ -189,7 +189,7 @@ let meta := ConstraintSystem.create_gate meta {|
   Gate.constraints :=
     let a := Expression.Advice a Rotation.cur in
     Constraints.with_selector q [
-      (None, expr)
+      (None, Constraint.EqualZeroToPrecise expr)
     ];
 |} in
 meta
@@ -234,11 +234,20 @@ column is represented as a fixed column.
 Individual constraint names are optional:
 
 ```coq
-Constraints.t columns = list (option string * Expression.t columns)
+Constraints.t columns = list (option string * Constraint.t columns)
 ```
 
 Use `Some "name"` when the source gives a meaningful label. Use `None` when the
 Rust source has an unlabeled expression such as `Some(a + b - c)`.
+
+For now, translate ordinary Halo2 expression constraints explicitly as:
+
+```coq
+Constraint.EqualZeroToPrecise expression
+```
+
+Later proof passes may replace these with more precise semantic constructors,
+such as equality or product-zero forms.
 
 ## Expressions
 
@@ -258,7 +267,19 @@ For selected constraints, use:
 Constraints.with_selector selector constraints
 ```
 
-This represents multiplying each constraint by the selector expression.
+This wraps each semantic constraint with `Constraint.Select selector`. Do not
+translate selected gates by multiplying the expression by
+`Expression.Selector selector`.
+
+Gate semantics for proof work live in:
+
+```text
+Garden/Halo2/proof.v
+```
+
+That file evaluates expressions modulo a prime and interprets
+`Constraint.Select`, `Constraint.Equal`, and `Constraint.EqualZeroToPrecise` as
+propositions.
 
 Shared algebraic helpers that correspond to `halo2_gadgets/src/utilities.rs`
 live in:

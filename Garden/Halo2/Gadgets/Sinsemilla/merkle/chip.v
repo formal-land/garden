@@ -38,10 +38,10 @@ Definition configure_instance
         reconstructed -E left_node in
       let right_check := b_2 +E c_whole *E two_pow_5 -E right_node in
       Constraints.with_selector q_decompose [
-        (Some "l_check", a_0 -E l_whole);
-        (Some "left_check", left_check);
-        (Some "right_check", right_check);
-        (Some "b1_b2_check", b1_b2_check)
+        (Some "l_check", Constraint.EqualZeroToPrecise (a_0 -E l_whole));
+        (Some "left_check", Constraint.EqualZeroToPrecise left_check);
+        (Some "right_check", Constraint.EqualZeroToPrecise right_check);
+        (Some "b1_b2_check", Constraint.EqualZeroToPrecise b1_b2_check)
       ];
   |} in
   meta.

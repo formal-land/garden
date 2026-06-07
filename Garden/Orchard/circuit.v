@@ -29,13 +29,16 @@ Definition configure
       let enable_outputs := Expression.Advice Advice.A7 Rotation.cur in
       Constraints.with_selector Selector.QOrchard [
         (Some "v_old - v_new = magnitude * sign",
-          v_old -E v_new -E (magnitude *E sign));
+          Constraint.EqualZeroToPrecise
+            (v_old -E v_new -E (magnitude *E sign)));
         (Some "Either v_old = 0, or root = anchor",
-          v_old *E (root -E anchor));
+          Constraint.EqualZeroToPrecise (v_old *E (root -E anchor)));
         (Some "v_old = 0 or enable_spends = 1",
-          v_old *E (Expression.Constant 1 -E enable_spends));
+          Constraint.EqualZeroToPrecise
+            (v_old *E (Expression.Constant 1 -E enable_spends)));
         (Some "v_new = 0 or enable_outputs = 1",
-          v_new *E (Expression.Constant 1 -E enable_outputs))
+          Constraint.EqualZeroToPrecise
+            (v_new *E (Expression.Constant 1 -E enable_outputs)))
       ];
   |} in
   let meta :=

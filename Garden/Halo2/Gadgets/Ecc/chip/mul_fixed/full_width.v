@@ -20,9 +20,10 @@ Definition configure
           window
         ++ [
           (Some "window range check",
-            Garden.Halo2.Gadgets.Utilities.range_check
-              window
-              Garden.Halo2.Gadgets.Ecc.chip.constants.h_nat)
+            Constraint.EqualZeroToPrecise
+              (Garden.Halo2.Gadgets.Utilities.range_check
+                window
+                Garden.Halo2.Gadgets.Ecc.chip.constants.h_nat))
         ]);
   |} in
   meta.

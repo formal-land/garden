@@ -13,6 +13,8 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 
 - `Garden/Halo2/main.v`: shared Halo2 DSL for columns, expressions, gates,
   lookups, and constraint systems.
+- `Garden/Halo2/proof.v`: proof-facing semantics for Halo2 expressions, gates,
+  and semantic constraints.
 - `Garden/Orchard/columns.v`: absolute Orchard column constructors used by the
   Orchard-specialized translation.
 - `Garden/Orchard/circuit.v`: top-level Orchard configure translation.

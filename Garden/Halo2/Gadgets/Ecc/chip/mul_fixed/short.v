@@ -26,10 +26,11 @@ Definition configure
       Constraints.with_selector
         Selector.QMulFixedShort
         [
-          (Some "last_window_check", last_window_check);
-          (Some "sign_check", sign_check);
-          (Some "y_check", y_check);
-          (Some "negation_check", negation_check)
+          (Some "last_window_check",
+            Constraint.EqualZeroToPrecise last_window_check);
+          (Some "sign_check", Constraint.EqualZeroToPrecise sign_check);
+          (Some "y_check", Constraint.EqualZeroToPrecise y_check);
+          (Some "negation_check", Constraint.EqualZeroToPrecise negation_check)
         ];
   |} in
   meta.

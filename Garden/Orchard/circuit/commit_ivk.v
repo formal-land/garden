@@ -56,20 +56,26 @@ Definition configure
           -E b2_c_prime in
       let z14_b2_c_prime := d_1 *E z14_b2_c_prime in
       Constraints.with_selector Selector.QCommitIvk [
-        (Some "b1_bool_check", b1_bool_check);
-        (Some "d1_bool_check", d1_bool_check);
-        (Some "b_decomposition_check", b_decomposition_check);
-        (Some "d_decomposition_check", d_decomposition_check);
-        (Some "ak_decomposition_check", ak_decomposition_check);
-        (Some "nk_decomposition_check", nk_decomposition_check);
-        (Some "b0_canon_check", b0_canon_check);
-        (Some "z13_a_check", z13_a_check);
-        (Some "a_prime_check", a_prime_check);
-        (Some "z13_a_prime", z13_a_prime);
-        (Some "c0_canon_check", c0_canon_check);
-        (Some "z13_c_check", z13_c_check);
-        (Some "b2_c_prime_check", b2_c_prime_check);
-        (Some "z14_b2_c_prime", z14_b2_c_prime)
+        (Some "b1_bool_check", Constraint.EqualZeroToPrecise b1_bool_check);
+        (Some "d1_bool_check", Constraint.EqualZeroToPrecise d1_bool_check);
+        (Some "b_decomposition_check",
+          Constraint.EqualZeroToPrecise b_decomposition_check);
+        (Some "d_decomposition_check",
+          Constraint.EqualZeroToPrecise d_decomposition_check);
+        (Some "ak_decomposition_check",
+          Constraint.EqualZeroToPrecise ak_decomposition_check);
+        (Some "nk_decomposition_check",
+          Constraint.EqualZeroToPrecise nk_decomposition_check);
+        (Some "b0_canon_check", Constraint.EqualZeroToPrecise b0_canon_check);
+        (Some "z13_a_check", Constraint.EqualZeroToPrecise z13_a_check);
+        (Some "a_prime_check", Constraint.EqualZeroToPrecise a_prime_check);
+        (Some "z13_a_prime", Constraint.EqualZeroToPrecise z13_a_prime);
+        (Some "c0_canon_check", Constraint.EqualZeroToPrecise c0_canon_check);
+        (Some "z13_c_check", Constraint.EqualZeroToPrecise z13_c_check);
+        (Some "b2_c_prime_check",
+          Constraint.EqualZeroToPrecise b2_c_prime_check);
+        (Some "z14_b2_c_prime",
+          Constraint.EqualZeroToPrecise z14_b2_c_prime)
       ];
   |} in
   meta.

@@ -93,7 +93,8 @@ Definition configure_instance
       let y_q := Expression.Fixed fixed_y_q Rotation.cur in
       let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
       Constraints.with_selector q_sinsemilla4 [
-        (Some "init_y_q_check", y_q *Z 2 -E y_a_cur)
+        (Some "init_y_q_check",
+          Constraint.EqualZeroToPrecise (y_q *Z 2 -E y_a_cur))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -117,8 +118,8 @@ Definition configure_instance
           +E (q_s3 *E Expression.Constant 2 *E lambda_1_next) in
       let y_check := lhs -E rhs in
       Constraints.with_selector q_sinsemilla1 [
-        (Some "Secant line", secant_line);
-        (Some "y check", y_check)
+        (Some "Secant line", Constraint.EqualZeroToPrecise secant_line);
+        (Some "y check", Constraint.EqualZeroToPrecise y_check)
       ];
   |} in
   meta.

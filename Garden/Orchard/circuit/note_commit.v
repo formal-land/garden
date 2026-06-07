@@ -27,9 +27,13 @@ Definition configure_instance
         b -E (b_0 +E (b_1 *Z (2 ^ 4)) +E (b_2 *Z (2 ^ 5))
           +E (b_3 *Z (2 ^ 6))) in
       Constraints.with_selector q_b [
-        (Some "bool_check b_1", Garden.Halo2.Gadgets.Utilities.bool_check b_1);
-        (Some "bool_check b_2", Garden.Halo2.Gadgets.Utilities.bool_check b_2);
-        (Some "decomposition", decomposition_check)
+        (Some "bool_check b_1",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check b_1));
+        (Some "bool_check b_2",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check b_2));
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -44,9 +48,13 @@ Definition configure_instance
         d -E (d_0 +E (d_1 *Z 2) +E (d_2 *Z (2 ^ 2))
           +E (d_3 *Z (2 ^ 10))) in
       Constraints.with_selector q_d [
-        (Some "bool_check d_0", Garden.Halo2.Gadgets.Utilities.bool_check d_0);
-        (Some "bool_check d_1", Garden.Halo2.Gadgets.Utilities.bool_check d_1);
-        (Some "decomposition", decomposition_check)
+        (Some "bool_check d_0",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check d_0));
+        (Some "bool_check d_1",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check d_1));
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -57,7 +65,7 @@ Definition configure_instance
       let e_1 := Expression.Advice Advice.A8 Rotation.cur in
       let decomposition_check := e -E (e_0 +E (e_1 *Z (2 ^ 6))) in
       Constraints.with_selector q_e [
-        (Some "decomposition", decomposition_check)
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -70,8 +78,10 @@ Definition configure_instance
       let decomposition_check :=
         g -E (g_0 +E (g_1 *Z 2) +E (g_2 *Z (2 ^ 10))) in
       Constraints.with_selector q_g [
-        (Some "bool_check g_0", Garden.Halo2.Gadgets.Utilities.bool_check g_0);
-        (Some "decomposition", decomposition_check)
+        (Some "bool_check g_0",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check g_0));
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -82,8 +92,10 @@ Definition configure_instance
       let h_1 := Expression.Advice Advice.A8 Rotation.cur in
       let decomposition_check := h -E (h_0 +E (h_1 *Z (2 ^ 5))) in
       Constraints.with_selector q_h [
-        (Some "bool_check h_1", Garden.Halo2.Gadgets.Utilities.bool_check h_1);
-        (Some "decomposition", decomposition_check)
+        (Some "bool_check h_1",
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.bool_check h_1));
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -101,11 +113,14 @@ Definition configure_instance
       let a_prime_check :=
         a +E Expression.Constant (2 ^ 130) -E t_p_expr -E a_prime in
       Constraints.with_selector q_gd [
-        (Some "decomposition", decomposition_check);
-        (Some "a_prime_check", a_prime_check);
-        (Some "b_1 = 1 => b_0", b_1 *E b_0);
-        (Some "b_1 = 1 => z13_a", b_1 *E z13_a);
-        (Some "b_1 = 1 => z13_a_prime", b_1 *E z13_a_prime)
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check);
+        (Some "a_prime_check", Constraint.EqualZeroToPrecise a_prime_check);
+        (Some "b_1 = 1 => b_0",
+          Constraint.EqualZeroToPrecise (b_1 *E b_0));
+        (Some "b_1 = 1 => z13_a",
+          Constraint.EqualZeroToPrecise (b_1 *E z13_a));
+        (Some "b_1 = 1 => z13_a_prime",
+          Constraint.EqualZeroToPrecise (b_1 *E z13_a_prime))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -124,10 +139,13 @@ Definition configure_instance
         b_3 +E (c *Z (2 ^ 4)) +E Expression.Constant (2 ^ 140)
           -E t_p_expr -E b3_c_prime in
       Constraints.with_selector q_pkd [
-        (Some "decomposition", decomposition_check);
-        (Some "b3_c_prime_check", b3_c_prime_check);
-        (Some "d_0 = 1 => z13_c", d_0 *E z13_c);
-        (Some "d_0 = 1 => z14_b3_c_prime", d_0 *E z14_b3_c_prime)
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check);
+        (Some "b3_c_prime_check",
+          Constraint.EqualZeroToPrecise b3_c_prime_check);
+        (Some "d_0 = 1 => z13_c",
+          Constraint.EqualZeroToPrecise (d_0 *E z13_c));
+        (Some "d_0 = 1 => z14_b3_c_prime",
+          Constraint.EqualZeroToPrecise (d_0 *E z14_b3_c_prime))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -140,7 +158,7 @@ Definition configure_instance
       let value_check :=
         d_2 +E (z1_d *Z (2 ^ 8)) +E (e_0 *Z (2 ^ 58)) -E value in
       Constraints.with_selector q_value [
-        (Some "value_check", value_check)
+        (Some "value_check", Constraint.EqualZeroToPrecise value_check)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -159,10 +177,13 @@ Definition configure_instance
         e_1 +E (f *Z (2 ^ 4)) +E Expression.Constant (2 ^ 140)
           -E t_p_expr -E e1_f_prime in
       Constraints.with_selector q_rho [
-        (Some "decomposition", decomposition_check);
-        (Some "e1_f_prime_check", e1_f_prime_check);
-        (Some "g_0 = 1 => z13_f", g_0 *E z13_f);
-        (Some "g_0 = 1 => z14_e1_f_prime", g_0 *E z14_e1_f_prime)
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check);
+        (Some "e1_f_prime_check",
+          Constraint.EqualZeroToPrecise e1_f_prime_check);
+        (Some "g_0 = 1 => z13_f",
+          Constraint.EqualZeroToPrecise (g_0 *E z13_f));
+        (Some "g_0 = 1 => z14_e1_f_prime",
+          Constraint.EqualZeroToPrecise (g_0 *E z14_e1_f_prime))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -184,11 +205,15 @@ Definition configure_instance
         g_1 +E (g_2 *Z (2 ^ 9)) +E Expression.Constant (2 ^ 130)
           -E t_p_expr -E g1_g2_prime in
       Constraints.with_selector q_psi [
-        (Some "decomposition", decomposition_check);
-        (Some "g1_g2_prime_check", g1_g2_prime_check);
-        (Some "h_1 = 1 => h_0", h_1 *E h_0);
-        (Some "h_1 = 1 => z13_g", h_1 *E z13_g);
-        (Some "h_1 = 1 => z13_g1_g2_prime", h_1 *E z13_g1_g2_prime)
+        (Some "decomposition", Constraint.EqualZeroToPrecise decomposition_check);
+        (Some "g1_g2_prime_check",
+          Constraint.EqualZeroToPrecise g1_g2_prime_check);
+        (Some "h_1 = 1 => h_0",
+          Constraint.EqualZeroToPrecise (h_1 *E h_0));
+        (Some "h_1 = 1 => z13_g",
+          Constraint.EqualZeroToPrecise (h_1 *E z13_g));
+        (Some "h_1 = 1 => z13_g1_g2_prime",
+          Constraint.EqualZeroToPrecise (h_1 *E z13_g1_g2_prime))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -211,13 +236,16 @@ Definition configure_instance
       let j_prime_check :=
         j +E Expression.Constant (2 ^ 130) -E t_p_expr -E j_prime in
       Constraints.with_selector q_y_canon [
-        (Some "k3_check", k3_check);
-        (Some "j_check", j_check);
-        (Some "y_check", y_check);
-        (Some "j_prime_check", j_prime_check);
-        (Some "k_3 = 1 => k_2 = 0", k_3 *E k_2);
-        (Some "k_3 = 1 => z13_j = 0", k_3 *E z13_j);
-        (Some "k_3 = 1 => z13_j_prime = 0", k_3 *E z13_j_prime)
+        (Some "k3_check", Constraint.EqualZeroToPrecise k3_check);
+        (Some "j_check", Constraint.EqualZeroToPrecise j_check);
+        (Some "y_check", Constraint.EqualZeroToPrecise y_check);
+        (Some "j_prime_check", Constraint.EqualZeroToPrecise j_prime_check);
+        (Some "k_3 = 1 => k_2 = 0",
+          Constraint.EqualZeroToPrecise (k_3 *E k_2));
+        (Some "k_3 = 1 => z13_j = 0",
+          Constraint.EqualZeroToPrecise (k_3 *E z13_j));
+        (Some "k_3 = 1 => z13_j_prime = 0",
+          Constraint.EqualZeroToPrecise (k_3 *E z13_j_prime))
       ];
   |} in
   meta.

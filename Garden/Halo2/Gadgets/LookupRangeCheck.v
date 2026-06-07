@@ -37,7 +37,9 @@ Definition configure {columns : Columns.t}
       let shifted_word := Expression.Advice running_sum Rotation.cur in
       let inv_two_pow_s := Expression.Advice running_sum Rotation.next in
       Constraints.with_selector q_bitshift [
-        (None, word *Z two_pow_k *E inv_two_pow_s -E shifted_word)
+        (None,
+          Constraint.EqualZeroToPrecise
+            (word *Z two_pow_k *E inv_two_pow_s -E shifted_word))
       ];
   |} in
   meta.

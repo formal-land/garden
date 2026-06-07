@@ -48,9 +48,9 @@ Definition coords_check
       -E Garden.Halo2.Gadgets.Utilities.square x_p *E x_p
       -E Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b in
   [
-    (Some "check x", x_check);
-    (Some "check y", y_check);
-    (Some "on-curve", on_curve)
+    (Some "check x", Constraint.EqualZeroToPrecise x_check);
+    (Some "check y", Constraint.EqualZeroToPrecise y_check);
+    (Some "on-curve", Constraint.EqualZeroToPrecise on_curve)
   ].
 
 Definition configure

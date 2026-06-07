@@ -42,17 +42,22 @@ Definition configure
         Selector.QMulFixedBaseField
         [
           (Some "MSB = 1 => alpha_1 = 0",
-            alpha_2 *E alpha_1);
+            Constraint.EqualZeroToPrecise (alpha_2 *E alpha_1));
           (Some "MSB = 1 => alpha_0_hi_120 = 0",
-            alpha_2 *E alpha_0_hi_120);
+            Constraint.EqualZeroToPrecise (alpha_2 *E alpha_0_hi_120));
           (Some "MSB = 1 => a_43 = 0 or 1",
-            alpha_2 *E Garden.Halo2.Gadgets.Utilities.bool_check a_43);
+            Constraint.EqualZeroToPrecise
+              (alpha_2 *E Garden.Halo2.Gadgets.Utilities.bool_check a_43));
           (Some "MSB = 1 => z_13_alpha_0_prime = 0",
-            alpha_2 *E z_13_alpha_0_prime);
-          (Some "alpha_1_range_check", alpha_1_range_check);
-          (Some "alpha_2_range_check", alpha_2_range_check);
-          (Some "z_84_alpha_check", z_84_alpha_check);
-          (Some "alpha_0_prime check", alpha_0_prime_check)
+            Constraint.EqualZeroToPrecise (alpha_2 *E z_13_alpha_0_prime));
+          (Some "alpha_1_range_check",
+            Constraint.EqualZeroToPrecise alpha_1_range_check);
+          (Some "alpha_2_range_check",
+            Constraint.EqualZeroToPrecise alpha_2_range_check);
+          (Some "z_84_alpha_check",
+            Constraint.EqualZeroToPrecise z_84_alpha_check);
+          (Some "alpha_0_prime check",
+            Constraint.EqualZeroToPrecise alpha_0_prime_check)
         ];
   |} in
   meta.

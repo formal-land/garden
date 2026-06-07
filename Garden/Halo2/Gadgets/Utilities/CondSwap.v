@@ -26,9 +26,9 @@ Definition configure_instance
           Garden.Halo2.Gadgets.Utilities.ternary swap a b in
       let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check swap in
       Constraints.with_selector q_swap [
-        (Some "a check", a_check);
-        (Some "b check", b_check);
-        (Some "swap is bool", bool_check)
+        (Some "a check", Constraint.EqualZeroToPrecise a_check);
+        (Some "b check", Constraint.EqualZeroToPrecise b_check);
+        (Some "swap is bool", Constraint.EqualZeroToPrecise bool_check)
       ];
   |} in
   meta.

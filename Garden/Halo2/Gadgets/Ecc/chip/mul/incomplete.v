@@ -54,10 +54,10 @@ Definition for_loop
   let gradient_2 :=
     lambda2_cur *E (x_a_cur -E x_a_next) -E y_a_cur -E y_a_next in
   [
-    (Some "bool_check", bool_check);
-    (Some "gradient_1", gradient_1);
-    (Some "secant_line", secant_line);
-    (Some "gradient_2", gradient_2)
+    (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
+    (Some "gradient_1", Constraint.EqualZeroToPrecise gradient_1);
+    (Some "secant_line", Constraint.EqualZeroToPrecise secant_line);
+    (Some "gradient_2", Constraint.EqualZeroToPrecise gradient_2)
   ].
 
 Definition configure
@@ -71,7 +71,8 @@ Definition configure
       let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
       let y_a_witnessed := Expression.Advice lambda_1 Rotation.cur in
       Constraints.with_selector q_mul_1 [
-        (Some "init y_a", y_a_witnessed -E y_a_next)
+        (Some "init y_a",
+          Constraint.EqualZeroToPrecise (y_a_witnessed -E y_a_next))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -86,8 +87,8 @@ Definition configure
       let y_p_check := y_p_cur -E y_p_next in
       Constraints.with_selector q_mul_2 (
         [
-          (Some "x_p_check", x_p_check);
-          (Some "y_p_check", y_p_check)
+          (Some "x_p_check", Constraint.EqualZeroToPrecise x_p_check);
+          (Some "y_p_check", Constraint.EqualZeroToPrecise y_p_check)
         ]
         ++ for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_next);
   |} in

@@ -80,38 +80,56 @@ Module Expression.
 End Expression.
 Export (notations) Expression.
 
+Module Constraint.
+  Inductive t (columns : Columns.t) : Set :=
+  | Select
+      (selector : columns.(Columns.Selector))
+      (constraint : t columns)
+  | Equal
+      (left : Expression.t columns)
+      (right : Expression.t columns)
+  | EqualZeroToPrecise
+      (expression : Expression.t columns).
+  Arguments Select {_}.
+  Arguments Equal {_}.
+  Arguments EqualZeroToPrecise {_}.
+End Constraint.
+
 Module Constraints.
   Definition t (columns : Columns.t) : Set :=
-    list (option string * Expression.t columns).
+    list (option string * Constraint.t columns).
 
   Definition with_selector {columns : Columns.t}
       (selector : columns.(Columns.Selector))
       (constraints : t columns) : t columns :=
     List.map
       (fun constraint =>
-        let '(name, expression) := constraint in
-        (name, Expression.Selector selector *E expression))
+        let '(name, constraint) := constraint in
+        (name, Constraint.Select selector constraint))
       constraints.
 End Constraints.
 
 Module Gate.
-  Record t (columns : Columns.t) : Set := {
+  Record t {columns : Columns.t} : Set := {
     name : string;
     constraints : Constraints.t columns;
   }.
+  Arguments t : clear implicits.
 End Gate.
 
 Module LookupArgument.
-  Record t (columns : Columns.t) : Set := {
+  Record t {columns : Columns.t} : Set := {
     pairs : list (Expression.t columns * columns.(Columns.Fixed));
   }.
+  Arguments t : clear implicits.
 End LookupArgument.
 
 Module ConstraintSystem.
-  Record t (columns : Columns.t) : Set := {
+  Record t {columns : Columns.t} : Set := {
     gates : list (Gate.t columns);
     lookups : list (LookupArgument.t columns);
   }.
+  Arguments t : clear implicits.
 
   Definition empty {columns : Columns.t} : t columns := {|
     gates := [];
@@ -120,21 +138,21 @@ Module ConstraintSystem.
 
   Definition concat {columns : Columns.t}
       (left right : t columns) : t columns := {|
-    gates := left.(gates columns) ++ right.(gates columns);
-    lookups := left.(lookups columns) ++ right.(lookups columns);
+    gates := left.(gates) ++ right.(gates);
+    lookups := left.(lookups) ++ right.(lookups);
   |}.
 
   Definition create_gate {columns : Columns.t}
       (self : t columns)
       (gate : Gate.t columns) : t columns := {|
-    gates := self.(gates columns) ++ [gate];
-    lookups := self.(lookups columns);
+    gates := self.(gates) ++ [gate];
+    lookups := self.(lookups);
   |}.
 
   Definition create_lookup {columns : Columns.t}
       (self : t columns)
       (lookup : LookupArgument.t columns) : t columns := {|
-    gates := self.(gates columns);
-    lookups := self.(lookups columns) ++ [lookup];
+    gates := self.(gates);
+    lookups := self.(lookups) ++ [lookup];
   |}.
 End ConstraintSystem.

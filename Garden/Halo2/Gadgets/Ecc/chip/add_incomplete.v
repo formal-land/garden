@@ -26,8 +26,8 @@ Definition configure
         (y_r +E y_q) *E (x_p -E x_q)
           -E (y_p -E y_q) *E (x_q -E x_r) in
       Constraints.with_selector Selector.QAddIncomplete [
-        (Some "x_r", poly1);
-        (Some "y_r", poly2)
+        (Some "x_r", Constraint.EqualZeroToPrecise poly1);
+        (Some "y_r", Constraint.EqualZeroToPrecise poly2)
       ];
   |} in
   meta.

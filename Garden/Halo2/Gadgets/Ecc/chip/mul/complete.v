@@ -24,8 +24,8 @@ Definition configure
           (base_y -E y_p)
           (base_y +E y_p) in
       Constraints.with_selector Selector.QMulDecomposeVar [
-        (Some "bool_check", bool_check);
-        (Some "y_switch", y_switch)
+        (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
+        (Some "y_switch", Constraint.EqualZeroToPrecise y_switch)
       ];
   |} in
   meta.

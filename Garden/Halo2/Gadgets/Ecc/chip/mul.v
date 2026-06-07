@@ -66,9 +66,9 @@ Definition configure
       Constraints.with_selector
         Selector.QMulLsb
         [
-          (Some "bool_check", bool_check);
-          (Some "lsb_x", lsb_x);
-          (Some "lsb_y", lsb_y)
+          (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
+          (Some "lsb_x", Constraint.EqualZeroToPrecise lsb_x);
+          (Some "lsb_y", Constraint.EqualZeroToPrecise lsb_y)
         ];
   |} in
   meta.

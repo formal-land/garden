@@ -31,11 +31,12 @@ Definition configure
       let canonicity :=
         (one -E k_254) *E (one -E (z_130 *E eta)) *E s_minus_lo_130 in
       Constraints.with_selector Selector.QMulOverflow [
-        (Some "s_check", s_check);
-        (Some "recovery", recovery);
-        (Some "lo_zero", lo_zero);
-        (Some "s_minus_lo_130_check", s_minus_lo_130_check);
-        (Some "canonicity", canonicity)
+        (Some "s_check", Constraint.EqualZeroToPrecise s_check);
+        (Some "recovery", Constraint.EqualZeroToPrecise recovery);
+        (Some "lo_zero", Constraint.EqualZeroToPrecise lo_zero);
+        (Some "s_minus_lo_130_check",
+          Constraint.EqualZeroToPrecise s_minus_lo_130_check);
+        (Some "canonicity", Constraint.EqualZeroToPrecise canonicity)
       ];
   |} in
   meta.

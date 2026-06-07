@@ -20,9 +20,10 @@ Definition configure {columns : Columns.t}
       let word := z_cur -E (z_next *Z two_pow_k) in
       Constraints.with_selector q_range_check [
         (None,
-          Garden.Halo2.Gadgets.Utilities.range_check
-            word
-            (Z.to_nat two_pow_k))
+          Constraint.EqualZeroToPrecise
+            (Garden.Halo2.Gadgets.Utilities.range_check
+              word
+              (Z.to_nat two_pow_k)))
       ];
   |} in
   meta.

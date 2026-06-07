@@ -62,18 +62,18 @@ Definition configure
       let poly6a := (one -E if_alpha -E if_delta) *E x_r in
       let poly6b := (one -E if_alpha -E if_delta) *E y_r in
       Constraints.with_selector Selector.QEccAdd [
-        (Some "1", poly1);
-        (Some "2", poly2);
-        (Some "3a", poly3a);
-        (Some "3b", poly3b);
-        (Some "3c", poly3c);
-        (Some "3d", poly3d);
-        (Some "4a", poly4a);
-        (Some "4b", poly4b);
-        (Some "5a", poly5a);
-        (Some "5b", poly5b);
-        (Some "6a", poly6a);
-        (Some "6b", poly6b)
+        (Some "1", Constraint.EqualZeroToPrecise poly1);
+        (Some "2", Constraint.EqualZeroToPrecise poly2);
+        (Some "3a", Constraint.EqualZeroToPrecise poly3a);
+        (Some "3b", Constraint.EqualZeroToPrecise poly3b);
+        (Some "3c", Constraint.EqualZeroToPrecise poly3c);
+        (Some "3d", Constraint.EqualZeroToPrecise poly3d);
+        (Some "4a", Constraint.EqualZeroToPrecise poly4a);
+        (Some "4b", Constraint.EqualZeroToPrecise poly4b);
+        (Some "5a", Constraint.EqualZeroToPrecise poly5a);
+        (Some "5b", Constraint.EqualZeroToPrecise poly5b);
+        (Some "6a", Constraint.EqualZeroToPrecise poly6a);
+        (Some "6b", Constraint.EqualZeroToPrecise poly6b)
       ];
   |} in
   meta.
