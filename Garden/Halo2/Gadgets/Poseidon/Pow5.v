@@ -62,12 +62,9 @@ Definition configure
       let state_1_next := Expression.Advice Advice.A7 Rotation.next in
       let state_2_next := Expression.Advice Advice.A8 Rotation.next in
       Constraints.with_selector Selector.QPoseidonFull [
-        (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 0 ➖ state_0_next));
-        (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 1 ➖ state_1_next));
-        (None, Constraint.EqualZeroToPrecise
-          (full_round_sum 2 ➖ state_2_next))
+        (None, Constraint.Equal (full_round_sum 0) state_0_next);
+        (None, Constraint.Equal (full_round_sum 1) state_1_next);
+        (None, Constraint.Equal (full_round_sum 2) state_2_next)
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -80,14 +77,10 @@ Definition configure
       let rc_b_1 := Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur in
       let rc_b_2 := Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur in
       Constraints.with_selector Selector.QPoseidonPartial [
-        (None, Constraint.EqualZeroToPrecise
-          (pow_5 (cur_0 ➕ rc_a_0) ➖ mid_0));
-        (None, Constraint.EqualZeroToPrecise
-          (pow_5 (mid 0 ➕ rc_b_0) ➖ next 0));
-        (None, Constraint.EqualZeroToPrecise
-          (mid 1 ➕ rc_b_1 ➖ next 1));
-        (None, Constraint.EqualZeroToPrecise
-          (mid 2 ➕ rc_b_2 ➖ next 2))
+        (None, Constraint.Equal (pow_5 (cur_0 ➕ rc_a_0)) mid_0);
+        (None, Constraint.Equal (pow_5 (mid 0 ➕ rc_b_0)) (next 0));
+        (None, Constraint.Equal (mid 1 ➕ rc_b_1) (next 1));
+        (None, Constraint.Equal (mid 2 ➕ rc_b_2) (next 2))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|
@@ -102,12 +95,9 @@ Definition configure
       let state_1_next := Expression.Advice Advice.A7 Rotation.next in
       let state_2_next := Expression.Advice Advice.A8 Rotation.next in
       Constraints.with_selector Selector.QPoseidonPadAndAdd [
-        (None, Constraint.EqualZeroToPrecise
-          (state_0_prev ➕ state_0_cur ➖ state_0_next));
-        (None, Constraint.EqualZeroToPrecise
-          (state_1_prev ➕ state_1_cur ➖ state_1_next));
-        (None, Constraint.EqualZeroToPrecise
-          (state_2_prev ➖ state_2_next))
+        (None, Constraint.Equal (state_0_prev ➕ state_0_cur) state_0_next);
+        (None, Constraint.Equal (state_1_prev ➕ state_1_cur) state_1_next);
+        (None, Constraint.Equal state_2_prev state_2_next)
       ];
   |} in
   meta.
