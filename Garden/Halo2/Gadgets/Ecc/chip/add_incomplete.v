@@ -31,3 +31,8 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "incomplete addition" (
+    Region.enable_selector Selector.QAddIncomplete 0 "").

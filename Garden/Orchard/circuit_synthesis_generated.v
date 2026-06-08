@@ -57,11 +57,8 @@ Module Synthesis.
 
     Definition default : t := EnterRegion "".
   End Event.
-  Definition events_length : Z := 19617.
-  Definition events_length_uint63 : Uint63.int := 19617%uint63.
-
   Definition events : array Event.t :=
-    (make events_length_uint63 Event.default)
+    (make 19617%uint63 Event.default)
       .[0%uint63 <-
         Event.EnterRegion
           "generator_table"
@@ -21576,9 +21573,9 @@ Module Synthesis.
       ]
       .[3074%uint63 <-
         Event.FillFromRow
-          0
+          2
           1024
-          0
+          21285653556795296467031706491948305595095309413618206259690549906869937136771
       ]
       .[3075%uint63 <-
         Event.FillFromRow
@@ -21588,9 +21585,9 @@ Module Synthesis.
       ]
       .[3076%uint63 <-
         Event.FillFromRow
-          2
+          0
           1024
-          21285653556795296467031706491948305595095309413618206259690549906869937136771
+          0
       ]
       .[3077%uint63 <-
         Event.PushNamespace

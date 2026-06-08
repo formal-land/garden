@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 
 Import ListNotations.
 Global Open Scope pstring_scope.
@@ -43,3 +44,7 @@ Definition configure {columns : Columns.t}
       ];
   |} in
   meta.
+
+Definition synthesize {columns : Columns.t}
+    : Layouter.t columns unit :=
+  return_ℒ tt.

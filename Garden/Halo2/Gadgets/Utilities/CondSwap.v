@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Utilities.
 
@@ -56,3 +57,17 @@ Definition configure_2
     Advice.A7
     Advice.A8
     Advice.A9.
+
+Definition synthesize_instance
+    (q_swap : Selector.t)
+    : Layouter.t columns unit :=
+  Layouter.assign_region "conditional swap" (
+    Region.enable_selector q_swap 0 "").
+
+Definition synthesize_1
+    : Layouter.t columns unit :=
+  synthesize_instance Selector.QCondSwap1.
+
+Definition synthesize_2
+    : Layouter.t columns unit :=
+  synthesize_instance Selector.QCondSwap2.

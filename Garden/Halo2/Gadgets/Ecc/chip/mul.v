@@ -72,3 +72,20 @@ Definition configure
         ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ :=
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.synthesize
+      Selector.QMulIncompleteHi1
+      Selector.QMulIncompleteHi2
+      Selector.QMulIncompleteHi3 in
+  let_ℒ _ :=
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.synthesize
+      Selector.QMulIncompleteLo1
+      Selector.QMulIncompleteLo2
+      Selector.QMulIncompleteLo3 in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul.complete.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul.overflow.synthesize in
+  Layouter.assign_region "LSB check" (
+    Region.enable_selector Selector.QMulLsb 0 "").

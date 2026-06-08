@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Utilities.
 Require Garden.Halo2.Gadgets.Ecc.chip.constants.
@@ -272,6 +273,73 @@ Definition configure_new
     : ConstraintSystem.t columns :=
   configure_instance
     meta
+    Selector.QNoteCommitNewB
+    Selector.QNoteCommitNewD
+    Selector.QNoteCommitNewE
+    Selector.QNoteCommitNewG
+    Selector.QNoteCommitNewH
+    Selector.QNoteCommitNewGd
+    Selector.QNoteCommitNewPkd
+    Selector.QNoteCommitNewValue
+    Selector.QNoteCommitNewRho
+    Selector.QNoteCommitNewPsi
+    Selector.QNoteCommitNewYCanon.
+
+Definition synthesize_instance
+    (q_b q_d q_e q_g q_h
+      q_gd q_pkd q_value q_rho q_psi q_y_canon : Selector.t)
+    : Layouter.t columns unit :=
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit MessagePiece b" (
+      Region.enable_selector q_b 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit MessagePiece d" (
+      Region.enable_selector q_d 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit MessagePiece e" (
+      Region.enable_selector q_e 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit MessagePiece g" (
+      Region.enable_selector q_g 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit MessagePiece h" (
+      Region.enable_selector q_h 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit input g_d" (
+      Region.enable_selector q_gd 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit input pk_d" (
+      Region.enable_selector q_pkd 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit input value" (
+      Region.enable_selector q_value 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit input rho" (
+      Region.enable_selector q_rho 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "NoteCommit input psi" (
+      Region.enable_selector q_psi 0 "") in
+  Layouter.assign_region "y coordinate checks" (
+    Region.enable_selector q_y_canon 0 "").
+
+Definition synthesize_old
+    : Layouter.t columns unit :=
+  synthesize_instance
+    Selector.QNoteCommitOldB
+    Selector.QNoteCommitOldD
+    Selector.QNoteCommitOldE
+    Selector.QNoteCommitOldG
+    Selector.QNoteCommitOldH
+    Selector.QNoteCommitOldGd
+    Selector.QNoteCommitOldPkd
+    Selector.QNoteCommitOldValue
+    Selector.QNoteCommitOldRho
+    Selector.QNoteCommitOldPsi
+    Selector.QNoteCommitOldYCanon.
+
+Definition synthesize_new
+    : Layouter.t columns unit :=
+  synthesize_instance
     Selector.QNoteCommitNewB
     Selector.QNoteCommitNewD
     Selector.QNoteCommitNewE

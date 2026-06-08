@@ -100,3 +100,15 @@ Definition configure
         (for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_final);
   |} in
   meta.
+
+Definition synthesize
+    (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
+    : Layouter.t columns unit :=
+  let_ℒ _ :=
+    Layouter.assign_region "q_mul_1 == 1 checks" (
+      Region.enable_selector q_mul_1 0 "") in
+  let_ℒ _ :=
+    Layouter.assign_region "q_mul_2 == 1 checks" (
+      Region.enable_selector q_mul_2 0 "") in
+  Layouter.assign_region "q_mul_3 == 1 checks" (
+    Region.enable_selector q_mul_3 0 "").

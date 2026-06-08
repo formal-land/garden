@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Utilities.
 Require Garden.Halo2.Gadgets.Ecc.chip.constants.
@@ -155,3 +156,31 @@ Definition configure_2
     Advice.A7
     Advice.A8
     Advice.A9.
+
+Definition generator_table_prefix : list Raw.Event.t :=
+  [
+    Raw.Event.AssignFixed 0 0 "table_idx" 0;
+    Raw.Event.AssignFixed 1 0 "table_x" sinsemilla_s0_x;
+    Raw.Event.AssignFixed 2 0 "table_y" sinsemilla_s0_y
+  ].
+
+Definition load_generator_table
+    : Layouter.t columns unit :=
+  Layouter.assign_table "generator_table" generator_table_prefix.
+
+Definition synthesize_instance
+    (q_sinsemilla1 q_sinsemilla4 : Selector.t)
+    : Layouter.t columns unit :=
+  let_ℒ _ :=
+    Layouter.assign_region "Sinsemilla gate" (
+      Region.enable_selector q_sinsemilla1 0 "") in
+  Layouter.assign_region "Initial y_Q" (
+    Region.enable_selector q_sinsemilla4 0 "").
+
+Definition synthesize_1
+    : Layouter.t columns unit :=
+  synthesize_instance Selector.QSinsemilla1_1 Selector.QSinsemilla4_1.
+
+Definition synthesize_2
+    : Layouter.t columns unit :=
+  synthesize_instance Selector.QSinsemilla1_2 Selector.QSinsemilla4_2.

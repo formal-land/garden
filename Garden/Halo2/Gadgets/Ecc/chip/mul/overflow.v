@@ -40,3 +40,8 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "overflow checks" (
+    Region.enable_selector Selector.QMulOverflow 0 "").

@@ -77,3 +77,8 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "complete addition" (
+    Region.enable_selector Selector.QEccAdd 0 "").

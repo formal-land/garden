@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Poseidon.P128Pow5T3.
 Require Garden.Halo2.Gadgets.Utilities.
@@ -107,3 +108,24 @@ Definition configure
   let meta := ConstraintSystem.create_gate meta partial_rounds_gate in
   let meta := ConstraintSystem.create_gate meta pad_and_add_gate in
   meta.
+
+Definition synthesize_full_round
+    : Layouter.t columns unit :=
+  Layouter.assign_region "full round" (
+    Region.enable_selector Selector.QPoseidonFull 0 "").
+
+Definition synthesize_partial_rounds
+    : Layouter.t columns unit :=
+  Layouter.assign_region "partial rounds" (
+    Region.enable_selector Selector.QPoseidonPartial 0 "").
+
+Definition synthesize_pad_and_add
+    : Layouter.t columns unit :=
+  Layouter.assign_region "pad-and-add" (
+    Region.enable_selector Selector.QPoseidonPadAndAdd 0 "").
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ := synthesize_full_round in
+  let_ℒ _ := synthesize_partial_rounds in
+  synthesize_pad_and_add.

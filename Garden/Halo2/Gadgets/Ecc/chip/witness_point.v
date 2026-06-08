@@ -43,3 +43,11 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ :=
+    Layouter.assign_region "witness point" (
+      Region.enable_selector Selector.QWitnessPoint 0 "") in
+  Layouter.assign_region "witness non-identity point" (
+    Region.enable_selector Selector.QWitnessPointNonId 0 "").

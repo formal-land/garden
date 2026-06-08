@@ -37,3 +37,14 @@ Definition configure
     Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.configure
       meta in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.witness_point.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.synthesize in
+  Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.synthesize.

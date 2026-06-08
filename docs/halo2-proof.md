@@ -24,6 +24,12 @@ The translated Poseidon configure gates live in:
 Garden/Halo2/Gadgets/Poseidon/Pow5.v
 ```
 
+The high-level synthesis DSL lives in:
+
+```text
+Garden/Halo2/Synthesis.v
+```
+
 The Pallas prime and field operations live in:
 
 ```text
@@ -41,6 +47,11 @@ Require Import Garden.Plonky3.M.
 ## Evaluation Semantics
 
 `Garden/Halo2/proof.v` defines the proof-side evaluator.
+
+This evaluator is currently for configured expressions, constraints, gates, and
+constraint systems. The high-level synthesis DSL records raw events and logical
+cells, but it does not yet define proof obligations connecting synthesized
+assignments to gate evaluation.
 
 `Assignment.t columns` gives concrete values for selectors, fixed columns,
 advice columns, and instance columns:

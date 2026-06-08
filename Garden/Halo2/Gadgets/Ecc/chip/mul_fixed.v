@@ -75,3 +75,9 @@ Definition configure
         (coords_check word);
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ := Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
+  Layouter.assign_region "Running sum coordinates check" (
+    Region.enable_selector Selector.QMulFixedRunningSum 0 "").

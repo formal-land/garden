@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Utilities.
 Require Garden.Halo2.Gadgets.Ecc.chip.constants.
@@ -79,3 +80,8 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "CommitIvk canonicity check" (
+    Region.enable_selector Selector.QCommitIvk 0 "").

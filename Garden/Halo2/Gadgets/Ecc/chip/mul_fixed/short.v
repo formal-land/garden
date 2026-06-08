@@ -34,3 +34,8 @@ Definition configure
         ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "Short fixed-base mul gate" (
+    Region.enable_selector Selector.QMulFixedShort 0 "").

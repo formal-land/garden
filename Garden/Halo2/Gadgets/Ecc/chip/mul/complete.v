@@ -29,3 +29,8 @@ Definition configure
       ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "Decompose scalar for complete bits of variable-base mul" (
+    Region.enable_selector Selector.QMulDecomposeVar 0 "").

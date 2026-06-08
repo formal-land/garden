@@ -12,6 +12,12 @@ Shared Halo2 concepts live in:
 Garden/Halo2/main.v
 ```
 
+High-level synthesis concepts live in:
+
+```text
+Garden/Halo2/Synthesis.v
+```
+
 Orchard files mirror the Rust module path where practical:
 
 ```text
@@ -62,12 +68,23 @@ When Rust submodules need to share translated column bundles without creating
 cycles, put those bundles in a small local `common.v` file under the mirrored
 directory.
 
+Configure and synthesize translations for the same Rust module should live in
+the same Rocq file. Keep the configure definitions first, then add the
+corresponding `synthesize`, `synthesize_instance`, `synthesize_1`, or
+`synthesize_2` definitions below them.
+
 ## Imports
 
 Translated files should import the shared Halo2 DSL:
 
 ```coq
 Require Import Garden.Halo2.main.
+```
+
+Files that define synthesis programs should also import:
+
+```coq
+Require Import Garden.Halo2.Synthesis.
 ```
 
 Prefer adding further imports only when the translated file really needs them.
@@ -105,6 +122,10 @@ Garden/Orchard/columns.v
 
 That file defines the absolute constructors used by the Orchard circuit and by
 Orchard-specialized gadgets such as ECC.
+
+`Garden/Orchard/columns.v` also defines `Index.indices`, a reusable
+interpretation from absolute Orchard columns to the numeric column indices used
+by generated traces.
 
 Concrete circuit column files group their column families with `Columns.t`:
 
@@ -207,7 +228,7 @@ The `configure` definition contains only configure-time gates and lookups, using
 numeric Halo2 column and selector indices. The full synthesis trace is generated
 separately into `Garden/Orchard/circuit_synthesis_generated.v`; that file
 defines a `Synthesis` module with event types and
-`events : list Synthesis.Event.t`. It is intentionally blacklisted from the
+`events : array Synthesis.Event.t`. It is intentionally blacklisted from the
 normal Garden build because the full trace is large.
 
 The generated files intentionally do not encode the extra Halo2 metadata such as
@@ -234,6 +255,83 @@ Current comparison status: `configure_eq_generated` closes by
 aligned with the generated Halo2 AST, including cases where Rust uses explicit
 products instead of `Constraints::with_selector`, or `Expression::Scaled` instead
 of multiplication by a constant.
+
+## Synthesize Functions
+
+`Garden/Halo2/Synthesis.v` defines the high-level representation for
+`synthesize`.
+
+The raw events mirror the generated synthesis trace:
+
+```coq
+Raw.Event.EnterRegion
+Raw.Event.ExitRegion
+Raw.Event.PushNamespace
+Raw.Event.PopNamespace
+Raw.Event.EnableSelector
+Raw.Event.AssignFixed
+Raw.Event.Copy
+Raw.Event.FillFromRow
+```
+
+Advice assignments are represented in the high-level state so later copies can
+refer to cells, but they intentionally emit no raw event for now. This matches
+the current Rust recorder, which omits advice values from
+`circuit_synthesis_generated.v`.
+
+Use `Layouter.t columns A` for layouter-level programs and
+`Region.t columns A` for region bodies. Use `let_ℒ` and `return_ℒ` for
+layouter sequencing, and `let_ℛ` and `return_ℛ` for region sequencing.
+
+The basic one-step pattern is:
+
+```coq
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "gate name" (
+    Region.enable_selector Selector.QExample 0 "").
+```
+
+For multi-step programs:
+
+```coq
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ := first_layouter_step in
+  second_layouter_step.
+
+Definition synthesize_region
+    : Region.t columns (Cell.t columns) :=
+  let_ℛ _ := Region.enable_selector Selector.QExample 0 "" in
+  let_ℛ cell := Region.assign_advice "value" Advice.A0 0 Value.Unknown in
+  return_ℛ cell.
+```
+
+For gadgets with several configured instances, mirror the configure naming:
+
+```coq
+synthesize_instance
+synthesize_1
+synthesize_2
+```
+
+The current Orchard synthesis translation is intentionally structural: it
+creates the same ownership points as configure and records selector/table/copy
+events where they are already modeled, but most witness computations are still
+skeletal. The next refinement step is to translate each Rust witness function
+inside these existing in-file synthesis definitions until `synthesize_events`
+matches the generated raw trace.
+
+Run a top-level high-level synthesis trace with:
+
+```coq
+Garden.Orchard.circuit.synthesize_events
+  Garden.Orchard.columns.Index.indices
+```
+
+The current runner is a lightweight state transformer. It records regions and
+events and exposes `V1.run`; exact Halo2 V1 two-pass placement and generated
+array parity are still future work.
 
 ## Gates
 

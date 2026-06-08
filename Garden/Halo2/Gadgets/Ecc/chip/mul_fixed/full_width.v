@@ -27,3 +27,8 @@ Definition configure
         ]);
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "Full-width fixed-base scalar mul" (
+    Region.enable_selector Selector.QMulFixedFull 0 "").

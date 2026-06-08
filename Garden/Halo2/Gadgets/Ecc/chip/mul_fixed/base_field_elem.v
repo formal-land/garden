@@ -62,3 +62,8 @@ Definition configure
         ];
   |} in
   meta.
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  Layouter.assign_region "Canonicity checks" (
+    Region.enable_selector Selector.QMulFixedBaseField 0 "").

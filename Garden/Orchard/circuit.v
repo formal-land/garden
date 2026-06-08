@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Garden.Halo2.Gadgets.LookupRangeCheck.
 Require Garden.Halo2.Gadgets.Ecc.chip.
 Require Garden.Halo2.Gadgets.Poseidon.Pow5.
@@ -81,3 +82,36 @@ Definition configure
     Garden.Orchard.circuit.note_commit.configure_new
       meta in
   meta.
+
+Definition synthesize_range_check
+    : Layouter.t columns unit :=
+  Garden.Halo2.Gadgets.LookupRangeCheck.synthesize.
+
+Definition synthesize_orchard_gate
+    : Layouter.t columns unit :=
+  Layouter.assign_region "Orchard circuit checks" (
+    Region.enable_selector Selector.QOrchard 0 "").
+
+Definition synthesize
+    : Layouter.t columns unit :=
+  let_ℒ _ := Garden.Halo2.Gadgets.Sinsemilla.chip.load_generator_table in
+  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.synthesize in
+  let_ℒ _ :=
+    Garden.Orchard.circuit.gadget.add_chip.synthesize
+      Value.Unknown Value.Unknown Value.Unknown in
+  let_ℒ _ := synthesize_range_check in
+  let_ℒ _ := Garden.Halo2.Gadgets.Poseidon.Pow5.synthesize in
+  let_ℒ _ := Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_1 in
+  let_ℒ _ := Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.synthesize_1 in
+  let_ℒ _ := Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_2 in
+  let_ℒ _ := Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.synthesize_2 in
+  let_ℒ _ := Garden.Orchard.circuit.commit_ivk.synthesize in
+  let_ℒ _ := Garden.Orchard.circuit.note_commit.synthesize_old in
+  let_ℒ _ := Garden.Orchard.circuit.note_commit.synthesize_new in
+  synthesize_orchard_gate.
+
+Definition synthesize_events
+    (indices : Indices.t columns)
+    : list Raw.Event.t :=
+  let '(_, events) := V1.run indices synthesize in
+  events.

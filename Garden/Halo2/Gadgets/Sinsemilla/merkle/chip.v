@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
 Require Garden.Halo2.Gadgets.Utilities.CondSwap.
 
@@ -69,3 +70,23 @@ Definition configure_2
     Advice.A7
     Advice.A8
     Advice.A9.
+
+Definition synthesize_instance
+    (q_decompose : Selector.t)
+    (synthesize_cond_swap : Layouter.t columns unit)
+    : Layouter.t columns unit :=
+  let_ℒ _ := synthesize_cond_swap in
+  Layouter.assign_region "Decomposition check" (
+    Region.enable_selector q_decompose 0 "").
+
+Definition synthesize_1
+    : Layouter.t columns unit :=
+  synthesize_instance
+    Selector.QMerkleDecompose1
+    Garden.Halo2.Gadgets.Utilities.CondSwap.synthesize_1.
+
+Definition synthesize_2
+    : Layouter.t columns unit :=
+  synthesize_instance
+    Selector.QMerkleDecompose2
+    Garden.Halo2.Gadgets.Utilities.CondSwap.synthesize_2.
