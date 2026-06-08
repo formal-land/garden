@@ -1,7 +1,6 @@
 {
   "schema": "orchard.action_circuit.synthesis.v1",
   "source": "orchard::circuit::Circuit::synthesize",
-  "event_default": {"tag":"EnterRegion","name":""},
   "events": [
     {"tag":"EnterRegion","name":"generator_table"},
     {"tag":"AssignFixed","column":"0","row":"0","annotation":"table_idx","value":"0"},
@@ -3077,9 +3076,9 @@
     {"tag":"AssignFixed","column":"1","row":"1023","annotation":"table_x","value":"1093230847645536979936743753857511812060502273070439896600445972204993224110"},
     {"tag":"AssignFixed","column":"2","row":"1023","annotation":"table_y","value":"26002465274768363823869533298650935518655726540752975986040009872244448848790"},
     {"tag":"ExitRegion","name":"generator_table"},
+    {"tag":"FillFromRow","column":"0","from_row":"1024","value":"0"},
     {"tag":"FillFromRow","column":"2","from_row":"1024","value":"21285653556795296467031706491948305595095309413618206259690549906869937136771"},
     {"tag":"FillFromRow","column":"1","from_row":"1024","value":"6200097879647205583499851243213148560621730003917924543823561700220554504799"},
-    {"tag":"FillFromRow","column":"0","from_row":"1024","value":"0"},
     {"tag":"PushNamespace","name":"witness psi_old"},
     {"tag":"EnterRegion","name":"load private"},
     {"tag":"ExitRegion","name":"load private"},

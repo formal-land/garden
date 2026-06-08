@@ -6,5 +6,5 @@ LLZK/mastermind.v
 OpenVM/BranchEq/pretty_print.v
 OpenVM/Sha256/pretty_print.v
 Plonky3/keccak/pretty_print.v
-# Large generated trace, kept for inspection and later merging work.
-Orchard/circuit_synthesis_generated.v
+# Extraction entry point for the Orchard model JSON generator.
+Orchard/circuit_synthesis_json_extract.v

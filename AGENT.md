@@ -27,8 +27,12 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `Garden/Orchard/circuit_generated_proof.v`: comparison bridge from absolute
   Orchard columns to generated numeric indices; keep it free of gadget-specific
   expression rewrites.
-- `Garden/Orchard/circuit_synthesis_generated.v`: generated full V1 synthesis
-  event trace; intentionally excluded from the normal Garden build.
+- `Garden/Orchard/circuit_synthesis_json_extract.v`: extraction entry point
+  used to compile the Rocq synthesis model to OCaml.
+- `Garden/Orchard/circuit_synthesis_generated_from_model.json`: full V1
+  synthesis event trace generated from the Rocq model.
+- `Garden/Orchard/circuit_synthesis_generated_from_implementation.json`: full
+  V1 synthesis event trace generated from the Rust/Halo2 implementation.
 
 ## Maintenance Rules
 
