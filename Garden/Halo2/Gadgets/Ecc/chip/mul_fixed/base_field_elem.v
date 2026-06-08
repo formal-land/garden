@@ -34,7 +34,8 @@ Definition configure
           ➖ (alpha_0
             ➕ Expression.Constant (2 ^ 130)
             ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p) in
-      let alpha_0_hi_120 := z_44_alpha ➖ (z_84_alpha ● (2 ^ 120)) in
+      let alpha_0_hi_120 :=
+        z_44_alpha ➖ (z_84_alpha ✖️ Expression.Constant (2 ^ 120)) in
       let a_43 :=
         z_43_alpha
           ➖ (z_44_alpha ● Garden.Halo2.Gadgets.Ecc.chip.constants.h) in

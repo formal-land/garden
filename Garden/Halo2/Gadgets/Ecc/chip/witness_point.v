@@ -22,15 +22,16 @@ Definition configure
   let meta := ConstraintSystem.create_gate meta {|
     Gate.name := "witness point";
     Gate.constraints :=
+      let q_point := Expression.Selector Selector.QWitnessPoint in
       let x_cur := Expression.Advice Advice.A0 Rotation.cur in
       let y_cur := Expression.Advice Advice.A1 Rotation.cur in
-      Constraints.with_selector Selector.QWitnessPoint [
+      [
         (Some "x == 0 v on_curve",
           Constraint.EqualZeroToPrecise
-            (x_cur ✖️ curve_eqn Advice.A0 Advice.A1));
+            ((q_point ✖️ x_cur) ✖️ curve_eqn Advice.A0 Advice.A1));
         (Some "y == 0 v on_curve",
           Constraint.EqualZeroToPrecise
-            (y_cur ✖️ curve_eqn Advice.A0 Advice.A1))
+            ((q_point ✖️ y_cur) ✖️ curve_eqn Advice.A0 Advice.A1))
       ];
   |} in
   let meta := ConstraintSystem.create_gate meta {|

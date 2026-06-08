@@ -17,8 +17,6 @@ Definition configure_instance
     Gate.name := "Decomposition check";
     Gate.constraints :=
       let l_whole := Expression.Advice right_col Rotation.next in
-      let two_pow_5 := Expression.Constant (2 ^ 5) in
-      let two_pow_10 := Expression.Constant (2 ^ 10) in
       let a_whole := Expression.Advice a_col Rotation.cur in
       let b_whole := Expression.Advice b_col Rotation.cur in
       let c_whole := Expression.Advice c_col Rotation.cur in
@@ -26,17 +24,17 @@ Definition configure_instance
       let right_node := Expression.Advice right_col Rotation.cur in
       let z1_a := Expression.Advice a_col Rotation.next in
       let a_1 := z1_a in
-      let a_0 := a_whole ➖ (a_1 ✖️ two_pow_10) in
+      let a_0 := a_whole ➖ (a_1 ● (2 ^ 10)) in
       let z1_b := Expression.Advice b_col Rotation.next in
       let b_1 := Expression.Advice c_col Rotation.next in
       let b_2 := Expression.Advice left_col Rotation.next in
-      let b1_b2_check := z1_b ➖ (b_1 ➕ b_2 ✖️ two_pow_5) in
-      let b_0 := b_whole ➖ (z1_b ✖️ two_pow_10) in
+      let b1_b2_check := z1_b ➖ (b_1 ➕ (b_2 ● (2 ^ 5))) in
+      let b_0 := b_whole ➖ (z1_b ● (2 ^ 10)) in
       let left_check :=
-        let two_pow_240 := Expression.Constant (2 ^ 240) in
-        let reconstructed := a_1 ➕ ((b_0 ➕ b_1 ✖️ two_pow_10) ✖️ two_pow_240) in
+        let reconstructed :=
+          a_1 ➕ ((b_0 ➕ (b_1 ● (2 ^ 10))) ● (2 ^ 240)) in
         reconstructed ➖ left_node in
-      let right_check := b_2 ➕ c_whole ✖️ two_pow_5 ➖ right_node in
+      let right_check := b_2 ➕ (c_whole ● (2 ^ 5)) ➖ right_node in
       Constraints.with_selector q_decompose [
         (Some "l_check", Constraint.EqualZeroToPrecise (a_0 ➖ l_whole));
         (Some "left_check", Constraint.EqualZeroToPrecise left_check);

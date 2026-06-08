@@ -11,7 +11,7 @@ Definition configure_instance
     (a b a_swapped b_swapped swap : Advice.t)
     : ConstraintSystem.t columns :=
   let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "a' = b * swap + a * (1-swap)";
+    Gate.name := "a' = b ⋅ swap + a ⋅ (1-swap)";
     Gate.constraints :=
       let a := Expression.Advice a Rotation.cur in
       let b := Expression.Advice b Rotation.cur in

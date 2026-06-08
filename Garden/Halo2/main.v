@@ -14,6 +14,18 @@ Module Columns.
     Advice : Set;
     Instance_ : Set;
   }.
+
+  Record map (source target : t) : Set := {
+    selector : source.(Selector) -> target.(Selector);
+    fixed : source.(Fixed) -> target.(Fixed);
+    advice : source.(Advice) -> target.(Advice);
+    instance_ : source.(Instance_) -> target.(Instance_);
+  }.
+  Arguments map : clear implicits.
+  Arguments selector {_ _} _ _.
+  Arguments fixed {_ _} _ _.
+  Arguments advice {_ _} _ _.
+  Arguments instance_ {_ _} _ _.
 End Columns.
 
 Module Rotation.
@@ -77,6 +89,30 @@ Module Expression.
     (at level 40, left associativity).
   Notation "x ● y" := (Scaled x y)
     (at level 40, left associativity).
+
+  Fixpoint map {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (expression : t source) : t target :=
+    match expression with
+    | Constant value =>
+        Constant value
+    | Selector selector =>
+        Selector (column_map.(Columns.selector) selector)
+    | Fixed fixed rotation =>
+        Fixed (column_map.(Columns.fixed) fixed) rotation
+    | Advice advice rotation =>
+        Advice (column_map.(Columns.advice) advice) rotation
+    | Instance_ instance rotation =>
+        Instance_ (column_map.(Columns.instance_) instance) rotation
+    | Negated expression =>
+        Negated (map column_map expression)
+    | Sum lhs rhs =>
+        Sum (map column_map lhs) (map column_map rhs)
+    | Product lhs rhs =>
+        Product (map column_map lhs) (map column_map rhs)
+    | Scaled expression scale =>
+        Scaled (map column_map expression) scale
+    end.
 End Expression.
 Export (notations) Expression.
 
@@ -93,6 +129,26 @@ Module Constraint.
   Arguments Select {_}.
   Arguments Equal {_}.
   Arguments EqualZeroToPrecise {_}.
+
+  Fixpoint to_expression {columns : Columns.t}
+      (constraint : t columns) : Expression.t columns :=
+    match constraint with
+    | Select selector constraint =>
+        Expression.Product
+          (Expression.Selector selector)
+          (to_expression constraint)
+    | Equal lhs rhs =>
+        Expression.Sum lhs (Expression.Negated rhs)
+    | EqualZeroToPrecise expression =>
+        expression
+    end.
+
+  Definition map_to_equal_zero_to_precise {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (constraint : t source) : t target :=
+    EqualZeroToPrecise
+      (Expression.map column_map (to_expression constraint)).
+  Arguments to_expression {_} _ /.
 End Constraint.
 
 Module Constraints.
@@ -108,6 +164,15 @@ Module Constraints.
         (name, Constraint.Select selector constraint))
       constraints.
   Arguments with_selector {_} _ _ /.
+
+  Definition map {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (constraints : t source) : t target :=
+    List.map
+      (fun constraint =>
+        let '(name, constraint) := constraint in
+        (name, Constraint.map_to_equal_zero_to_precise column_map constraint))
+      constraints.
 End Constraints.
 
 Module Gate.
@@ -116,6 +181,13 @@ Module Gate.
     constraints : Constraints.t columns;
   }.
   Arguments t : clear implicits.
+
+  Definition map {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (gate : t source) : t target := {|
+    name := gate.(name);
+    constraints := Constraints.map column_map gate.(constraints);
+  |}.
 End Gate.
 
 Module LookupArgument.
@@ -123,6 +195,17 @@ Module LookupArgument.
     pairs : list (Expression.t columns * columns.(Columns.Fixed));
   }.
   Arguments t : clear implicits.
+
+  Definition map {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (lookup : t source) : t target := {|
+    pairs :=
+      List.map
+        (fun '(expression, fixed) =>
+          (Expression.map column_map expression,
+            column_map.(Columns.fixed) fixed))
+        lookup.(pairs);
+  |}.
 End LookupArgument.
 
 Module ConstraintSystem.
@@ -155,5 +238,12 @@ Module ConstraintSystem.
       (lookup : LookupArgument.t columns) : t columns := {|
     gates := self.(gates);
     lookups := self.(lookups) ++ [lookup];
+  |}.
+
+  Definition map {source target : Columns.t}
+      (column_map : Columns.map source target)
+      (system : t source) : t target := {|
+    gates := List.map (Gate.map column_map) system.(gates);
+    lookups := List.map (LookupArgument.map column_map) system.(lookups);
   |}.
 End ConstraintSystem.

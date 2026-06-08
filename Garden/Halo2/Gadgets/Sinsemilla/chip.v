@@ -9,9 +9,11 @@ Global Open Scope Z_scope.
 
 Definition sinsemilla_k : Z := 10.
 
-Definition sinsemilla_s0_x : Z := 0.
+Definition sinsemilla_s0_x : Z :=
+  6200097879647205583499851243213148560621730003917924543823561700220554504799.
 
-Definition sinsemilla_s0_y : Z := 0.
+Definition sinsemilla_s0_y : Z :=
+  21285653556795296467031706491948305595095309413618206259690549906869937136771.
 
 Definition x_r
     (x_a x_p lambda_1 : Advice.t)
@@ -63,9 +65,9 @@ Definition configure_generator_table
       let not_q_s1 := Expression.Constant 1 ➖ q_s1 in
       [
         (q_s1 ✖️ word, Fixed.Lookup Lookup.TableIdx);
-        (q_s1 ✖️ x_p_expr ➕ not_q_s1 ✖️ Expression.Constant sinsemilla_s0_x,
+        (q_s1 ✖️ x_p_expr ➕ (not_q_s1 ● sinsemilla_s0_x),
           Fixed.Lookup Lookup.TableX);
-        (q_s1 ✖️ y_p ➕ not_q_s1 ✖️ Expression.Constant sinsemilla_s0_y,
+        (q_s1 ✖️ y_p ➕ (not_q_s1 ● sinsemilla_s0_y),
           Fixed.Lookup Lookup.TableY)
       ];
   |} in
@@ -115,7 +117,7 @@ Definition configure_instance
       let rhs :=
         (y_a_cur ● 2)
           ➕ ((Expression.Constant 2 ➖ q_s3) ✖️ y_a_next)
-          ➕ (q_s3 ✖️ Expression.Constant 2 ✖️ lambda_1_next) in
+          ➕ ((q_s3 ● 2) ✖️ lambda_1_next) in
       let y_check := lhs ➖ rhs in
       Constraints.with_selector q_sinsemilla1 [
         (Some "Secant line", Constraint.EqualZeroToPrecise secant_line);

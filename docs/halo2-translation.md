@@ -52,6 +52,12 @@ halo2_gadgets/src/utilities/cond_swap.rs
   -> Garden/Halo2/Gadgets/Utilities/CondSwap.v
 ```
 
+Generated comparison bridges live next to the translated circuit:
+
+```text
+Garden/Orchard/circuit_generated_proof.v
+```
+
 When Rust submodules need to share translated column bundles without creating
 cycles, put those bundles in a small local `common.v` file under the mirrored
 directory.
@@ -180,6 +186,7 @@ Orchard test:
 ```sh
 cd orchard
 cargo +1.85.1 test generate_action_circuit_configure_rocq -- --ignored --nocapture
+cargo +1.85.1 test generate_action_circuit_synthesis_rocq -- --ignored --nocapture
 ```
 
 The generated file defines:
@@ -196,16 +203,37 @@ Canonical indexed_columns.
 Definition configure : ConstraintSystem.t indexed_columns := ...
 ```
 
-This snapshot currently contains only configure-time gates and lookups, using
-numeric Halo2 column and selector indices. It intentionally does not encode the
-extra Halo2 metadata such as query tables, equality/permutation columns,
-constants, or minimum degree; those remain available in the high-level JSON
-artifact.
+The `configure` definition contains only configure-time gates and lookups, using
+numeric Halo2 column and selector indices. The full synthesis trace is generated
+separately into `Garden/Orchard/circuit_synthesis_generated.v`; that file
+defines a `Synthesis` module with event types and
+`events : list Synthesis.Event.t`. It is intentionally blacklisted from the
+normal Garden build because the full trace is large.
+
+The generated files intentionally do not encode the extra Halo2 metadata such as
+query tables, equality/permutation columns, constants, or minimum degree; those
+remain available in the high-level JSON artifact.
 
 The generated file declares `indexed_columns` as a canonical structure so Rocq
 can infer the `Columns.t` parameter from numeric `Z` column arguments. This
 keeps generated expressions readable, for example `Expression.Selector 0`
 instead of `@Expression.Selector indexed_columns 0`.
+
+`Garden/Orchard/circuit_generated_proof.v` is the bridge between the handwritten
+Orchard configure translation and the generated numeric-index snapshot. The only
+choice made in that file is assigning numeric Halo2 indices to the absolute
+Orchard column constructors. Generic structural mapping lives in
+`Garden/Halo2/main.v`: expressions are mapped homomorphically, and semantic
+constraints are converted with `Constraint.to_expression` into generated
+`Constraint.EqualZeroToPrecise` constraints. Do not add gadget-specific
+expression rewrites to the bridge; any mismatch in expression shape or names
+should stay visible as a translation or generator issue to fix at the source.
+
+Current comparison status: `configure_eq_generated` closes by
+`vm_compute; reflexivity`. Keep the handwritten translation's expression shapes
+aligned with the generated Halo2 AST, including cases where Rust uses explicit
+products instead of `Constraints::with_selector`, or `Expression::Scaled` instead
+of multiplication by a constant.
 
 ## Gates
 

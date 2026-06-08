@@ -22,6 +22,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `Garden/Orchard/circuit.v`: top-level Orchard configure translation.
 - `Garden/Orchard/circuit_generated.v`: generated numeric-index Orchard
   configure snapshot emitted by the Rust generator in Orchard/Halo2.
+- `Garden/Orchard/circuit_generated_proof.v`: comparison bridge from absolute
+  Orchard columns to generated numeric indices; keep it free of gadget-specific
+  expression rewrites.
+- `Garden/Orchard/circuit_synthesis_generated.v`: generated full V1 synthesis
+  event trace; intentionally excluded from the normal Garden build.
 
 ## Maintenance Rules
 
