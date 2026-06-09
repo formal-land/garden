@@ -48,3 +48,22 @@ Definition configure {columns : Columns.t}
 Definition synthesize {columns : Columns.t}
     : Layouter.t columns unit :=
   return_ℒ tt.
+
+Definition synthesize_short {columns : Columns.t}
+    (name : string)
+    (q_lookup q_bitshift : columns.(Columns.Selector))
+    (running_sum : columns.(Columns.Advice))
+    : Layouter.t columns (Cell.t columns) :=
+  Layouter.assign_region name (
+    let_ℛ element :=
+      Region.assign_advice "Witness element" running_sum 0 Value.Unknown in
+    let_ℛ _ := Region.enable_selector q_lookup 0 "" in
+    let_ℛ _ := Region.enable_selector q_lookup 1 "" in
+    let_ℛ _ := Region.enable_selector q_bitshift 1 "" in
+    let_ℛ _ :=
+      Region.assign_advice
+        "element * 2^(10-5)" running_sum 1 Value.Unknown in
+    let_ℛ _ :=
+      Region.assign_advice_from_constant
+        "2^(-5)" running_sum 2 0 in
+    return_ℛ element).

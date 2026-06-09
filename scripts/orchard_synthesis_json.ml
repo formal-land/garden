@@ -95,8 +95,6 @@ let write_json path =
       Printf.fprintf channel "{\n";
       Printf.fprintf channel "  \"schema\": %s,\n" (json_pstring M.schema);
       Printf.fprintf channel "  \"source\": %s,\n" (json_pstring M.source);
-      Printf.fprintf channel
-        "  \"event_default\": {\"tag\":\"EnterRegion\",\"name\":\"\"},\n";
       Printf.fprintf channel "  \"events\": [\n";
       let event_count = List.length M.model_events in
       List.iteri

@@ -11,29 +11,6 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `docs/halo2-proof.md`: proof-facing Halo2 semantics, Poseidon determinism
   proof patterns, and tactic/performance notes.
 
-## Code Pointers
-
-- `Garden/Halo2/main.v`: shared Halo2 DSL for columns, expressions, gates,
-  lookups, and constraint systems.
-- `Garden/Halo2/Synthesis.v`: shared high-level Halo2 synthesis DSL and raw
-  V1 event types used by Orchard synthesis translations.
-- `Garden/Halo2/proof.v`: proof-facing semantics for Halo2 expressions, gates,
-  and semantic constraints.
-- `Garden/Orchard/columns.v`: absolute Orchard column constructors used by the
-  Orchard-specialized translation, plus the shared Orchard column-index map.
-- `Garden/Orchard/circuit.v`: top-level Orchard configure translation.
-- `Garden/Orchard/circuit_generated.v`: generated numeric-index Orchard
-  configure snapshot emitted by the Rust generator in Orchard/Halo2.
-- `Garden/Orchard/circuit_generated_proof.v`: comparison bridge from absolute
-  Orchard columns to generated numeric indices; keep it free of gadget-specific
-  expression rewrites.
-- `Garden/Orchard/circuit_synthesis_json_extract.v`: extraction entry point
-  used to compile the Rocq synthesis model to OCaml.
-- `Garden/Orchard/circuit_synthesis_generated_from_model.json`: full V1
-  synthesis event trace generated from the Rocq model.
-- `Garden/Orchard/circuit_synthesis_generated_from_implementation.json`: full
-  V1 synthesis event trace generated from the Rust/Halo2 implementation.
-
 ## Maintenance Rules
 
 - Put new agent-facing documentation in `docs/`, not beside the Rocq code,

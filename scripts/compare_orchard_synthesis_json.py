@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+import argparse
+import copy
 import json
 import sys
 
@@ -12,9 +14,26 @@ def show(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True)
 
 
-def compare_events(model, implementation):
+def normalize_event_rows(event):
+    event = copy.deepcopy(event)
+    for key in ("row", "from_row"):
+        if key in event:
+            event[key] = "*"
+    for key in ("left", "right"):
+        if key in event and isinstance(event[key], dict) and "row" in event[key]:
+            event[key]["row"] = "*"
+    return event
+
+
+def compare_events(model, implementation, normalize_rows=False):
     model_events = model.get("events", [])
     implementation_events = implementation.get("events", [])
+
+    if normalize_rows:
+        model_events = [normalize_event_rows(event) for event in model_events]
+        implementation_events = [
+            normalize_event_rows(event) for event in implementation_events
+        ]
 
     if model_events == implementation_events:
         return True
@@ -51,28 +70,34 @@ def compare_events(model, implementation):
 
 
 def main(argv):
-    if len(argv) != 3:
-        print(
-            "usage: compare_orchard_synthesis_json.py MODEL.json IMPLEMENTATION.json",
-            file=sys.stderr,
-        )
-        return 2
+    parser = argparse.ArgumentParser()
+    parser.add_argument("model")
+    parser.add_argument("implementation")
+    parser.add_argument(
+        "--normalize-rows",
+        action="store_true",
+        help="ignore row and from_row fields when comparing events",
+    )
+    args = parser.parse_args(argv[1:])
 
-    model = load_json(argv[1])
-    implementation = load_json(argv[2])
+    model = load_json(args.model)
+    implementation = load_json(args.implementation)
 
     print("model source: {}".format(model.get("source")))
     print("implementation source: {}".format(implementation.get("source")))
 
     ok = True
-    for key in ("schema", "event_default"):
+    for key in ("schema",):
         if model.get(key) != implementation.get(key):
             print("{} mismatch".format(key))
             print("model:          {}".format(show(model.get(key))))
             print("implementation: {}".format(show(implementation.get(key))))
             ok = False
 
-    ok = compare_events(model, implementation) and ok
+    if args.normalize_rows:
+        print("row normalization: enabled")
+
+    ok = compare_events(model, implementation, args.normalize_rows) and ok
 
     if ok:
         print("synthesis JSON comparison succeeded")

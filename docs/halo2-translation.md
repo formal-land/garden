@@ -4,19 +4,47 @@ This file records the current conventions for translating Halo2 Rust circuit
 code into Garden/Rocq. Keep it current with the code: update this when the Rocq
 DSL or translation style changes.
 
-## File Layout
+## Code Pointers
 
-Shared Halo2 concepts live in:
+Shared translation infrastructure:
 
 ```text
 Garden/Halo2/main.v
+  shared Halo2 DSL for columns, expressions, gates, lookups, and constraint systems
+
+Garden/Halo2/Synthesis.v
+  high-level Halo2 synthesis DSL and raw V1 event types
+
+Garden/Halo2/proof.v
+  proof-facing semantics for expressions, gates, and semantic constraints
 ```
 
-High-level synthesis concepts live in:
+Top-level Orchard translation and generated comparison artifacts:
 
 ```text
-Garden/Halo2/Synthesis.v
+Garden/Orchard/columns.v
+  absolute Orchard column constructors and shared column-index map
+
+Garden/Orchard/circuit.v
+  top-level Orchard configure translation and synthesize entry point
+
+Garden/Orchard/circuit_generated.v
+  generated numeric-index configure snapshot from the Rust generator
+
+Garden/Orchard/circuit_generated_proof.v
+  bridge from absolute Orchard columns to generated numeric indices
+
+Garden/Orchard/circuit_synthesis_json_extract.v
+  extraction entry point for compiling the Rocq synthesis model to OCaml
+
+Garden/Orchard/circuit_synthesis_generated_from_model.json
+  V1 synthesis trace generated from the structured Rocq model
+
+Garden/Orchard/circuit_synthesis_generated_from_implementation.json
+  full V1 synthesis trace generated from the Rust/Halo2 implementation
 ```
+
+## File Layout
 
 Orchard files mirror the Rust module path where practical:
 
@@ -125,7 +153,7 @@ Orchard-specialized gadgets such as ECC.
 
 `Garden/Orchard/columns.v` also defines `Index.indices`, a reusable
 interpretation from absolute Orchard columns to the numeric column indices used
-by generated traces.
+by generated configure snapshots and synthesis JSON comparison.
 
 Concrete circuit column files group their column families with `Columns.t`:
 
@@ -261,7 +289,7 @@ of multiplication by a constant.
 `Garden/Halo2/Synthesis.v` defines the high-level representation for
 `synthesize`.
 
-The raw events mirror the generated synthesis trace:
+The raw events mirror the Rust recorder schema:
 
 ```coq
 Raw.Event.EnterRegion
@@ -278,6 +306,28 @@ Advice assignments are represented in the high-level state so later copies can
 refer to cells, but they intentionally emit no raw event for now. This matches
 the current Rust recorder, which omits advice values from
 `circuit_synthesis_generated_from_implementation.json`.
+
+Large fixed-table data should be produced by structured Rocq model code rather
+than pasted generated Rocq traces. The Sinsemilla chip currently enumerates the
+1024 lookup-table rows in `Garden/Halo2/Gadgets/Sinsemilla/chip.v` and emits
+them through `Layouter.assign_table_with_fills`.
+
+`Garden/Halo2/Gadgets/Sinsemilla/SConstants.v` contains the translated
+`SINSEMILLA_S` coordinate table from the Rust `sinsemilla` crate. This is data
+used by the structured table loader, not a raw generated synthesis event dump.
+
+`Garden/Orchard/circuit_synthesis_constants.v` contains the generated replay
+table for Halo2 V1 floor-planner constant fixed-column bindings. It is generated
+by `scripts/generate_orchard_synthesis_constants.py` from the Rust
+implementation JSON and contains only the trailing `AssignFixed`/`Copy` pairs
+for the constant fixed column. The logical Orchard synthesis regions remain
+hand-written in the Rocq circuit and gadget files.
+
+`Garden/Orchard/circuit_synthesis_layout.v` contains the generated V1
+floor-planner region starts emitted by the Rust Orchard generator. The Rocq
+model uses these starts for strict JSON extraction so that remaining row
+mismatches point to incorrect modeled cell dependencies, not to the mechanical
+region-placement algorithm.
 
 Use `Layouter.t columns A` for layouter-level programs and
 `Region.t columns A` for region bodies. Use `let_ℒ` and `return_ℒ` for
@@ -315,12 +365,22 @@ synthesize_1
 synthesize_2
 ```
 
-The current Orchard synthesis translation is intentionally structural: it
-creates the same ownership points as configure and records selector/table/copy
-events where they are already modeled, but most witness computations are still
-skeletal. The next refinement step is to translate each Rust witness function
-inside these existing in-file synthesis definitions until `synthesize_events`
-matches the generated raw trace.
+The current Orchard `synthesize_events` entry point is backed by a structured
+hand-written Rocq synthesis program:
+
+```coq
+Definition synthesize_events
+    (indices : Indices.t columns)
+    : list Raw.Event.t :=
+  let '(_, events) := V1.run indices synthesize in
+  events.
+```
+
+The hand-written monadic synthesis definitions in the circuit and gadget files
+are still intentionally structural. They record the ownership points and raw
+operations modeled so far, and they are now the source of the model JSON. Keep
+refining those definitions toward the Rust witness functions; do not restore a
+raw generated Rocq event dump as the model source.
 
 Run a top-level high-level synthesis trace with:
 
@@ -330,8 +390,10 @@ Garden.Orchard.circuit.synthesize_events
 ```
 
 The current runner is a lightweight state transformer. It records regions and
-events and exposes `V1.run`; exact Halo2 V1 two-pass placement and generated
-array parity are still future work.
+events and exposes `V1.run`. `V1.run` performs a measurement pass, computes a
+first-fit V1-style region placement ordered by advice area, then replays the
+program to emit events. Row parity still depends on completing the real gadget
+synthesis shapes.
 
 Generate the Rocq-model JSON with:
 
@@ -345,9 +407,28 @@ Compare it against the Rust implementation JSON with:
 opam exec -- make -C Garden orchard-synthesis-json-compare
 ```
 
+Compare only the structural event stream, ignoring floor-planner row placement,
+with:
+
+```sh
+opam exec -- make -C Garden orchard-synthesis-json-compare-normalized
+```
+
 The comparison intentionally ignores the top-level `source` string, because the
 model and implementation are generated by different programs, and compares the
-schema, default event, and event list.
+schema and event list.
+
+Current comparison status: strict synthesis JSON comparison succeeds. The model
+and implementation both emit 19617 events, and
+`opam exec -- make -C Garden orchard-synthesis-json-compare` verifies equality
+of the schema and event list. The only ignored top-level field is `source`,
+because the model JSON is produced by the Rocq extractor while the implementation
+JSON is produced by the Rust generator.
+
+The strict comparison uses the generated Rust V1 layout so row mismatches now
+represent actual source-cell dependency mistakes. The NoteCommit message-piece
+and input gates currently thread the concrete message, range-check, Sinsemilla
+running-sum, and canonicity cells needed for strict parity.
 
 ## Gates
 

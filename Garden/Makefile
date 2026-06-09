@@ -1,5 +1,5 @@
 .PHONY: all clean clean-util distclean default
-.PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare
+.PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare orchard-synthesis-json-compare-normalized
 
 VFILES := $(shell find -L . -name "*.v" | grep -v -f blacklist.txt | sort)
 
@@ -59,6 +59,12 @@ orchard-synthesis-json-from-model: $(ORCHARD_SYNTHESIS_EXE)
 
 orchard-synthesis-json-compare: orchard-synthesis-json-from-model
 	python3 ../scripts/compare_orchard_synthesis_json.py \
+	  $(ORCHARD_SYNTHESIS_MODEL_JSON) \
+	  $(ORCHARD_SYNTHESIS_IMPL_JSON)
+
+orchard-synthesis-json-compare-normalized: orchard-synthesis-json-from-model
+	python3 ../scripts/compare_orchard_synthesis_json.py \
+	  --normalize-rows \
 	  $(ORCHARD_SYNTHESIS_MODEL_JSON) \
 	  $(ORCHARD_SYNTHESIS_IMPL_JSON)
 
