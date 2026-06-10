@@ -45,9 +45,9 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  let_ℒ _ :=
-    Layouter.assign_region "witness point" (
-      Region.enable_selector Selector.QWitnessPoint 0 "") in
-  Layouter.assign_region "witness non-identity point" (
-    Region.enable_selector Selector.QWitnessPointNonId 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ :=
+    ℒ.AddRegion (RegionId.of_index 0) "witness point" (
+      ℛ.EnableSelector Selector.QWitnessPoint 0 "") in
+  ℒ.AddRegion (RegionId.of_index 0) "witness non-identity point" (
+    ℛ.EnableSelector Selector.QWitnessPointNonId 0 "").

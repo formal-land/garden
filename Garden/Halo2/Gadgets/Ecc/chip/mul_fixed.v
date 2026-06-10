@@ -77,7 +77,7 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  let_ℒ _ := Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
-  Layouter.assign_region "Running sum coordinates check" (
-    Region.enable_selector Selector.QMulFixedRunningSum 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ := Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
+  ℒ.AddRegion (RegionId.of_index 0) "Running sum coordinates check" (
+    ℛ.EnableSelector Selector.QMulFixedRunningSum 0 "").

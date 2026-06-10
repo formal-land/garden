@@ -36,6 +36,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "Short fixed-base mul gate" (
-    Region.enable_selector Selector.QMulFixedShort 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "Short fixed-base mul gate" (
+    ℛ.EnableSelector Selector.QMulFixedShort 0 "").

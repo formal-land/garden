@@ -42,6 +42,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "overflow checks" (
-    Region.enable_selector Selector.QMulOverflow 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "overflow checks" (
+    ℛ.EnableSelector Selector.QMulOverflow 0 "").

@@ -3,6 +3,7 @@
 
 Require Export Stdlib.Lists.List.
 Require Export Stdlib.ZArith.ZArith.
+Require Import Garden.Orchard.regions.
 
 Import ListNotations.
 Global Open Scope Z_scope.
@@ -412,5 +413,7 @@ Fixpoint region_start_of_list (index : Z) (starts : list Z) : Z :=
       if Z.eqb index 0 then start else region_start_of_list (index - 1) starts
   end.
 
-Definition region_start_of (region_index : Z) : Z :=
-  region_start_of_list region_index region_starts.
+Definition region_start_of (region : RegionId.t) : Z :=
+  match region with
+  | RegionId.OfIndex index => region_start_of_list index region_starts
+  end.

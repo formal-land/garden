@@ -39,18 +39,17 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.witness_point.synthesize in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
-  let_ℒ base :=
-    Layouter.assign_region "variable-base scalar mul dummy base" (
-      let_ℛ x := Region.assign_advice "x" Advice.A0 0 Value.Unknown in
-      let_ℛ y := Region.assign_advice "y" Advice.A1 0 Value.Unknown in
-      return_ℛ (x, y)) in
-  let '(base_x, base_y) := base in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize base_x base_y in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.synthesize in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.synthesize in
-  let_ℒ _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.synthesize in
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.witness_point.synthesize in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
+  let🞵 '(base_x, base_y) :=
+    ℒ.AddRegion (RegionId.of_index 0) "variable-base scalar mul dummy base" (
+      let🞵 x := ℛ.AssignAdvice "x" Advice.A0 0 0 in
+      let🞵 y := ℛ.AssignAdvice "y" Advice.A1 0 0 in
+      return🞵 (x, y)) in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize 0 base_x base_y in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.synthesize in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.synthesize in
+  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.synthesize in
   Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.synthesize.

@@ -12,8 +12,8 @@ Global Open Scope Z_scope.
 
 Module AssignedPoint.
   Record t : Set := {
-    x : Cell.t columns;
-    y : Cell.t columns;
+    x : Cell.t columns RegionId.t;
+    y : Cell.t columns RegionId.t;
   }.
 End AssignedPoint.
 
@@ -26,10 +26,10 @@ End FullFixedResult.
 
 Module LookupResult.
   Record t : Set := {
-    z_0 : Cell.t columns;
-    z_1 : Cell.t columns;
-    z_13 : Cell.t columns;
-    z_end : Cell.t columns;
+    z_0 : Cell.t columns RegionId.t;
+    z_1 : Cell.t columns RegionId.t;
+    z_13 : Cell.t columns RegionId.t;
+    z_end : Cell.t columns RegionId.t;
   }.
 End LookupResult.
 
@@ -39,12 +39,12 @@ Definition fixed_base_row : Set :=
 Fixpoint assign_fixed_row
     (offset : Z)
     (row : fixed_base_row)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match row with
-  | [] => return_ℛ tt
+  | [] => return🞵 tt
   | (column, annotation, value) :: row =>
-      let_ℛ _ :=
-        Region.assign_fixed annotation column offset (Value.Known value) in
+      let🞵 _ :=
+        ℛ.AssignFixed annotation column offset value in
       assign_fixed_row offset row
   end.
 
@@ -52,121 +52,128 @@ Fixpoint assign_fixed_rows_with_selector
     (selector : Selector.t)
     (offset : Z)
     (rows : list fixed_base_row)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match rows with
-  | [] => return_ℛ tt
+  | [] => return🞵 tt
   | row :: rows =>
-      let_ℛ _ := Region.enable_selector selector offset "" in
-      let_ℛ _ := assign_fixed_row offset row in
+      let🞵 _ := ℛ.EnableSelector selector offset "" in
+      let🞵 _ := assign_fixed_row offset row in
       assign_fixed_rows_with_selector selector (offset + 1) rows
   end.
 
 Definition assign_mul_fixed_window
     (offset : Z)
-    : Region.t columns AssignedPoint.t :=
-  let_ℛ x :=
-    Region.assign_advice "mul_b_x" Advice.A0 offset Value.Unknown in
-  let_ℛ y :=
-    Region.assign_advice "mul_b_y" Advice.A1 offset Value.Unknown in
-  let_ℛ _ :=
-    Region.assign_advice "u" Advice.A5 offset Value.Unknown in
-  return_ℛ {| AssignedPoint.x := x; AssignedPoint.y := y |}.
+    : 𝓡 columns RegionId.t AssignedPoint.t :=
+  let🞵 x :=
+    ℛ.AssignAdvice "mul_b_x" Advice.A0 offset 0 in
+  let🞵 y :=
+    ℛ.AssignAdvice "mul_b_y" Advice.A1 offset 0 in
+  let🞵 _ :=
+    ℛ.AssignAdvice "u" Advice.A5 offset 0 in
+  return🞵 {| AssignedPoint.x := x; AssignedPoint.y := y |}.
 
 Definition assign_add_incomplete
     (offset : Z)
     (p q : AssignedPoint.t)
-    : Region.t columns AssignedPoint.t :=
-  let_ℛ _ := Region.enable_selector Selector.QAddIncomplete offset "" in
-  let_ℛ _ :=
-    Region.copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 offset Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 offset Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 offset Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 offset Value.Unknown in
-  let_ℛ x_r :=
-    Region.assign_advice "x_r" Advice.A2 (offset + 1) Value.Unknown in
-  let_ℛ y_r :=
-    Region.assign_advice "y_r" Advice.A3 (offset + 1) Value.Unknown in
-  return_ℛ {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
+    : 𝓡 columns RegionId.t AssignedPoint.t :=
+  let🞵 _ := ℛ.EnableSelector Selector.QAddIncomplete offset "" in
+  let🞵 _ :=
+    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 offset 0 in
+  let🞵 _ :=
+    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 offset 0 in
+  let🞵 _ :=
+    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 offset 0 in
+  let🞵 _ :=
+    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 offset 0 in
+  let🞵 x_r :=
+    ℛ.AssignAdvice "x_r" Advice.A2 (offset + 1) 0 in
+  let🞵 y_r :=
+    ℛ.AssignAdvice "y_r" Advice.A3 (offset + 1) 0 in
+  return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Fixpoint assign_incomplete_additions
     (offset : Z)
     (count : nat)
     (acc : AssignedPoint.t)
-    : Region.t columns AssignedPoint.t :=
+    : 𝓡 columns RegionId.t AssignedPoint.t :=
   match count with
-  | O => return_ℛ acc
+  | O => return🞵 acc
   | S count =>
-      let_ℛ mul_b := assign_mul_fixed_window offset in
-      let_ℛ acc := assign_add_incomplete offset mul_b acc in
+      let🞵 mul_b := assign_mul_fixed_window offset in
+      let🞵 acc := assign_add_incomplete offset mul_b acc in
       assign_incomplete_additions (offset + 1) count acc
   end.
 
 Fixpoint assign_full_window_witnesses
     (offset : Z)
     (count : nat)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match count with
-  | O => return_ℛ tt
+  | O => return🞵 tt
   | S count =>
-      let_ℛ _ :=
-        Region.enable_selector Selector.QMulFixedFull offset "" in
-      let_ℛ _ := Region.assign_advice "k" Advice.A4 offset Value.Unknown in
+      let🞵 _ :=
+        ℛ.EnableSelector Selector.QMulFixedFull offset "" in
+      let🞵 _ := ℛ.AssignAdvice "k" Advice.A4 offset 0 in
       assign_full_window_witnesses (offset + 1) count
   end.
 
 Definition assign_complete_add
     (p q : AssignedPoint.t)
-    : Region.t columns AssignedPoint.t :=
-  let_ℛ _ := Region.enable_selector Selector.QEccAdd 0 "" in
-  let_ℛ _ :=
-    Region.copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 0 Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 0 Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 0 Value.Unknown in
-  let_ℛ _ :=
-    Region.copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 0 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "alpha" Advice.A5 0 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "beta" Advice.A6 0 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "gamma" Advice.A7 0 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "delta" Advice.A8 0 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "lambda" Advice.A4 0 Value.Unknown in
-  let_ℛ x_r := Region.assign_advice "x_r" Advice.A2 1 Value.Unknown in
-  let_ℛ y_r := Region.assign_advice "y_r" Advice.A3 1 Value.Unknown in
-  return_ℛ {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
+    : 𝓡 columns RegionId.t AssignedPoint.t :=
+  let🞵 _ := ℛ.EnableSelector Selector.QEccAdd 0 "" in
+  let🞵 _ :=
+    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 0 0 in
+  let🞵 _ :=
+    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 0 0 in
+  let🞵 _ :=
+    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 0 0 in
+  let🞵 _ :=
+    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 0 0 in
+  let🞵 _ := ℛ.AssignAdvice "alpha" Advice.A5 0 0 in
+  let🞵 _ := ℛ.AssignAdvice "beta" Advice.A6 0 0 in
+  let🞵 _ := ℛ.AssignAdvice "gamma" Advice.A7 0 0 in
+  let🞵 _ := ℛ.AssignAdvice "delta" Advice.A8 0 0 in
+  let🞵 _ := ℛ.AssignAdvice "lambda" Advice.A4 0 0 in
+  let🞵 x_r := ℛ.AssignAdvice "x_r" Advice.A2 1 0 in
+  let🞵 y_r := ℛ.AssignAdvice "y_r" Advice.A3 1 0 in
+  return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
-    : Layouter.t columns FullFixedResult.t :=
-  Layouter.assign_region "Full-width fixed-base mul (incomplete addition)" (
-    let_ℛ _ := assign_full_window_witnesses 0 85%nat in
-    let_ℛ _ :=
+    (region : RegionId.t)
+    : 𝓛 columns RegionId.t FullFixedResult.t :=
+  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (
+    let🞵 _ := assign_full_window_witnesses 0 85%nat in
+    let🞵 _ :=
       assign_fixed_rows_with_selector
         Selector.QMulFixedFull
         0
         Garden.Orchard.FixedBases.NoteCommitR.full_fixed_rows in
-    let_ℛ acc := assign_mul_fixed_window 0 in
-    let_ℛ acc := assign_incomplete_additions 1 83%nat acc in
-    let_ℛ mul_b := assign_mul_fixed_window 84 in
-    return_ℛ {|
+    let🞵 acc := assign_mul_fixed_window 0 in
+    let🞵 acc := assign_incomplete_additions 1 83%nat acc in
+    let🞵 mul_b := assign_mul_fixed_window 84 in
+    return🞵 {|
       FullFixedResult.acc := acc;
       FullFixedResult.mul_b := mul_b;
     |}).
 
 Definition synthesize_full_fixed_base_mul_note_commit_r_last_region
+    (region : RegionId.t)
     (result : FullFixedResult.t)
-    : Layouter.t columns AssignedPoint.t :=
-  Layouter.assign_region "Full-width fixed-base mul (last window, complete addition)" (
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
+  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (
     assign_complete_add
       result.(FullFixedResult.mul_b)
       result.(FullFixedResult.acc)).
 
 Definition synthesize_full_fixed_base_mul_note_commit_r
-    : Layouter.t columns AssignedPoint.t :=
-  let_ℒ result := synthesize_full_fixed_base_mul_note_commit_r_incomplete_region in
-  synthesize_full_fixed_base_mul_note_commit_r_last_region result.
+    (first_region_index : Z)
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
+  let🞵 result :=
+    synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
+      (RegionId.of_index first_region_index) in
+  synthesize_full_fixed_base_mul_note_commit_r_last_region
+    (RegionId.of_index (first_region_index + 1))
+    result.
 
 Definition t_p_expr : Expression.t columns :=
   Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p.
@@ -452,55 +459,58 @@ Definition configure_new
     Selector.QNoteCommitNewYCanon.
 
 Definition witness_message_piece
+    (region : RegionId.t)
     (column : Advice.t)
     (name : string)
-    : Layouter.t columns (Cell.t columns) :=
-  Layouter.namespace name (
-    Layouter.assign_region "witness message piece" (
-      Region.assign_advice "witness message piece" column 0 Value.Unknown)).
+    : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
+  ℒ.InNamespace name (
+    ℒ.AddRegion region "witness message piece" (
+      ℛ.AssignAdvice "witness message piece" column 0 0)).
 
 Definition synthesize_short_range
+    (region : RegionId.t)
     (namespace region_name : string)
-    : Layouter.t columns (Cell.t columns) :=
-  Layouter.namespace namespace (
-    Layouter.assign_region region_name (
-      let_ℛ element :=
-        Region.assign_advice "Witness element" Advice.A9 0 Value.Unknown in
-      let_ℛ _ := Region.enable_selector Selector.QLookup 0 "" in
-      let_ℛ _ := Region.enable_selector Selector.QLookup 1 "" in
-      let_ℛ _ := Region.enable_selector Selector.QBitshift 1 "" in
-      return_ℛ element)).
+    : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
+  ℒ.InNamespace namespace (
+    ℒ.AddRegion region region_name (
+      let🞵 element :=
+        ℛ.AssignAdvice "Witness element" Advice.A9 0 0 in
+      let🞵 _ := ℛ.EnableSelector Selector.QLookup 0 "" in
+      let🞵 _ := ℛ.EnableSelector Selector.QLookup 1 "" in
+      let🞵 _ := ℛ.EnableSelector Selector.QBitshift 1 "" in
+      return🞵 element)).
 
 Fixpoint enable_lookup_running_rows
     (offset : Z)
     (count : nat)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match count with
-  | O => return_ℛ tt
+  | O => return🞵 tt
   | S count =>
-      let_ℛ _ := Region.enable_selector Selector.QLookup offset "" in
-      let_ℛ _ := Region.enable_selector Selector.QRunning offset "" in
-      let_ℛ _ := Region.assign_advice "z" Advice.A9 offset Value.Unknown in
+      let🞵 _ := ℛ.EnableSelector Selector.QLookup offset "" in
+      let🞵 _ := ℛ.EnableSelector Selector.QRunning offset "" in
+      let🞵 _ := ℛ.AssignAdvice "z" Advice.A9 offset 0 in
       enable_lookup_running_rows (offset + 1) count
   end.
 
 Definition synthesize_running_lookup
+    (region : RegionId.t)
     (namespace : string)
     (count : nat)
-    : Layouter.t columns LookupResult.t :=
-  Layouter.namespace namespace (
-    Layouter.assign_region "Witness element" (
-      let_ℛ z_0 := Region.assign_advice "z_0" Advice.A9 0 Value.Unknown in
-      let_ℛ z_1 := Region.assign_advice "z_1" Advice.A9 1 Value.Unknown in
-      let_ℛ z_13 := Region.assign_advice "z_13" Advice.A9 13 Value.Unknown in
-      let_ℛ _ := enable_lookup_running_rows 0 count in
-      let_ℛ z_end :=
-        Region.assign_advice
+    : 𝓛 columns RegionId.t LookupResult.t :=
+  ℒ.InNamespace namespace (
+    ℒ.AddRegion region "Witness element" (
+      let🞵 z_0 := ℛ.AssignAdvice "z_0" Advice.A9 0 0 in
+      let🞵 z_1 := ℛ.AssignAdvice "z_1" Advice.A9 1 0 in
+      let🞵 z_13 := ℛ.AssignAdvice "z_13" Advice.A9 13 0 in
+      let🞵 _ := enable_lookup_running_rows 0 count in
+      let🞵 z_end :=
+        ℛ.AssignAdvice
           "z_end"
           Advice.A9
           (Z.of_nat count)
-          Value.Unknown in
-      return_ℛ {|
+          0 in
+      return🞵 {|
         LookupResult.z_0 := z_0;
         LookupResult.z_1 := z_1;
         LookupResult.z_13 := z_13;
@@ -510,96 +520,179 @@ Definition synthesize_running_lookup
 Definition copy_advice_column
     (source_column target_column : Advice.t)
     (source_offset target_offset : Z)
-    : Region.t columns (Cell.t columns) :=
-  let_ℛ source :=
-    Region.assign_advice "source" source_column source_offset Value.Unknown in
-  Region.copy_advice "copy" source target_column target_offset Value.Unknown.
+    : 𝓡 columns RegionId.t (Cell.t columns RegionId.t) :=
+  let🞵 source :=
+    ℛ.AssignAdvice "source" source_column source_offset 0 in
+  copy_advice "copy" source target_column target_offset 0.
 
 Definition synthesize_y_canonicity
+    (first_region_index : Z)
     (namespace : string)
     (q_y_canon : Selector.t)
-    (y : Cell.t columns)
-    : Layouter.t columns (Cell.t columns) :=
-  Layouter.namespace namespace (
-    let_ℒ k_0 := synthesize_short_range "k_0" "Range check 9 bits" in
-    let_ℒ k_2 := synthesize_short_range "k_2" "Range check 4 bits" in
-    let_ℒ j_lookup :=
+    (y : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
+  ℒ.InNamespace namespace (
+    let🞵 k_0 :=
+      synthesize_short_range
+        (RegionId.of_index first_region_index)
+        "k_0"
+        "Range check 9 bits" in
+    let🞵 k_2 :=
+      synthesize_short_range
+        (RegionId.of_index (first_region_index + 1))
+        "k_2"
+        "Range check 4 bits" in
+    let🞵 j_lookup :=
       synthesize_running_lookup
+        (RegionId.of_index (first_region_index + 2))
         "Decompose j = LSB + (2)k_0 + (2^10)k_1"
         25%nat in
-    let_ℒ j_prime_lookup :=
-      Layouter.namespace "j_prime = j + 2^130 - t_P" (
+    let🞵 j_prime_lookup :=
+      ℒ.InNamespace "j_prime = j + 2^130 - t_P" (
         synthesize_running_lookup
+          (RegionId.of_index (first_region_index + 3))
           "Decompose low 130 bits of (a + 2^130 - t_P)"
           13%nat) in
-    Layouter.assign_region "y canonicity" (
-      let_ℛ _ := Region.enable_selector q_y_canon 0 "" in
-      let_ℛ y_bit := Region.assign_advice "y_bit" Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "y" y Advice.A5 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "k_0" k_0 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "k_2" k_2 Advice.A8 0 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "j_0" j_lookup.(LookupResult.z_0) Advice.A5 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "j_1" j_lookup.(LookupResult.z_1) Advice.A6 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "j_13" j_lookup.(LookupResult.z_13) Advice.A7 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 4))
+      "y canonicity" (
+      let🞵 _ := ℛ.EnableSelector q_y_canon 0 "" in
+      let🞵 y_bit := ℛ.AssignAdvice "y_bit" Advice.A6 0 0 in
+      let🞵 _ := copy_advice "y" y Advice.A5 0 0 in
+      let🞵 _ := copy_advice "k_0" k_0 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "k_2" k_2 Advice.A8 0 0 in
+      let🞵 _ :=
+        copy_advice "j_0" j_lookup.(LookupResult.z_0) Advice.A5 1 0 in
+      let🞵 _ :=
+        copy_advice "j_1" j_lookup.(LookupResult.z_1) Advice.A6 1 0 in
+      let🞵 _ :=
+        copy_advice "j_13" j_lookup.(LookupResult.z_13) Advice.A7 1 0 in
+      let🞵 _ :=
+        copy_advice
           "j_prime_0"
           j_prime_lookup.(LookupResult.z_0)
           Advice.A8
           1
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice
           "j_prime_13"
           j_prime_lookup.(LookupResult.z_end)
           Advice.A9
           1
-          Value.Unknown in
-      return_ℛ y_bit)).
+          0 in
+      return🞵 y_bit)).
 
 Definition synthesize_instance
+    (first_region_index : Z)
     (q_b q_d q_e q_g q_h
       q_gd q_pkd q_value q_rho q_psi q_y_canon : Selector.t)
     (use_second_sinsemilla : bool)
-    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns)
-    : Layouter.t columns AssignedPoint.t :=
+    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
   let piece_column :=
     if use_second_sinsemilla then Advice.A7 else Advice.A6 in
   let bits_column :=
     if use_second_sinsemilla then Advice.A7 else Advice.A2 in
   let rho_column :=
     if use_second_sinsemilla then Advice.A2 else Advice.A0 in
-  let_ℒ a := witness_message_piece piece_column "a" in
-  let_ℒ b_0 := synthesize_short_range "b_0" "Range check 4 bits" in
-  let_ℒ b_3 := synthesize_short_range "b_3" "Range check 4 bits" in
-  let_ℒ b := witness_message_piece piece_column "b" in
-  let_ℒ c := witness_message_piece piece_column "c" in
-  let_ℒ d_2 := synthesize_short_range "d_2" "Range check 8 bits" in
-  let_ℒ d := witness_message_piece piece_column "d" in
-  let_ℒ e_0 := synthesize_short_range "e_0" "Range check 6 bits" in
-  let_ℒ e_1 := synthesize_short_range "e_1" "Range check 4 bits" in
-  let_ℒ e := witness_message_piece piece_column "e" in
-  let_ℒ f := witness_message_piece piece_column "f" in
-  let_ℒ g_1 := synthesize_short_range "g_1" "Range check 9 bits" in
-  let_ℒ g := witness_message_piece piece_column "g" in
-  let_ℒ h_0 := synthesize_short_range "h_0" "Range check 5 bits" in
-  let_ℒ h := witness_message_piece piece_column "h" in
-  let_ℒ b_2 := synthesize_y_canonicity "y(g_d) decomposition" q_y_canon g_d_y in
-  let_ℒ d_1 := synthesize_y_canonicity "y(pk_d) decomposition" q_y_canon pk_d_y in
-  let_ℒ process :=
-    Layouter.namespace "Process NoteCommit inputs" (
-      let_ℒ blind :=
-        Layouter.namespace "[r] R" (
-          Layouter.namespace "fixed-base mul of NoteCommitR" (
-            synthesize_full_fixed_base_mul_note_commit_r)) in
-      let_ℒ m_hash :=
-        Layouter.namespace "M" (
+  let🞵 a :=
+    witness_message_piece (RegionId.of_index first_region_index) piece_column "a" in
+  let🞵 b_0 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 1))
+      "b_0"
+      "Range check 4 bits" in
+  let🞵 b_3 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 2))
+      "b_3"
+      "Range check 4 bits" in
+  let🞵 b :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 3))
+      piece_column
+      "b" in
+  let🞵 c :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 4))
+      piece_column
+      "c" in
+  let🞵 d_2 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 5))
+      "d_2"
+      "Range check 8 bits" in
+  let🞵 d :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 6))
+      piece_column
+      "d" in
+  let🞵 e_0 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 7))
+      "e_0"
+      "Range check 6 bits" in
+  let🞵 e_1 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 8))
+      "e_1"
+      "Range check 4 bits" in
+  let🞵 e :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 9))
+      piece_column
+      "e" in
+  let🞵 f :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 10))
+      piece_column
+      "f" in
+  let🞵 g_1 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 11))
+      "g_1"
+      "Range check 9 bits" in
+  let🞵 g :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 12))
+      piece_column
+      "g" in
+  let🞵 h_0 :=
+    synthesize_short_range
+      (RegionId.of_index (first_region_index + 13))
+      "h_0"
+      "Range check 5 bits" in
+  let🞵 h :=
+    witness_message_piece
+      (RegionId.of_index (first_region_index + 14))
+      piece_column
+      "h" in
+  let🞵 b_2 :=
+    synthesize_y_canonicity
+      (first_region_index + 15)
+      "y(g_d) decomposition"
+      q_y_canon
+      g_d_y in
+  let🞵 d_1 :=
+    synthesize_y_canonicity
+      (first_region_index + 20)
+      "y(pk_d) decomposition"
+      q_y_canon
+      pk_d_y in
+  let🞵 '(cm, hash) :=
+    ℒ.InNamespace "Process NoteCommit inputs" (
+      let🞵 blind :=
+        ℒ.InNamespace "[r] R" (
+          ℒ.InNamespace "fixed-base mul of NoteCommitR" (
+            synthesize_full_fixed_base_mul_note_commit_r
+              (first_region_index + 25))) in
+      let🞵 m_hash :=
+        ℒ.InNamespace "M" (
           (if use_second_sinsemilla
            then Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit_2
            else Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit)
+            (RegionId.of_index (first_region_index + 27))
             q_note_commit_m_x
             q_note_commit_m_y
             a
@@ -616,202 +709,228 @@ Definition synthesize_instance
         AssignedPoint.y :=
           m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.y);
       |} in
-      let_ℒ cm :=
-        Layouter.namespace "M + [r] R" (
-          Layouter.assign_region "complete point addition" (
+      let🞵 cm :=
+        ℒ.InNamespace "M + [r] R" (
+          ℒ.AddRegion
+            (RegionId.of_index (first_region_index + 28))
+            "complete point addition" (
             assign_complete_add m blind)) in
-      return_ℒ (cm, m_hash)) in
-  let '(cm, hash) := process in
-  let_ℒ x_gd_lookup :=
-    Layouter.namespace "x(g_d) canonicity" (
+      return🞵 (cm, m_hash)) in
+  let🞵 x_gd_lookup :=
+    ℒ.InNamespace "x(g_d) canonicity" (
       synthesize_running_lookup
+        (RegionId.of_index (first_region_index + 29))
         "Decompose low 130 bits of (a + 2^130 - t_P)"
         13%nat) in
-  let_ℒ x_pkd_lookup :=
-    Layouter.namespace "x(pk_d) canonicity" (
+  let🞵 x_pkd_lookup :=
+    ℒ.InNamespace "x(pk_d) canonicity" (
       synthesize_running_lookup
+        (RegionId.of_index (first_region_index + 30))
         "Decompose low 140 bits of (b_3 + 2^4 c + 2^140 - t_P)"
         14%nat) in
-  let_ℒ rho_lookup :=
-    Layouter.namespace "rho canonicity" (
+  let🞵 rho_lookup :=
+    ℒ.InNamespace "rho canonicity" (
       synthesize_running_lookup
+        (RegionId.of_index (first_region_index + 31))
         "Decompose low 140 bits of (e_1 + 2^4 f + 2^140 - t_P)"
         14%nat) in
-  let_ℒ psi_lookup :=
-    Layouter.namespace "psi canonicity" (
+  let🞵 psi_lookup :=
+    ℒ.InNamespace "psi canonicity" (
       synthesize_running_lookup
+        (RegionId.of_index (first_region_index + 32))
         "Decompose low 130 bits of (g_1 + (2^9)g_2 + 2^130 - t_P)"
         13%nat) in
-  let_ℒ b_1 :=
-    Layouter.assign_region "NoteCommit MessagePiece b" (
-      let_ℛ _ := Region.enable_selector q_b 0 "" in
-      let_ℛ _ := Region.copy_advice "b" b Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_0" b_0 Advice.A7 0 Value.Unknown in
-      let_ℛ b_1 := Region.assign_advice "b_1" Advice.A8 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_2" b_2 Advice.A7 1 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_3" b_3 Advice.A8 1 Value.Unknown in
-      return_ℛ b_1) in
-  let_ℒ d_0 :=
-    Layouter.assign_region "NoteCommit MessagePiece d" (
-      let_ℛ _ := Region.enable_selector q_d 0 "" in
-      let_ℛ _ := Region.copy_advice "d" d Advice.A6 0 Value.Unknown in
-      let_ℛ d_0 := Region.assign_advice "d_0" Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "d_1" d_1 Advice.A8 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "d_2" d_2 Advice.A7 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+  let🞵 b_1 :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 33))
+      "NoteCommit MessagePiece b" (
+      let🞵 _ := ℛ.EnableSelector q_b 0 "" in
+      let🞵 _ := copy_advice "b" b Advice.A6 0 0 in
+      let🞵 _ := copy_advice "b_0" b_0 Advice.A7 0 0 in
+      let🞵 b_1 := ℛ.AssignAdvice "b_1" Advice.A8 0 0 in
+      let🞵 _ := copy_advice "b_2" b_2 Advice.A7 1 0 in
+      let🞵 _ := copy_advice "b_3" b_3 Advice.A8 1 0 in
+      return🞵 b_1) in
+  let🞵 d_0 :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 34))
+      "NoteCommit MessagePiece d" (
+      let🞵 _ := ℛ.EnableSelector q_d 0 "" in
+      let🞵 _ := copy_advice "d" d Advice.A6 0 0 in
+      let🞵 d_0 := ℛ.AssignAdvice "d_0" Advice.A7 0 0 in
+      let🞵 _ := copy_advice "d_1" d_1 Advice.A8 0 0 in
+      let🞵 _ := copy_advice "d_2" d_2 Advice.A7 1 0 in
+      let🞵 _ :=
+        copy_advice
           "d_3"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d)
           Advice.A8
           1
-          Value.Unknown in
-      return_ℛ d_0) in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit MessagePiece e" (
-      let_ℛ _ := Region.enable_selector q_e 0 "" in
-      let_ℛ _ := Region.copy_advice "e" e Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "e_0" e_0 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "e_1" e_1 Advice.A8 0 Value.Unknown in
-      return_ℛ tt) in
-  let_ℒ g_0 :=
-    Layouter.assign_region "NoteCommit MessagePiece g" (
-      let_ℛ _ := Region.enable_selector q_g 0 "" in
-      let_ℛ _ := Region.copy_advice "g" g Advice.A6 0 Value.Unknown in
-      let_ℛ g_0 := Region.assign_advice "g_0" Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "g_1" g_1 Advice.A6 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      return🞵 d_0) in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 35))
+      "NoteCommit MessagePiece e" (
+      let🞵 _ := ℛ.EnableSelector q_e 0 "" in
+      let🞵 _ := copy_advice "e" e Advice.A6 0 0 in
+      let🞵 _ := copy_advice "e_0" e_0 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "e_1" e_1 Advice.A8 0 0 in
+      return🞵 tt) in
+  let🞵 g_0 :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 36))
+      "NoteCommit MessagePiece g" (
+      let🞵 _ := ℛ.EnableSelector q_g 0 "" in
+      let🞵 _ := copy_advice "g" g Advice.A6 0 0 in
+      let🞵 g_0 := ℛ.AssignAdvice "g_0" Advice.A7 0 0 in
+      let🞵 _ := copy_advice "g_1" g_1 Advice.A6 1 0 in
+      let🞵 _ :=
+        copy_advice
           "g_2"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g)
           Advice.A7
           1
-          Value.Unknown in
-      return_ℛ g_0) in
-  let_ℒ h_1 :=
-    Layouter.assign_region "NoteCommit MessagePiece h" (
-      let_ℛ _ := Region.enable_selector q_h 0 "" in
-      let_ℛ _ := Region.copy_advice "h" h Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "h_0" h_0 Advice.A7 0 Value.Unknown in
-      let_ℛ h_1 := Region.assign_advice "h_1" Advice.A8 0 Value.Unknown in
-      return_ℛ h_1) in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit input g_d" (
-      let_ℛ _ := Region.copy_advice "gd_x" g_d_x Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_0" b_0 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_1" b_1 Advice.A7 1 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "a" a Advice.A8 0 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "a_prime" x_gd_lookup.(LookupResult.z_0) Advice.A8 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      return🞵 g_0) in
+  let🞵 h_1 :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 37))
+      "NoteCommit MessagePiece h" (
+      let🞵 _ := ℛ.EnableSelector q_h 0 "" in
+      let🞵 _ := copy_advice "h" h Advice.A6 0 0 in
+      let🞵 _ := copy_advice "h_0" h_0 Advice.A7 0 0 in
+      let🞵 h_1 := ℛ.AssignAdvice "h_1" Advice.A8 0 0 in
+      return🞵 h_1) in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 38))
+      "NoteCommit input g_d" (
+      let🞵 _ := copy_advice "gd_x" g_d_x Advice.A6 0 0 in
+      let🞵 _ := copy_advice "b_0" b_0 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "b_1" b_1 Advice.A7 1 0 in
+      let🞵 _ := copy_advice "a" a Advice.A8 0 0 in
+      let🞵 _ :=
+        copy_advice "a_prime" x_gd_lookup.(LookupResult.z_0) Advice.A8 1 0 in
+      let🞵 _ :=
+        copy_advice
           "z13_a"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a)
           Advice.A9
           0
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice
           "z13_a_prime"
           x_gd_lookup.(LookupResult.z_end)
           Advice.A9
           1
-          Value.Unknown in
-      Region.enable_selector q_gd 0 "") in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit input pk_d" (
-      let_ℛ _ := Region.copy_advice "pkd_x" pk_d_x Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "b_3" b_3 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "d_0" d_0 Advice.A7 1 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "c" c Advice.A8 0 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "b3_c_prime" x_pkd_lookup.(LookupResult.z_0) Advice.A8 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      ℛ.EnableSelector q_gd 0 "") in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 39))
+      "NoteCommit input pk_d" (
+      let🞵 _ := copy_advice "pkd_x" pk_d_x Advice.A6 0 0 in
+      let🞵 _ := copy_advice "b_3" b_3 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "d_0" d_0 Advice.A7 1 0 in
+      let🞵 _ := copy_advice "c" c Advice.A8 0 0 in
+      let🞵 _ :=
+        copy_advice "b3_c_prime" x_pkd_lookup.(LookupResult.z_0) Advice.A8 1 0 in
+      let🞵 _ :=
+        copy_advice
           "z13_c"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c)
           Advice.A9
           0
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice
           "z14_b3_c_prime"
           x_pkd_lookup.(LookupResult.z_end)
           Advice.A9
           1
-          Value.Unknown in
-      Region.enable_selector q_pkd 0 "") in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit input value" (
-      let_ℛ _ := Region.copy_advice "value" value Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "d_2" d_2 Advice.A7 0 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      ℛ.EnableSelector q_pkd 0 "") in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 40))
+      "NoteCommit input value" (
+      let🞵 _ := copy_advice "value" value Advice.A6 0 0 in
+      let🞵 _ := copy_advice "d_2" d_2 Advice.A7 0 0 in
+      let🞵 _ :=
+        copy_advice
           "d3"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d)
           Advice.A8
           0
-          Value.Unknown in
-      let_ℛ _ := Region.copy_advice "e_0" e_0 Advice.A9 0 Value.Unknown in
-      Region.enable_selector q_value 0 "") in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit input rho" (
-      let_ℛ _ := Region.copy_advice "rho" rho Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "e_1" e_1 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "g_0" g_0 Advice.A7 1 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "f" f Advice.A8 0 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "e1_f_prime" rho_lookup.(LookupResult.z_0) Advice.A8 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ := copy_advice "e_0" e_0 Advice.A9 0 0 in
+      ℛ.EnableSelector q_value 0 "") in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 41))
+      "NoteCommit input rho" (
+      let🞵 _ := copy_advice "rho" rho Advice.A6 0 0 in
+      let🞵 _ := copy_advice "e_1" e_1 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "g_0" g_0 Advice.A7 1 0 in
+      let🞵 _ := copy_advice "f" f Advice.A8 0 0 in
+      let🞵 _ :=
+        copy_advice "e1_f_prime" rho_lookup.(LookupResult.z_0) Advice.A8 1 0 in
+      let🞵 _ :=
+        copy_advice
           "z13_f"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_f)
           Advice.A9
           0
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice
           "z14_e1_f_prime"
           rho_lookup.(LookupResult.z_end)
           Advice.A9
           1
-          Value.Unknown in
-      Region.enable_selector q_rho 0 "") in
-  let_ℒ _ :=
-    Layouter.assign_region "NoteCommit input psi" (
-      let_ℛ _ := Region.copy_advice "psi" psi Advice.A6 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "h_0" h_0 Advice.A6 1 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "g_1" g_1 Advice.A7 0 Value.Unknown in
-      let_ℛ _ := Region.copy_advice "h_1" h_1 Advice.A7 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      ℛ.EnableSelector q_rho 0 "") in
+  let🞵 _ :=
+    ℒ.AddRegion
+      (RegionId.of_index (first_region_index + 42))
+      "NoteCommit input psi" (
+      let🞵 _ := copy_advice "psi" psi Advice.A6 0 0 in
+      let🞵 _ := copy_advice "h_0" h_0 Advice.A6 1 0 in
+      let🞵 _ := copy_advice "g_1" g_1 Advice.A7 0 0 in
+      let🞵 _ := copy_advice "h_1" h_1 Advice.A7 1 0 in
+      let🞵 _ :=
+        copy_advice
           "g_2"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g)
           Advice.A8
           0
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice "g1_g2_prime" psi_lookup.(LookupResult.z_0) Advice.A8 1 Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice "g1_g2_prime" psi_lookup.(LookupResult.z_0) Advice.A8 1 0 in
+      let🞵 _ :=
+        copy_advice
           "z13_g"
           hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_g)
           Advice.A9
           0
-          Value.Unknown in
-      let_ℛ _ :=
-        Region.copy_advice
+          0 in
+      let🞵 _ :=
+        copy_advice
           "z13_g1_g2_prime"
           psi_lookup.(LookupResult.z_end)
           Advice.A9
           1
-          Value.Unknown in
-      Region.enable_selector q_psi 0 "") in
-  return_ℒ cm.
+          0 in
+      ℛ.EnableSelector q_psi 0 "") in
+  return🞵 cm.
 
 Definition synthesize_old
-    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns)
-    : Layouter.t columns AssignedPoint.t :=
+    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
   synthesize_instance
+    303
     Selector.QNoteCommitOldB
     Selector.QNoteCommitOldD
     Selector.QNoteCommitOldE
@@ -833,9 +952,10 @@ Definition synthesize_old
     psi.
 
 Definition synthesize_new
-    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns)
-    : Layouter.t columns AssignedPoint.t :=
+    (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
   synthesize_instance
+    350
     Selector.QNoteCommitNewB
     Selector.QNoteCommitNewD
     Selector.QNoteCommitNewE

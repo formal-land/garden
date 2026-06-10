@@ -60,14 +60,14 @@ Definition configure_2
 
 Definition synthesize_instance
     (q_swap : Selector.t)
-    : Layouter.t columns unit :=
-  Layouter.assign_region "conditional swap" (
-    Region.enable_selector q_swap 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "conditional swap" (
+    ℛ.EnableSelector q_swap 0 "").
 
 Definition synthesize_1
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance Selector.QCondSwap1.
 
 Definition synthesize_2
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance Selector.QCondSwap2.

@@ -11,9 +11,9 @@ Global Open Scope Z_scope.
 
 Module State.
   Record t : Set := {
-    state_0 : Cell.t columns;
-    state_1 : Cell.t columns;
-    state_2 : Cell.t columns;
+    state_0 : Cell.t columns RegionId.t;
+    state_1 : Cell.t columns RegionId.t;
+    state_2 : Cell.t columns RegionId.t;
   }.
 End State.
 
@@ -120,14 +120,14 @@ Definition configure
 
 Definition assign_state
     (offset : Z)
-    : Region.t columns State.t :=
-  let_ℛ state_0 :=
-    Region.assign_advice "state_0" Advice.A6 offset Value.Unknown in
-  let_ℛ state_1 :=
-    Region.assign_advice "state_1" Advice.A7 offset Value.Unknown in
-  let_ℛ state_2 :=
-    Region.assign_advice "state_2" Advice.A8 offset Value.Unknown in
-  return_ℛ {|
+    : 𝓡 columns RegionId.t State.t :=
+  let🞵 state_0 :=
+    ℛ.AssignAdvice "state_0" Advice.A6 offset 0 in
+  let🞵 state_1 :=
+    ℛ.AssignAdvice "state_1" Advice.A7 offset 0 in
+  let🞵 state_2 :=
+    ℛ.AssignAdvice "state_2" Advice.A8 offset 0 in
+  return🞵 {|
     State.state_0 := state_0;
     State.state_1 := state_1;
     State.state_2 := state_2;
@@ -136,27 +136,26 @@ Definition assign_state
 Definition copy_state
     (offset : Z)
     (state : State.t)
-    : Region.t columns State.t :=
-  let_ℛ state_0 :=
-    Region.copy_advice
-      "state_0" state.(State.state_0) Advice.A6 offset Value.Unknown in
-  let_ℛ state_1 :=
-    Region.copy_advice
-      "state_1" state.(State.state_1) Advice.A7 offset Value.Unknown in
-  let_ℛ state_2 :=
-    Region.copy_advice
-      "state_2" state.(State.state_2) Advice.A8 offset Value.Unknown in
-  return_ℛ {|
+    : 𝓡 columns RegionId.t State.t :=
+  let🞵 state_0 :=
+    copy_advice
+      "state_0" state.(State.state_0) Advice.A6 offset 0 in
+  let🞵 state_1 :=
+    copy_advice
+      "state_1" state.(State.state_1) Advice.A7 offset 0 in
+  let🞵 state_2 :=
+    copy_advice
+      "state_2" state.(State.state_2) Advice.A8 offset 0 in
+  return🞵 {|
     State.state_0 := state_0;
     State.state_1 := state_1;
     State.state_2 := state_2;
   |}.
 
 Definition synthesize_initial_state
-    : Layouter.t columns State.t :=
-  Layouter.namespace "Poseidon init" (
-    Layouter.assign_region
-      "initial state for domain ConstantLength<2>"
+    : 𝓛 columns RegionId.t State.t :=
+  ℒ.InNamespace "Poseidon init" (
+    ℒ.AddRegion (RegionId.of_index 271) "initial state for domain ConstantLength<2>"
       (assign_state 0)).
 
 Fixpoint assign_round_constant_entries
@@ -165,12 +164,12 @@ Fixpoint assign_round_constant_entries
       list
         Garden.Halo2.Gadgets.Poseidon.P128Pow5T3Synthesis
           .round_constant_entry)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match entries with
-  | [] => return_ℛ tt
+  | [] => return🞵 tt
   | (column, annotation, value) :: entries =>
-      let_ℛ _ :=
-        Region.assign_fixed annotation column offset (Value.Known value) in
+      let🞵 _ :=
+        ℛ.AssignFixed annotation column offset value in
       assign_round_constant_entries offset entries
   end.
 
@@ -179,9 +178,9 @@ Definition assign_round_constant_row
     (row :
       Garden.Halo2.Gadgets.Poseidon.P128Pow5T3Synthesis
         .round_constant_row)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   let '(selector, entries) := row in
-  let_ℛ _ := Region.enable_selector selector offset "" in
+  let🞵 _ := ℛ.EnableSelector selector offset "" in
   assign_round_constant_entries offset entries.
 
 Fixpoint assign_permutation_rows
@@ -190,37 +189,37 @@ Fixpoint assign_permutation_rows
       list
         Garden.Halo2.Gadgets.Poseidon.P128Pow5T3Synthesis
           .round_constant_row)
-    : Region.t columns State.t :=
+    : 𝓡 columns RegionId.t State.t :=
   match rows with
   | [] => assign_state offset
   | row :: rows =>
-      let_ℛ _ := assign_round_constant_row offset row in
-      let_ℛ _ := assign_state (offset + 1) in
+      let🞵 _ := assign_round_constant_row offset row in
+      let🞵 _ := assign_state (offset + 1) in
       assign_permutation_rows (offset + 1) rows
   end.
 
 Definition synthesize_add_input_region
     (state : State.t)
-    (input_0 input_1 : Cell.t columns)
-    : Layouter.t columns State.t :=
-  Layouter.assign_region "add input for domain ConstantLength<2>" (
-    let_ℛ _ := Region.enable_selector Selector.QPoseidonPadAndAdd 1 "" in
-    let_ℛ _ := copy_state 0 state in
-    let_ℛ state_0 :=
-      Region.assign_advice "state_0" Advice.A6 1 Value.Unknown in
-    let_ℛ state_1 :=
-      Region.assign_advice "state_1" Advice.A7 1 Value.Unknown in
-    let_ℛ state_2 :=
-      Region.assign_advice "state_2" Advice.A8 1 Value.Unknown in
-    let_ℛ _ := Region.copy input_0 state_0 in
-    let_ℛ _ := Region.copy input_1 state_1 in
-    let_ℛ state_0 :=
-      Region.assign_advice "state_0" Advice.A6 2 Value.Unknown in
-    let_ℛ state_1 :=
-      Region.assign_advice "state_1" Advice.A7 2 Value.Unknown in
-    let_ℛ state_2 :=
-      Region.assign_advice "state_2" Advice.A8 2 Value.Unknown in
-    return_ℛ {|
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t State.t :=
+  ℒ.AddRegion (RegionId.of_index 272) "add input for domain ConstantLength<2>" (
+    let🞵 _ := ℛ.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
+    let🞵 _ := copy_state 0 state in
+    let🞵 state_0 :=
+      ℛ.AssignAdvice "state_0" Advice.A6 1 0 in
+    let🞵 state_1 :=
+      ℛ.AssignAdvice "state_1" Advice.A7 1 0 in
+    let🞵 state_2 :=
+      ℛ.AssignAdvice "state_2" Advice.A8 1 0 in
+    let🞵 _ := ℛ.Copy input_0 state_0 in
+    let🞵 _ := ℛ.Copy input_1 state_1 in
+    let🞵 state_0 :=
+      ℛ.AssignAdvice "state_0" Advice.A6 2 0 in
+    let🞵 state_1 :=
+      ℛ.AssignAdvice "state_1" Advice.A7 2 0 in
+    let🞵 state_2 :=
+      ℛ.AssignAdvice "state_2" Advice.A8 2 0 in
+    return🞵 {|
       State.state_0 := state_0;
       State.state_1 := state_1;
       State.state_2 := state_2;
@@ -228,9 +227,9 @@ Definition synthesize_add_input_region
 
 Definition synthesize_permute_state
     (state : State.t)
-    : Layouter.t columns State.t :=
-  Layouter.assign_region "permute state" (
-    let_ℛ _ := copy_state 0 state in
+    : 𝓛 columns RegionId.t State.t :=
+  ℒ.AddRegion (RegionId.of_index 273) "permute state" (
+    let🞵 _ := copy_state 0 state in
     assign_permutation_rows
       0
       Garden.Halo2.Gadgets.Poseidon.P128Pow5T3Synthesis
@@ -238,42 +237,42 @@ Definition synthesize_permute_state
 
 Definition synthesize_sponge
     (state : State.t)
-    (input_0 input_1 : Cell.t columns)
-    : Layouter.t columns State.t :=
-  Layouter.namespace "PoseidonSponge" (
-    let_ℒ state := synthesize_add_input_region state input_0 input_1 in
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t State.t :=
+  ℒ.InNamespace "PoseidonSponge" (
+    let🞵 state := synthesize_add_input_region state input_0 input_1 in
     synthesize_permute_state state).
 
 Definition synthesize_hash
-    (input_0 input_1 : Cell.t columns)
-    : Layouter.t columns (Cell.t columns) :=
-  let_ℒ state := synthesize_initial_state in
-  Layouter.namespace "Poseidon hash (nk, rho)" (
-    let_ℒ _ := Layouter.namespace "absorb_0" (return_ℒ tt) in
-    let_ℒ _ := Layouter.namespace "absorb_1" (return_ℒ tt) in
-    let_ℒ state :=
-      Layouter.namespace "finish absorbing" (
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
+  let🞵 state := synthesize_initial_state in
+  ℒ.InNamespace "Poseidon hash (nk, rho)" (
+    let🞵 _ := ℒ.InNamespace "absorb_0" (return🞵 tt) in
+    let🞵 _ := ℒ.InNamespace "absorb_1" (return🞵 tt) in
+    let🞵 state :=
+      ℒ.InNamespace "finish absorbing" (
         synthesize_sponge state input_0 input_1) in
-    let_ℒ _ := Layouter.namespace "squeeze" (return_ℒ tt) in
-    return_ℒ state.(State.state_0)).
+    let🞵 _ := ℒ.InNamespace "squeeze" (return🞵 tt) in
+    return🞵 state.(State.state_0)).
 
 Definition synthesize_full_round
-    : Layouter.t columns unit :=
-  Layouter.assign_region "full round" (
-    Region.enable_selector Selector.QPoseidonFull 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "full round" (
+    ℛ.EnableSelector Selector.QPoseidonFull 0 "").
 
 Definition synthesize_partial_rounds
-    : Layouter.t columns unit :=
-  Layouter.assign_region "partial rounds" (
-    Region.enable_selector Selector.QPoseidonPartial 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "partial rounds" (
+    ℛ.EnableSelector Selector.QPoseidonPartial 0 "").
 
 Definition synthesize_pad_and_add
-    : Layouter.t columns unit :=
-  Layouter.assign_region "pad-and-add" (
-    Region.enable_selector Selector.QPoseidonPadAndAdd 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "pad-and-add" (
+    ℛ.EnableSelector Selector.QPoseidonPadAndAdd 0 "").
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  let_ℒ _ := synthesize_full_round in
-  let_ℒ _ := synthesize_partial_rounds in
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ := synthesize_full_round in
+  let🞵 _ := synthesize_partial_rounds in
   synthesize_pad_and_add.

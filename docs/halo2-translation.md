@@ -12,8 +12,13 @@ Shared translation infrastructure:
 Garden/Halo2/main.v
   shared Halo2 DSL for columns, expressions, gates, lookups, and constraint systems
 
+Garden/Halo2/serialize.v
+  shared indexed configure projection plus raw synthesis JSON types and
+  typed-event-to-raw serializers
+
 Garden/Halo2/Synthesis.v
-  high-level Halo2 synthesis DSL and raw V1 event types
+  high-level Halo2 synthesis DSL with typed cells and free region/layouter
+  programs
 
 Garden/Halo2/proof.v
   proof-facing semantics for expressions, gates, and semantic constraints
@@ -28,19 +33,19 @@ Garden/Orchard/columns.v
 Garden/Orchard/circuit.v
   top-level Orchard configure translation and synthesize entry point
 
-Garden/Orchard/circuit_generated.v
-  generated numeric-index configure snapshot from the Rust generator
-
-Garden/Orchard/circuit_generated_proof.v
-  bridge from absolute Orchard columns to generated numeric indices
-
 Garden/Orchard/circuit_synthesis_json_extract.v
-  extraction entry point for compiling the Rocq synthesis model to OCaml
+  extraction entry point for compiling Rocq configure and synthesis models to OCaml
 
-Garden/Orchard/circuit_synthesis_generated_from_model.json
+Garden/Orchard/Snapshots/circuit_configure_generated_from_model.json
+  configure gates and lookups generated from the structured Rocq model
+
+Garden/Orchard/Snapshots/circuit_configure_generated_from_implementation.json
+  configure gates and lookups generated from the Rust/Halo2 implementation
+
+Garden/Orchard/Snapshots/circuit_synthesis_generated_from_model.json
   V1 synthesis trace generated from the structured Rocq model
 
-Garden/Orchard/circuit_synthesis_generated_from_implementation.json
+Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json
   full V1 synthesis trace generated from the Rust/Halo2 implementation
 ```
 
@@ -51,9 +56,6 @@ Orchard files mirror the Rust module path where practical:
 ```text
 orchard/src/circuit.rs
   -> Garden/Orchard/circuit.v
-
-orchard/src/circuit_data/action_circuit.highlevel.json
-  -> Garden/Orchard/circuit_generated.v
 
 orchard/src/circuit/gadget/add_chip.rs
   -> Garden/Orchard/circuit/gadget/add_chip.v
@@ -84,12 +86,6 @@ halo2_gadgets/src/sinsemilla/merkle/chip.rs
 
 halo2_gadgets/src/utilities/cond_swap.rs
   -> Garden/Halo2/Gadgets/Utilities/CondSwap.v
-```
-
-Generated comparison bridges live next to the translated circuit:
-
-```text
-Garden/Orchard/circuit_generated_proof.v
 ```
 
 When Rust submodules need to share translated column bundles without creating
@@ -161,6 +157,7 @@ Concrete circuit column files group their column families with `Columns.t`:
 Definition columns : Columns.t := {|
   Columns.Selector := Selector.t;
   Columns.Fixed := Fixed.t;
+  Columns.Lookup := Lookup.t;
   Columns.Advice := Advice.t;
   Columns.Instance_ := Instance_.t;
 |}.
@@ -170,17 +167,26 @@ Canonical columns.
 Use `Empty_set` for a column family that is not present in the translated
 component.
 
-Halo2 `TableColumn`s are represented through the fixed-column family for now.
-When a circuit has an explicit lookup-table column type, wrap it in the fixed
-column type:
+Halo2 `TableColumn`s are represented through the `Lookup` column family, not
+through ordinary `Fixed` columns. Lookup arguments pair a queried expression
+with a table-side lookup column:
 
 ```coq
-Module Fixed.
+Module Lookup.
   Inductive t : Set :=
-  | LagrangeCoeffs0
-  | Lookup (lookup : Lookup.t).
-End Fixed.
+  | TableIdx
+  | TableX
+  | TableY.
+End Lookup.
+
+LookupArgument.pairs :
+  list (Expression.t columns * columns.(Columns.Lookup)).
 ```
+
+The serializer has a separate `Indices.lookup` function. For Orchard, lookup
+table columns still use raw indices `0`, `1`, and `2` in the JSON snapshots,
+while ordinary fixed columns start after them. This mirrors Halo2's
+`TableColumn` distinction without changing the current raw JSON shape.
 
 ## Configure Functions
 
@@ -226,60 +232,42 @@ generic gadgets.
 add a placeholder event for it unless the shared DSL starts tracking equality
 state.
 
-## Generated Configure Snapshot
+## Generated Configure Snapshots
 
-`Garden/Orchard/circuit_generated.v` is generated from the Halo2
-`ConstraintSystem` data by Rust code in `halo2_proofs::dev`, through an ignored
-Orchard test:
+Configure snapshots are generated as JSON only. The Rust/Halo2 implementation
+snapshot is produced by ignored Orchard tests, and the structured Rocq model
+snapshot is produced by extraction:
 
 ```sh
 cd orchard
-cargo +1.85.1 test generate_action_circuit_configure_rocq -- --ignored --nocapture
+cargo +1.85.1 test generate_action_circuit_configure_json -- --ignored --nocapture
 cargo +1.85.1 test generate_action_circuit_synthesis_json -- --ignored --nocapture
+
+cd ../garden
+opam exec -- make -C Garden orchard-json-from-model
+opam exec -- make -C Garden orchard-configure-json-compare
 ```
 
-The generated file defines:
+The configure JSON contains only configure-time gates and lookups, using numeric
+Halo2 column and selector indices. The implementation snapshot lives at
+`Garden/Orchard/Snapshots/circuit_configure_generated_from_implementation.json`;
+the extracted Rocq model snapshot lives at
+`Garden/Orchard/Snapshots/circuit_configure_generated_from_model.json`.
+In the configure JSON, `Constraint.EqualZeroToPrecise expression` is serialized
+as the inner expression directly; there is no `EqualZeroToPrecise` wrapper node
+in the JSON format.
 
-```coq
-Definition indexed_columns : Columns.t := {|
-  Columns.Selector := Z;
-  Columns.Fixed := Z;
-  Columns.Advice := Z;
-  Columns.Instance_ := Z;
-|}.
-Canonical indexed_columns.
-
-Definition configure : ConstraintSystem.t indexed_columns := ...
-```
-
-The `configure` definition contains only configure-time gates and lookups, using
-numeric Halo2 column and selector indices. The full synthesis trace from the
-Rust implementation is generated separately into
-`Garden/Orchard/circuit_synthesis_generated_from_implementation.json`; it
+The full synthesis trace from the Rust implementation is generated separately into
+`Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json`; it
 records the same raw synthesis events that Rocq extraction regenerates into
-`Garden/Orchard/circuit_synthesis_generated_from_model.json` for comparison.
+`Garden/Orchard/Snapshots/circuit_synthesis_generated_from_model.json` for comparison.
 
 The generated files intentionally do not encode the extra Halo2 metadata such as
 query tables, equality/permutation columns, constants, or minimum degree; those
 remain available in the high-level JSON artifact.
 
-The generated file declares `indexed_columns` as a canonical structure so Rocq
-can infer the `Columns.t` parameter from numeric `Z` column arguments. This
-keeps generated expressions readable, for example `Expression.Selector 0`
-instead of `@Expression.Selector indexed_columns 0`.
-
-`Garden/Orchard/circuit_generated_proof.v` is the bridge between the handwritten
-Orchard configure translation and the generated numeric-index snapshot. The only
-choice made in that file is assigning numeric Halo2 indices to the absolute
-Orchard column constructors. Generic structural mapping lives in
-`Garden/Halo2/main.v`: expressions are mapped homomorphically, and semantic
-constraints are converted with `Constraint.to_expression` into generated
-`Constraint.EqualZeroToPrecise` constraints. Do not add gadget-specific
-expression rewrites to the bridge; any mismatch in expression shape or names
-should stay visible as a translation or generator issue to fix at the source.
-
-Current comparison status: `configure_eq_generated` closes by
-`vm_compute; reflexivity`. Keep the handwritten translation's expression shapes
+`Garden/Halo2/serialize.v` defines the typed-to-indexed projection used by the
+Rocq model JSON extraction. Keep the handwritten translation's expression shapes
 aligned with the generated Halo2 AST, including cases where Rust uses explicit
 products instead of `Constraints::with_selector`, or `Expression::Scaled` instead
 of multiplication by a constant.
@@ -287,9 +275,23 @@ of multiplication by a constant.
 ## Synthesize Functions
 
 `Garden/Halo2/Synthesis.v` defines the high-level representation for
-`synthesize`.
+`synthesize`. It owns the typed synthesis syntax:
 
-The raw events mirror the Rust recorder schema:
+```coq
+ColumnRef.t columns
+Cell.t columns RegionId.t
+𝓡 columns RegionId.t A
+𝓛 columns RegionId.t A
+```
+
+`𝓡` is the region-level free-monad type and `𝓛` is the layouter-level
+free-monad type. Their constructors live in the `ℛ` and `ℒ` modules.
+Both are constructor-only syntax trees: `Ret` and `Bind` are constructors, and
+the primitive Halo2 actions are constructors too. `Synthesis.v` does not define
+an event trace type.
+
+`Garden/Halo2/serialize.v` requires `Synthesis.v` and owns the raw JSON-facing
+schema:
 
 ```coq
 Raw.Event.EnterRegion
@@ -302,15 +304,18 @@ Raw.Event.Copy
 Raw.Event.FillFromRow
 ```
 
+It also defines serializers such as `ColumnRef.to_raw` and `Cell.to_raw`, plus
+an evaluator for `ℛ` and `ℒ`. The serializer is the only place where typed cells
+are converted into raw numeric columns and absolute rows.
+
 Advice assignments are represented in the high-level state so later copies can
-refer to cells, but they intentionally emit no raw event for now. This matches
+refer to cells, but they intentionally emit no raw JSON event for now. This matches
 the current Rust recorder, which omits advice values from
-`circuit_synthesis_generated_from_implementation.json`.
+`Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json`.
 
 Large fixed-table data should be produced by structured Rocq model code rather
-than pasted generated Rocq traces. The Sinsemilla chip currently enumerates the
-1024 lookup-table rows in `Garden/Halo2/Gadgets/Sinsemilla/chip.v` and emits
-them through `Layouter.assign_table_with_fills`.
+than pasted generated Rocq traces. Table and fill-from-row replay are currently
+deferred in the free-monad synthesis model.
 
 `Garden/Halo2/Gadgets/Sinsemilla/SConstants.v` contains the translated
 `SINSEMILLA_S` coordinate table from the Rust `sinsemilla` crate. This is data
@@ -319,43 +324,61 @@ used by the structured table loader, not a raw generated synthesis event dump.
 `Garden/Orchard/circuit_synthesis_constants.v` contains the generated replay
 table for Halo2 V1 floor-planner constant fixed-column bindings. It is generated
 by `scripts/generate_orchard_synthesis_constants.py` from the Rust
-implementation JSON and contains only the trailing `AssignFixed`/`Copy` pairs
-for the constant fixed column. The logical Orchard synthesis regions remain
-hand-written in the Rocq circuit and gadget files.
+implementation JSON. The data is currently inert for the free-monad model; the
+logical Orchard synthesis regions remain hand-written in the Rocq circuit and
+gadget files.
 
 `Garden/Orchard/circuit_synthesis_layout.v` contains the generated V1
-floor-planner region starts emitted by the Rust Orchard generator. The Rocq
-model uses these starts for strict JSON extraction so that remaining row
-mismatches point to incorrect modeled cell dependencies, not to the mechanical
-region-placement algorithm.
+floor-planner region starts emitted by the Rust Orchard generator. Its public
+`region_start_of` function takes the typed Orchard region identifier from
+`Garden/Orchard/regions.v`, and the Rocq model uses those starts for strict
+JSON extraction so that row mismatches point to incorrect modeled cell
+dependencies.
 
-Use `Layouter.t columns A` for layouter-level programs and
-`Region.t columns A` for region bodies. Use `let_ℒ` and `return_ℒ` for
-layouter sequencing, and `let_ℛ` and `return_ℛ` for region sequencing.
+Use `𝓛 columns RegionId.t A` for layouter-level programs and
+`𝓡 columns RegionId.t A` for region bodies. Both use the shared `let🞵` and
+`return🞵` notations; Rocq infers the concrete monad from the surrounding type.
+Cells carry typed region ownership:
+
+```coq
+Cell.t columns RegionId.t
+```
+
+The region id is converted to an absolute row only when emitting raw synthesis
+events, by `Garden.Halo2.serialize.V1.run_with_region_start`.
 
 The basic one-step pattern is:
 
 ```coq
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "gate name" (
-    Region.enable_selector Selector.QExample 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "gate name" (
+    ℛ.EnableSelector Selector.QExample 0 "").
 ```
 
 For multi-step programs:
 
 ```coq
 Definition synthesize
-    : Layouter.t columns unit :=
-  let_ℒ _ := first_layouter_step in
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ := first_layouter_step in
   second_layouter_step.
 
 Definition synthesize_region
-    : Region.t columns (Cell.t columns) :=
-  let_ℛ _ := Region.enable_selector Selector.QExample 0 "" in
-  let_ℛ cell := Region.assign_advice "value" Advice.A0 0 Value.Unknown in
-  return_ℛ cell.
+    : 𝓡 columns RegionId.t (Cell.t columns RegionId.t) :=
+  let🞵 _ := ℛ.EnableSelector Selector.QExample 0 "" in
+  let🞵 cell := ℛ.AssignAdvice "value" Advice.A0 0 0 in
+  return🞵 cell.
+
+Definition synthesize_pair
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 '(left, right) := returns_pair in
+  use_pair left right.
 ```
+
+Each `ℒ.AddRegion` must pass the concrete Orchard region id for that
+Rust region occurrence. Reused gadgets should expose a region parameter or a
+small base index so the caller decides the concrete occurrence.
 
 For gadgets with several configured instances, mirror the configure naming:
 
@@ -370,17 +393,21 @@ hand-written Rocq synthesis program:
 
 ```coq
 Definition synthesize_events
-    (indices : Indices.t columns)
-    : list Raw.Event.t :=
-  let '(_, events) := V1.run indices synthesize in
+    (indices : Garden.Halo2.serialize.Indices.t columns)
+    : list Garden.Halo2.serialize.Raw.Event.t :=
+  let '(_, events) :=
+    Garden.Halo2.serialize.V1.run_with_region_start
+      indices
+      Garden.Orchard.circuit_synthesis_layout.region_start_of
+      synthesize in
   events.
 ```
 
 The hand-written monadic synthesis definitions in the circuit and gadget files
-are still intentionally structural. They record the ownership points and raw
-operations modeled so far, and they are now the source of the model JSON. Keep
-refining those definitions toward the Rust witness functions; do not restore a
-raw generated Rocq event dump as the model source.
+are still intentionally structural. They record typed ownership points and the
+modeled synthesis operations. Keep refining those definitions toward the Rust
+witness functions; do not restore a raw generated Rocq event dump as the model
+source.
 
 Run a top-level high-level synthesis trace with:
 
@@ -389,19 +416,24 @@ Garden.Orchard.circuit.synthesize_events
   Garden.Orchard.columns.Index.indices
 ```
 
-The current runner is a lightweight state transformer. It records regions and
-events and exposes `V1.run`. `V1.run` performs a measurement pass, computes a
-first-fit V1-style region placement ordered by advice area, then replays the
-program to emit events. Row parity still depends on completing the real gadget
-synthesis shapes.
+The current runner is `serialize.V1.run_with_region_start`. It interprets the
+`ℛ`/`ℒ` syntax into raw JSON events using the supplied column indices and
+generated region starts. Region placement is supplied as generated data rather
+than computed inside the model.
 
-Generate the Rocq-model JSON with:
+Generate the Rocq-model configure and synthesis JSON files with:
 
 ```sh
-opam exec -- make -C Garden orchard-synthesis-json-from-model
+opam exec -- make -C Garden orchard-json-from-model
 ```
 
-Compare it against the Rust implementation JSON with:
+Compare configure JSON against the Rust implementation JSON with:
+
+```sh
+opam exec -- make -C Garden orchard-configure-json-compare
+```
+
+Compare synthesis JSON against the Rust implementation JSON with:
 
 ```sh
 opam exec -- make -C Garden orchard-synthesis-json-compare

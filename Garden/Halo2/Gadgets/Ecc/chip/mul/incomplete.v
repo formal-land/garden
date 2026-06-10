@@ -103,12 +103,12 @@ Definition configure
 
 Definition synthesize
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
-    : Layouter.t columns unit :=
-  let_ℒ _ :=
-    Layouter.assign_region "q_mul_1 == 1 checks" (
-      Region.enable_selector q_mul_1 0 "") in
-  let_ℒ _ :=
-    Layouter.assign_region "q_mul_2 == 1 checks" (
-      Region.enable_selector q_mul_2 0 "") in
-  Layouter.assign_region "q_mul_3 == 1 checks" (
-    Region.enable_selector q_mul_3 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ :=
+    ℒ.AddRegion (RegionId.of_index 0) "q_mul_1 == 1 checks" (
+      ℛ.EnableSelector q_mul_1 0 "") in
+  let🞵 _ :=
+    ℒ.AddRegion (RegionId.of_index 0) "q_mul_2 == 1 checks" (
+      ℛ.EnableSelector q_mul_2 0 "") in
+  ℒ.AddRegion (RegionId.of_index 0) "q_mul_3 == 1 checks" (
+    ℛ.EnableSelector q_mul_3 0 "").

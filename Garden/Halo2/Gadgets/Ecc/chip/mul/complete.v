@@ -31,6 +31,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "Decompose scalar for complete bits of variable-base mul" (
-    Region.enable_selector Selector.QMulDecomposeVar 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "Decompose scalar for complete bits of variable-base mul" (
+    ℛ.EnableSelector Selector.QMulDecomposeVar 0 "").

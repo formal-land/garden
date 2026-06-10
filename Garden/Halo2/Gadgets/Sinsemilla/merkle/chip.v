@@ -73,20 +73,20 @@ Definition configure_2
 
 Definition synthesize_instance
     (q_decompose : Selector.t)
-    (synthesize_cond_swap : Layouter.t columns unit)
-    : Layouter.t columns unit :=
-  let_ℒ _ := synthesize_cond_swap in
-  Layouter.assign_region "Decomposition check" (
-    Region.enable_selector q_decompose 0 "").
+    (synthesize_cond_swap : 𝓛 columns RegionId.t unit)
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ := synthesize_cond_swap in
+  ℒ.AddRegion (RegionId.of_index 0) "Decomposition check" (
+    ℛ.EnableSelector q_decompose 0 "").
 
 Definition synthesize_1
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance
     Selector.QMerkleDecompose1
     Garden.Halo2.Gadgets.Utilities.CondSwap.synthesize_1.
 
 Definition synthesize_2
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance
     Selector.QMerkleDecompose2
     Garden.Halo2.Gadgets.Utilities.CondSwap.synthesize_2.

@@ -33,6 +33,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "incomplete addition" (
-    Region.enable_selector Selector.QAddIncomplete 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "incomplete addition" (
+    ℛ.EnableSelector Selector.QAddIncomplete 0 "").

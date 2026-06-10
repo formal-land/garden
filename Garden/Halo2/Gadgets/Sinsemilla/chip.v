@@ -66,11 +66,11 @@ Definition configure_generator_table
           ➖ (lambda1 ✖️ (x_a_expr ➖ x_p_expr)) in
       let not_q_s1 := Expression.Constant 1 ➖ q_s1 in
       [
-        (q_s1 ✖️ word, Fixed.Lookup Lookup.TableIdx);
+        (q_s1 ✖️ word, Lookup.TableIdx);
         (q_s1 ✖️ x_p_expr ➕ (not_q_s1 ● sinsemilla_s0_x),
-          Fixed.Lookup Lookup.TableX);
+          Lookup.TableX);
         (q_s1 ✖️ y_p ➕ (not_q_s1 ● sinsemilla_s0_y),
-          Fixed.Lookup Lookup.TableY)
+          Lookup.TableY)
       ];
   |} in
   meta.
@@ -164,45 +164,46 @@ Definition sinsemilla_s_x (index : Z) : Z :=
 Definition sinsemilla_s_y (index : Z) : Z :=
   Garden.Halo2.Gadgets.Sinsemilla.SConstants.y index.
 
-Definition generator_table_row (index : nat) : list Raw.Event.t :=
-  let index := Z.of_nat index in
-  [
-    Raw.Event.AssignFixed 0 index "table_idx" index;
-    Raw.Event.AssignFixed 1 index "table_x" (sinsemilla_s_x index);
-    Raw.Event.AssignFixed 2 index "table_y" (sinsemilla_s_y index)
-  ].
-
-Definition generator_table_events : list Raw.Event.t :=
-  List.flat_map
-    generator_table_row
-    (List.seq 0 (Z.to_nat (2 ^ sinsemilla_k))).
-
-Definition generator_table_fills : list Raw.Event.t :=
-  [
-    Raw.Event.FillFromRow 0 (2 ^ sinsemilla_k) 0;
-    Raw.Event.FillFromRow 1 (2 ^ sinsemilla_k) sinsemilla_s0_x;
-    Raw.Event.FillFromRow 2 (2 ^ sinsemilla_k) sinsemilla_s0_y
-  ].
+Definition generator_table_indexes : list Z :=
+  List.map Z.of_nat (List.seq 0%nat (Z.to_nat (2 ^ sinsemilla_k))).
 
 Definition load_generator_table
-    : Layouter.t columns unit :=
-  Layouter.assign_table_with_fills
-    "generator_table"
-    generator_table_events
-    generator_table_fills.
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.InitLookupTables "generator_table" [
+    {|
+      LookupTableColumn.lookup := Lookup.TableIdx;
+      LookupTableColumn.annotation := "table_idx";
+      LookupTableColumn.values := generator_table_indexes;
+      LookupTableColumn.default_value := 0;
+    |};
+    {|
+      LookupTableColumn.lookup := Lookup.TableX;
+      LookupTableColumn.annotation := "table_x";
+      LookupTableColumn.values :=
+        List.map sinsemilla_s_x generator_table_indexes;
+      LookupTableColumn.default_value := sinsemilla_s0_x;
+    |};
+    {|
+      LookupTableColumn.lookup := Lookup.TableY;
+      LookupTableColumn.annotation := "table_y";
+      LookupTableColumn.values :=
+        List.map sinsemilla_s_y generator_table_indexes;
+      LookupTableColumn.default_value := sinsemilla_s0_y;
+    |}
+  ].
 
 Module HashResult.
   Record t : Set := {
-    x : Cell.t columns;
-    y : Cell.t columns;
-    z1_a : Cell.t columns;
-    z1_b : Cell.t columns;
-    z1_d : Cell.t columns;
-    z1_g : Cell.t columns;
-    z13_a : Cell.t columns;
-    z13_c : Cell.t columns;
-    z13_f : Cell.t columns;
-    z13_g : Cell.t columns;
+    x : Cell.t columns RegionId.t;
+    y : Cell.t columns RegionId.t;
+    z1_a : Cell.t columns RegionId.t;
+    z1_b : Cell.t columns RegionId.t;
+    z1_d : Cell.t columns RegionId.t;
+    z1_g : Cell.t columns RegionId.t;
+    z13_a : Cell.t columns RegionId.t;
+    z13_c : Cell.t columns RegionId.t;
+    z13_f : Cell.t columns RegionId.t;
+    z13_g : Cell.t columns RegionId.t;
   }.
 End HashResult.
 
@@ -210,11 +211,11 @@ Fixpoint enable_selector_rows
     (selector : Selector.t)
     (offset : Z)
     (count : nat)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match count with
-  | O => return_ℛ tt
+  | O => return🞵 tt
   | S count =>
-      let_ℛ _ := Region.enable_selector selector offset "" in
+      let🞵 _ := ℛ.EnableSelector selector offset "" in
       enable_selector_rows selector (offset + 1) count
   end.
 
@@ -223,26 +224,26 @@ Fixpoint assign_q_s2_rows
     (offset : Z)
     (count : nat)
     (final_piece : bool)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match count with
-  | O => return_ℛ tt
+  | O => return🞵 tt
   | S O =>
-      let_ℛ _ :=
-        Region.assign_fixed
+      let🞵 _ :=
+        ℛ.AssignFixed
           (if final_piece
            then "q_s2 for final piece"
            else "q_s2 between pieces")
           q_sinsemilla2
           offset
-          (Value.Known (if final_piece then 2 else 0)) in
-      return_ℛ tt
+          (if final_piece then 2 else 0) in
+      return🞵 tt
   | S count =>
-      let_ℛ _ :=
-        Region.assign_fixed
+      let🞵 _ :=
+        ℛ.AssignFixed
           "q_s2 = 1"
           q_sinsemilla2
           offset
-          (Value.Known 1) in
+          1 in
       assign_q_s2_rows q_sinsemilla2 (offset + 1) count final_piece
   end.
 
@@ -250,12 +251,12 @@ Fixpoint assign_intermediate_zs
     (bits : Advice.t)
     (offset : Z)
     (count : nat)
-    : Region.t columns unit :=
+    : 𝓡 columns RegionId.t unit :=
   match count with
-  | O => return_ℛ tt
+  | O => return🞵 tt
   | S count =>
-      let_ℛ _ :=
-        Region.assign_advice "z" bits offset Value.Unknown in
+      let🞵 _ :=
+        ℛ.AssignAdvice "z" bits offset 0 in
       assign_intermediate_zs bits (offset + 1) count
   end.
 
@@ -263,23 +264,23 @@ Fixpoint assign_double_and_add_rows
     (x_a x_p lambda_1 lambda_2 : Advice.t)
     (offset : Z)
     (count : nat)
-    : Region.t columns (Cell.t columns) :=
+    : 𝓡 columns RegionId.t (Cell.t columns RegionId.t) :=
   match count with
-  | O => Region.assign_advice "x_a" x_a offset Value.Unknown
+  | O => ℛ.AssignAdvice "x_a" x_a offset 0
   | S O =>
-      let_ℛ _ := Region.assign_advice "x_p" x_p offset Value.Unknown in
-      let_ℛ _ :=
-        Region.assign_advice "lambda_1" lambda_1 offset Value.Unknown in
-      let_ℛ _ :=
-        Region.assign_advice "lambda_2" lambda_2 offset Value.Unknown in
-      Region.assign_advice "x_a" x_a (offset + 1) Value.Unknown
+      let🞵 _ := ℛ.AssignAdvice "x_p" x_p offset 0 in
+      let🞵 _ :=
+        ℛ.AssignAdvice "lambda_1" lambda_1 offset 0 in
+      let🞵 _ :=
+        ℛ.AssignAdvice "lambda_2" lambda_2 offset 0 in
+      ℛ.AssignAdvice "x_a" x_a (offset + 1) 0
   | S count =>
-      let_ℛ _ := Region.assign_advice "x_p" x_p offset Value.Unknown in
-      let_ℛ _ :=
-        Region.assign_advice "lambda_1" lambda_1 offset Value.Unknown in
-      let_ℛ _ :=
-        Region.assign_advice "lambda_2" lambda_2 offset Value.Unknown in
-      let_ℛ _ := Region.assign_advice "x_a" x_a (offset + 1) Value.Unknown in
+      let🞵 _ := ℛ.AssignAdvice "x_p" x_p offset 0 in
+      let🞵 _ :=
+        ℛ.AssignAdvice "lambda_1" lambda_1 offset 0 in
+      let🞵 _ :=
+        ℛ.AssignAdvice "lambda_2" lambda_2 offset 0 in
+      let🞵 _ := ℛ.AssignAdvice "x_a" x_a (offset + 1) 0 in
       assign_double_and_add_rows
         x_a
         x_p
@@ -293,44 +294,44 @@ Definition synthesize_hash_piece
     (q_sinsemilla1 : Selector.t)
     (q_sinsemilla2 : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
-    (piece : Cell.t columns)
+    (piece : Cell.t columns RegionId.t)
     (offset : Z)
     (num_words : nat)
     (final_piece : bool)
-    : Region.t columns (Cell.t columns * Cell.t columns) :=
-  let_ℛ _ := enable_selector_rows q_sinsemilla1 offset num_words in
-  let_ℛ _ := assign_q_s2_rows q_sinsemilla2 offset num_words final_piece in
-  let_ℛ _ :=
-    Region.copy_advice
+    : 𝓡 columns RegionId.t (Cell.t columns RegionId.t * Cell.t columns RegionId.t) :=
+  let🞵 _ := enable_selector_rows q_sinsemilla1 offset num_words in
+  let🞵 _ := assign_q_s2_rows q_sinsemilla2 offset num_words final_piece in
+  let🞵 _ :=
+    copy_advice
       "z_0 (copy of message piece)"
       piece
       bits
       offset
-      Value.Unknown in
-  let_ℛ z1 :=
-    Region.assign_advice "z_1" bits (offset + 1) Value.Unknown in
-  let_ℛ _ :=
+      0 in
+  let🞵 z1 :=
+    ℛ.AssignAdvice "z_1" bits (offset + 1) 0 in
+  let🞵 _ :=
     assign_intermediate_zs
       bits
       (offset + 2)
       (Nat.pred (Nat.pred num_words)) in
-  let_ℛ x :=
+  let🞵 x :=
     assign_double_and_add_rows x_a x_p lambda_1 lambda_2 offset num_words in
-  return_ℛ (x, z1).
+  return🞵 (x, z1).
 
 Definition synthesize_hash_to_point_region
     (q_sinsemilla1 q_sinsemilla4 : Selector.t)
     (q_sinsemilla2 fixed_y_q : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     (q_x q_y : Z)
-    (a b c : Cell.t columns)
-    : Region.t columns HashResult.t :=
-  let_ℛ _ := Region.enable_selector q_sinsemilla4 0 "" in
-  let_ℛ _ :=
-    Region.assign_fixed "fixed y_q" fixed_y_q 0 (Value.Known q_y) in
-  let_ℛ _ :=
-    Region.assign_advice_from_constant "variable x_q" x_a 0 q_x in
-  let_ℛ a_result :=
+    (a b c : Cell.t columns RegionId.t)
+    : 𝓡 columns RegionId.t HashResult.t :=
+  let🞵 _ := ℛ.EnableSelector q_sinsemilla4 0 "" in
+  let🞵 _ :=
+    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  let🞵 _ :=
+    assign_advice_from_constant "variable x_q" x_a 0 q_x in
+  let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -343,9 +344,8 @@ Definition synthesize_hash_to_point_region
       0
       25%nat
       false in
-  let '(x, z1_a) := a_result in
   let _ := x in
-  let_ℛ b_result :=
+  let🞵 '(x, z1_b) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -358,9 +358,8 @@ Definition synthesize_hash_to_point_region
       25
       2%nat
       false in
-  let '(x, z1_b) := b_result in
   let _ := x in
-  let_ℛ c_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -373,14 +372,13 @@ Definition synthesize_hash_to_point_region
       27
       25%nat
       true in
-  let '(x, _) := c_result in
-  let_ℛ y :=
-    Region.assign_advice "y_a" lambda_1 52 Value.Unknown in
-  let_ℛ _ :=
-    Region.assign_advice "dummy lambda2" lambda_2 52 Value.Unknown in
-  let_ℛ _ :=
-    Region.assign_advice "dummy x_p" x_p 52 Value.Unknown in
-  return_ℛ {|
+  let🞵 y :=
+    ℛ.AssignAdvice "y_a" lambda_1 52 0 in
+  let🞵 _ :=
+    ℛ.AssignAdvice "dummy lambda2" lambda_2 52 0 in
+  let🞵 _ :=
+    ℛ.AssignAdvice "dummy x_p" x_p 52 0 in
+  return🞵 {|
     HashResult.x := x;
     HashResult.y := y;
     HashResult.z1_a := z1_a;
@@ -398,14 +396,14 @@ Definition synthesize_hash_to_point_commit_ivk_region
     (q_sinsemilla2 fixed_y_q : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     (q_x q_y : Z)
-    (a b c d : Cell.t columns)
-    : Region.t columns HashResult.t :=
-  let_ℛ _ := Region.enable_selector q_sinsemilla4 0 "" in
-  let_ℛ _ :=
-    Region.assign_fixed "fixed y_q" fixed_y_q 0 (Value.Known q_y) in
-  let_ℛ _ :=
-    Region.assign_advice_from_constant "variable x_q" x_a 0 q_x in
-  let_ℛ a_result :=
+    (a b c d : Cell.t columns RegionId.t)
+    : 𝓡 columns RegionId.t HashResult.t :=
+  let🞵 _ := ℛ.EnableSelector q_sinsemilla4 0 "" in
+  let🞵 _ :=
+    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  let🞵 _ :=
+    assign_advice_from_constant "variable x_q" x_a 0 q_x in
+  let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -418,11 +416,10 @@ Definition synthesize_hash_to_point_commit_ivk_region
       0
       25%nat
       false in
-  let '(x, z1_a) := a_result in
-  let_ℛ z13_a :=
-    Region.assign_advice "z_13" bits 13 Value.Unknown in
+  let🞵 z13_a :=
+    ℛ.AssignAdvice "z_13" bits 13 0 in
   let _ := x in
-  let_ℛ b_result :=
+  let🞵 '(x, z1_b) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -435,9 +432,8 @@ Definition synthesize_hash_to_point_commit_ivk_region
       25
       1%nat
       false in
-  let '(x, z1_b) := b_result in
   let _ := x in
-  let_ℛ c_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -450,11 +446,10 @@ Definition synthesize_hash_to_point_commit_ivk_region
       26
       24%nat
       false in
-  let '(x, _) := c_result in
-  let_ℛ z13_c :=
-    Region.assign_advice "z_13" bits 39 Value.Unknown in
+  let🞵 z13_c :=
+    ℛ.AssignAdvice "z_13" bits 39 0 in
   let _ := x in
-  let_ℛ d_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1
       q_sinsemilla2
@@ -467,14 +462,13 @@ Definition synthesize_hash_to_point_commit_ivk_region
       50
       1%nat
       true in
-  let '(x, _) := d_result in
-  let_ℛ y :=
-    Region.assign_advice "y_a" lambda_1 51 Value.Unknown in
-  let_ℛ _ :=
-    Region.assign_advice "dummy lambda2" lambda_2 51 Value.Unknown in
-  let_ℛ _ :=
-    Region.assign_advice "dummy x_p" x_p 51 Value.Unknown in
-  return_ℛ {|
+  let🞵 y :=
+    ℛ.AssignAdvice "y_a" lambda_1 51 0 in
+  let🞵 _ :=
+    ℛ.AssignAdvice "dummy lambda2" lambda_2 51 0 in
+  let🞵 _ :=
+    ℛ.AssignAdvice "dummy x_p" x_p 51 0 in
+  return🞵 {|
     HashResult.x := x;
     HashResult.y := y;
     HashResult.z1_a := z1_a;
@@ -488,10 +482,11 @@ Definition synthesize_hash_to_point_commit_ivk_region
   |}.
 
 Definition synthesize_hash_to_point_1
+    (region : RegionId.t)
     (q_x q_y : Z)
-    (a b c : Cell.t columns)
-    : Layouter.t columns HashResult.t :=
-  Layouter.assign_region "hash_to_point" (
+    (a b c : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t HashResult.t :=
+  ℒ.AddRegion region "hash_to_point" (
     synthesize_hash_to_point_region
       Selector.QSinsemilla1_1
       Selector.QSinsemilla4_1
@@ -509,10 +504,11 @@ Definition synthesize_hash_to_point_1
       c).
 
 Definition synthesize_hash_to_point_2
+    (region : RegionId.t)
     (q_x q_y : Z)
-    (a b c : Cell.t columns)
-    : Layouter.t columns HashResult.t :=
-  Layouter.assign_region "hash_to_point" (
+    (a b c : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t HashResult.t :=
+  ℒ.AddRegion region "hash_to_point" (
     synthesize_hash_to_point_region
       Selector.QSinsemilla1_2
       Selector.QSinsemilla4_2
@@ -530,10 +526,11 @@ Definition synthesize_hash_to_point_2
       c).
 
 Definition synthesize_hash_to_point_commit_ivk
+    (region : RegionId.t)
     (q_x q_y : Z)
-    (a b c d : Cell.t columns)
-    : Layouter.t columns HashResult.t :=
-  Layouter.assign_region "hash_to_point" (
+    (a b c d : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t HashResult.t :=
+  ℒ.AddRegion region "hash_to_point" (
     synthesize_hash_to_point_commit_ivk_region
       Selector.QSinsemilla1_1
       Selector.QSinsemilla4_1
@@ -556,68 +553,60 @@ Definition synthesize_hash_to_point_note_commit_region
     (q_sinsemilla2 fixed_y_q : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     (q_x q_y : Z)
-    (a b c d e f g h : Cell.t columns)
-    : Region.t columns HashResult.t :=
-  let_ℛ _ := Region.enable_selector q_sinsemilla4 0 "" in
-  let_ℛ _ :=
-    Region.assign_fixed "fixed y_q" fixed_y_q 0 (Value.Known q_y) in
-  let_ℛ _ :=
-    Region.assign_advice_from_constant "variable x_q" x_a 0 q_x in
-  let_ℛ a_result :=
+    (a b c d e f g h : Cell.t columns RegionId.t)
+    : 𝓡 columns RegionId.t HashResult.t :=
+  let🞵 _ := ℛ.EnableSelector q_sinsemilla4 0 "" in
+  let🞵 _ :=
+    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  let🞵 _ :=
+    assign_advice_from_constant "variable x_q" x_a 0 q_x in
+  let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       a 0 25%nat false in
-  let '(x, z1_a) := a_result in
-  let_ℛ z13_a := Region.assign_advice "z_13" bits 13 Value.Unknown in
+  let🞵 z13_a := ℛ.AssignAdvice "z_13" bits 13 0 in
   let _ := x in
-  let_ℛ b_result :=
+  let🞵 '(x, z1_b) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       b 25 1%nat false in
-  let '(x, z1_b) := b_result in
   let _ := x in
-  let_ℛ c_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       c 26 25%nat false in
-  let '(x, _) := c_result in
-  let_ℛ z13_c := Region.assign_advice "z_13" bits 39 Value.Unknown in
+  let🞵 z13_c := ℛ.AssignAdvice "z_13" bits 39 0 in
   let _ := x in
-  let_ℛ d_result :=
+  let🞵 '(x, z1_d) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       d 51 6%nat false in
-  let '(x, z1_d) := d_result in
   let _ := x in
-  let_ℛ e_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       e 57 1%nat false in
-  let '(x, _) := e_result in
   let _ := x in
-  let_ℛ f_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       f 58 25%nat false in
-  let '(x, _) := f_result in
-  let_ℛ z13_f := Region.assign_advice "z_13" bits 71 Value.Unknown in
+  let🞵 z13_f := ℛ.AssignAdvice "z_13" bits 71 0 in
   let _ := x in
-  let_ℛ g_result :=
+  let🞵 '(x, z1_g) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       g 83 25%nat false in
-  let '(x, z1_g) := g_result in
-  let_ℛ z13_g := Region.assign_advice "z_13" bits 96 Value.Unknown in
+  let🞵 z13_g := ℛ.AssignAdvice "z_13" bits 96 0 in
   let _ := x in
-  let_ℛ h_result :=
+  let🞵 '(x, _) :=
     synthesize_hash_piece
       q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2
       h 108 1%nat true in
-  let '(x, _) := h_result in
-  let_ℛ y := Region.assign_advice "y_a" lambda_1 109 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "dummy lambda2" lambda_2 109 Value.Unknown in
-  let_ℛ _ := Region.assign_advice "dummy x_p" x_p 109 Value.Unknown in
-  return_ℛ {|
+  let🞵 y := ℛ.AssignAdvice "y_a" lambda_1 109 0 in
+  let🞵 _ := ℛ.AssignAdvice "dummy lambda2" lambda_2 109 0 in
+  let🞵 _ := ℛ.AssignAdvice "dummy x_p" x_p 109 0 in
+  return🞵 {|
     HashResult.x := x;
     HashResult.y := y;
     HashResult.z1_a := z1_a;
@@ -631,10 +620,11 @@ Definition synthesize_hash_to_point_note_commit_region
   |}.
 
 Definition synthesize_hash_to_point_note_commit
+    (region : RegionId.t)
     (q_x q_y : Z)
-    (a b c d e f g h : Cell.t columns)
-    : Layouter.t columns HashResult.t :=
-  Layouter.assign_region "hash_to_point" (
+    (a b c d e f g h : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t HashResult.t :=
+  ℒ.AddRegion region "hash_to_point" (
     synthesize_hash_to_point_note_commit_region
       Selector.QSinsemilla1_1
       Selector.QSinsemilla4_1
@@ -657,10 +647,11 @@ Definition synthesize_hash_to_point_note_commit
       h).
 
 Definition synthesize_hash_to_point_note_commit_2
+    (region : RegionId.t)
     (q_x q_y : Z)
-    (a b c d e f g h : Cell.t columns)
-    : Layouter.t columns HashResult.t :=
-  Layouter.assign_region "hash_to_point" (
+    (a b c d e f g h : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t HashResult.t :=
+  ℒ.AddRegion region "hash_to_point" (
     synthesize_hash_to_point_note_commit_region
       Selector.QSinsemilla1_2
       Selector.QSinsemilla4_2
@@ -684,17 +675,17 @@ Definition synthesize_hash_to_point_note_commit_2
 
 Definition synthesize_instance
     (q_sinsemilla1 q_sinsemilla4 : Selector.t)
-    : Layouter.t columns unit :=
-  let_ℒ _ :=
-    Layouter.assign_region "Sinsemilla gate" (
-      Region.enable_selector q_sinsemilla1 0 "") in
-  Layouter.assign_region "Initial y_Q" (
-    Region.enable_selector q_sinsemilla4 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  let🞵 _ :=
+    ℒ.AddRegion (RegionId.of_index 0) "Sinsemilla gate" (
+      ℛ.EnableSelector q_sinsemilla1 0 "") in
+  ℒ.AddRegion (RegionId.of_index 0) "Initial y_Q" (
+    ℛ.EnableSelector q_sinsemilla4 0 "").
 
 Definition synthesize_1
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance Selector.QSinsemilla1_1 Selector.QSinsemilla4_1.
 
 Definition synthesize_2
-    : Layouter.t columns unit :=
+    : 𝓛 columns RegionId.t unit :=
   synthesize_instance Selector.QSinsemilla1_2 Selector.QSinsemilla4_2.

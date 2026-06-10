@@ -64,6 +64,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "Canonicity checks" (
-    Region.enable_selector Selector.QMulFixedBaseField 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "Canonicity checks" (
+    ℛ.EnableSelector Selector.QMulFixedBaseField 0 "").

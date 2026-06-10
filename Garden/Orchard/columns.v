@@ -1,5 +1,7 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
+Require Garden.Halo2.serialize.
+Require Export Garden.Orchard.regions.
 
 Module Advice.
   Inductive t : Set :=
@@ -34,8 +36,7 @@ Module Fixed.
   | LagrangeCoeffs7
   | FixedZ
   | QSinsemilla2_1
-  | QSinsemilla2_2
-  | Lookup (lookup : Lookup.t).
+  | QSinsemilla2_2.
 End Fixed.
 
 Module Instance_.
@@ -106,6 +107,7 @@ End Selector.
 Definition columns : Columns.t := {|
   Columns.Selector := Selector.t;
   Columns.Fixed := Fixed.t;
+  Columns.Lookup := Lookup.t;
   Columns.Advice := Advice.t;
   Columns.Instance_ := Instance_.t;
 |}.
@@ -135,7 +137,6 @@ Module Index.
 
   Definition fixed (fixed : Fixed.t) : Z :=
     match fixed with
-    | Fixed.Lookup lookup_column => lookup lookup_column
     | Fixed.LagrangeCoeffs0 => 3
     | Fixed.LagrangeCoeffs1 => 4
     | Fixed.LagrangeCoeffs2 => 5
@@ -214,10 +215,11 @@ Module Index.
     | Selector.QNoteCommitNewYCanon => 55
     end.
 
-  Definition indices : Indices.t columns := {|
-    Indices.selector := selector;
-    Indices.fixed := fixed;
-    Indices.advice := advice;
-    Indices.instance_ := instance_;
+  Definition indices : Garden.Halo2.serialize.Indices.t columns := {|
+    Garden.Halo2.serialize.Indices.selector := selector;
+    Garden.Halo2.serialize.Indices.fixed := fixed;
+    Garden.Halo2.serialize.Indices.lookup := lookup;
+    Garden.Halo2.serialize.Indices.advice := advice;
+    Garden.Halo2.serialize.Indices.instance_ := instance_;
   |}.
 End Index.

@@ -49,8 +49,11 @@ Require Import Garden.Plonky3.M.
 `Garden/Halo2/proof.v` defines the proof-side evaluator.
 
 This evaluator is currently for configured expressions, constraints, gates, and
-constraint systems. The high-level synthesis DSL records raw events and logical
-cells, but it does not yet define proof obligations connecting synthesized
+constraint systems. The high-level synthesis DSL is now a pair of free-monad
+syntax trees, `ℛ` for region programs and `ℒ` for layouter programs.
+`Garden/Halo2/serialize.v` currently gives the executable raw-JSON
+interpretation; the future Prop semantics should interpret the same syntax.
+The proof semantics do not yet define obligations connecting synthesized
 assignments to gate evaluation.
 
 `Assignment.t columns` gives concrete values for selectors, fixed columns,
@@ -62,6 +65,11 @@ fixed : columns.(Columns.Fixed) -> Z -> Z;
 advice : columns.(Columns.Advice) -> Z -> Z;
 instance_ : columns.(Columns.Instance_) -> Z -> Z;
 ```
+
+Lookup table columns are a separate `columns.(Columns.Lookup)` family in the
+configure model. They do not appear in `Expression.t`, so the current gate
+evaluator does not include a lookup-table assignment yet. Add one when proving
+lookup-argument semantics.
 
 `Evaluation.t columns` packages an assignment, a current row, and the number of
 rows:

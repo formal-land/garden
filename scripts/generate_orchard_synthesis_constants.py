@@ -16,7 +16,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 IMPLEMENTATION_JSON = (
-    ROOT / "Garden" / "Orchard" / "circuit_synthesis_generated_from_implementation.json"
+    ROOT
+    / "Garden"
+    / "Orchard"
+    / "Snapshots"
+    / "circuit_synthesis_generated_from_implementation.json"
 )
 OUTPUT = ROOT / "Garden" / "Orchard" / "circuit_synthesis_constants.v"
 

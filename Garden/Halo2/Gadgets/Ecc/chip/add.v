@@ -79,6 +79,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "complete addition" (
-    Region.enable_selector Selector.QEccAdd 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "complete addition" (
+    ℛ.EnableSelector Selector.QEccAdd 0 "").

@@ -29,6 +29,6 @@ Definition configure {columns : Columns.t}
   |} in
   meta.
 
-Definition synthesize {columns : Columns.t}
-    : Layouter.t columns unit :=
-  return_ℒ tt.
+Definition synthesize {columns : Columns.t} {RegionId : Set}
+    : 𝓛 columns RegionId unit :=
+  return🞵 tt.

@@ -29,6 +29,6 @@ Definition configure
   meta.
 
 Definition synthesize
-    : Layouter.t columns unit :=
-  Layouter.assign_region "Full-width fixed-base scalar mul" (
-    Region.enable_selector Selector.QMulFixedFull 0 "").
+    : 𝓛 columns RegionId.t unit :=
+  ℒ.AddRegion (RegionId.of_index 0) "Full-width fixed-base scalar mul" (
+    ℛ.EnableSelector Selector.QMulFixedFull 0 "").

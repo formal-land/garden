@@ -10,7 +10,7 @@ Definition configure {columns : Columns.t}
     (meta : ConstraintSystem.t columns)
     (q_lookup q_running q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
-    (table_idx : columns.(Columns.Fixed))
+    (table_idx : columns.(Columns.Lookup))
     : ConstraintSystem.t columns :=
   let two_pow_k := 2 ^ k in
   let meta := ConstraintSystem.create_lookup meta {|
@@ -45,25 +45,26 @@ Definition configure {columns : Columns.t}
   |} in
   meta.
 
-Definition synthesize {columns : Columns.t}
-    : Layouter.t columns unit :=
-  return_ℒ tt.
+Definition synthesize {columns : Columns.t} {RegionId : Set}
+    : 𝓛 columns RegionId unit :=
+  return🞵 tt.
 
-Definition synthesize_short {columns : Columns.t}
+Definition synthesize_short {columns : Columns.t} {RegionId : Set}
+    (region : RegionId)
     (name : string)
     (q_lookup q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
-    : Layouter.t columns (Cell.t columns) :=
-  Layouter.assign_region name (
-    let_ℛ element :=
-      Region.assign_advice "Witness element" running_sum 0 Value.Unknown in
-    let_ℛ _ := Region.enable_selector q_lookup 0 "" in
-    let_ℛ _ := Region.enable_selector q_lookup 1 "" in
-    let_ℛ _ := Region.enable_selector q_bitshift 1 "" in
-    let_ℛ _ :=
-      Region.assign_advice
-        "element * 2^(10-5)" running_sum 1 Value.Unknown in
-    let_ℛ _ :=
-      Region.assign_advice_from_constant
+    : 𝓛 columns RegionId (Cell.t columns RegionId) :=
+  ℒ.AddRegion region name (
+    let🞵 element :=
+      ℛ.AssignAdvice "Witness element" running_sum 0 0 in
+    let🞵 _ := ℛ.EnableSelector q_lookup 0 "" in
+    let🞵 _ := ℛ.EnableSelector q_lookup 1 "" in
+    let🞵 _ := ℛ.EnableSelector q_bitshift 1 "" in
+    let🞵 _ :=
+      ℛ.AssignAdvice
+        "element * 2^(10-5)" running_sum 1 0 in
+    let🞵 _ :=
+      assign_advice_from_constant
         "2^(-5)" running_sum 2 0 in
-    return_ℛ element).
+    return🞵 element).

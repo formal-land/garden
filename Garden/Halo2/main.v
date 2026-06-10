@@ -11,6 +11,7 @@ Module Columns.
   Record t : Type := {
     Selector : Set;
     Fixed : Set;
+    Lookup : Set;
     Advice : Set;
     Instance_ : Set;
   }.
@@ -18,12 +19,14 @@ Module Columns.
   Record map (source target : t) : Set := {
     selector : source.(Selector) -> target.(Selector);
     fixed : source.(Fixed) -> target.(Fixed);
+    lookup : source.(Lookup) -> target.(Lookup);
     advice : source.(Advice) -> target.(Advice);
     instance_ : source.(Instance_) -> target.(Instance_);
   }.
   Arguments map : clear implicits.
   Arguments selector {_ _} _ _.
   Arguments fixed {_ _} _ _.
+  Arguments lookup {_ _} _ _.
   Arguments advice {_ _} _ _.
   Arguments instance_ {_ _} _ _.
 End Columns.
@@ -192,7 +195,7 @@ End Gate.
 
 Module LookupArgument.
   Record t {columns : Columns.t} : Set := {
-    pairs : list (Expression.t columns * columns.(Columns.Fixed));
+    pairs : list (Expression.t columns * columns.(Columns.Lookup));
   }.
   Arguments t : clear implicits.
 
@@ -201,9 +204,9 @@ Module LookupArgument.
       (lookup : t source) : t target := {|
     pairs :=
       List.map
-        (fun '(expression, fixed) =>
+        (fun '(expression, lookup) =>
           (Expression.map column_map expression,
-            column_map.(Columns.fixed) fixed))
+            column_map.(Columns.lookup) lookup))
         lookup.(pairs);
   |}.
 End LookupArgument.
