@@ -55,16 +55,9 @@ Definition synthesize_short {columns : Columns.t} {RegionId : Set}
     (q_lookup q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
     : 𝓛 columns RegionId (Cell.t columns RegionId) :=
-  ℒ.AddRegion region name (
-    let🞵 element :=
-      ℛ.AssignAdvice "Witness element" running_sum 0 0 in
-    let🞵 _ := ℛ.EnableSelector q_lookup 0 "" in
-    let🞵 _ := ℛ.EnableSelector q_lookup 1 "" in
-    let🞵 _ := ℛ.EnableSelector q_bitshift 1 "" in
-    let🞵 _ :=
-      ℛ.AssignAdvice
-        "element * 2^(10-5)" running_sum 1 0 in
-    let🞵 _ :=
-      assign_advice_from_constant
-        "2^(-5)" running_sum 2 0 in
+  ℒ.AddRegion region name (fun region =>
+    let element := Cell.advice region running_sum 0 in
+    do🞵 ℛ.EnableSelector q_lookup 0 "" in
+    do🞵 ℛ.EnableSelector q_lookup 1 "" in
+    do🞵 ℛ.EnableSelector q_bitshift 1 "" in
     return🞵 element).

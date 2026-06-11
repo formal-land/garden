@@ -104,11 +104,17 @@ Definition configure
 Definition synthesize
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ :=
-    ℒ.AddRegion (RegionId.of_index 0) "q_mul_1 == 1 checks" (
+  do🞵
+    ℒ.AddRegion
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1)
+      "q_mul_1 == 1 checks" (fun _ =>
       ℛ.EnableSelector q_mul_1 0 "") in
-  let🞵 _ :=
-    ℒ.AddRegion (RegionId.of_index 0) "q_mul_2 == 1 checks" (
+  do🞵
+    ℒ.AddRegion
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2)
+      "q_mul_2 == 1 checks" (fun _ =>
       ℛ.EnableSelector q_mul_2 0 "") in
-  ℒ.AddRegion (RegionId.of_index 0) "q_mul_3 == 1 checks" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3)
+    "q_mul_3 == 1 checks" (fun _ =>
     ℛ.EnableSelector q_mul_3 0 "").

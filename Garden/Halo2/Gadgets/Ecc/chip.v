@@ -40,16 +40,26 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.witness_point.synthesize in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.witness_point.synthesize in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
   let🞵 '(base_x, base_y) :=
-    ℒ.AddRegion (RegionId.of_index 0) "variable-base scalar mul dummy base" (
-      let🞵 x := ℛ.AssignAdvice "x" Advice.A0 0 0 in
-      let🞵 y := ℛ.AssignAdvice "y" Advice.A1 0 0 in
+    ℒ.AddRegion
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccChipDummyBase)
+      "variable-base scalar mul dummy base" (fun region =>
+      let x := Cell.advice region Advice.A0 0 in
+      let y := Cell.advice region Advice.A1 0 in
       return🞵 (x, y)) in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize 0 base_x base_y in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.synthesize in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.synthesize in
-  let🞵 _ := Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.synthesize in
+  let🞵 _ :=
+    Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulVariableBase)
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowS)
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowLookup)
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck)
+      base_x
+      base_x
+      base_y in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.synthesize in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.synthesize in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.synthesize in
   Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.synthesize.

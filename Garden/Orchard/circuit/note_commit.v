@@ -10,6 +10,17 @@ Import ListNotations.
 Global Open Scope pstring_scope.
 Global Open Scope Z_scope.
 
+Definition note_commit_region
+    (which : RegionId.NoteCommit.Which.t)
+    (region : RegionId.NoteCommit.t) : RegionId.t :=
+  RegionId.NoteCommit which region.
+
+Definition note_commit_y_region
+    (which : RegionId.NoteCommit.Which.t)
+    (subject : RegionId.NoteCommit.YSubject.t)
+    (region : RegionId.NoteCommit.YCanonicity.t) : RegionId.t :=
+  note_commit_region which (RegionId.NoteCommit.YCanonicity subject region).
+
 Module AssignedPoint.
   Record t : Set := {
     x : Cell.t columns RegionId.t;
@@ -43,7 +54,7 @@ Fixpoint assign_fixed_row
   match row with
   | [] => return🞵 tt
   | (column, annotation, value) :: row =>
-      let🞵 _ :=
+      do🞵
         ℛ.AssignFixed annotation column offset value in
       assign_fixed_row offset row
   end.
@@ -56,42 +67,39 @@ Fixpoint assign_fixed_rows_with_selector
   match rows with
   | [] => return🞵 tt
   | row :: rows =>
-      let🞵 _ := ℛ.EnableSelector selector offset "" in
-      let🞵 _ := assign_fixed_row offset row in
+      do🞵 ℛ.EnableSelector selector offset "" in
+      do🞵 assign_fixed_row offset row in
       assign_fixed_rows_with_selector selector (offset + 1) rows
   end.
 
 Definition assign_mul_fixed_window
+    (region : RegionId.t)
     (offset : Z)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 x :=
-    ℛ.AssignAdvice "mul_b_x" Advice.A0 offset 0 in
-  let🞵 y :=
-    ℛ.AssignAdvice "mul_b_y" Advice.A1 offset 0 in
-  let🞵 _ :=
-    ℛ.AssignAdvice "u" Advice.A5 offset 0 in
+  let x := Cell.advice region Advice.A0 offset in
+  let y := Cell.advice region Advice.A1 offset in
   return🞵 {| AssignedPoint.x := x; AssignedPoint.y := y |}.
 
 Definition assign_add_incomplete
+    (region : RegionId.t)
     (offset : Z)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 _ := ℛ.EnableSelector Selector.QAddIncomplete offset "" in
-  let🞵 _ :=
-    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 offset 0 in
-  let🞵 _ :=
-    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 offset 0 in
-  let🞵 _ :=
-    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 offset 0 in
-  let🞵 _ :=
-    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 offset 0 in
-  let🞵 x_r :=
-    ℛ.AssignAdvice "x_r" Advice.A2 (offset + 1) 0 in
-  let🞵 y_r :=
-    ℛ.AssignAdvice "y_r" Advice.A3 (offset + 1) 0 in
+  do🞵 ℛ.EnableSelector Selector.QAddIncomplete offset "" in
+  let x_p := Cell.advice region Advice.A0 offset in
+  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  let y_p := Cell.advice region Advice.A1 offset in
+  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  let x_q := Cell.advice region Advice.A2 offset in
+  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  let y_q := Cell.advice region Advice.A3 offset in
+  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  let x_r := Cell.advice region Advice.A2 (offset + 1) in
+  let y_r := Cell.advice region Advice.A3 (offset + 1) in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Fixpoint assign_incomplete_additions
+    (region : RegionId.t)
     (offset : Z)
     (count : nat)
     (acc : AssignedPoint.t)
@@ -99,9 +107,9 @@ Fixpoint assign_incomplete_additions
   match count with
   | O => return🞵 acc
   | S count =>
-      let🞵 mul_b := assign_mul_fixed_window offset in
-      let🞵 acc := assign_add_incomplete offset mul_b acc in
-      assign_incomplete_additions (offset + 1) count acc
+      let🞵 mul_b := assign_mul_fixed_window region offset in
+      let🞵 acc := assign_add_incomplete region offset mul_b acc in
+      assign_incomplete_additions region (offset + 1) count acc
   end.
 
 Fixpoint assign_full_window_witnesses
@@ -111,46 +119,41 @@ Fixpoint assign_full_window_witnesses
   match count with
   | O => return🞵 tt
   | S count =>
-      let🞵 _ :=
+      do🞵
         ℛ.EnableSelector Selector.QMulFixedFull offset "" in
-      let🞵 _ := ℛ.AssignAdvice "k" Advice.A4 offset 0 in
       assign_full_window_witnesses (offset + 1) count
   end.
 
 Definition assign_complete_add
+    (region : RegionId.t)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 _ := ℛ.EnableSelector Selector.QEccAdd 0 "" in
-  let🞵 _ :=
-    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 0 0 in
-  let🞵 _ :=
-    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 0 0 in
-  let🞵 _ :=
-    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 0 0 in
-  let🞵 _ :=
-    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "alpha" Advice.A5 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "beta" Advice.A6 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "gamma" Advice.A7 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "delta" Advice.A8 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "lambda" Advice.A4 0 0 in
-  let🞵 x_r := ℛ.AssignAdvice "x_r" Advice.A2 1 0 in
-  let🞵 y_r := ℛ.AssignAdvice "y_r" Advice.A3 1 0 in
+  do🞵 ℛ.EnableSelector Selector.QEccAdd 0 "" in
+  let x_p := Cell.advice region Advice.A0 0 in
+  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  let y_p := Cell.advice region Advice.A1 0 in
+  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  let x_q := Cell.advice region Advice.A2 0 in
+  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  let y_q := Cell.advice region Advice.A3 0 in
+  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  let x_r := Cell.advice region Advice.A2 1 in
+  let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
     (region : RegionId.t)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (
-    let🞵 _ := assign_full_window_witnesses 0 85%nat in
-    let🞵 _ :=
+  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
+    do🞵 assign_full_window_witnesses 0 85%nat in
+    do🞵
       assign_fixed_rows_with_selector
         Selector.QMulFixedFull
         0
         Garden.Orchard.FixedBases.NoteCommitR.full_fixed_rows in
-    let🞵 acc := assign_mul_fixed_window 0 in
-    let🞵 acc := assign_incomplete_additions 1 83%nat acc in
-    let🞵 mul_b := assign_mul_fixed_window 84 in
+    let🞵 acc := assign_mul_fixed_window region 0 in
+    let🞵 acc := assign_incomplete_additions region 1 83%nat acc in
+    let🞵 mul_b := assign_mul_fixed_window region 84 in
     return🞵 {|
       FullFixedResult.acc := acc;
       FullFixedResult.mul_b := mul_b;
@@ -160,19 +163,20 @@ Definition synthesize_full_fixed_base_mul_note_commit_r_last_region
     (region : RegionId.t)
     (result : FullFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (
+  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (fun region =>
     assign_complete_add
+      region
       result.(FullFixedResult.mul_b)
       result.(FullFixedResult.acc)).
 
 Definition synthesize_full_fixed_base_mul_note_commit_r
-    (first_region_index : Z)
+    (which : RegionId.NoteCommit.Which.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   let🞵 result :=
     synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
-      (RegionId.of_index first_region_index) in
+      (note_commit_region which RegionId.NoteCommit.FixedBaseIncomplete) in
   synthesize_full_fixed_base_mul_note_commit_r_last_region
-    (RegionId.of_index (first_region_index + 1))
+    (note_commit_region which RegionId.NoteCommit.FixedBaseLast)
     result.
 
 Definition t_p_expr : Expression.t columns :=
@@ -464,20 +468,19 @@ Definition witness_message_piece
     (name : string)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   ℒ.InNamespace name (
-    ℒ.AddRegion region "witness message piece" (
-      ℛ.AssignAdvice "witness message piece" column 0 0)).
+    ℒ.AddRegion region "witness message piece" (fun region =>
+      return🞵 (Cell.advice region column 0))).
 
 Definition synthesize_short_range
     (region : RegionId.t)
     (namespace region_name : string)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   ℒ.InNamespace namespace (
-    ℒ.AddRegion region region_name (
-      let🞵 element :=
-        ℛ.AssignAdvice "Witness element" Advice.A9 0 0 in
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup 0 "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup 1 "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QBitshift 1 "" in
+    ℒ.AddRegion region region_name (fun region =>
+      let element := Cell.advice region Advice.A9 0 in
+      do🞵 ℛ.EnableSelector Selector.QLookup 0 "" in
+      do🞵 ℛ.EnableSelector Selector.QLookup 1 "" in
+      do🞵 ℛ.EnableSelector Selector.QBitshift 1 "" in
       return🞵 element)).
 
 Fixpoint enable_lookup_running_rows
@@ -487,9 +490,8 @@ Fixpoint enable_lookup_running_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup offset "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QRunning offset "" in
-      let🞵 _ := ℛ.AssignAdvice "z" Advice.A9 offset 0 in
+      do🞵 ℛ.EnableSelector Selector.QLookup offset "" in
+      do🞵 ℛ.EnableSelector Selector.QRunning offset "" in
       enable_lookup_running_rows (offset + 1) count
   end.
 
@@ -499,17 +501,12 @@ Definition synthesize_running_lookup
     (count : nat)
     : 𝓛 columns RegionId.t LookupResult.t :=
   ℒ.InNamespace namespace (
-    ℒ.AddRegion region "Witness element" (
-      let🞵 z_0 := ℛ.AssignAdvice "z_0" Advice.A9 0 0 in
-      let🞵 z_1 := ℛ.AssignAdvice "z_1" Advice.A9 1 0 in
-      let🞵 z_13 := ℛ.AssignAdvice "z_13" Advice.A9 13 0 in
-      let🞵 _ := enable_lookup_running_rows 0 count in
-      let🞵 z_end :=
-        ℛ.AssignAdvice
-          "z_end"
-          Advice.A9
-          (Z.of_nat count)
-          0 in
+    ℒ.AddRegion region "Witness element" (fun region =>
+      let z_0 := Cell.advice region Advice.A9 0 in
+      let z_1 := Cell.advice region Advice.A9 1 in
+      let z_13 := Cell.advice region Advice.A9 13 in
+      do🞵 enable_lookup_running_rows 0 count in
+      let z_end := Cell.advice region Advice.A9 (Z.of_nat count) in
       return🞵 {|
         LookupResult.z_0 := z_0;
         LookupResult.z_1 := z_1;
@@ -517,16 +514,9 @@ Definition synthesize_running_lookup
         LookupResult.z_end := z_end;
       |})).
 
-Definition copy_advice_column
-    (source_column target_column : Advice.t)
-    (source_offset target_offset : Z)
-    : 𝓡 columns RegionId.t (Cell.t columns RegionId.t) :=
-  let🞵 source :=
-    ℛ.AssignAdvice "source" source_column source_offset 0 in
-  copy_advice "copy" source target_column target_offset 0.
-
 Definition synthesize_y_canonicity
-    (first_region_index : Z)
+    (which : RegionId.NoteCommit.Which.t)
+    (subject : RegionId.NoteCommit.YSubject.t)
     (namespace : string)
     (q_y_canon : Selector.t)
     (y : Cell.t columns RegionId.t)
@@ -534,57 +524,64 @@ Definition synthesize_y_canonicity
   ℒ.InNamespace namespace (
     let🞵 k_0 :=
       synthesize_short_range
-        (RegionId.of_index first_region_index)
+        (note_commit_y_region
+          which
+          subject
+          RegionId.NoteCommit.YCanonicity.RangeK0)
         "k_0"
         "Range check 9 bits" in
     let🞵 k_2 :=
       synthesize_short_range
-        (RegionId.of_index (first_region_index + 1))
+        (note_commit_y_region
+          which
+          subject
+          RegionId.NoteCommit.YCanonicity.RangeK2)
         "k_2"
         "Range check 4 bits" in
     let🞵 j_lookup :=
       synthesize_running_lookup
-        (RegionId.of_index (first_region_index + 2))
+        (note_commit_y_region
+          which
+          subject
+          RegionId.NoteCommit.YCanonicity.JLookup)
         "Decompose j = LSB + (2)k_0 + (2^10)k_1"
         25%nat in
     let🞵 j_prime_lookup :=
       ℒ.InNamespace "j_prime = j + 2^130 - t_P" (
         synthesize_running_lookup
-          (RegionId.of_index (first_region_index + 3))
+          (note_commit_y_region
+            which
+            subject
+            RegionId.NoteCommit.YCanonicity.JPrimeLookup)
           "Decompose low 130 bits of (a + 2^130 - t_P)"
           13%nat) in
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 4))
-      "y canonicity" (
-      let🞵 _ := ℛ.EnableSelector q_y_canon 0 "" in
-      let🞵 y_bit := ℛ.AssignAdvice "y_bit" Advice.A6 0 0 in
-      let🞵 _ := copy_advice "y" y Advice.A5 0 0 in
-      let🞵 _ := copy_advice "k_0" k_0 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "k_2" k_2 Advice.A8 0 0 in
-      let🞵 _ :=
-        copy_advice "j_0" j_lookup.(LookupResult.z_0) Advice.A5 1 0 in
-      let🞵 _ :=
-        copy_advice "j_1" j_lookup.(LookupResult.z_1) Advice.A6 1 0 in
-      let🞵 _ :=
-        copy_advice "j_13" j_lookup.(LookupResult.z_13) Advice.A7 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "j_prime_0"
-          j_prime_lookup.(LookupResult.z_0)
-          Advice.A8
-          1
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "j_prime_13"
-          j_prime_lookup.(LookupResult.z_end)
-          Advice.A9
-          1
-          0 in
+      (note_commit_y_region which subject RegionId.NoteCommit.YCanonicity.Gate)
+      "y canonicity" (fun region =>
+      do🞵 ℛ.EnableSelector q_y_canon 0 "" in
+      let y_bit := Cell.advice region Advice.A6 0 in
+      let y_target := Cell.advice region Advice.A5 0 in
+      do🞵 ℛ.Copy y_target y in
+      let k_0_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy k_0_target k_0 in
+      let k_2_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy k_2_target k_2 in
+      let j_0_target := Cell.advice region Advice.A5 1 in
+      do🞵 ℛ.Copy j_0_target j_lookup.(LookupResult.z_0) in
+      let j_1_target := Cell.advice region Advice.A6 1 in
+      do🞵 ℛ.Copy j_1_target j_lookup.(LookupResult.z_1) in
+      let j_13_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy j_13_target j_lookup.(LookupResult.z_13) in
+      let j_prime_0_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy j_prime_0_target j_prime_lookup.(LookupResult.z_0) in
+      let j_prime_13_target := Cell.advice region Advice.A9 1 in
+      do🞵
+        ℛ.Copy j_prime_13_target j_prime_lookup.(LookupResult.z_end) in
       return🞵 y_bit)).
 
 Definition synthesize_instance
-    (first_region_index : Z)
+    (which : RegionId.NoteCommit.Which.t)
     (q_b q_d q_e q_g q_h
       q_gd q_pkd q_value q_rho q_psi q_y_canon : Selector.t)
     (use_second_sinsemilla : bool)
@@ -597,86 +594,91 @@ Definition synthesize_instance
   let rho_column :=
     if use_second_sinsemilla then Advice.A2 else Advice.A0 in
   let🞵 a :=
-    witness_message_piece (RegionId.of_index first_region_index) piece_column "a" in
+    witness_message_piece
+      (note_commit_region which RegionId.NoteCommit.WitnessA)
+      piece_column
+      "a" in
   let🞵 b_0 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 1))
+      (note_commit_region which RegionId.NoteCommit.RangeB0)
       "b_0"
       "Range check 4 bits" in
   let🞵 b_3 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 2))
+      (note_commit_region which RegionId.NoteCommit.RangeB3)
       "b_3"
       "Range check 4 bits" in
   let🞵 b :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 3))
+      (note_commit_region which RegionId.NoteCommit.WitnessB)
       piece_column
       "b" in
   let🞵 c :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 4))
+      (note_commit_region which RegionId.NoteCommit.WitnessC)
       piece_column
       "c" in
   let🞵 d_2 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 5))
+      (note_commit_region which RegionId.NoteCommit.RangeD2)
       "d_2"
       "Range check 8 bits" in
   let🞵 d :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 6))
+      (note_commit_region which RegionId.NoteCommit.WitnessD)
       piece_column
       "d" in
   let🞵 e_0 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 7))
+      (note_commit_region which RegionId.NoteCommit.RangeE0)
       "e_0"
       "Range check 6 bits" in
   let🞵 e_1 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 8))
+      (note_commit_region which RegionId.NoteCommit.RangeE1)
       "e_1"
       "Range check 4 bits" in
   let🞵 e :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 9))
+      (note_commit_region which RegionId.NoteCommit.WitnessE)
       piece_column
       "e" in
   let🞵 f :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 10))
+      (note_commit_region which RegionId.NoteCommit.WitnessF)
       piece_column
       "f" in
   let🞵 g_1 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 11))
+      (note_commit_region which RegionId.NoteCommit.RangeG1)
       "g_1"
       "Range check 9 bits" in
   let🞵 g :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 12))
+      (note_commit_region which RegionId.NoteCommit.WitnessG)
       piece_column
       "g" in
   let🞵 h_0 :=
     synthesize_short_range
-      (RegionId.of_index (first_region_index + 13))
+      (note_commit_region which RegionId.NoteCommit.RangeH0)
       "h_0"
       "Range check 5 bits" in
   let🞵 h :=
     witness_message_piece
-      (RegionId.of_index (first_region_index + 14))
+      (note_commit_region which RegionId.NoteCommit.WitnessH)
       piece_column
       "h" in
   let🞵 b_2 :=
     synthesize_y_canonicity
-      (first_region_index + 15)
+      which
+      RegionId.NoteCommit.YSubject.GD
       "y(g_d) decomposition"
       q_y_canon
       g_d_y in
   let🞵 d_1 :=
     synthesize_y_canonicity
-      (first_region_index + 20)
+      which
+      RegionId.NoteCommit.YSubject.PkD
       "y(pk_d) decomposition"
       q_y_canon
       pk_d_y in
@@ -685,14 +687,13 @@ Definition synthesize_instance
       let🞵 blind :=
         ℒ.InNamespace "[r] R" (
           ℒ.InNamespace "fixed-base mul of NoteCommitR" (
-            synthesize_full_fixed_base_mul_note_commit_r
-              (first_region_index + 25))) in
+            synthesize_full_fixed_base_mul_note_commit_r which)) in
       let🞵 m_hash :=
         ℒ.InNamespace "M" (
           (if use_second_sinsemilla
            then Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit_2
            else Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit)
-            (RegionId.of_index (first_region_index + 27))
+            (note_commit_region which RegionId.NoteCommit.HashToPoint)
             q_note_commit_m_x
             q_note_commit_m_y
             a
@@ -712,217 +713,222 @@ Definition synthesize_instance
       let🞵 cm :=
         ℒ.InNamespace "M + [r] R" (
           ℒ.AddRegion
-            (RegionId.of_index (first_region_index + 28))
-            "complete point addition" (
-            assign_complete_add m blind)) in
+            (note_commit_region which RegionId.NoteCommit.CompletePointAdd)
+            "complete point addition" (fun region =>
+            assign_complete_add region m blind)) in
       return🞵 (cm, m_hash)) in
   let🞵 x_gd_lookup :=
     ℒ.InNamespace "x(g_d) canonicity" (
       synthesize_running_lookup
-        (RegionId.of_index (first_region_index + 29))
+        (note_commit_region which RegionId.NoteCommit.XGDLookup)
         "Decompose low 130 bits of (a + 2^130 - t_P)"
         13%nat) in
   let🞵 x_pkd_lookup :=
     ℒ.InNamespace "x(pk_d) canonicity" (
       synthesize_running_lookup
-        (RegionId.of_index (first_region_index + 30))
+        (note_commit_region which RegionId.NoteCommit.XPKDLookup)
         "Decompose low 140 bits of (b_3 + 2^4 c + 2^140 - t_P)"
         14%nat) in
   let🞵 rho_lookup :=
     ℒ.InNamespace "rho canonicity" (
       synthesize_running_lookup
-        (RegionId.of_index (first_region_index + 31))
+        (note_commit_region which RegionId.NoteCommit.RhoLookup)
         "Decompose low 140 bits of (e_1 + 2^4 f + 2^140 - t_P)"
         14%nat) in
   let🞵 psi_lookup :=
     ℒ.InNamespace "psi canonicity" (
       synthesize_running_lookup
-        (RegionId.of_index (first_region_index + 32))
+        (note_commit_region which RegionId.NoteCommit.PsiLookup)
         "Decompose low 130 bits of (g_1 + (2^9)g_2 + 2^130 - t_P)"
         13%nat) in
   let🞵 b_1 :=
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 33))
-      "NoteCommit MessagePiece b" (
-      let🞵 _ := ℛ.EnableSelector q_b 0 "" in
-      let🞵 _ := copy_advice "b" b Advice.A6 0 0 in
-      let🞵 _ := copy_advice "b_0" b_0 Advice.A7 0 0 in
-      let🞵 b_1 := ℛ.AssignAdvice "b_1" Advice.A8 0 0 in
-      let🞵 _ := copy_advice "b_2" b_2 Advice.A7 1 0 in
-      let🞵 _ := copy_advice "b_3" b_3 Advice.A8 1 0 in
+      (note_commit_region which RegionId.NoteCommit.MessagePieceB)
+      "NoteCommit MessagePiece b" (fun region =>
+      do🞵 ℛ.EnableSelector q_b 0 "" in
+      let b_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy b_target b in
+      let b_0_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy b_0_target b_0 in
+      let b_1 := Cell.advice region Advice.A8 0 in
+      let b_2_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy b_2_target b_2 in
+      let b_3_target := Cell.advice region Advice.A8 1 in
+      do🞵 ℛ.Copy b_3_target b_3 in
       return🞵 b_1) in
   let🞵 d_0 :=
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 34))
-      "NoteCommit MessagePiece d" (
-      let🞵 _ := ℛ.EnableSelector q_d 0 "" in
-      let🞵 _ := copy_advice "d" d Advice.A6 0 0 in
-      let🞵 d_0 := ℛ.AssignAdvice "d_0" Advice.A7 0 0 in
-      let🞵 _ := copy_advice "d_1" d_1 Advice.A8 0 0 in
-      let🞵 _ := copy_advice "d_2" d_2 Advice.A7 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "d_3"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d)
-          Advice.A8
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.MessagePieceD)
+      "NoteCommit MessagePiece d" (fun region =>
+      do🞵 ℛ.EnableSelector q_d 0 "" in
+      let d_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy d_target d in
+      let d_0 := Cell.advice region Advice.A7 0 in
+      let d_1_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy d_1_target d_1 in
+      let d_2_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy d_2_target d_2 in
+      let d_3_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy
+          d_3_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d) in
       return🞵 d_0) in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 35))
-      "NoteCommit MessagePiece e" (
-      let🞵 _ := ℛ.EnableSelector q_e 0 "" in
-      let🞵 _ := copy_advice "e" e Advice.A6 0 0 in
-      let🞵 _ := copy_advice "e_0" e_0 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "e_1" e_1 Advice.A8 0 0 in
+      (note_commit_region which RegionId.NoteCommit.MessagePieceE)
+      "NoteCommit MessagePiece e" (fun region =>
+      do🞵 ℛ.EnableSelector q_e 0 "" in
+      let e_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy e_target e in
+      let e_0_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy e_0_target e_0 in
+      let e_1_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy e_1_target e_1 in
       return🞵 tt) in
   let🞵 g_0 :=
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 36))
-      "NoteCommit MessagePiece g" (
-      let🞵 _ := ℛ.EnableSelector q_g 0 "" in
-      let🞵 _ := copy_advice "g" g Advice.A6 0 0 in
-      let🞵 g_0 := ℛ.AssignAdvice "g_0" Advice.A7 0 0 in
-      let🞵 _ := copy_advice "g_1" g_1 Advice.A6 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "g_2"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g)
-          Advice.A7
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.MessagePieceG)
+      "NoteCommit MessagePiece g" (fun region =>
+      do🞵 ℛ.EnableSelector q_g 0 "" in
+      let g_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy g_target g in
+      let g_0 := Cell.advice region Advice.A7 0 in
+      let g_1_target := Cell.advice region Advice.A6 1 in
+      do🞵 ℛ.Copy g_1_target g_1 in
+      let g_2_target := Cell.advice region Advice.A7 1 in
+      do🞵
+        ℛ.Copy
+          g_2_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g) in
       return🞵 g_0) in
   let🞵 h_1 :=
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 37))
-      "NoteCommit MessagePiece h" (
-      let🞵 _ := ℛ.EnableSelector q_h 0 "" in
-      let🞵 _ := copy_advice "h" h Advice.A6 0 0 in
-      let🞵 _ := copy_advice "h_0" h_0 Advice.A7 0 0 in
-      let🞵 h_1 := ℛ.AssignAdvice "h_1" Advice.A8 0 0 in
+      (note_commit_region which RegionId.NoteCommit.MessagePieceH)
+      "NoteCommit MessagePiece h" (fun region =>
+      do🞵 ℛ.EnableSelector q_h 0 "" in
+      let h_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy h_target h in
+      let h_0_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy h_0_target h_0 in
+      let h_1 := Cell.advice region Advice.A8 0 in
       return🞵 h_1) in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 38))
-      "NoteCommit input g_d" (
-      let🞵 _ := copy_advice "gd_x" g_d_x Advice.A6 0 0 in
-      let🞵 _ := copy_advice "b_0" b_0 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "b_1" b_1 Advice.A7 1 0 in
-      let🞵 _ := copy_advice "a" a Advice.A8 0 0 in
-      let🞵 _ :=
-        copy_advice "a_prime" x_gd_lookup.(LookupResult.z_0) Advice.A8 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_a"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a)
-          Advice.A9
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_a_prime"
-          x_gd_lookup.(LookupResult.z_end)
-          Advice.A9
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.InputGD)
+      "NoteCommit input g_d" (fun region =>
+      let gd_x_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy gd_x_target g_d_x in
+      let b_0_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy b_0_target b_0 in
+      let b_1_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy b_1_target b_1 in
+      let a_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy a_target a in
+      let a_prime_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy a_prime_target x_gd_lookup.(LookupResult.z_0) in
+      let z13_a_target := Cell.advice region Advice.A9 0 in
+      do🞵
+        ℛ.Copy
+          z13_a_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a) in
+      let z13_a_prime_target := Cell.advice region Advice.A9 1 in
+      do🞵
+        ℛ.Copy z13_a_prime_target x_gd_lookup.(LookupResult.z_end) in
       ℛ.EnableSelector q_gd 0 "") in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 39))
-      "NoteCommit input pk_d" (
-      let🞵 _ := copy_advice "pkd_x" pk_d_x Advice.A6 0 0 in
-      let🞵 _ := copy_advice "b_3" b_3 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "d_0" d_0 Advice.A7 1 0 in
-      let🞵 _ := copy_advice "c" c Advice.A8 0 0 in
-      let🞵 _ :=
-        copy_advice "b3_c_prime" x_pkd_lookup.(LookupResult.z_0) Advice.A8 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_c"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c)
-          Advice.A9
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z14_b3_c_prime"
-          x_pkd_lookup.(LookupResult.z_end)
-          Advice.A9
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.InputPkD)
+      "NoteCommit input pk_d" (fun region =>
+      let pkd_x_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy pkd_x_target pk_d_x in
+      let b_3_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy b_3_target b_3 in
+      let d_0_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy d_0_target d_0 in
+      let c_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy c_target c in
+      let b3_c_prime_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy b3_c_prime_target x_pkd_lookup.(LookupResult.z_0) in
+      let z13_c_target := Cell.advice region Advice.A9 0 in
+      do🞵
+        ℛ.Copy
+          z13_c_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c) in
+      let z14_b3_c_prime_target := Cell.advice region Advice.A9 1 in
+      do🞵
+        ℛ.Copy z14_b3_c_prime_target x_pkd_lookup.(LookupResult.z_end) in
       ℛ.EnableSelector q_pkd 0 "") in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 40))
-      "NoteCommit input value" (
-      let🞵 _ := copy_advice "value" value Advice.A6 0 0 in
-      let🞵 _ := copy_advice "d_2" d_2 Advice.A7 0 0 in
-      let🞵 _ :=
-        copy_advice
-          "d3"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d)
-          Advice.A8
-          0
-          0 in
-      let🞵 _ := copy_advice "e_0" e_0 Advice.A9 0 0 in
+      (note_commit_region which RegionId.NoteCommit.InputValue)
+      "NoteCommit input value" (fun region =>
+      let value_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy value_target value in
+      let d_2_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy d_2_target d_2 in
+      let d3_target := Cell.advice region Advice.A8 0 in
+      do🞵
+        ℛ.Copy
+          d3_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d) in
+      let e_0_target := Cell.advice region Advice.A9 0 in
+      do🞵 ℛ.Copy e_0_target e_0 in
       ℛ.EnableSelector q_value 0 "") in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 41))
-      "NoteCommit input rho" (
-      let🞵 _ := copy_advice "rho" rho Advice.A6 0 0 in
-      let🞵 _ := copy_advice "e_1" e_1 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "g_0" g_0 Advice.A7 1 0 in
-      let🞵 _ := copy_advice "f" f Advice.A8 0 0 in
-      let🞵 _ :=
-        copy_advice "e1_f_prime" rho_lookup.(LookupResult.z_0) Advice.A8 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_f"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_f)
-          Advice.A9
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z14_e1_f_prime"
-          rho_lookup.(LookupResult.z_end)
-          Advice.A9
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.InputRho)
+      "NoteCommit input rho" (fun region =>
+      let rho_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy rho_target rho in
+      let e_1_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy e_1_target e_1 in
+      let g_0_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy g_0_target g_0 in
+      let f_target := Cell.advice region Advice.A8 0 in
+      do🞵 ℛ.Copy f_target f in
+      let e1_f_prime_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy e1_f_prime_target rho_lookup.(LookupResult.z_0) in
+      let z13_f_target := Cell.advice region Advice.A9 0 in
+      do🞵
+        ℛ.Copy
+          z13_f_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_f) in
+      let z14_e1_f_prime_target := Cell.advice region Advice.A9 1 in
+      do🞵
+        ℛ.Copy z14_e1_f_prime_target rho_lookup.(LookupResult.z_end) in
       ℛ.EnableSelector q_rho 0 "") in
-  let🞵 _ :=
+  do🞵
     ℒ.AddRegion
-      (RegionId.of_index (first_region_index + 42))
-      "NoteCommit input psi" (
-      let🞵 _ := copy_advice "psi" psi Advice.A6 0 0 in
-      let🞵 _ := copy_advice "h_0" h_0 Advice.A6 1 0 in
-      let🞵 _ := copy_advice "g_1" g_1 Advice.A7 0 0 in
-      let🞵 _ := copy_advice "h_1" h_1 Advice.A7 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "g_2"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g)
-          Advice.A8
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice "g1_g2_prime" psi_lookup.(LookupResult.z_0) Advice.A8 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_g"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_g)
-          Advice.A9
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_g1_g2_prime"
-          psi_lookup.(LookupResult.z_end)
-          Advice.A9
-          1
-          0 in
+      (note_commit_region which RegionId.NoteCommit.InputPsi)
+      "NoteCommit input psi" (fun region =>
+      let psi_target := Cell.advice region Advice.A6 0 in
+      do🞵 ℛ.Copy psi_target psi in
+      let h_0_target := Cell.advice region Advice.A6 1 in
+      do🞵 ℛ.Copy h_0_target h_0 in
+      let g_1_target := Cell.advice region Advice.A7 0 in
+      do🞵 ℛ.Copy g_1_target g_1 in
+      let h_1_target := Cell.advice region Advice.A7 1 in
+      do🞵 ℛ.Copy h_1_target h_1 in
+      let g_2_target := Cell.advice region Advice.A8 0 in
+      do🞵
+        ℛ.Copy
+          g_2_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g) in
+      let g1_g2_prime_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy g1_g2_prime_target psi_lookup.(LookupResult.z_0) in
+      let z13_g_target := Cell.advice region Advice.A9 0 in
+      do🞵
+        ℛ.Copy
+          z13_g_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_g) in
+      let z13_g1_g2_prime_target := Cell.advice region Advice.A9 1 in
+      do🞵
+        ℛ.Copy z13_g1_g2_prime_target psi_lookup.(LookupResult.z_end) in
       ℛ.EnableSelector q_psi 0 "") in
   return🞵 cm.
 
@@ -930,7 +936,7 @@ Definition synthesize_old
     (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   synthesize_instance
-    303
+    RegionId.NoteCommit.Which.Old
     Selector.QNoteCommitOldB
     Selector.QNoteCommitOldD
     Selector.QNoteCommitOldE
@@ -955,7 +961,7 @@ Definition synthesize_new
     (g_d_x g_d_y pk_d_x pk_d_y value rho psi : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   synthesize_instance
-    350
+    RegionId.NoteCommit.Which.New
     Selector.QNoteCommitNewB
     Selector.QNoteCommitNewD
     Selector.QNoteCommitNewE

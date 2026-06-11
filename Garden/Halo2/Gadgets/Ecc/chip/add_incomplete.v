@@ -34,5 +34,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "incomplete addition" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete)
+    "incomplete addition" (fun _ =>
     ℛ.EnableSelector Selector.QAddIncomplete 0 "").

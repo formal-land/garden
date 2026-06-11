@@ -26,6 +26,33 @@ Module Cell.
     row_offset : Z;
   }.
   Arguments t : clear implicits.
+
+  Definition advice {columns : Columns.t} {RegionId : Set}
+      (region : RegionId)
+      (column : columns.(Columns.Advice))
+      (offset : Z) : t columns RegionId := {|
+    column := ColumnRef.Advice column;
+    region := region;
+    row_offset := offset;
+  |}.
+
+  Definition fixed {columns : Columns.t} {RegionId : Set}
+      (region : RegionId)
+      (column : columns.(Columns.Fixed))
+      (offset : Z) : t columns RegionId := {|
+    column := ColumnRef.Fixed column;
+    region := region;
+    row_offset := offset;
+  |}.
+
+  Definition instance {columns : Columns.t} {RegionId : Set}
+      (region : RegionId)
+      (column : columns.(Columns.Instance_))
+      (row : Z) : t columns RegionId := {|
+    column := ColumnRef.Instance_ column;
+    region := region;
+    row_offset := row;
+  |}.
 End Cell.
 
 Module LookupTableColumn.
@@ -59,22 +86,16 @@ Module ℛ.
       (selector : columns.(Columns.Selector))
       (offset : Z)
       (annotation : string) : t columns RegionId unit
-  | AssignAdvice
-      (annotation : string)
-      (column : columns.(Columns.Advice))
-      (offset : Z)
-      (value : Z) : t columns RegionId (Cell.t columns RegionId)
   | AssignFixed
       (annotation : string)
       (column : columns.(Columns.Fixed))
       (offset : Z)
-      (value : Z) : t columns RegionId (Cell.t columns RegionId)
+      (value : Z) : t columns RegionId unit
   | Copy
       (left right : Cell.t columns RegionId) : t columns RegionId unit.
   Arguments Ret {_ _ _}.
   Arguments Bind {_ _ _ _}.
   Arguments EnableSelector {_ _}.
-  Arguments AssignAdvice {_ _}.
   Arguments AssignFixed {_ _}.
   Arguments Copy {_ _}.
 End ℛ.
@@ -109,22 +130,14 @@ Notation "'let🞵' ' x ':=' a 'in' b" :=
   (Monad.bind a (fun x => b))
   (at level 200, x pattern, a at level 100, b at level 200).
 
-Definition copy_advice {columns : Columns.t} {RegionId : Set}
-    (annotation : string)
-    (source : Cell.t columns RegionId)
-    (column : columns.(Columns.Advice))
-    (offset : Z)
-    (value : Z) : 𝓡 columns RegionId (Cell.t columns RegionId) :=
-  let🞵 target := ℛ.AssignAdvice annotation column offset value in
-  let🞵 _ := ℛ.Copy target source in
-  return🞵 target.
+Definition monad_do {M : Set -> Set} `{Monad.C M} {B : Set}
+    (a : M unit)
+    (b : M B) : M B :=
+  Monad.bind a (fun _ => b).
 
-Definition assign_advice_from_constant {columns : Columns.t} {RegionId : Set}
-    (annotation : string)
-    (column : columns.(Columns.Advice))
-    (offset : Z)
-    (constant : Z) : 𝓡 columns RegionId (Cell.t columns RegionId) :=
-  ℛ.AssignAdvice annotation column offset constant.
+Notation "'do🞵' a 'in' b" :=
+  (Monad.bind a (fun _ : unit => b))
+  (at level 200, a at level 100, b at level 200).
 
 Module ℒ.
   (** Free syntax tree for layouter-level computations.  These programs
@@ -138,7 +151,11 @@ Module ℒ.
   | AddRegion {A : Set}
       (region : RegionId)
       (name : string)
-      (program : 𝓡 columns RegionId A) : t columns RegionId A
+      (program : RegionId -> 𝓡 columns RegionId A) : t columns RegionId A
+  | ConstrainInstance
+      (cell : Cell.t columns RegionId)
+      (instance : columns.(Columns.Instance_))
+      (row : Z) : t columns RegionId unit
   | InitLookupTables
       (name : string)
       (entries : list (LookupTableColumn.t columns)) : t columns RegionId unit
@@ -148,6 +165,7 @@ Module ℒ.
   Arguments Ret {_ _ _}.
   Arguments Bind {_ _ _ _}.
   Arguments AddRegion {_ _ _}.
+  Arguments ConstrainInstance {_ _}.
   Arguments InitLookupTables {_ _}.
   Arguments InNamespace {_ _ _}.
 End ℒ.

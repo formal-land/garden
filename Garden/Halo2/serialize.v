@@ -111,8 +111,13 @@ Module Cell.
         indices
         (Garden.Halo2.Synthesis.Cell.column cell);
     Raw.Cell.row :=
-      region_start (Garden.Halo2.Synthesis.Cell.region cell)
-        + Garden.Halo2.Synthesis.Cell.row_offset cell;
+      match Garden.Halo2.Synthesis.Cell.column cell with
+      | Garden.Halo2.Synthesis.ColumnRef.Instance_ _ =>
+          Garden.Halo2.Synthesis.Cell.row_offset cell
+      | _ =>
+          region_start (Garden.Halo2.Synthesis.Cell.region cell)
+            + Garden.Halo2.Synthesis.Cell.row_offset cell
+      end;
   |}.
 
   Definition instance_raw {columns : Columns.t}
@@ -159,8 +164,6 @@ Module Configure.
 End Configure.
 
 Module V1.
-  Definition default_fuel : nat := 1000000%nat.
-
   Definition make_cell {columns : Columns.t} {RegionId : Set}
       (region : RegionId)
       (column : Garden.Halo2.Synthesis.ColumnRef.t columns)
@@ -171,68 +174,47 @@ Module V1.
   |}.
 
   Fixpoint eval_region {columns : Columns.t} {RegionId : Set} {A : Set}
-      (fuel : nat)
       (indices : Indices.t columns)
       (region_start : RegionId -> Z)
       (region : RegionId)
-      (program : Garden.Halo2.Synthesis.𝓡 columns RegionId A)
-      : option (A * list Raw.Event.t) :=
-    match fuel with
-    | O => None
-    | S fuel =>
-        match program with
-        | Garden.Halo2.Synthesis.ℛ.Ret value =>
-            Some (value, [])
-        | Garden.Halo2.Synthesis.ℛ.Bind first second =>
-            match eval_region fuel indices region_start region first with
-            | None => None
-            | Some (value, events_first) =>
-                match eval_region fuel indices region_start region (second value) with
-                | None => None
-                | Some (value, events_second) =>
-                    Some (value, events_first ++ events_second)
-                end
-            end
-        | Garden.Halo2.Synthesis.ℛ.EnableSelector selector offset annotation =>
-            Some (
-              tt,
-              [
-                Raw.Event.EnableSelector
-                  (indices.(Indices.selector) selector)
-                  (region_start region + offset)
-                  annotation
-              ])
-        | Garden.Halo2.Synthesis.ℛ.AssignAdvice annotation column offset value =>
-            let cell :=
-              make_cell
-                region
-                (Garden.Halo2.Synthesis.ColumnRef.Advice column)
-                offset in
-            Some (cell, [])
-        | Garden.Halo2.Synthesis.ℛ.AssignFixed annotation column offset value =>
-            let cell :=
-              make_cell
-                region
-                (Garden.Halo2.Synthesis.ColumnRef.Fixed column)
-                offset in
-            Some (
-              cell,
-              [
-                Raw.Event.AssignFixed
-                  (indices.(Indices.fixed) column)
-                  (region_start region + offset)
-                  annotation
-                  value
-              ])
-        | Garden.Halo2.Synthesis.ℛ.Copy lhs rhs =>
-            Some (
-              tt,
-              [
-                Raw.Event.Copy
-                  (Cell.to_raw indices region_start lhs)
-                  (Cell.to_raw indices region_start rhs)
-              ])
-        end
+      (program : Garden.Halo2.Synthesis.𝓡 columns RegionId A) {struct program}
+      : A * list Raw.Event.t :=
+    match program with
+    | Garden.Halo2.Synthesis.ℛ.Ret value =>
+        (value, [])
+    | Garden.Halo2.Synthesis.ℛ.Bind first second =>
+        let '(value, events_first) :=
+          eval_region indices region_start region first in
+        let '(value, events_second) :=
+          eval_region indices region_start region (second value) in
+        (value, events_first ++ events_second)
+    | Garden.Halo2.Synthesis.ℛ.EnableSelector selector offset annotation =>
+        (
+          tt,
+          [
+            Raw.Event.EnableSelector
+              (indices.(Indices.selector) selector)
+              (region_start region + offset)
+              annotation
+          ])
+    | Garden.Halo2.Synthesis.ℛ.AssignFixed annotation column offset value =>
+        (
+          tt,
+          [
+            Raw.Event.AssignFixed
+              (indices.(Indices.fixed) column)
+              (region_start region + offset)
+              annotation
+              value
+          ])
+    | Garden.Halo2.Synthesis.ℛ.Copy lhs rhs =>
+        (
+          tt,
+          [
+            Raw.Event.Copy
+              (Cell.to_raw indices region_start lhs)
+              (Cell.to_raw indices region_start rhs)
+          ])
     end.
 
   Fixpoint value_at_row (row : nat) (values : list Z) {struct row}
@@ -283,13 +265,13 @@ Module V1.
 
   Fixpoint assign_lookup_rows {columns : Columns.t}
       (indices : Indices.t columns)
-      (fuel row : nat)
+      (rows_remaining row : nat)
       (entries : list (LookupTableColumn.t columns)) : list Raw.Event.t :=
-    match fuel with
+    match rows_remaining with
     | O => []
-    | S fuel =>
+    | S rows_remaining =>
         assign_lookup_row indices row entries
-          ++ assign_lookup_rows indices fuel (S row) entries
+          ++ assign_lookup_rows indices rows_remaining (S row) entries
     end.
 
   Fixpoint fill_lookup_entries {columns : Columns.t}
@@ -316,59 +298,51 @@ Module V1.
       ++ fill_lookup_entries indices entries.
 
   Fixpoint eval_layouter {columns : Columns.t} {RegionId : Set} {A : Set}
-      (fuel : nat)
       (indices : Indices.t columns)
       (region_start : RegionId -> Z)
-      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
-      : option (A * list Raw.Event.t) :=
-    match fuel with
-    | O => None
-    | S fuel =>
-        match program with
-        | Garden.Halo2.Synthesis.ℒ.Ret value =>
-            Some (value, [])
-        | Garden.Halo2.Synthesis.ℒ.Bind first second =>
-            match eval_layouter fuel indices region_start first with
-            | None => None
-            | Some (value, events_first) =>
-                match eval_layouter fuel indices region_start (second value) with
-                | None => None
-                | Some (value, events_second) =>
-                    Some (value, events_first ++ events_second)
-                end
-            end
-        | Garden.Halo2.Synthesis.ℒ.AddRegion region name region_program =>
-            match eval_region fuel indices region_start region region_program with
-            | None => None
-            | Some (value, events) =>
-                Some (
-                  value,
-                  [Raw.Event.EnterRegion name]
-                    ++ events
-                    ++ [Raw.Event.ExitRegion name])
-            end
-        | Garden.Halo2.Synthesis.ℒ.InitLookupTables name entries =>
-            Some (tt, init_lookup_table_events indices name entries)
-        | Garden.Halo2.Synthesis.ℒ.InNamespace name nested =>
-            match eval_layouter fuel indices region_start nested with
-            | None => None
-            | Some (value, events) =>
-                Some (
-                  value,
-                  [Raw.Event.PushNamespace name]
-                    ++ events
-                    ++ [Raw.Event.PopNamespace name])
-            end
-        end
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A) {struct program}
+      : A * list Raw.Event.t :=
+    match program with
+    | Garden.Halo2.Synthesis.ℒ.Ret value =>
+        (value, [])
+    | Garden.Halo2.Synthesis.ℒ.Bind first second =>
+        let '(value, events_first) :=
+          eval_layouter indices region_start first in
+        let '(value, events_second) :=
+          eval_layouter indices region_start (second value) in
+        (value, events_first ++ events_second)
+    | Garden.Halo2.Synthesis.ℒ.AddRegion region name region_program =>
+        let '(value, events) :=
+          eval_region indices region_start region (region_program region) in
+        (
+          value,
+          [Raw.Event.EnterRegion name]
+            ++ events
+            ++ [Raw.Event.ExitRegion name])
+    | Garden.Halo2.Synthesis.ℒ.ConstrainInstance cell instance row =>
+        (
+          tt,
+          [
+            Raw.Event.Copy
+              (Cell.to_raw indices region_start cell)
+              (Cell.instance_raw indices instance row)
+          ])
+    | Garden.Halo2.Synthesis.ℒ.InitLookupTables name entries =>
+        (tt, init_lookup_table_events indices name entries)
+    | Garden.Halo2.Synthesis.ℒ.InNamespace name nested =>
+        let '(value, events) :=
+          eval_layouter indices region_start nested in
+        (
+          value,
+          [Raw.Event.PushNamespace name]
+            ++ events
+            ++ [Raw.Event.PopNamespace name])
     end.
 
   Definition run_with_region_start {columns : Columns.t} {RegionId : Set} {A : Set}
       (indices : Indices.t columns)
       (region_start : RegionId -> Z)
       (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
-      : option A * list Raw.Event.t :=
-    match eval_layouter default_fuel indices region_start program with
-    | None => (None, [])
-    | Some (value, events) => (Some value, events)
-    end.
+      : A * list Raw.Event.t :=
+    eval_layouter indices region_start program.
 End V1.

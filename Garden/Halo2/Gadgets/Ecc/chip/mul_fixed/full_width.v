@@ -30,5 +30,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "Full-width fixed-base scalar mul" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedFullWidth)
+    "Full-width fixed-base scalar mul" (fun _ =>
     ℛ.EnableSelector Selector.QMulFixedFull 0 "").

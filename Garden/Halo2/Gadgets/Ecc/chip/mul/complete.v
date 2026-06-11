@@ -32,5 +32,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "Decompose scalar for complete bits of variable-base mul" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulComplete)
+    "Decompose scalar for complete bits of variable-base mul" (fun _ =>
     ℛ.EnableSelector Selector.QMulDecomposeVar 0 "").

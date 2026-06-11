@@ -65,5 +65,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "Canonicity checks" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedBaseField)
+    "Canonicity checks" (fun _ =>
     ℛ.EnableSelector Selector.QMulFixedBaseField 0 "").

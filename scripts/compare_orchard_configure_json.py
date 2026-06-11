@@ -22,11 +22,8 @@ def main(argv):
     model = load_json(args.model)
     implementation = load_json(args.implementation)
 
-    print("model source: {}".format(model.get("source")))
-    print("implementation source: {}".format(implementation.get("source")))
-
     ok = True
-    for key in ("schema", "configure"):
+    for key in ("configure",):
         if model.get(key) != implementation.get(key):
             print("{} mismatch".format(key))
             print("model:          {}".format(show(model.get(key))))

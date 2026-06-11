@@ -74,6 +74,7 @@ def render(pairs: list[tuple[dict, dict]]) -> str:
         "   Contains only Halo2 floor-planner constant fixed-column bindings. *)",
         "",
         "Require Import Garden.Halo2.Synthesis.",
+        "Require Import Garden.Halo2.serialize.",
         "",
         "Require Export Stdlib.Lists.List.",
         "Require Export Stdlib.Strings.PrimString.",

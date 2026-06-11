@@ -1,6 +1,4 @@
 {
-  "schema": "orchard.action_circuit.configure.v1",
-  "source": "Garden.Orchard.circuit.configure",
   "configure": {
     "gates": [
       {"name":"Orchard circuit checks","constraints":[

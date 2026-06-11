@@ -37,5 +37,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "Short fixed-base mul gate" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort)
+    "Short fixed-base mul gate" (fun _ =>
     ℛ.EnableSelector Selector.QMulFixedShort 0 "").

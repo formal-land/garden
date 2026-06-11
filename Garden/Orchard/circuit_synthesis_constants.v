@@ -2,6 +2,7 @@
    Contains only Halo2 floor-planner constant fixed-column bindings. *)
 
 Require Import Garden.Halo2.Synthesis.
+Require Import Garden.Halo2.serialize.
 
 Require Export Stdlib.Lists.List.
 Require Export Stdlib.Strings.PrimString.
@@ -22,12 +23,37 @@ Module ConstantCopy.
   }.
 End ConstantCopy.
 
-Definition to_events
-    (_entry : ConstantCopy.t) : list unit :=
-  [].
+Definition fixed_cell (row : Z) : Raw.Cell.t := {|
+  Raw.Cell.column := {|
+    Raw.ColumnRef.kind := Raw.ColumnKind.Fixed;
+    Raw.ColumnRef.index := 3;
+  |};
+  Raw.Cell.row := row;
+|}.
 
-Fixpoint to_event_list
-    (entries : list ConstantCopy.t) : list unit :=
+Definition advice_cell (column row : Z) : Raw.Cell.t := {|
+  Raw.Cell.column := {|
+    Raw.ColumnRef.kind := Raw.ColumnKind.Advice;
+    Raw.ColumnRef.index := column;
+  |};
+  Raw.Cell.row := row;
+|}.
+
+Definition to_events (entry : ConstantCopy.t) : list Raw.Event.t :=
+  [
+    Raw.Event.AssignFixed
+      3
+      entry.(ConstantCopy.fixed_row)
+      entry.(ConstantCopy.annotation)
+      entry.(ConstantCopy.value);
+    Raw.Event.Copy
+      (fixed_cell entry.(ConstantCopy.fixed_row))
+      (advice_cell
+        entry.(ConstantCopy.advice_column)
+        entry.(ConstantCopy.advice_row))
+  ].
+
+Fixpoint to_event_list (entries : list ConstantCopy.t) : list Raw.Event.t :=
   match entries with
   | [] => []
   | entry :: entries => to_events entry ++ to_event_list entries
@@ -1199,5 +1225,5 @@ Definition constant_copies : list ConstantCopy.t :=
     |}
   ].
 
-Definition events : list unit :=
+Definition events : list Raw.Event.t :=
   to_event_list constant_copies.

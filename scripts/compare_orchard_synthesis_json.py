@@ -83,17 +83,7 @@ def main(argv):
     model = load_json(args.model)
     implementation = load_json(args.implementation)
 
-    print("model source: {}".format(model.get("source")))
-    print("implementation source: {}".format(implementation.get("source")))
-
     ok = True
-    for key in ("schema",):
-        if model.get(key) != implementation.get(key):
-            print("{} mismatch".format(key))
-            print("model:          {}".format(show(model.get(key))))
-            print("implementation: {}".format(show(implementation.get(key))))
-            ok = False
-
     if args.normalize_rows:
         print("row normalization: enabled")
 

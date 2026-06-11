@@ -118,45 +118,36 @@ Definition configure
   let meta := ConstraintSystem.create_gate meta pad_and_add_gate in
   meta.
 
-Definition assign_state
+Definition state_at
+    (region : RegionId.t)
     (offset : Z)
-    : 𝓡 columns RegionId.t State.t :=
-  let🞵 state_0 :=
-    ℛ.AssignAdvice "state_0" Advice.A6 offset 0 in
-  let🞵 state_1 :=
-    ℛ.AssignAdvice "state_1" Advice.A7 offset 0 in
-  let🞵 state_2 :=
-    ℛ.AssignAdvice "state_2" Advice.A8 offset 0 in
-  return🞵 {|
+    : State.t :=
+  let state_0 := Cell.advice region Advice.A6 offset in
+  let state_1 := Cell.advice region Advice.A7 offset in
+  let state_2 := Cell.advice region Advice.A8 offset in
+  {|
     State.state_0 := state_0;
     State.state_1 := state_1;
     State.state_2 := state_2;
   |}.
 
-Definition copy_state
+Definition copy_state_to
+    (region : RegionId.t)
     (offset : Z)
     (state : State.t)
-    : 𝓡 columns RegionId.t State.t :=
-  let🞵 state_0 :=
-    copy_advice
-      "state_0" state.(State.state_0) Advice.A6 offset 0 in
-  let🞵 state_1 :=
-    copy_advice
-      "state_1" state.(State.state_1) Advice.A7 offset 0 in
-  let🞵 state_2 :=
-    copy_advice
-      "state_2" state.(State.state_2) Advice.A8 offset 0 in
-  return🞵 {|
-    State.state_0 := state_0;
-    State.state_1 := state_1;
-    State.state_2 := state_2;
-  |}.
+    : 𝓡 columns RegionId.t unit :=
+  let target := state_at region offset in
+  do🞵 ℛ.Copy target.(State.state_0) state.(State.state_0) in
+  do🞵 ℛ.Copy target.(State.state_1) state.(State.state_1) in
+  ℛ.Copy target.(State.state_2) state.(State.state_2).
 
 Definition synthesize_initial_state
     : 𝓛 columns RegionId.t State.t :=
   ℒ.InNamespace "Poseidon init" (
-    ℒ.AddRegion (RegionId.of_index 271) "initial state for domain ConstantLength<2>"
-      (assign_state 0)).
+    ℒ.AddRegion
+      (RegionId.Poseidon RegionId.Poseidon.InitialState)
+      "initial state for domain ConstantLength<2>"
+      (fun region => return🞵 (state_at region 0))).
 
 Fixpoint assign_round_constant_entries
     (offset : Z)
@@ -168,7 +159,7 @@ Fixpoint assign_round_constant_entries
   match entries with
   | [] => return🞵 tt
   | (column, annotation, value) :: entries =>
-      let🞵 _ :=
+      do🞵
         ℛ.AssignFixed annotation column offset value in
       assign_round_constant_entries offset entries
   end.
@@ -180,10 +171,11 @@ Definition assign_round_constant_row
         .round_constant_row)
     : 𝓡 columns RegionId.t unit :=
   let '(selector, entries) := row in
-  let🞵 _ := ℛ.EnableSelector selector offset "" in
+  do🞵 ℛ.EnableSelector selector offset "" in
   assign_round_constant_entries offset entries.
 
 Fixpoint assign_permutation_rows
+    (region : RegionId.t)
     (offset : Z)
     (rows :
       list
@@ -191,34 +183,29 @@ Fixpoint assign_permutation_rows
           .round_constant_row)
     : 𝓡 columns RegionId.t State.t :=
   match rows with
-  | [] => assign_state offset
+  | [] => return🞵 (state_at region offset)
   | row :: rows =>
-      let🞵 _ := assign_round_constant_row offset row in
-      let🞵 _ := assign_state (offset + 1) in
-      assign_permutation_rows (offset + 1) rows
+      do🞵 assign_round_constant_row offset row in
+      assign_permutation_rows region (offset + 1) rows
   end.
 
 Definition synthesize_add_input_region
     (state : State.t)
     (input_0 input_1 : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.AddRegion (RegionId.of_index 272) "add input for domain ConstantLength<2>" (
-    let🞵 _ := ℛ.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
-    let🞵 _ := copy_state 0 state in
-    let🞵 state_0 :=
-      ℛ.AssignAdvice "state_0" Advice.A6 1 0 in
-    let🞵 state_1 :=
-      ℛ.AssignAdvice "state_1" Advice.A7 1 0 in
-    let🞵 state_2 :=
-      ℛ.AssignAdvice "state_2" Advice.A8 1 0 in
-    let🞵 _ := ℛ.Copy input_0 state_0 in
-    let🞵 _ := ℛ.Copy input_1 state_1 in
-    let🞵 state_0 :=
-      ℛ.AssignAdvice "state_0" Advice.A6 2 0 in
-    let🞵 state_1 :=
-      ℛ.AssignAdvice "state_1" Advice.A7 2 0 in
-    let🞵 state_2 :=
-      ℛ.AssignAdvice "state_2" Advice.A8 2 0 in
+  ℒ.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.AddInput)
+    "add input for domain ConstantLength<2>" (fun region =>
+    do🞵 ℛ.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
+    do🞵 copy_state_to region 0 state in
+    let state_0 := Cell.advice region Advice.A6 1 in
+    let state_1 := Cell.advice region Advice.A7 1 in
+    let state_2 := Cell.advice region Advice.A8 1 in
+    do🞵 ℛ.Copy input_0 state_0 in
+    do🞵 ℛ.Copy input_1 state_1 in
+    let state_0 := Cell.advice region Advice.A6 2 in
+    let state_1 := Cell.advice region Advice.A7 2 in
+    let state_2 := Cell.advice region Advice.A8 2 in
     return🞵 {|
       State.state_0 := state_0;
       State.state_1 := state_1;
@@ -228,9 +215,12 @@ Definition synthesize_add_input_region
 Definition synthesize_permute_state
     (state : State.t)
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.AddRegion (RegionId.of_index 273) "permute state" (
-    let🞵 _ := copy_state 0 state in
+  ℒ.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PermuteState)
+    "permute state" (fun region =>
+    do🞵 copy_state_to region 0 state in
     assign_permutation_rows
+      region
       0
       Garden.Halo2.Gadgets.Poseidon.P128Pow5T3Synthesis
         .permutation_rows).
@@ -248,31 +238,35 @@ Definition synthesize_hash
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   let🞵 state := synthesize_initial_state in
   ℒ.InNamespace "Poseidon hash (nk, rho)" (
-    let🞵 _ := ℒ.InNamespace "absorb_0" (return🞵 tt) in
-    let🞵 _ := ℒ.InNamespace "absorb_1" (return🞵 tt) in
+    do🞵 ℒ.InNamespace "absorb_0" (return🞵 tt) in
+    do🞵 ℒ.InNamespace "absorb_1" (return🞵 tt) in
     let🞵 state :=
       ℒ.InNamespace "finish absorbing" (
         synthesize_sponge state input_0 input_1) in
-    let🞵 _ := ℒ.InNamespace "squeeze" (return🞵 tt) in
+    do🞵 ℒ.InNamespace "squeeze" (return🞵 tt) in
     return🞵 state.(State.state_0)).
 
 Definition synthesize_full_round
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "full round" (
+  ℒ.AddRegion (RegionId.Poseidon RegionId.Poseidon.FullRound) "full round" (fun _ =>
     ℛ.EnableSelector Selector.QPoseidonFull 0 "").
 
 Definition synthesize_partial_rounds
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "partial rounds" (
+  ℒ.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PartialRounds)
+    "partial rounds" (fun _ =>
     ℛ.EnableSelector Selector.QPoseidonPartial 0 "").
 
 Definition synthesize_pad_and_add
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "pad-and-add" (
+  ℒ.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PadAndAdd)
+    "pad-and-add" (fun _ =>
     ℛ.EnableSelector Selector.QPoseidonPadAndAdd 0 "").
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ := synthesize_full_round in
-  let🞵 _ := synthesize_partial_rounds in
+  do🞵 synthesize_full_round in
+  do🞵 synthesize_partial_rounds in
   synthesize_pad_and_add.

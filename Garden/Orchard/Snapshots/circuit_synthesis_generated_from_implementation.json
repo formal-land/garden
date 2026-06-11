@@ -1,6 +1,4 @@
 {
-  "schema": "orchard.action_circuit.synthesis.v1",
-  "source": "orchard::circuit::Circuit::synthesize",
   "events": [
     {"tag":"EnterRegion","name":"generator_table"},
     {"tag":"AssignFixed","column":"0","row":"0","annotation":"table_idx","value":"0"},

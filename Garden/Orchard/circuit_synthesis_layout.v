@@ -413,7 +413,198 @@ Fixpoint region_start_of_list (index : Z) (starts : list Z) : Z :=
       if Z.eqb index 0 then start else region_start_of_list (index - 1) starts
   end.
 
-Definition region_start_of (region : RegionId.t) : Z :=
+Definition witness_input_index (region : RegionId.WitnessInput.t) : Z :=
   match region with
-  | RegionId.OfIndex index => region_start_of_list index region_starts
+  | RegionId.WitnessInput.PsiOld => 0
+  | RegionId.WitnessInput.RhoOld => 1
+  | RegionId.WitnessInput.CmOld => 2
+  | RegionId.WitnessInput.GDOld => 3
+  | RegionId.WitnessInput.AkP => 4
+  | RegionId.WitnessInput.Nk => 5
+  | RegionId.WitnessInput.VOld => 6
+  | RegionId.WitnessInput.VNew => 7
   end.
+
+Definition merkle_region_offset (region : RegionId.Merkle.Region.t) : Z :=
+  match region with
+  | RegionId.Merkle.Region.NodePosition => 0
+  | RegionId.Merkle.Region.WitnessA => 1
+  | RegionId.Merkle.Region.RangeB1 => 2
+  | RegionId.Merkle.Region.RangeB2 => 3
+  | RegionId.Merkle.Region.WitnessB => 4
+  | RegionId.Merkle.Region.WitnessC => 5
+  | RegionId.Merkle.Region.HashToPoint => 6
+  | RegionId.Merkle.Region.Decomposition => 7
+  end.
+
+Definition merkle_index
+    (layer : RegionId.Merkle.Layer.t)
+    (region : RegionId.Merkle.Region.t) : Z :=
+  8 + 8 * RegionId.Merkle.Layer.to_index layer + merkle_region_offset region.
+
+Definition poseidon_index (region : RegionId.Poseidon.t) : Z :=
+  match region with
+  | RegionId.Poseidon.InitialState => 271
+  | RegionId.Poseidon.AddInput => 272
+  | RegionId.Poseidon.PermuteState => 273
+  | RegionId.Poseidon.FullRound => 0
+  | RegionId.Poseidon.PartialRounds => 0
+  | RegionId.Poseidon.PadAndAdd => 0
+  end.
+
+Definition value_commitment_index (region : RegionId.ValueCommitment.t) : Z :=
+  match region with
+  | RegionId.ValueCommitment.MagnitudeRangeCheck => 264
+  | RegionId.ValueCommitment.SignRangeCheck => 265
+  | RegionId.ValueCommitment.ValueCommitVIncomplete => 266
+  | RegionId.ValueCommitment.ValueCommitVMsb => 267
+  | RegionId.ValueCommitment.ValueCommitRIncomplete => 268
+  | RegionId.ValueCommitment.ValueCommitRLast => 269
+  | RegionId.ValueCommitment.CompletePointAdd => 270
+  end.
+
+Definition nullifier_index (region : RegionId.Nullifier.t) : Z :=
+  match region with
+  | RegionId.Nullifier.ScalarAdd => 274
+  | RegionId.Nullifier.BaseFieldIncomplete => 275
+  | RegionId.Nullifier.BaseFieldComplete => 276
+  | RegionId.Nullifier.AlphaLookup => 277
+  | RegionId.Nullifier.CanonicityChecks => 278
+  | RegionId.Nullifier.CompletePointAdd => 279
+  end.
+
+Definition spend_authority_index (region : RegionId.SpendAuthority.t) : Z :=
+  match region with
+  | RegionId.SpendAuthority.FullFixedIncomplete => 280
+  | RegionId.SpendAuthority.FullFixedLast => 281
+  | RegionId.SpendAuthority.CompletePointAdd => 282
+  end.
+
+Definition address_integrity_mul_index
+    (region : RegionId.AddressIntegrity.Mul.t) : Z :=
+  match region with
+  | RegionId.AddressIntegrity.Mul.VariableBase => 297
+  | RegionId.AddressIntegrity.Mul.OverflowS => 298
+  | RegionId.AddressIntegrity.Mul.OverflowLookup => 299
+  | RegionId.AddressIntegrity.Mul.OverflowCheck => 300
+  end.
+
+Definition address_integrity_index
+    (region : RegionId.AddressIntegrity.t) : Z :=
+  match region with
+  | RegionId.AddressIntegrity.Mul region =>
+      address_integrity_mul_index region
+  | RegionId.AddressIntegrity.WitnessPkD => 301
+  | RegionId.AddressIntegrity.Equality => 302
+  end.
+
+Definition commit_ivk_index (region : RegionId.CommitIvk.t) : Z :=
+  match region with
+  | RegionId.CommitIvk.WitnessA => 283
+  | RegionId.CommitIvk.RangeB0 => 284
+  | RegionId.CommitIvk.RangeB2 => 285
+  | RegionId.CommitIvk.WitnessB => 286
+  | RegionId.CommitIvk.WitnessC => 287
+  | RegionId.CommitIvk.RangeD0 => 288
+  | RegionId.CommitIvk.WitnessD => 289
+  | RegionId.CommitIvk.FixedBaseIncomplete => 290
+  | RegionId.CommitIvk.FixedBaseLast => 291
+  | RegionId.CommitIvk.HashToPoint => 292
+  | RegionId.CommitIvk.CompletePointAdd => 293
+  | RegionId.CommitIvk.AkLookup => 294
+  | RegionId.CommitIvk.NkLookup => 295
+  | RegionId.CommitIvk.CanonicityGate => 296
+  end.
+
+Definition note_commit_base (which : RegionId.NoteCommit.Which.t) : Z :=
+  match which with
+  | RegionId.NoteCommit.Which.Old => 303
+  | RegionId.NoteCommit.Which.New => 350
+  end.
+
+Definition note_commit_y_subject_base
+    (subject : RegionId.NoteCommit.YSubject.t) : Z :=
+  match subject with
+  | RegionId.NoteCommit.YSubject.GD => 15
+  | RegionId.NoteCommit.YSubject.PkD => 20
+  end.
+
+Definition note_commit_y_canonicity_offset
+    (region : RegionId.NoteCommit.YCanonicity.t) : Z :=
+  match region with
+  | RegionId.NoteCommit.YCanonicity.RangeK0 => 0
+  | RegionId.NoteCommit.YCanonicity.RangeK2 => 1
+  | RegionId.NoteCommit.YCanonicity.JLookup => 2
+  | RegionId.NoteCommit.YCanonicity.JPrimeLookup => 3
+  | RegionId.NoteCommit.YCanonicity.Gate => 4
+  end.
+
+Definition note_commit_offset (region : RegionId.NoteCommit.t) : Z :=
+  match region with
+  | RegionId.NoteCommit.WitnessA => 0
+  | RegionId.NoteCommit.RangeB0 => 1
+  | RegionId.NoteCommit.RangeB3 => 2
+  | RegionId.NoteCommit.WitnessB => 3
+  | RegionId.NoteCommit.WitnessC => 4
+  | RegionId.NoteCommit.RangeD2 => 5
+  | RegionId.NoteCommit.WitnessD => 6
+  | RegionId.NoteCommit.RangeE0 => 7
+  | RegionId.NoteCommit.RangeE1 => 8
+  | RegionId.NoteCommit.WitnessE => 9
+  | RegionId.NoteCommit.WitnessF => 10
+  | RegionId.NoteCommit.RangeG1 => 11
+  | RegionId.NoteCommit.WitnessG => 12
+  | RegionId.NoteCommit.RangeH0 => 13
+  | RegionId.NoteCommit.WitnessH => 14
+  | RegionId.NoteCommit.YCanonicity subject region =>
+      note_commit_y_subject_base subject
+        + note_commit_y_canonicity_offset region
+  | RegionId.NoteCommit.FixedBaseIncomplete => 25
+  | RegionId.NoteCommit.FixedBaseLast => 26
+  | RegionId.NoteCommit.HashToPoint => 27
+  | RegionId.NoteCommit.CompletePointAdd => 28
+  | RegionId.NoteCommit.XGDLookup => 29
+  | RegionId.NoteCommit.XPKDLookup => 30
+  | RegionId.NoteCommit.RhoLookup => 31
+  | RegionId.NoteCommit.PsiLookup => 32
+  | RegionId.NoteCommit.MessagePieceB => 33
+  | RegionId.NoteCommit.MessagePieceD => 34
+  | RegionId.NoteCommit.MessagePieceE => 35
+  | RegionId.NoteCommit.MessagePieceG => 36
+  | RegionId.NoteCommit.MessagePieceH => 37
+  | RegionId.NoteCommit.InputGD => 38
+  | RegionId.NoteCommit.InputPkD => 39
+  | RegionId.NoteCommit.InputValue => 40
+  | RegionId.NoteCommit.InputRho => 41
+  | RegionId.NoteCommit.InputPsi => 42
+  end.
+
+Definition note_commit_index
+    (which : RegionId.NoteCommit.Which.t)
+    (region : RegionId.NoteCommit.t) : Z :=
+  note_commit_base which + note_commit_offset region.
+
+Definition gadget_local_index (_ : RegionId.GadgetLocal.t) : Z :=
+  0.
+
+Definition region_index_of (region : RegionId.t) : Z :=
+  match region with
+  | RegionId.WitnessInput region => witness_input_index region
+  | RegionId.Merkle layer region => merkle_index layer region
+  | RegionId.Poseidon region => poseidon_index region
+  | RegionId.ValueCommitment region => value_commitment_index region
+  | RegionId.Nullifier region => nullifier_index region
+  | RegionId.SpendAuthority region => spend_authority_index region
+  | RegionId.AddressIntegrity region => address_integrity_index region
+  | RegionId.CommitIvk region => commit_ivk_index region
+  | RegionId.NoteCommit which region => note_commit_index which region
+  | RegionId.NoteCommitOldEquality => 346
+  | RegionId.NoteCommitNewWitnessGD => 347
+  | RegionId.NoteCommitNewWitnessPkD => 348
+  | RegionId.NoteCommitNewWitnessPsi => 349
+  | RegionId.OrchardCircuitChecks => 393
+  | RegionId.GadgetLocal region => gadget_local_index region
+  end.
+
+Definition region_start_of (region : RegionId.t) : Z :=
+  region_start_of_list (region_index_of region) region_starts.

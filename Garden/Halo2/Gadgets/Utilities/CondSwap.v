@@ -61,7 +61,9 @@ Definition configure_2
 Definition synthesize_instance
     (q_swap : Selector.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "conditional swap" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.CondSwap)
+    "conditional swap" (fun _ =>
     ℛ.EnableSelector q_swap 0 "").
 
 Definition synthesize_1

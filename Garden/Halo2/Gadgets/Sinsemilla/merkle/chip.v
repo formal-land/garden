@@ -75,8 +75,10 @@ Definition synthesize_instance
     (q_decompose : Selector.t)
     (synthesize_cond_swap : 𝓛 columns RegionId.t unit)
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ := synthesize_cond_swap in
-  ℒ.AddRegion (RegionId.of_index 0) "Decomposition check" (
+  do🞵 synthesize_cond_swap in
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition)
+    "Decomposition check" (fun _ =>
     ℛ.EnableSelector q_decompose 0 "").
 
 Definition synthesize_1

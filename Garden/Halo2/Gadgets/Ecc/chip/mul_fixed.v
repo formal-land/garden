@@ -78,6 +78,8 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ := Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
-  ℒ.AddRegion (RegionId.of_index 0) "Running sum coordinates check" (
+  do🞵 Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed)
+    "Running sum coordinates check" (fun _ =>
     ℛ.EnableSelector Selector.QMulFixedRunningSum 0 "").

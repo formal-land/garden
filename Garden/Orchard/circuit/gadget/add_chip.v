@@ -23,9 +23,9 @@ Definition configure
 Definition synthesize
     (a b c : Z)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t * Cell.t columns RegionId.t * Cell.t columns RegionId.t) :=
-  ℒ.AddRegion (RegionId.of_index 0) "add" (
-    let🞵 _ := ℛ.EnableSelector Selector.QAdd 0 "" in
-    let🞵 a_cell := ℛ.AssignAdvice "a" Advice.A7 0 a in
-    let🞵 b_cell := ℛ.AssignAdvice "b" Advice.A8 0 b in
-    let🞵 c_cell := ℛ.AssignAdvice "c" Advice.A6 0 c in
+  ℒ.AddRegion (RegionId.GadgetLocal RegionId.GadgetLocal.AddChip) "add" (fun region =>
+    do🞵 ℛ.EnableSelector Selector.QAdd 0 "" in
+    let a_cell := Cell.advice region Advice.A7 0 in
+    let b_cell := Cell.advice region Advice.A8 0 in
+    let c_cell := Cell.advice region Advice.A6 0 in
     return🞵 (a_cell, b_cell, c_cell)).

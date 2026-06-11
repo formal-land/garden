@@ -1,6 +1,4 @@
 {
-  "schema": "orchard.action_circuit.configure.v1",
-  "source": "orchard::circuit::Circuit::configure",
   "configure": {
     "gates": [
       {

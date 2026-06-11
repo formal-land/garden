@@ -185,8 +185,6 @@ let write_synthesis_json path =
     ~finally:(fun () -> close_out channel)
     (fun () ->
       Printf.fprintf channel "{\n";
-      Printf.fprintf channel "  \"schema\": %s,\n" (json_pstring M.synthesis_schema);
-      Printf.fprintf channel "  \"source\": %s,\n" (json_pstring M.synthesis_source);
       Printf.fprintf channel "  \"events\": [\n";
       let event_count = List.length M.model_synthesis_events in
       List.iteri
@@ -203,8 +201,6 @@ let write_configure_json path =
     ~finally:(fun () -> close_out channel)
     (fun () ->
       Printf.fprintf channel "{\n";
-      Printf.fprintf channel "  \"schema\": %s,\n" (json_pstring M.configure_schema);
-      Printf.fprintf channel "  \"source\": %s,\n" (json_pstring M.configure_source);
       Printf.fprintf channel "  \"configure\": {\n";
       Printf.fprintf channel "    \"gates\": %s,\n"
         (json_list ~indent:4 json_gate M.model_configure.gates);

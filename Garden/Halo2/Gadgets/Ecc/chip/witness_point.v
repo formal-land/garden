@@ -46,8 +46,12 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  let🞵 _ :=
-    ℒ.AddRegion (RegionId.of_index 0) "witness point" (
+  do🞵
+    ℒ.AddRegion
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccWitnessPoint)
+      "witness point" (fun _ =>
       ℛ.EnableSelector Selector.QWitnessPoint 0 "") in
-  ℒ.AddRegion (RegionId.of_index 0) "witness non-identity point" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccWitnessNonIdentityPoint)
+    "witness non-identity point" (fun _ =>
     ℛ.EnableSelector Selector.QWitnessPointNonId 0 "").

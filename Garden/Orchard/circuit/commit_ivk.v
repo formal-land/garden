@@ -10,6 +10,9 @@ Import ListNotations.
 Global Open Scope pstring_scope.
 Global Open Scope Z_scope.
 
+Definition commit_ivk_region (region : RegionId.CommitIvk.t) : RegionId.t :=
+  RegionId.CommitIvk region.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
@@ -114,7 +117,7 @@ Fixpoint assign_fixed_row
   match row with
   | [] => return🞵 tt
   | (column, annotation, value) :: row =>
-      let🞵 _ :=
+      do🞵
         ℛ.AssignFixed annotation column offset value in
       assign_fixed_row offset row
   end.
@@ -127,42 +130,39 @@ Fixpoint assign_fixed_rows_with_selector
   match rows with
   | [] => return🞵 tt
   | row :: rows =>
-      let🞵 _ := ℛ.EnableSelector selector offset "" in
-      let🞵 _ := assign_fixed_row offset row in
+      do🞵 ℛ.EnableSelector selector offset "" in
+      do🞵 assign_fixed_row offset row in
       assign_fixed_rows_with_selector selector (offset + 1) rows
   end.
 
 Definition assign_mul_fixed_window
+    (region : RegionId.t)
     (offset : Z)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 x :=
-    ℛ.AssignAdvice "mul_b_x" Advice.A0 offset 0 in
-  let🞵 y :=
-    ℛ.AssignAdvice "mul_b_y" Advice.A1 offset 0 in
-  let🞵 _ :=
-    ℛ.AssignAdvice "u" Advice.A5 offset 0 in
+  let x := Cell.advice region Advice.A0 offset in
+  let y := Cell.advice region Advice.A1 offset in
   return🞵 {| AssignedPoint.x := x; AssignedPoint.y := y |}.
 
 Definition assign_add_incomplete
+    (region : RegionId.t)
     (offset : Z)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 _ := ℛ.EnableSelector Selector.QAddIncomplete offset "" in
-  let🞵 _ :=
-    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 offset 0 in
-  let🞵 _ :=
-    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 offset 0 in
-  let🞵 _ :=
-    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 offset 0 in
-  let🞵 _ :=
-    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 offset 0 in
-  let🞵 x_r :=
-    ℛ.AssignAdvice "x_r" Advice.A2 (offset + 1) 0 in
-  let🞵 y_r :=
-    ℛ.AssignAdvice "y_r" Advice.A3 (offset + 1) 0 in
+  do🞵 ℛ.EnableSelector Selector.QAddIncomplete offset "" in
+  let x_p := Cell.advice region Advice.A0 offset in
+  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  let y_p := Cell.advice region Advice.A1 offset in
+  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  let x_q := Cell.advice region Advice.A2 offset in
+  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  let y_q := Cell.advice region Advice.A3 offset in
+  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  let x_r := Cell.advice region Advice.A2 (offset + 1) in
+  let y_r := Cell.advice region Advice.A3 (offset + 1) in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Fixpoint assign_incomplete_additions
+    (region : RegionId.t)
     (offset : Z)
     (count : nat)
     (acc : AssignedPoint.t)
@@ -170,9 +170,9 @@ Fixpoint assign_incomplete_additions
   match count with
   | O => return🞵 acc
   | S count =>
-      let🞵 mul_b := assign_mul_fixed_window offset in
-      let🞵 acc := assign_add_incomplete offset mul_b acc in
-      assign_incomplete_additions (offset + 1) count acc
+      let🞵 mul_b := assign_mul_fixed_window region offset in
+      let🞵 acc := assign_add_incomplete region offset mul_b acc in
+      assign_incomplete_additions region (offset + 1) count acc
   end.
 
 Fixpoint assign_full_window_witnesses
@@ -182,46 +182,41 @@ Fixpoint assign_full_window_witnesses
   match count with
   | O => return🞵 tt
   | S count =>
-      let🞵 _ :=
+      do🞵
         ℛ.EnableSelector Selector.QMulFixedFull offset "" in
-      let🞵 _ := ℛ.AssignAdvice "k" Advice.A4 offset 0 in
       assign_full_window_witnesses (offset + 1) count
   end.
 
 Definition assign_complete_add
+    (region : RegionId.t)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  let🞵 _ := ℛ.EnableSelector Selector.QEccAdd 0 "" in
-  let🞵 _ :=
-    copy_advice "x_p" p.(AssignedPoint.x) Advice.A0 0 0 in
-  let🞵 _ :=
-    copy_advice "y_p" p.(AssignedPoint.y) Advice.A1 0 0 in
-  let🞵 _ :=
-    copy_advice "x_q" q.(AssignedPoint.x) Advice.A2 0 0 in
-  let🞵 _ :=
-    copy_advice "y_q" q.(AssignedPoint.y) Advice.A3 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "alpha" Advice.A5 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "beta" Advice.A6 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "gamma" Advice.A7 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "delta" Advice.A8 0 0 in
-  let🞵 _ := ℛ.AssignAdvice "lambda" Advice.A4 0 0 in
-  let🞵 x_r := ℛ.AssignAdvice "x_r" Advice.A2 1 0 in
-  let🞵 y_r := ℛ.AssignAdvice "y_r" Advice.A3 1 0 in
+  do🞵 ℛ.EnableSelector Selector.QEccAdd 0 "" in
+  let x_p := Cell.advice region Advice.A0 0 in
+  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  let y_p := Cell.advice region Advice.A1 0 in
+  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  let x_q := Cell.advice region Advice.A2 0 in
+  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  let y_q := Cell.advice region Advice.A3 0 in
+  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  let x_r := Cell.advice region Advice.A2 1 in
+  let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
 Definition synthesize_full_fixed_base_mul_incomplete_region
     (region : RegionId.t)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (
-    let🞵 _ := assign_full_window_witnesses 0 85%nat in
-    let🞵 _ :=
+  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
+    do🞵 assign_full_window_witnesses 0 85%nat in
+    do🞵
       assign_fixed_rows_with_selector
         Selector.QMulFixedFull
         0
         Garden.Orchard.FixedBases.CommitIvkR.full_fixed_rows in
-    let🞵 acc := assign_mul_fixed_window 0 in
-    let🞵 acc := assign_incomplete_additions 1 83%nat acc in
-    let🞵 mul_b := assign_mul_fixed_window 84 in
+    let🞵 acc := assign_mul_fixed_window region 0 in
+    let🞵 acc := assign_incomplete_additions region 1 83%nat acc in
+    let🞵 mul_b := assign_mul_fixed_window region 84 in
     return🞵 {|
       FullFixedResult.acc := acc;
       FullFixedResult.mul_b := mul_b;
@@ -231,16 +226,20 @@ Definition synthesize_full_fixed_base_mul_last_region
     (region : RegionId.t)
     (result : FullFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (
+  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (fun region =>
     assign_complete_add
+      region
       result.(FullFixedResult.mul_b)
       result.(FullFixedResult.acc)).
 
 Definition synthesize_full_fixed_base_mul_commit_ivk_r
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   let🞵 result :=
-    synthesize_full_fixed_base_mul_incomplete_region (RegionId.of_index 290) in
-  synthesize_full_fixed_base_mul_last_region (RegionId.of_index 291) result.
+    synthesize_full_fixed_base_mul_incomplete_region
+      (commit_ivk_region RegionId.CommitIvk.FixedBaseIncomplete) in
+  synthesize_full_fixed_base_mul_last_region
+    (commit_ivk_region RegionId.CommitIvk.FixedBaseLast)
+    result.
 
 Definition q_commit_ivk_m_x : Z :=
   2593820817260930114322133467408868473290945477826616247349533151445648376562.
@@ -253,20 +252,19 @@ Definition witness_message_piece
     (name : string)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   ℒ.InNamespace name (
-    ℒ.AddRegion region "witness message piece" (
-      ℛ.AssignAdvice "witness message piece" Advice.A6 0 0)).
+    ℒ.AddRegion region "witness message piece" (fun region =>
+      return🞵 (Cell.advice region Advice.A6 0))).
 
 Definition synthesize_range_check
     (region : RegionId.t)
     (namespace region_name : string)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   ℒ.InNamespace namespace (
-    ℒ.AddRegion region region_name (
-      let🞵 element :=
-        ℛ.AssignAdvice "Witness element" Advice.A9 0 0 in
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup 0 "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup 1 "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QBitshift 1 "" in
+    ℒ.AddRegion region region_name (fun region =>
+      let element := Cell.advice region Advice.A9 0 in
+      do🞵 ℛ.EnableSelector Selector.QLookup 0 "" in
+      do🞵 ℛ.EnableSelector Selector.QLookup 1 "" in
+      do🞵 ℛ.EnableSelector Selector.QBitshift 1 "" in
       return🞵 element)).
 
 Fixpoint enable_lookup_running_rows
@@ -276,9 +274,8 @@ Fixpoint enable_lookup_running_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      let🞵 _ := ℛ.EnableSelector Selector.QLookup offset "" in
-      let🞵 _ := ℛ.EnableSelector Selector.QRunning offset "" in
-      let🞵 _ := ℛ.AssignAdvice "z" Advice.A9 offset 0 in
+      do🞵 ℛ.EnableSelector Selector.QLookup offset "" in
+      do🞵 ℛ.EnableSelector Selector.QRunning offset "" in
       enable_lookup_running_rows (offset + 1) count
   end.
 
@@ -289,16 +286,10 @@ Definition synthesize_running_lookup
     : 𝓛 columns RegionId.t LookupResult.t :=
   ℒ.InNamespace namespace (
     ℒ.InNamespace region_namespace (
-      ℒ.AddRegion region "Witness element" (
-        let🞵 z_0 :=
-          ℛ.AssignAdvice "z_0" Advice.A9 0 0 in
-        let🞵 _ := enable_lookup_running_rows 0 count in
-        let🞵 z_end :=
-          ℛ.AssignAdvice
-            "z_end"
-            Advice.A9
-            (Z.of_nat count)
-            0 in
+      ℒ.AddRegion region "Witness element" (fun region =>
+        let z_0 := Cell.advice region Advice.A9 0 in
+        do🞵 enable_lookup_running_rows 0 count in
+        let z_end := Cell.advice region Advice.A9 (Z.of_nat count) in
         return🞵 {|
           LookupResult.z_0 := z_0;
           LookupResult.z_end := z_end;
@@ -313,78 +304,78 @@ Definition assign_cells_used_in_canonicity_gate
     (ak_lookup nk_lookup : LookupResult.t)
     : 𝓛 columns RegionId.t unit :=
   ℒ.InNamespace "Assign cells used in canonicity gate" (
-    ℒ.AddRegion region "Assign cells used in canonicity gate" (
-      let🞵 _ := ℛ.EnableSelector Selector.QCommitIvk 0 "" in
-      let🞵 _ := copy_advice "ak" ak Advice.A0 0 0 in
-      let🞵 _ := copy_advice "a" a Advice.A1 0 0 in
-      let🞵 _ := copy_advice "b" b Advice.A2 0 0 in
-      let🞵 _ := copy_advice "b_0" b_0 Advice.A3 0 0 in
-      let🞵 _ := ℛ.AssignAdvice "Witness b_1" Advice.A4 0 0 in
-      let🞵 _ := copy_advice "b_2" b_2 Advice.A5 0 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_a"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a)
-          Advice.A6
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "a_prime"
-          ak_lookup.(LookupResult.z_0)
-          Advice.A7
-          0
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_a_prime"
-          ak_lookup.(LookupResult.z_end)
-          Advice.A8
-          0
-          0 in
-      let🞵 _ := copy_advice "nk" nk Advice.A0 1 0 in
-      let🞵 _ := copy_advice "c" c Advice.A1 1 0 in
-      let🞵 _ := copy_advice "d" d Advice.A2 1 0 in
-      let🞵 _ := copy_advice "d_0" d_0 Advice.A3 1 0 in
-      let🞵 _ := ℛ.AssignAdvice "Witness d_1" Advice.A4 1 0 in
-      let🞵 _ :=
-        copy_advice
-          "z13_c"
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c)
-          Advice.A6
-          1
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "b2_c_prime"
-          nk_lookup.(LookupResult.z_0)
-          Advice.A7
-          1
-          0 in
-      let🞵 _ :=
-        copy_advice
-          "z14_b2_c_prime"
-          nk_lookup.(LookupResult.z_end)
-          Advice.A8
-          1
-          0 in
+    ℒ.AddRegion region "Assign cells used in canonicity gate" (fun region =>
+      do🞵 ℛ.EnableSelector Selector.QCommitIvk 0 "" in
+      let ak_target := Cell.advice region Advice.A0 0 in
+      do🞵 ℛ.Copy ak_target ak in
+      let a_target := Cell.advice region Advice.A1 0 in
+      do🞵 ℛ.Copy a_target a in
+      let b_target := Cell.advice region Advice.A2 0 in
+      do🞵 ℛ.Copy b_target b in
+      let b_0_target := Cell.advice region Advice.A3 0 in
+      do🞵 ℛ.Copy b_0_target b_0 in
+      let b_2_target := Cell.advice region Advice.A5 0 in
+      do🞵 ℛ.Copy b_2_target b_2 in
+      let z13_a_target := Cell.advice region Advice.A6 0 in
+      do🞵
+        ℛ.Copy
+          z13_a_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a) in
+      let a_prime_target := Cell.advice region Advice.A7 0 in
+      do🞵
+        ℛ.Copy a_prime_target ak_lookup.(LookupResult.z_0) in
+      let z13_a_prime_target := Cell.advice region Advice.A8 0 in
+      do🞵
+        ℛ.Copy z13_a_prime_target ak_lookup.(LookupResult.z_end) in
+      let nk_target := Cell.advice region Advice.A0 1 in
+      do🞵 ℛ.Copy nk_target nk in
+      let c_target := Cell.advice region Advice.A1 1 in
+      do🞵 ℛ.Copy c_target c in
+      let d_target := Cell.advice region Advice.A2 1 in
+      do🞵 ℛ.Copy d_target d in
+      let d_0_target := Cell.advice region Advice.A3 1 in
+      do🞵 ℛ.Copy d_0_target d_0 in
+      let z13_c_target := Cell.advice region Advice.A6 1 in
+      do🞵
+        ℛ.Copy
+          z13_c_target
+          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c) in
+      let b2_c_prime_target := Cell.advice region Advice.A7 1 in
+      do🞵
+        ℛ.Copy b2_c_prime_target nk_lookup.(LookupResult.z_0) in
+      let z14_b2_c_prime_target := Cell.advice region Advice.A8 1 in
+      do🞵
+        ℛ.Copy z14_b2_c_prime_target nk_lookup.(LookupResult.z_end) in
       return🞵 tt)).
 
 Definition synthesize
     (ak nk : Cell.t columns RegionId.t)
-    : 𝓛 columns RegionId.t unit :=
-  let🞵 a := witness_message_piece (RegionId.of_index 283) "a" in
+    : 𝓛 columns RegionId.t AssignedPoint.t :=
+  let🞵 a := witness_message_piece (commit_ivk_region RegionId.CommitIvk.WitnessA) "a" in
   let🞵 b_0 :=
-    synthesize_range_check (RegionId.of_index 284) "b_0" "Range check 4 bits" in
+    synthesize_range_check
+      (commit_ivk_region RegionId.CommitIvk.RangeB0)
+      "b_0"
+      "Range check 4 bits" in
   let🞵 b_2 :=
-    synthesize_range_check (RegionId.of_index 285) "b_2" "Range check 5 bits" in
+    synthesize_range_check
+      (commit_ivk_region RegionId.CommitIvk.RangeB2)
+      "b_2"
+      "Range check 5 bits" in
   let🞵 b :=
-    witness_message_piece (RegionId.of_index 286) "b = b_0 || b_1 || b_2" in
-  let🞵 c := witness_message_piece (RegionId.of_index 287) "c" in
+    witness_message_piece
+      (commit_ivk_region RegionId.CommitIvk.WitnessB)
+      "b = b_0 || b_1 || b_2" in
+  let🞵 c := witness_message_piece (commit_ivk_region RegionId.CommitIvk.WitnessC) "c" in
   let🞵 d_0 :=
-    synthesize_range_check (RegionId.of_index 288) "d_0" "Range check 9 bits" in
+    synthesize_range_check
+      (commit_ivk_region RegionId.CommitIvk.RangeD0)
+      "d_0"
+      "Range check 9 bits" in
   let🞵 d :=
-    witness_message_piece (RegionId.of_index 289) "d = d_0 || d_1" in
+    witness_message_piece
+      (commit_ivk_region RegionId.CommitIvk.WitnessD)
+      "d = d_0 || d_1" in
   let🞵 hash :=
     ℒ.InNamespace "Hash ak||nk" (
     ℒ.InNamespace "commit" (
@@ -395,7 +386,7 @@ Definition synthesize
       let🞵 m_hash :=
         ℒ.InNamespace "M" (
           Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_commit_ivk
-            (RegionId.of_index 292)
+            (commit_ivk_region RegionId.CommitIvk.HashToPoint)
             q_commit_ivk_m_x
             q_commit_ivk_m_y
             a
@@ -408,25 +399,28 @@ Definition synthesize
         AssignedPoint.y :=
           m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.y);
       |} in
-      let🞵 _ :=
+      let🞵 ivk :=
         ℒ.InNamespace "M + [r] R" (
-          ℒ.AddRegion (RegionId.of_index 293) "complete point addition" (
-            assign_complete_add m blind)) in
-      return🞵 m_hash)) in
+          ℒ.AddRegion
+            (commit_ivk_region RegionId.CommitIvk.CompletePointAdd)
+            "complete point addition" (fun region =>
+            assign_complete_add region m blind)) in
+      return🞵 (m_hash, ivk))) in
   let🞵 ak_lookup :=
     synthesize_running_lookup
-      (RegionId.of_index 294)
+      (commit_ivk_region RegionId.CommitIvk.AkLookup)
       "ak canonicity"
       "Decompose low 130 bits of (a + 2^130 - t_P)"
       13%nat in
   let🞵 nk_lookup :=
     synthesize_running_lookup
-      (RegionId.of_index 295)
+      (commit_ivk_region RegionId.CommitIvk.NkLookup)
       "nk canonicity"
       "Decompose low 140 bits of (b_2 + c * 2^5 + 2^140 - t_P)"
       14%nat in
+  do🞵
   assign_cells_used_in_canonicity_gate
-    (RegionId.of_index 296)
+    (commit_ivk_region RegionId.CommitIvk.CanonicityGate)
     ak
     nk
     a
@@ -436,6 +430,7 @@ Definition synthesize
     b_0
     b_2
     d_0
-    hash
+    (fst hash)
     ak_lookup
-    nk_lookup.
+    nk_lookup in
+  return🞵 (snd hash).

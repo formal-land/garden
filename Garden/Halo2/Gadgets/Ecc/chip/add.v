@@ -80,5 +80,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "complete addition" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd)
+    "complete addition" (fun _ =>
     ℛ.EnableSelector Selector.QEccAdd 0 "").

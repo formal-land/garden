@@ -43,5 +43,7 @@ Definition configure
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.of_index 0) "overflow checks" (
+  ℒ.AddRegion
+    (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck)
+    "overflow checks" (fun _ =>
     ℛ.EnableSelector Selector.QMulOverflow 0 "").
