@@ -102,68 +102,125 @@ let json_selector selector =
 let json_negated expr =
   Printf.sprintf "{\"tag\":\"Negated\",\"expr\":%s}" expr
 
-let json_sum left right =
-  Printf.sprintf "{\"tag\":\"Sum\",\"left\":%s,\"right\":%s}" left right
+let json_inline_list json_item items =
+  "[" ^ String.concat "," (List.map json_item items) ^ "]"
 
-let json_product left right =
-  Printf.sprintf "{\"tag\":\"Product\",\"left\":%s,\"right\":%s}" left right
+type json_expression_tree =
+  | JsonAtom of string
+  | JsonSum of json_expression_tree list
+  | JsonProduct of json_expression_tree list
 
-let rec json_expression = function
+let rec json_expression_tree_to_string = function
+  | JsonAtom json -> json
+  | JsonSum args ->
+      Printf.sprintf "{\"tag\":\"Sum\",\"args\":%s}"
+        (json_inline_list json_expression_tree_to_string args)
+  | JsonProduct args ->
+      Printf.sprintf "{\"tag\":\"Product\",\"args\":%s}"
+        (json_inline_list json_expression_tree_to_string args)
+
+let json_negated_tree expr =
+  JsonAtom (json_negated (json_expression_tree_to_string expr))
+
+let json_sum_tree left right =
+  let left_args =
+    match left with
+    | JsonSum args -> args
+    | _ -> [left]
+  in
+  let right_args =
+    match right with
+    | JsonSum args -> args
+    | _ -> [right]
+  in
+  JsonSum (left_args @ right_args)
+
+let json_product_tree left right =
+  let left_args =
+    match left with
+    | JsonProduct args -> args
+    | _ -> [left]
+  in
+  let right_args =
+    match right with
+    | JsonProduct args -> args
+    | _ -> [right]
+  in
+  JsonProduct (left_args @ right_args)
+
+let rec json_expression_tree = function
   | M.Expression.Constant value ->
-      json_constant value
+      JsonAtom (json_constant value)
   | M.Expression.Selector selector ->
-      json_selector selector
+      JsonAtom (json_selector selector)
   | M.Expression.Fixed (column, rotation) ->
-      Printf.sprintf "{\"tag\":\"Fixed\",\"column\":%s,\"rotation\":%s}"
-        (json_index column)
-        (json_rotation rotation)
+      JsonAtom (
+        Printf.sprintf "{\"tag\":\"Fixed\",\"column\":%s,\"rotation\":%s}"
+          (json_index column)
+          (json_rotation rotation))
   | M.Expression.Advice (column, rotation) ->
-      Printf.sprintf "{\"tag\":\"Advice\",\"column\":%s,\"rotation\":%s}"
-        (json_index column)
-        (json_rotation rotation)
+      JsonAtom (
+        Printf.sprintf "{\"tag\":\"Advice\",\"column\":%s,\"rotation\":%s}"
+          (json_index column)
+          (json_rotation rotation))
   | M.Expression.Instance_ (column, rotation) ->
-      Printf.sprintf "{\"tag\":\"Instance_\",\"column\":%s,\"rotation\":%s}"
-        (json_index column)
-        (json_rotation rotation)
+      JsonAtom (
+        Printf.sprintf "{\"tag\":\"Instance_\",\"column\":%s,\"rotation\":%s}"
+          (json_index column)
+          (json_rotation rotation))
   | M.Expression.Negated expr ->
-      json_negated (json_expression expr)
+      json_negated_tree (json_expression_tree expr)
   | M.Expression.Sum (left, right) ->
-      json_sum (json_expression left) (json_expression right)
+      json_sum_tree (json_expression_tree left) (json_expression_tree right)
   | M.Expression.Product (left, right) ->
-      json_product (json_expression left) (json_expression right)
+      json_product_tree (json_expression_tree left) (json_expression_tree right)
   | M.Expression.Scaled (expr, scale) ->
-      Printf.sprintf "{\"tag\":\"Scaled\",\"expr\":%s,\"scale\":%s}"
-        (json_expression expr)
-        (json_z scale)
+      JsonAtom (
+        Printf.sprintf "{\"tag\":\"Scaled\",\"expr\":%s,\"scale\":%s}"
+          (json_expression_tree_to_string (json_expression_tree expr))
+          (json_z scale))
+
+let json_expression expression =
+  json_expression_tree_to_string (json_expression_tree expression)
 
 let rec int_of_nat = function
   | M.O -> 0
   | M.S n -> 1 + int_of_nat n
 
-let json_difference left right = json_sum left (json_negated right)
+let json_difference_tree left right = json_sum_tree left (json_negated_tree right)
 
 let json_range_check expression range =
-  let word = json_expression expression in
+  let word = json_expression_tree expression in
   let range = int_of_nat range in
   let rec go acc i =
     if i >= range then acc
-    else go (json_product acc (json_difference (json_constant (z_of_int i)) word)) (i + 1)
+    else
+      go
+        (json_product_tree
+          acc
+          (json_difference_tree (JsonAtom (json_constant (z_of_int i))) word))
+        (i + 1)
   in
   go word 1
 
-let rec json_constraint = function
+let rec json_constraint_tree = function
   | M.Constraint.Select (selector, constraint_) ->
-      json_product (json_selector selector) (json_constraint constraint_)
+      json_product_tree
+        (JsonAtom (json_selector selector))
+        (json_constraint_tree constraint_)
   | M.Constraint.Equal (left, right) ->
-      json_difference (json_expression left) (json_expression right)
+      json_difference_tree (json_expression_tree left) (json_expression_tree right)
   | M.Constraint.Boolean expression ->
       json_range_check expression (M.S (M.S M.O))
   | M.Constraint.Range (expression, range) ->
       json_range_check expression range
   | M.Constraint.Either (left, right) ->
-      json_product (json_constraint left) (json_constraint right)
+      json_product_tree (json_constraint_tree left) (json_constraint_tree right)
   | M.Constraint.EqualZeroToPrecise expression ->
-      json_expression expression
+      json_expression_tree expression
+
+let json_constraint constraint_ =
+  json_expression_tree_to_string (json_constraint_tree constraint_)
 
 let json_named_constraint (name, constraint_) =
   Printf.sprintf "{\"name\":%s,\"constraint\":%s}"

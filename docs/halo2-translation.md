@@ -268,7 +268,10 @@ expression form. For example, `Constraint.Equal lhs rhs` serializes as
 `lhs - rhs`, `Constraint.Boolean x` serializes as the boolean range-check
 polynomial, and `Constraint.Either left right` serializes as the product of the
 two lowered branch expressions. There are no semantic constraint wrapper nodes
-in the JSON format.
+in the JSON format. Configure expressions use flattened associative nodes:
+additions are `{"tag":"Sum","args":[...]}`, multiplications are
+`{"tag":"Product","args":[...]}`, and all other expression nodes keep their
+direct shape.
 
 The full synthesis trace from the Rust implementation is generated separately into
 `Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json`; it

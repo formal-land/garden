@@ -19,24 +19,18 @@ Definition curve_eqn
 Definition witness_point_gate : Gate.t columns := {|
   Gate.name := "witness point";
   Gate.constraints :=
-    let q_point := Expression.Selector Selector.QWitnessPoint in
     let x_cur := Expression.Advice Advice.A0 Rotation.cur in
     let y_cur := Expression.Advice Advice.A1 Rotation.cur in
-    [
+    let on_curve := curve_eqn Advice.A0 Advice.A1 in
+    Constraints.with_selector Selector.QWitnessPoint [
       (Some "x == 0 v on_curve",
         Constraint.Either
-          (Constraint.Either
-            (Constraint.EqualZeroToPrecise q_point)
-            (Constraint.EqualZeroToPrecise x_cur)
-          )
-          (Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1)));
+          (Constraint.EqualZeroToPrecise x_cur)
+          (Constraint.EqualZeroToPrecise on_curve));
       (Some "y == 0 v on_curve",
         Constraint.Either
-          (Constraint.Either
-            (Constraint.EqualZeroToPrecise q_point)
-            (Constraint.EqualZeroToPrecise y_cur)
-          )
-          (Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1)))
+          (Constraint.EqualZeroToPrecise y_cur)
+          (Constraint.EqualZeroToPrecise on_curve))
     ];
 |}.
 
