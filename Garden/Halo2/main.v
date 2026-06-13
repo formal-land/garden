@@ -15,20 +15,6 @@ Module Columns.
     Advice : Set;
     Instance_ : Set;
   }.
-
-  Record map (source target : t) : Set := {
-    selector : source.(Selector) -> target.(Selector);
-    fixed : source.(Fixed) -> target.(Fixed);
-    lookup : source.(Lookup) -> target.(Lookup);
-    advice : source.(Advice) -> target.(Advice);
-    instance_ : source.(Instance_) -> target.(Instance_);
-  }.
-  Arguments map : clear implicits.
-  Arguments selector {_ _} _ _.
-  Arguments fixed {_ _} _ _.
-  Arguments lookup {_ _} _ _.
-  Arguments advice {_ _} _ _.
-  Arguments instance_ {_ _} _ _.
 End Columns.
 
 Module Rotation.
@@ -92,30 +78,6 @@ Module Expression.
     (at level 40, left associativity).
   Notation "x ● y" := (Scaled x y)
     (at level 40, left associativity).
-
-  Fixpoint map {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (expression : t source) : t target :=
-    match expression with
-    | Constant value =>
-        Constant value
-    | Selector selector =>
-        Selector (column_map.(Columns.selector) selector)
-    | Fixed fixed rotation =>
-        Fixed (column_map.(Columns.fixed) fixed) rotation
-    | Advice advice rotation =>
-        Advice (column_map.(Columns.advice) advice) rotation
-    | Instance_ instance rotation =>
-        Instance_ (column_map.(Columns.instance_) instance) rotation
-    | Negated expression =>
-        Negated (map column_map expression)
-    | Sum lhs rhs =>
-        Sum (map column_map lhs) (map column_map rhs)
-    | Product lhs rhs =>
-        Product (map column_map lhs) (map column_map rhs)
-    | Scaled expression scale =>
-        Scaled (map column_map expression) scale
-    end.
 End Expression.
 Export (notations) Expression.
 
@@ -127,31 +89,22 @@ Module Constraint.
   | Equal
       (left : Expression.t columns)
       (right : Expression.t columns)
+  | Boolean
+      (expression : Expression.t columns)
+  | Range
+      (expression : Expression.t columns)
+      (range : nat)
+  | Either
+      (left : t columns)
+      (right : t columns)
   | EqualZeroToPrecise
       (expression : Expression.t columns).
   Arguments Select {_}.
   Arguments Equal {_}.
+  Arguments Boolean {_}.
+  Arguments Range {_}.
+  Arguments Either {_}.
   Arguments EqualZeroToPrecise {_}.
-
-  Fixpoint to_expression {columns : Columns.t}
-      (constraint : t columns) : Expression.t columns :=
-    match constraint with
-    | Select selector constraint =>
-        Expression.Product
-          (Expression.Selector selector)
-          (to_expression constraint)
-    | Equal lhs rhs =>
-        Expression.Sum lhs (Expression.Negated rhs)
-    | EqualZeroToPrecise expression =>
-        expression
-    end.
-
-  Definition map_to_equal_zero_to_precise {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (constraint : t source) : t target :=
-    EqualZeroToPrecise
-      (Expression.map column_map (to_expression constraint)).
-  Arguments to_expression {_} _ /.
 End Constraint.
 
 Module Constraints.
@@ -167,15 +120,6 @@ Module Constraints.
         (name, Constraint.Select selector constraint))
       constraints.
   Arguments with_selector {_} _ _ /.
-
-  Definition map {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (constraints : t source) : t target :=
-    List.map
-      (fun constraint =>
-        let '(name, constraint) := constraint in
-        (name, Constraint.map_to_equal_zero_to_precise column_map constraint))
-      constraints.
 End Constraints.
 
 Module Gate.
@@ -184,13 +128,6 @@ Module Gate.
     constraints : Constraints.t columns;
   }.
   Arguments t : clear implicits.
-
-  Definition map {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (gate : t source) : t target := {|
-    name := gate.(name);
-    constraints := Constraints.map column_map gate.(constraints);
-  |}.
 End Gate.
 
 Module LookupArgument.
@@ -198,17 +135,6 @@ Module LookupArgument.
     pairs : list (Expression.t columns * columns.(Columns.Lookup));
   }.
   Arguments t : clear implicits.
-
-  Definition map {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (lookup : t source) : t target := {|
-    pairs :=
-      List.map
-        (fun '(expression, lookup) =>
-          (Expression.map column_map expression,
-            column_map.(Columns.lookup) lookup))
-        lookup.(pairs);
-  |}.
 End LookupArgument.
 
 Module ConstraintSystem.
@@ -242,11 +168,78 @@ Module ConstraintSystem.
     gates := self.(gates);
     lookups := self.(lookups) ++ [lookup];
   |}.
-
-  Definition map {source target : Columns.t}
-      (column_map : Columns.map source target)
-      (system : t source) : t target := {|
-    gates := List.map (Gate.map column_map) system.(gates);
-    lookups := List.map (LookupArgument.map column_map) system.(lookups);
-  |}.
 End ConstraintSystem.
+
+Module Monad.
+  Class C (M : Set -> Set) : Set := {
+    ret : forall {A : Set}, A -> M A;
+    bind : forall {A B : Set}, M A -> (A -> M B) -> M B;
+  }.
+End Monad.
+
+Arguments Monad.ret {M} {_} {A} _.
+Arguments Monad.bind {M} {_} {A B} _ _.
+
+Notation "'return🞵' x" :=
+  (Monad.ret x)
+  (at level 100).
+
+Notation "'let🞵' x ':=' a 'in' b" :=
+  (Monad.bind a (fun x => b))
+  (at level 200, x name, a at level 100, b at level 200).
+
+Notation "'let🞵' ' x ':=' a 'in' b" :=
+  (Monad.bind a (fun x => b))
+  (at level 200, x pattern, a at level 100, b at level 200).
+
+Notation "'do🞵' a 'in' b" :=
+  (Monad.bind a (fun _ : unit => b))
+  (at level 200, a at level 100, b at level 200).
+
+Module 𝓒.
+  (** Free syntax tree for Halo2 configure-time operations.  The
+      interpreter threads the immutable [ConstraintSystem.t], while proofs can
+      later give these operations relational semantics. *)
+  Inductive t (columns : Columns.t) : Set -> Set :=
+  | Ret {A : Set} (value : A) : t columns A
+  | Bind {A B : Set}
+      (first : t columns A)
+      (second : A -> t columns B) : t columns B
+  | CreateGate
+      (gate : Gate.t columns) : t columns unit
+  | CreateLookup
+      (lookup : LookupArgument.t columns) : t columns unit.
+  Arguments Ret {_ _}.
+  Arguments Bind {_ _ _}.
+  Arguments CreateGate {_}.
+  Arguments CreateLookup {_}.
+
+  Fixpoint run {columns : Columns.t} {A : Set}
+      (program : t columns A)
+      (meta : ConstraintSystem.t columns)
+      : A * ConstraintSystem.t columns :=
+    match program with
+    | Ret value => (value, meta)
+    | Bind first second =>
+        let '(value, meta) := run first meta in
+        run (second value) meta
+    | CreateGate gate =>
+        (tt, ConstraintSystem.create_gate meta gate)
+    | CreateLookup lookup =>
+        (tt, ConstraintSystem.create_lookup meta lookup)
+    end.
+
+  Definition run_unit {columns : Columns.t}
+      (program : t columns unit)
+      (meta : ConstraintSystem.t columns)
+      : ConstraintSystem.t columns :=
+    snd (run program meta).
+End 𝓒.
+
+Definition 𝓒 := 𝓒.t.
+
+Global Instance ConfigureIsMonad {columns : Columns.t}
+    : Monad.C (𝓒.t columns) := {|
+  Monad.ret := @𝓒.Ret columns;
+  Monad.bind := @𝓒.Bind columns;
+|}.

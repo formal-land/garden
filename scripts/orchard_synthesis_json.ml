@@ -10,6 +10,16 @@ let string_of_z = function
   | M.Zpos p -> Z.to_string (integer_of_positive p)
   | M.Zneg p -> "-" ^ Z.to_string (integer_of_positive p)
 
+let rec positive_of_int value =
+  if value = 1 then M.XH
+  else if value land 1 = 0 then M.XO (positive_of_int (value lsr 1))
+  else M.XI (positive_of_int (value lsr 1))
+
+let z_of_int value =
+  if value = 0 then M.Z0
+  else if value > 0 then M.Zpos (positive_of_int value)
+  else M.Zneg (positive_of_int (-value))
+
 let json_string value =
   let buffer = Buffer.create (String.length value + 2) in
   let add_hex byte =
@@ -83,11 +93,26 @@ let json_cell (cell : M.Raw.Cell.t) =
 
 let json_rotation (rotation : M.Rotation.t) = json_z rotation
 
+let json_constant value =
+  Printf.sprintf "{\"tag\":\"Constant\",\"value\":%s}" (json_z value)
+
+let json_selector selector =
+  Printf.sprintf "{\"tag\":\"Selector\",\"selector\":%s}" (json_index selector)
+
+let json_negated expr =
+  Printf.sprintf "{\"tag\":\"Negated\",\"expr\":%s}" expr
+
+let json_sum left right =
+  Printf.sprintf "{\"tag\":\"Sum\",\"left\":%s,\"right\":%s}" left right
+
+let json_product left right =
+  Printf.sprintf "{\"tag\":\"Product\",\"left\":%s,\"right\":%s}" left right
+
 let rec json_expression = function
   | M.Expression.Constant value ->
-      Printf.sprintf "{\"tag\":\"Constant\",\"value\":%s}" (json_z value)
+      json_constant value
   | M.Expression.Selector selector ->
-      Printf.sprintf "{\"tag\":\"Selector\",\"selector\":%s}" (json_index selector)
+      json_selector selector
   | M.Expression.Fixed (column, rotation) ->
       Printf.sprintf "{\"tag\":\"Fixed\",\"column\":%s,\"rotation\":%s}"
         (json_index column)
@@ -101,29 +126,42 @@ let rec json_expression = function
         (json_index column)
         (json_rotation rotation)
   | M.Expression.Negated expr ->
-      Printf.sprintf "{\"tag\":\"Negated\",\"expr\":%s}" (json_expression expr)
+      json_negated (json_expression expr)
   | M.Expression.Sum (left, right) ->
-      Printf.sprintf "{\"tag\":\"Sum\",\"left\":%s,\"right\":%s}"
-        (json_expression left)
-        (json_expression right)
+      json_sum (json_expression left) (json_expression right)
   | M.Expression.Product (left, right) ->
-      Printf.sprintf "{\"tag\":\"Product\",\"left\":%s,\"right\":%s}"
-        (json_expression left)
-        (json_expression right)
+      json_product (json_expression left) (json_expression right)
   | M.Expression.Scaled (expr, scale) ->
       Printf.sprintf "{\"tag\":\"Scaled\",\"expr\":%s,\"scale\":%s}"
         (json_expression expr)
         (json_z scale)
 
+let rec int_of_nat = function
+  | M.O -> 0
+  | M.S n -> 1 + int_of_nat n
+
+let json_difference left right = json_sum left (json_negated right)
+
+let json_range_check expression range =
+  let word = json_expression expression in
+  let range = int_of_nat range in
+  let rec go acc i =
+    if i >= range then acc
+    else go (json_product acc (json_difference (json_constant (z_of_int i)) word)) (i + 1)
+  in
+  go word 1
+
 let rec json_constraint = function
   | M.Constraint.Select (selector, constraint_) ->
-      Printf.sprintf "{\"tag\":\"Select\",\"selector\":%s,\"constraint\":%s}"
-        (json_index selector)
-        (json_constraint constraint_)
+      json_product (json_selector selector) (json_constraint constraint_)
   | M.Constraint.Equal (left, right) ->
-      Printf.sprintf "{\"tag\":\"Equal\",\"left\":%s,\"right\":%s}"
-        (json_expression left)
-        (json_expression right)
+      json_difference (json_expression left) (json_expression right)
+  | M.Constraint.Boolean expression ->
+      json_range_check expression (M.S (M.S M.O))
+  | M.Constraint.Range (expression, range) ->
+      json_range_check expression range
+  | M.Constraint.Either (left, right) ->
+      json_product (json_constraint left) (json_constraint right)
   | M.Constraint.EqualZeroToPrecise expression ->
       json_expression expression
 

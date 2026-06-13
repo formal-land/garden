@@ -6,39 +6,48 @@ Require Garden.Halo2.Gadgets.Utilities.
 Import ListNotations.
 Global Open Scope pstring_scope.
 
+Definition cond_swap_gate
+    (q_swap : Selector.t)
+    (a b a_swapped b_swapped swap : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "a' = b ⋅ swap + a ⋅ (1-swap)";
+  Gate.constraints :=
+    let a := Expression.Advice a Rotation.cur in
+    let b := Expression.Advice b Rotation.cur in
+    let a_swapped := Expression.Advice a_swapped Rotation.cur in
+    let b_swapped := Expression.Advice b_swapped Rotation.cur in
+    let swap := Expression.Advice swap Rotation.cur in
+    Constraints.with_selector q_swap [
+      (Some "a check",
+        Constraint.Equal
+          a_swapped
+          (Garden.Halo2.Gadgets.Utilities.ternary swap b a));
+      (Some "b check",
+        Constraint.Equal
+          b_swapped
+          (Garden.Halo2.Gadgets.Utilities.ternary swap a b));
+      (Some "swap is bool", Constraint.Boolean swap)
+    ];
+|}.
+
+Definition configure_instance_program
+    (q_swap : Selector.t)
+    (a b a_swapped b_swapped swap : Advice.t)
+    : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate (cond_swap_gate q_swap a b a_swapped b_swapped swap) in
+  return🞵 tt.
+
 Definition configure_instance
     (meta : ConstraintSystem.t columns)
     (q_swap : Selector.t)
     (a b a_swapped b_swapped swap : Advice.t)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "a' = b ⋅ swap + a ⋅ (1-swap)";
-    Gate.constraints :=
-      let a := Expression.Advice a Rotation.cur in
-      let b := Expression.Advice b Rotation.cur in
-      let a_swapped := Expression.Advice a_swapped Rotation.cur in
-      let b_swapped := Expression.Advice b_swapped Rotation.cur in
-      let swap := Expression.Advice swap Rotation.cur in
-      let a_check :=
-        a_swapped ➖
-          Garden.Halo2.Gadgets.Utilities.ternary swap b a in
-      let b_check :=
-        b_swapped ➖
-          Garden.Halo2.Gadgets.Utilities.ternary swap a b in
-      let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check swap in
-      Constraints.with_selector q_swap [
-        (Some "a check", Constraint.EqualZeroToPrecise a_check);
-        (Some "b check", Constraint.EqualZeroToPrecise b_check);
-        (Some "swap is bool", Constraint.EqualZeroToPrecise bool_check)
-      ];
-  |} in
-  meta.
+  𝓒.run_unit
+    (configure_instance_program q_swap a b a_swapped b_swapped swap)
+    meta.
 
-Definition configure_1
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  configure_instance
-    meta
+Definition configure_1_program : 𝓒 columns unit :=
+  configure_instance_program
     Selector.QCondSwap1
     Advice.A0
     Advice.A1
@@ -46,11 +55,13 @@ Definition configure_1
     Advice.A3
     Advice.A4.
 
-Definition configure_2
+Definition configure_1
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  configure_instance
-    meta
+  𝓒.run_unit configure_1_program meta.
+
+Definition configure_2_program : 𝓒 columns unit :=
+  configure_instance_program
     Selector.QCondSwap2
     Advice.A5
     Advice.A6
@@ -58,13 +69,18 @@ Definition configure_2
     Advice.A8
     Advice.A9.
 
+Definition configure_2
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit configure_2_program meta.
+
 Definition synthesize_instance
     (q_swap : Selector.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.CondSwap)
     "conditional swap" (fun _ =>
-    ℛ.EnableSelector q_swap 0 "").
+    𝓡.EnableSelector q_swap 0 "").
 
 Definition synthesize_1
     : 𝓛 columns RegionId.t unit :=

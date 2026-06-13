@@ -5,15 +5,33 @@ Import ListNotations.
 Global Open Scope pstring_scope.
 Global Open Scope Z_scope.
 
-Definition configure {columns : Columns.t}
+Definition short_lookup_bitshift_gate {columns : Columns.t}
     (k : Z)
-    (meta : ConstraintSystem.t columns)
+    (q_bitshift : columns.(Columns.Selector))
+    (running_sum : columns.(Columns.Advice))
+    : Gate.t columns := {|
+  Gate.name := "Short lookup bitshift";
+  Gate.constraints :=
+    let two_pow_k := 2 ^ k in
+    let word := Expression.Advice running_sum Rotation.prev in
+    let shifted_word := Expression.Advice running_sum Rotation.cur in
+    let inv_two_pow_s := Expression.Advice running_sum Rotation.next in
+    Constraints.with_selector q_bitshift [
+      (None,
+        Constraint.Equal
+          (word ● two_pow_k ✖️ inv_two_pow_s)
+          shifted_word)
+    ];
+|}.
+
+Definition configure_program {columns : Columns.t}
+    (k : Z)
     (q_lookup q_running q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
     (table_idx : columns.(Columns.Lookup))
-    : ConstraintSystem.t columns :=
+    : 𝓒 columns unit :=
   let two_pow_k := 2 ^ k in
-  let meta := ConstraintSystem.create_lookup meta {|
+  do🞵 𝓒.CreateLookup {|
     LookupArgument.pairs :=
       let q_lookup := Expression.Selector q_lookup in
       let q_running := Expression.Selector q_running in
@@ -31,19 +49,25 @@ Definition configure {columns : Columns.t}
         (q_lookup ✖️ (running_sum_lookup ➕ short_lookup), table_idx)
       ];
   |} in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Short lookup bitshift";
-    Gate.constraints :=
-      let word := Expression.Advice running_sum Rotation.prev in
-      let shifted_word := Expression.Advice running_sum Rotation.cur in
-      let inv_two_pow_s := Expression.Advice running_sum Rotation.next in
-      Constraints.with_selector q_bitshift [
-        (None,
-          Constraint.EqualZeroToPrecise
-            (word ● two_pow_k ✖️ inv_two_pow_s ➖ shifted_word))
-      ];
-  |} in
-  meta.
+  do🞵 𝓒.CreateGate (short_lookup_bitshift_gate k q_bitshift running_sum) in
+  return🞵 tt.
+
+Definition configure {columns : Columns.t}
+    (k : Z)
+    (meta : ConstraintSystem.t columns)
+    (q_lookup q_running q_bitshift : columns.(Columns.Selector))
+    (running_sum : columns.(Columns.Advice))
+    (table_idx : columns.(Columns.Lookup))
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit
+    (configure_program
+      k
+      q_lookup
+      q_running
+      q_bitshift
+      running_sum
+      table_idx)
+    meta.
 
 Definition synthesize {columns : Columns.t} {RegionId : Set}
     : 𝓛 columns RegionId unit :=
@@ -55,9 +79,9 @@ Definition synthesize_short {columns : Columns.t} {RegionId : Set}
     (q_lookup q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
     : 𝓛 columns RegionId (Cell.t columns RegionId) :=
-  ℒ.AddRegion region name (fun region =>
+  𝓛.AddRegion region name (fun region =>
     let element := Cell.advice region running_sum 0 in
-    do🞵 ℛ.EnableSelector q_lookup 0 "" in
-    do🞵 ℛ.EnableSelector q_lookup 1 "" in
-    do🞵 ℛ.EnableSelector q_bitshift 1 "" in
+    do🞵 𝓡.EnableSelector q_lookup 0 "" in
+    do🞵 𝓡.EnableSelector q_lookup 1 "" in
+    do🞵 𝓡.EnableSelector q_bitshift 1 "" in
     return🞵 element).

@@ -5,36 +5,41 @@ Require Garden.Halo2.Gadgets.Utilities.
 Import ListNotations.
 Global Open Scope pstring_scope.
 
+Definition incomplete_addition_gate : Gate.t columns := {|
+  Gate.name := "incomplete addition";
+  Gate.constraints :=
+    let x_p := Expression.Advice Advice.A0 Rotation.cur in
+    let y_p := Expression.Advice Advice.A1 Rotation.cur in
+    let x_q := Expression.Advice Advice.A2 Rotation.cur in
+    let y_q := Expression.Advice Advice.A3 Rotation.cur in
+    let x_r := Expression.Advice Advice.A2 Rotation.next in
+    let y_r := Expression.Advice Advice.A3 Rotation.next in
+    let poly1 :=
+      (x_r ➕ x_q ➕ x_p)
+        ✖️ (x_p ➖ x_q)
+        ✖️ (x_p ➖ x_q)
+        ➖ Garden.Halo2.Gadgets.Utilities.square (y_p ➖ y_q) in
+    let poly2 :=
+      (y_r ➕ y_q) ✖️ (x_p ➖ x_q)
+        ➖ (y_p ➖ y_q) ✖️ (x_q ➖ x_r) in
+    Constraints.with_selector Selector.QAddIncomplete [
+      (Some "x_r", Constraint.EqualZeroToPrecise poly1);
+      (Some "y_r", Constraint.EqualZeroToPrecise poly2)
+    ];
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate incomplete_addition_gate in
+  return🞵 tt.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "incomplete addition";
-    Gate.constraints :=
-      let x_p := Expression.Advice Advice.A0 Rotation.cur in
-      let y_p := Expression.Advice Advice.A1 Rotation.cur in
-      let x_q := Expression.Advice Advice.A2 Rotation.cur in
-      let y_q := Expression.Advice Advice.A3 Rotation.cur in
-      let x_r := Expression.Advice Advice.A2 Rotation.next in
-      let y_r := Expression.Advice Advice.A3 Rotation.next in
-      let poly1 :=
-        (x_r ➕ x_q ➕ x_p)
-          ✖️ (x_p ➖ x_q)
-          ✖️ (x_p ➖ x_q)
-          ➖ Garden.Halo2.Gadgets.Utilities.square (y_p ➖ y_q) in
-      let poly2 :=
-        (y_r ➕ y_q) ✖️ (x_p ➖ x_q)
-          ➖ (y_p ➖ y_q) ✖️ (x_q ➖ x_r) in
-      Constraints.with_selector Selector.QAddIncomplete [
-        (Some "x_r", Constraint.EqualZeroToPrecise poly1);
-        (Some "y_r", Constraint.EqualZeroToPrecise poly2)
-      ];
-  |} in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete)
     "incomplete addition" (fun _ =>
-    ℛ.EnableSelector Selector.QAddIncomplete 0 "").
+    𝓡.EnableSelector Selector.QAddIncomplete 0 "").

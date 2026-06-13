@@ -16,42 +16,57 @@ Definition curve_eqn
     ➖ (Garden.Halo2.Gadgets.Utilities.square x ✖️ x)
     ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b.
 
+Definition witness_point_gate : Gate.t columns := {|
+  Gate.name := "witness point";
+  Gate.constraints :=
+    let q_point := Expression.Selector Selector.QWitnessPoint in
+    let x_cur := Expression.Advice Advice.A0 Rotation.cur in
+    let y_cur := Expression.Advice Advice.A1 Rotation.cur in
+    [
+      (Some "x == 0 v on_curve",
+        Constraint.Either
+          (Constraint.Either
+            (Constraint.EqualZeroToPrecise q_point)
+            (Constraint.EqualZeroToPrecise x_cur)
+          )
+          (Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1)));
+      (Some "y == 0 v on_curve",
+        Constraint.Either
+          (Constraint.Either
+            (Constraint.EqualZeroToPrecise q_point)
+            (Constraint.EqualZeroToPrecise y_cur)
+          )
+          (Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1)))
+    ];
+|}.
+
+Definition witness_non_identity_point_gate : Gate.t columns := {|
+  Gate.name := "witness non-identity point";
+  Gate.constraints :=
+    Constraints.with_selector Selector.QWitnessPointNonId [
+      (Some "on_curve",
+        Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1))
+    ];
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate witness_point_gate in
+  do🞵 𝓒.CreateGate witness_non_identity_point_gate in
+  return🞵 tt.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "witness point";
-    Gate.constraints :=
-      let q_point := Expression.Selector Selector.QWitnessPoint in
-      let x_cur := Expression.Advice Advice.A0 Rotation.cur in
-      let y_cur := Expression.Advice Advice.A1 Rotation.cur in
-      [
-        (Some "x == 0 v on_curve",
-          Constraint.EqualZeroToPrecise
-            ((q_point ✖️ x_cur) ✖️ curve_eqn Advice.A0 Advice.A1));
-        (Some "y == 0 v on_curve",
-          Constraint.EqualZeroToPrecise
-            ((q_point ✖️ y_cur) ✖️ curve_eqn Advice.A0 Advice.A1))
-      ];
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "witness non-identity point";
-    Gate.constraints :=
-      Constraints.with_selector Selector.QWitnessPointNonId [
-        (Some "on_curve",
-          Constraint.EqualZeroToPrecise (curve_eqn Advice.A0 Advice.A1))
-      ];
-  |} in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
   do🞵
-    ℒ.AddRegion
+    𝓛.AddRegion
       (RegionId.GadgetLocal RegionId.GadgetLocal.EccWitnessPoint)
       "witness point" (fun _ =>
-      ℛ.EnableSelector Selector.QWitnessPoint 0 "") in
-  ℒ.AddRegion
+      𝓡.EnableSelector Selector.QWitnessPoint 0 "") in
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.EccWitnessNonIdentityPoint)
     "witness non-identity point" (fun _ =>
-    ℛ.EnableSelector Selector.QWitnessPointNonId 0 "").
+    𝓡.EnableSelector Selector.QWitnessPointNonId 0 "").

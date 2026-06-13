@@ -42,13 +42,12 @@ Definition q_s3
   let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
   q_s2 ✖️ (q_s2 ➖ Expression.Constant 1).
 
-Definition configure_generator_table
-    (meta : ConstraintSystem.t columns)
+Definition configure_generator_table_program
     (q_sinsemilla1 : Selector.t)
     (q_sinsemilla2 : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
-    : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_lookup meta {|
+    : 𝓒 columns unit :=
+  do🞵 𝓒.CreateLookup {|
     LookupArgument.pairs :=
       let q_s1 := Expression.Selector q_sinsemilla1 in
       let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
@@ -73,17 +72,80 @@ Definition configure_generator_table
           Lookup.TableY)
       ];
   |} in
-  meta.
+  return🞵 tt.
 
-Definition configure_instance
+Definition configure_generator_table
     (meta : ConstraintSystem.t columns)
+    (q_sinsemilla1 : Selector.t)
+    (q_sinsemilla2 : Fixed.t)
+    (x_a x_p bits lambda_1 lambda_2 : Advice.t)
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit
+    (configure_generator_table_program
+      q_sinsemilla1
+      q_sinsemilla2
+      x_a
+      x_p
+      bits
+      lambda_1
+      lambda_2)
+    meta.
+
+Definition initial_y_q_gate
+    (q_sinsemilla4 : Selector.t)
+    (fixed_y_q : Fixed.t)
+    (x_a x_p lambda_1 lambda_2 : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "Initial y_Q";
+  Gate.constraints :=
+    let y_q := Expression.Fixed fixed_y_q Rotation.cur in
+    let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
+    Constraints.with_selector q_sinsemilla4 [
+      (Some "init_y_q_check",
+        Constraint.Equal (y_q ● 2) y_a_cur)
+    ];
+|}.
+
+Definition sinsemilla_gate
+    (q_sinsemilla1 : Selector.t)
+    (q_sinsemilla2 : Fixed.t)
+    (x_a x_p lambda_1 lambda_2 : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "Sinsemilla gate";
+  Gate.constraints :=
+    let q_s3 := q_s3 q_sinsemilla2 in
+    let lambda_1_next := Expression.Advice lambda_1 Rotation.next in
+    let lambda_2_cur := Expression.Advice lambda_2 Rotation.cur in
+    let x_a_cur := Expression.Advice x_a Rotation.cur in
+    let x_a_next := Expression.Advice x_a Rotation.next in
+    let x_r_cur := x_r x_a x_p lambda_1 Rotation.cur in
+    let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
+    let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
+    let secant_line :=
+      Garden.Halo2.Gadgets.Utilities.square lambda_2_cur
+        ➖ (x_a_next ➕ x_r_cur ➕ x_a_cur) in
+    let lhs := lambda_2_cur ● 4 ✖️ (x_a_cur ➖ x_a_next) in
+    let rhs :=
+      (y_a_cur ● 2)
+        ➕ ((Expression.Constant 2 ➖ q_s3) ✖️ y_a_next)
+        ➕ ((q_s3 ● 2) ✖️ lambda_1_next) in
+    let y_check := lhs ➖ rhs in
+    Constraints.with_selector q_sinsemilla1 [
+      (Some "Secant line",
+        Constraint.Equal
+          (Garden.Halo2.Gadgets.Utilities.square lambda_2_cur)
+          (x_a_next ➕ x_r_cur ➕ x_a_cur));
+      (Some "y check", Constraint.Equal lhs rhs)
+    ];
+|}.
+
+Definition configure_instance_program
     (q_sinsemilla1 q_sinsemilla4 : Selector.t)
     (q_sinsemilla2 fixed_y_q : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
-    : ConstraintSystem.t columns :=
-  let meta :=
-    configure_generator_table
-      meta
+    : 𝓒 columns unit :=
+  do🞵
+    configure_generator_table_program
       q_sinsemilla1
       q_sinsemilla2
       x_a
@@ -91,48 +153,35 @@ Definition configure_instance
       bits
       lambda_1
       lambda_2 in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Initial y_Q";
-    Gate.constraints :=
-      let y_q := Expression.Fixed fixed_y_q Rotation.cur in
-      let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
-      Constraints.with_selector q_sinsemilla4 [
-        (Some "init_y_q_check",
-          Constraint.EqualZeroToPrecise (y_q ● 2 ➖ y_a_cur))
-      ];
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Sinsemilla gate";
-    Gate.constraints :=
-      let q_s3 := q_s3 q_sinsemilla2 in
-      let lambda_1_next := Expression.Advice lambda_1 Rotation.next in
-      let lambda_2_cur := Expression.Advice lambda_2 Rotation.cur in
-      let x_a_cur := Expression.Advice x_a Rotation.cur in
-      let x_a_next := Expression.Advice x_a Rotation.next in
-      let x_r_cur := x_r x_a x_p lambda_1 Rotation.cur in
-      let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
-      let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
-      let secant_line :=
-        Garden.Halo2.Gadgets.Utilities.square lambda_2_cur
-          ➖ (x_a_next ➕ x_r_cur ➕ x_a_cur) in
-      let lhs := lambda_2_cur ● 4 ✖️ (x_a_cur ➖ x_a_next) in
-      let rhs :=
-        (y_a_cur ● 2)
-          ➕ ((Expression.Constant 2 ➖ q_s3) ✖️ y_a_next)
-          ➕ ((q_s3 ● 2) ✖️ lambda_1_next) in
-      let y_check := lhs ➖ rhs in
-      Constraints.with_selector q_sinsemilla1 [
-        (Some "Secant line", Constraint.EqualZeroToPrecise secant_line);
-        (Some "y check", Constraint.EqualZeroToPrecise y_check)
-      ];
-  |} in
-  meta.
+  do🞵
+    𝓒.CreateGate
+      (initial_y_q_gate q_sinsemilla4 fixed_y_q x_a x_p lambda_1 lambda_2) in
+  do🞵
+    𝓒.CreateGate
+      (sinsemilla_gate q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2) in
+  return🞵 tt.
 
-Definition configure_1
+Definition configure_instance
     (meta : ConstraintSystem.t columns)
+    (q_sinsemilla1 q_sinsemilla4 : Selector.t)
+    (q_sinsemilla2 fixed_y_q : Fixed.t)
+    (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     : ConstraintSystem.t columns :=
-  configure_instance
-    meta
+  𝓒.run_unit
+    (configure_instance_program
+      q_sinsemilla1
+      q_sinsemilla4
+      q_sinsemilla2
+      fixed_y_q
+      x_a
+      x_p
+      bits
+      lambda_1
+      lambda_2)
+    meta.
+
+Definition configure_1_program : 𝓒 columns unit :=
+  configure_instance_program
     Selector.QSinsemilla1_1
     Selector.QSinsemilla4_1
     Fixed.QSinsemilla2_1
@@ -143,11 +192,13 @@ Definition configure_1
     Advice.A3
     Advice.A4.
 
-Definition configure_2
+Definition configure_1
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  configure_instance
-    meta
+  𝓒.run_unit configure_1_program meta.
+
+Definition configure_2_program : 𝓒 columns unit :=
+  configure_instance_program
     Selector.QSinsemilla1_2
     Selector.QSinsemilla4_2
     Fixed.QSinsemilla2_2
@@ -157,6 +208,11 @@ Definition configure_2
     Advice.A7
     Advice.A8
     Advice.A9.
+
+Definition configure_2
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit configure_2_program meta.
 
 Definition sinsemilla_s_x (index : Z) : Z :=
   Garden.Halo2.Gadgets.Sinsemilla.SConstants.x index.
@@ -169,7 +225,7 @@ Definition generator_table_indexes : list Z :=
 
 Definition load_generator_table
     : 𝓛 columns RegionId.t unit :=
-  ℒ.InitLookupTables "generator_table" [
+  𝓛.InitLookupTables "generator_table" [
     {|
       LookupTableColumn.lookup := Lookup.TableIdx;
       LookupTableColumn.annotation := "table_idx";
@@ -215,7 +271,7 @@ Fixpoint enable_selector_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      do🞵 ℛ.EnableSelector selector offset "" in
+      do🞵 𝓡.EnableSelector selector offset "" in
       enable_selector_rows selector (offset + 1) count
   end.
 
@@ -229,7 +285,7 @@ Fixpoint assign_q_s2_rows
   | O => return🞵 tt
   | S O =>
       do🞵
-        ℛ.AssignFixed
+        𝓡.AssignFixed
           (if final_piece
            then "q_s2 for final piece"
            else "q_s2 between pieces")
@@ -239,7 +295,7 @@ Fixpoint assign_q_s2_rows
       return🞵 tt
   | S count =>
       do🞵
-        ℛ.AssignFixed
+        𝓡.AssignFixed
           "q_s2 = 1"
           q_sinsemilla2
           offset
@@ -288,7 +344,7 @@ Definition synthesize_hash_piece
   do🞵 enable_selector_rows q_sinsemilla1 offset num_words in
   do🞵 assign_q_s2_rows q_sinsemilla2 offset num_words final_piece in
   let target := Cell.advice region bits offset in
-  do🞵 ℛ.Copy target piece in
+  do🞵 𝓡.Copy target piece in
   let z1 := Cell.advice region bits (offset + 1) in
   do🞵
     assign_intermediate_zs
@@ -307,9 +363,9 @@ Definition synthesize_hash_to_point_region
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
     : 𝓡 columns RegionId.t HashResult.t :=
-  do🞵 ℛ.EnableSelector q_sinsemilla4 0 "" in
+  do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
-    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+    𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
@@ -376,9 +432,9 @@ Definition synthesize_hash_to_point_commit_ivk_region
     (q_x q_y : Z)
     (a b c d : Cell.t columns RegionId.t)
     : 𝓡 columns RegionId.t HashResult.t :=
-  do🞵 ℛ.EnableSelector q_sinsemilla4 0 "" in
+  do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
-    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+    𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
@@ -459,7 +515,7 @@ Definition synthesize_hash_to_point_1
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t HashResult.t :=
-  ℒ.AddRegion region "hash_to_point" (fun region =>
+  𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_region
       region
       Selector.QSinsemilla1_1
@@ -482,7 +538,7 @@ Definition synthesize_hash_to_point_2
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t HashResult.t :=
-  ℒ.AddRegion region "hash_to_point" (fun region =>
+  𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_region
       region
       Selector.QSinsemilla1_2
@@ -505,7 +561,7 @@ Definition synthesize_hash_to_point_commit_ivk
     (q_x q_y : Z)
     (a b c d : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t HashResult.t :=
-  ℒ.AddRegion region "hash_to_point" (fun region =>
+  𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_commit_ivk_region
       region
       Selector.QSinsemilla1_1
@@ -532,9 +588,9 @@ Definition synthesize_hash_to_point_note_commit_region
     (q_x q_y : Z)
     (a b c d e f g h : Cell.t columns RegionId.t)
     : 𝓡 columns RegionId.t HashResult.t :=
-  do🞵 ℛ.EnableSelector q_sinsemilla4 0 "" in
+  do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
-    ℛ.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+    𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
@@ -605,7 +661,7 @@ Definition synthesize_hash_to_point_note_commit
     (q_x q_y : Z)
     (a b c d e f g h : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t HashResult.t :=
-  ℒ.AddRegion region "hash_to_point" (fun region =>
+  𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_note_commit_region
       region
       Selector.QSinsemilla1_1
@@ -633,7 +689,7 @@ Definition synthesize_hash_to_point_note_commit_2
     (q_x q_y : Z)
     (a b c d e f g h : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t HashResult.t :=
-  ℒ.AddRegion region "hash_to_point" (fun region =>
+  𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_note_commit_region
       region
       Selector.QSinsemilla1_2
@@ -660,14 +716,14 @@ Definition synthesize_instance
     (q_sinsemilla1 q_sinsemilla4 : Selector.t)
     : 𝓛 columns RegionId.t unit :=
   do🞵
-    ℒ.AddRegion
+    𝓛.AddRegion
       (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaGate)
       "Sinsemilla gate" (fun _ =>
-      ℛ.EnableSelector q_sinsemilla1 0 "") in
-  ℒ.AddRegion
+      𝓡.EnableSelector q_sinsemilla1 0 "") in
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaInitialY)
     "Initial y_Q" (fun _ =>
-    ℛ.EnableSelector q_sinsemilla4 0 "").
+    𝓡.EnableSelector q_sinsemilla4 0 "").
 
 Definition synthesize_1
     : 𝓛 columns RegionId.t unit :=

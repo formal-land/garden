@@ -65,6 +65,4 @@ Module AIR (F : PrimeField).
        *)
     eval : Z -> Prop;
   }.
-
-  
 End AIR.

@@ -185,74 +185,61 @@ Definition hash_at_l_name (layer : Z) : string :=
   | _ => "hash at l = ?"
   end.
 
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Orchard circuit checks";
-    Gate.constraints :=
-      let v_old := Expression.Advice Advice.A0 Rotation.cur in
-      let v_new := Expression.Advice Advice.A1 Rotation.cur in
-      let magnitude := Expression.Advice Advice.A2 Rotation.cur in
-      let sign := Expression.Advice Advice.A3 Rotation.cur in
-      let root := Expression.Advice Advice.A4 Rotation.cur in
-      let anchor := Expression.Advice Advice.A5 Rotation.cur in
-      let enable_spends := Expression.Advice Advice.A6 Rotation.cur in
-      let enable_outputs := Expression.Advice Advice.A7 Rotation.cur in
-      Constraints.with_selector Selector.QOrchard [
-        (Some "v_old - v_new = magnitude * sign",
-          Constraint.EqualZeroToPrecise
-            (v_old ➖ v_new ➖ (magnitude ✖️ sign)));
-        (Some "Either v_old = 0, or root = anchor",
-          Constraint.EqualZeroToPrecise (v_old ✖️ (root ➖ anchor)));
-        (Some "v_old = 0 or enable_spends = 1",
-          Constraint.EqualZeroToPrecise
-            (v_old ✖️ (Expression.Constant 1 ➖ enable_spends)));
-        (Some "v_new = 0 or enable_outputs = 1",
-          Constraint.EqualZeroToPrecise
-            (v_new ✖️ (Expression.Constant 1 ➖ enable_outputs)))
-      ];
-  |} in
-  let meta :=
-    Garden.Orchard.circuit.gadget.add_chip.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.LookupRangeCheck.configure
+Definition orchard_circuit_checks_gate : Gate.t columns := {|
+  Gate.name := "Orchard circuit checks";
+  Gate.constraints :=
+    let v_old := Expression.Advice Advice.A0 Rotation.cur in
+    let v_new := Expression.Advice Advice.A1 Rotation.cur in
+    let magnitude := Expression.Advice Advice.A2 Rotation.cur in
+    let sign := Expression.Advice Advice.A3 Rotation.cur in
+    let root := Expression.Advice Advice.A4 Rotation.cur in
+    let anchor := Expression.Advice Advice.A5 Rotation.cur in
+    let enable_spends := Expression.Advice Advice.A6 Rotation.cur in
+    let enable_outputs := Expression.Advice Advice.A7 Rotation.cur in
+    Constraints.with_selector Selector.QOrchard [
+      (Some "v_old - v_new = magnitude * sign",
+        Constraint.Equal (v_old ➖ v_new) (magnitude ✖️ sign));
+      (Some "Either v_old = 0, or root = anchor",
+        Constraint.Either
+          (Constraint.EqualZeroToPrecise v_old)
+          (Constraint.Equal root anchor));
+      (Some "v_old = 0 or enable_spends = 1",
+        Constraint.Either
+          (Constraint.EqualZeroToPrecise v_old)
+          (Constraint.Equal (Expression.Constant 1) enable_spends));
+      (Some "v_new = 0 or enable_outputs = 1",
+        Constraint.Either
+          (Constraint.EqualZeroToPrecise v_new)
+          (Constraint.Equal (Expression.Constant 1) enable_outputs))
+    ];
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate orchard_circuit_checks_gate in
+  do🞵 Garden.Orchard.circuit.gadget.add_chip.configure_program in
+  do🞵
+    Garden.Halo2.Gadgets.LookupRangeCheck.configure_program
       10
-      meta
       Selector.QLookup
       Selector.QRunning
       Selector.QBitshift
       Advice.A9
       Lookup.TableIdx in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Poseidon.Pow5.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2
-      meta in
-  let meta :=
-    Garden.Orchard.circuit.commit_ivk.configure
-      meta in
-  let meta :=
-    Garden.Orchard.circuit.note_commit.configure_old
-      meta in
-  let meta :=
-    Garden.Orchard.circuit.note_commit.configure_new
-      meta in
-  meta.
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Poseidon.Pow5.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1_program in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1_program in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2_program in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2_program in
+  do🞵 Garden.Orchard.circuit.commit_ivk.configure_program in
+  do🞵 Garden.Orchard.circuit.note_commit.configure_old_program in
+  do🞵 Garden.Orchard.circuit.note_commit.configure_new_program in
+  return🞵 tt.
+
+Definition configure
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize_range_check
     : 𝓛 columns RegionId.t unit :=
@@ -264,8 +251,8 @@ Definition assign_free_advice
     (column : Advice.t)
     (value : Z)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "load private" (fun region =>
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "load private" (fun region =>
       return🞵 (Cell.advice region column 0))).
 
 Definition witness_point_region
@@ -274,23 +261,23 @@ Definition witness_point_region
     : 𝓡 columns RegionId.t AssignedPoint.t :=
   let x := Cell.advice region Advice.A0 0 in
   let y := Cell.advice region Advice.A1 0 in
-  do🞵 ℛ.EnableSelector selector 0 "" in
+  do🞵 𝓡.EnableSelector selector 0 "" in
   return🞵 {| AssignedPoint.x := x; AssignedPoint.y := y |}.
 
 Definition witness_point
     (region : RegionId.t)
     (name : string)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "witness point" (fun region =>
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "witness point" (fun region =>
       witness_point_region region Selector.QWitnessPoint)).
 
 Definition witness_non_identity_point
     (region : RegionId.t)
     (name : string)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "witness non-identity point" (fun region =>
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "witness non-identity point" (fun region =>
       witness_point_region region Selector.QWitnessPointNonId)).
 
 Definition witness_message_piece
@@ -298,8 +285,8 @@ Definition witness_message_piece
     (name : string)
     (witness_pieces : Advice.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "witness message piece" (fun region =>
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "witness message piece" (fun region =>
       return🞵 (Cell.advice region witness_pieces 0))).
 
 Definition synthesize_witness_inputs
@@ -360,11 +347,11 @@ Definition synthesize_node_position_instance
     (a b a_swapped b_swapped swap : Advice.t)
     (leaf : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t AssignedPair.t :=
-  ℒ.InNamespace "node position" (
-    ℒ.AddRegion region "swap" (fun region =>
-      do🞵 ℛ.EnableSelector q_swap 0 "" in
+  𝓛.InNamespace "node position" (
+    𝓛.AddRegion region "swap" (fun region =>
+      do🞵 𝓡.EnableSelector q_swap 0 "" in
       let leaf_target := Cell.advice region a 0 in
-      do🞵 ℛ.Copy leaf_target leaf in
+      do🞵 𝓡.Copy leaf_target leaf in
       let left := Cell.advice region a_swapped 0 in
       let right := Cell.advice region b_swapped 0 in
       return🞵 {| AssignedPair.left := left; AssignedPair.right := right |})).
@@ -404,26 +391,26 @@ Definition synthesize_merkle_decomposition_instance
     (layer : Z)
     (a b c left right b1 b2 z1_a z1_b : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion region "Check piece decomposition" (fun region =>
-    do🞵 ℛ.EnableSelector q_decompose 0 "" in
+  𝓛.AddRegion region "Check piece decomposition" (fun region =>
+    do🞵 𝓡.EnableSelector q_decompose 0 "" in
     let a_target := Cell.advice region a_col 0 in
-    do🞵 ℛ.Copy a_target a in
+    do🞵 𝓡.Copy a_target a in
     let b_target := Cell.advice region b_col 0 in
-    do🞵 ℛ.Copy b_target b in
+    do🞵 𝓡.Copy b_target b in
     let c_target := Cell.advice region c_col 0 in
-    do🞵 ℛ.Copy c_target c in
+    do🞵 𝓡.Copy c_target c in
     let left_target := Cell.advice region left_col 0 in
-    do🞵 ℛ.Copy left_target left in
+    do🞵 𝓡.Copy left_target left in
     let right_target := Cell.advice region right_col 0 in
-    do🞵 ℛ.Copy right_target right in
+    do🞵 𝓡.Copy right_target right in
     let z1_a_target := Cell.advice region a_col 1 in
-    do🞵 ℛ.Copy z1_a_target z1_a in
+    do🞵 𝓡.Copy z1_a_target z1_a in
     let z1_b_target := Cell.advice region b_col 1 in
-    do🞵 ℛ.Copy z1_b_target z1_b in
+    do🞵 𝓡.Copy z1_b_target z1_b in
     let b1_target := Cell.advice region c_col 1 in
-    do🞵 ℛ.Copy b1_target b1 in
+    do🞵 𝓡.Copy b1_target b1 in
     let b2_target := Cell.advice region left_col 1 in
-    do🞵 ℛ.Copy b2_target b2 in
+    do🞵 𝓡.Copy b2_target b2 in
     return🞵 tt).
 
 Definition synthesize_merkle_decomposition_1
@@ -476,14 +463,14 @@ Definition synthesize_merkle_hash_layer_1
     (layer : Z)
     (pair : AssignedPair.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace (merkle_crh_name layer) (
+  𝓛.InNamespace (merkle_crh_name layer) (
     let🞵 a :=
       witness_message_piece
         (merkle_region layer RegionId.Merkle.Region.WitnessA)
         "Witness a = a_0 || a_1"
         Advice.A6 in
     let🞵 b1 :=
-      ℒ.InNamespace "b_1" (
+      𝓛.InNamespace "b_1" (
         Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB1)
           "Range check 5 bits"
@@ -491,7 +478,7 @@ Definition synthesize_merkle_hash_layer_1
           Selector.QBitshift
           Advice.A9) in
     let🞵 b2 :=
-      ℒ.InNamespace "b_2" (
+      𝓛.InNamespace "b_2" (
         Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB2)
           "Range check 5 bits"
@@ -509,7 +496,7 @@ Definition synthesize_merkle_hash_layer_1
         "Witness c"
         Advice.A6 in
     let🞵 hash :=
-      ℒ.InNamespace (hash_at_l_name layer) (
+      𝓛.InNamespace (hash_at_l_name layer) (
         Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_1
           (merkle_region layer RegionId.Merkle.Region.HashToPoint)
           merkle_q_x
@@ -535,14 +522,14 @@ Definition synthesize_merkle_hash_layer_2
     (layer : Z)
     (pair : AssignedPair.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace (merkle_crh_name layer) (
+  𝓛.InNamespace (merkle_crh_name layer) (
     let🞵 a :=
       witness_message_piece
         (merkle_region layer RegionId.Merkle.Region.WitnessA)
         "Witness a = a_0 || a_1"
         Advice.A7 in
     let🞵 b1 :=
-      ℒ.InNamespace "b_1" (
+      𝓛.InNamespace "b_1" (
         Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB1)
           "Range check 5 bits"
@@ -550,7 +537,7 @@ Definition synthesize_merkle_hash_layer_2
           Selector.QBitshift
           Advice.A9) in
     let🞵 b2 :=
-      ℒ.InNamespace "b_2" (
+      𝓛.InNamespace "b_2" (
         Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB2)
           "Range check 5 bits"
@@ -568,7 +555,7 @@ Definition synthesize_merkle_hash_layer_2
         "Witness c"
         Advice.A7 in
     let🞵 hash :=
-      ℒ.InNamespace (hash_at_l_name layer) (
+      𝓛.InNamespace (hash_at_l_name layer) (
         Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_2
           (merkle_region layer RegionId.Merkle.Region.HashToPoint)
           merkle_q_x
@@ -617,7 +604,7 @@ Fixpoint synthesize_merkle_layers
 Definition synthesize_merkle_path
     (leaf : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace "Merkle path" (
+  𝓛.InNamespace "Merkle path" (
     synthesize_merkle_layers 32%nat 0 leaf).
 
 Fixpoint enable_mul_fixed_running_sum_rows
@@ -628,7 +615,7 @@ Fixpoint enable_mul_fixed_running_sum_rows
   | O => return🞵 tt
   | S count =>
       do🞵
-        ℛ.EnableSelector Selector.QMulFixedRunningSum offset "" in
+        𝓡.EnableSelector Selector.QMulFixedRunningSum offset "" in
       enable_mul_fixed_running_sum_rows (offset + 1) count
   end.
 
@@ -643,7 +630,7 @@ Fixpoint assign_fixed_row
   | [] => return🞵 tt
   | (column, annotation, value) :: row =>
       do🞵
-        ℛ.AssignFixed annotation column offset value in
+        𝓡.AssignFixed annotation column offset value in
       assign_fixed_row offset row
   end.
 
@@ -656,7 +643,7 @@ Fixpoint assign_fixed_rows_with_selector
   | [] => return🞵 tt
   | row :: rows =>
       do🞵
-        ℛ.EnableSelector selector offset "" in
+        𝓡.EnableSelector selector offset "" in
       do🞵
         assign_fixed_row offset row in
       assign_fixed_rows_with_selector selector (offset + 1) rows
@@ -675,15 +662,15 @@ Definition assign_add_incomplete
     (offset : Z)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  do🞵 ℛ.EnableSelector Selector.QAddIncomplete offset "" in
+  do🞵 𝓡.EnableSelector Selector.QAddIncomplete offset "" in
   let x_p := Cell.advice region Advice.A0 offset in
-  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  do🞵 𝓡.Copy x_p p.(AssignedPoint.x) in
   let y_p := Cell.advice region Advice.A1 offset in
-  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  do🞵 𝓡.Copy y_p p.(AssignedPoint.y) in
   let x_q := Cell.advice region Advice.A2 offset in
-  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  do🞵 𝓡.Copy x_q q.(AssignedPoint.x) in
   let y_q := Cell.advice region Advice.A3 offset in
-  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  do🞵 𝓡.Copy y_q q.(AssignedPoint.y) in
   let x_r := Cell.advice region Advice.A2 (offset + 1) in
   let y_r := Cell.advice region Advice.A3 (offset + 1) in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
@@ -706,9 +693,9 @@ Definition synthesize_short_fixed_base_mul_incomplete_region
     (region : RegionId.t)
     (magnitude : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t ShortFixedResult.t :=
-  ℒ.AddRegion region "Short fixed-base mul (incomplete addition)" (fun region =>
+  𝓛.AddRegion region "Short fixed-base mul (incomplete addition)" (fun region =>
     let z_0 := Cell.advice region Advice.A4 0 in
-    do🞵 ℛ.Copy z_0 magnitude in
+    do🞵 𝓡.Copy z_0 magnitude in
     let last_window := Cell.advice region Advice.A4 21 in
     do🞵 enable_mul_fixed_running_sum_rows 0 22%nat in
     do🞵
@@ -729,15 +716,15 @@ Definition assign_complete_add
     (region : RegionId.t)
     (p q : AssignedPoint.t)
     : 𝓡 columns RegionId.t AssignedPoint.t :=
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 0 "" in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 0 "" in
   let x_p := Cell.advice region Advice.A0 0 in
-  do🞵 ℛ.Copy x_p p.(AssignedPoint.x) in
+  do🞵 𝓡.Copy x_p p.(AssignedPoint.x) in
   let y_p := Cell.advice region Advice.A1 0 in
-  do🞵 ℛ.Copy y_p p.(AssignedPoint.y) in
+  do🞵 𝓡.Copy y_p p.(AssignedPoint.y) in
   let x_q := Cell.advice region Advice.A2 0 in
-  do🞵 ℛ.Copy x_q q.(AssignedPoint.x) in
+  do🞵 𝓡.Copy x_q q.(AssignedPoint.x) in
   let y_q := Cell.advice region Advice.A3 0 in
-  do🞵 ℛ.Copy y_q q.(AssignedPoint.y) in
+  do🞵 𝓡.Copy y_q q.(AssignedPoint.y) in
   let x_r := Cell.advice region Advice.A2 1 in
   let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
@@ -747,13 +734,13 @@ Definition synthesize_short_fixed_base_mul_msb_region
     (sign last_window : Cell.t columns RegionId.t)
     (acc mul_b : AssignedPoint.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.AddRegion region "Short fixed-base mul (most significant word)" (fun region =>
+  𝓛.AddRegion region "Short fixed-base mul (most significant word)" (fun region =>
     let🞵 magnitude_mul := assign_complete_add region mul_b acc in
     let sign_target := Cell.advice region Advice.A4 1 in
-    do🞵 ℛ.Copy sign_target sign in
+    do🞵 𝓡.Copy sign_target sign in
     let last_window_target := Cell.advice region Advice.A5 1 in
-    do🞵 ℛ.Copy last_window_target last_window in
-    do🞵 ℛ.EnableSelector Selector.QMulFixedShort 1 "" in
+    do🞵 𝓡.Copy last_window_target last_window in
+    do🞵 𝓡.EnableSelector Selector.QMulFixedShort 1 "" in
     let y_var := Cell.advice region Advice.A1 1 in
     return🞵 {|
       AssignedPoint.x := magnitude_mul.(AssignedPoint.x);
@@ -782,7 +769,7 @@ Fixpoint assign_full_window_witnesses
   | O => return🞵 tt
   | S count =>
       do🞵
-        ℛ.EnableSelector Selector.QMulFixedFull offset "" in
+        𝓡.EnableSelector Selector.QMulFixedFull offset "" in
       assign_full_window_witnesses (offset + 1) count
   end.
 
@@ -790,7 +777,7 @@ Definition synthesize_full_fixed_base_mul_incomplete_region_with_rows
     (region : RegionId.t)
     (rows : list fixed_base_row)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
+  𝓛.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
     do🞵 assign_full_window_witnesses 0 85%nat in
     do🞵
       assign_fixed_rows_with_selector
@@ -809,7 +796,7 @@ Definition synthesize_full_fixed_base_mul_last_region
     (region : RegionId.t)
     (result : FullFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (fun region =>
+  𝓛.AddRegion region "Full-width fixed-base mul (last window, complete addition)" (fun region =>
     assign_complete_add
       region
       result.(FullFixedResult.mul_b)
@@ -840,18 +827,18 @@ Definition synthesize_complete_point_add
     (name : string)
     (p q : AssignedPoint.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "complete point addition" (fun region =>
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "complete point addition" (fun region =>
       assign_complete_add region p q)).
 
 Definition synthesize_base_field_fixed_base_mul_incomplete_region
     (region : RegionId.t)
     (scalar : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t BaseFieldFixedResult.t :=
-  ℒ.AddRegion region "Base-field elem fixed-base mul (incomplete addition)"
+  𝓛.AddRegion region "Base-field elem fixed-base mul (incomplete addition)"
     (fun region =>
       let alpha := Cell.advice region Advice.A4 0 in
-      do🞵 ℛ.Copy alpha scalar in
+      do🞵 𝓡.Copy alpha scalar in
       let z_43_alpha := Cell.advice region Advice.A4 43 in
       let z_44_alpha := Cell.advice region Advice.A4 44 in
       let z_84_alpha := Cell.advice region Advice.A4 84 in
@@ -877,7 +864,7 @@ Definition synthesize_base_field_fixed_base_mul_complete_region
     (region : RegionId.t)
     (result : BaseFieldFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.AddRegion region "Base-field elem fixed-base mul (complete addition)" (fun region =>
+  𝓛.AddRegion region "Base-field elem fixed-base mul (complete addition)" (fun region =>
     assign_complete_add
       region
       result.(BaseFieldFixedResult.mul_b)
@@ -890,16 +877,16 @@ Fixpoint enable_lookup_running_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      do🞵 ℛ.EnableSelector Selector.QLookup offset "" in
-      do🞵 ℛ.EnableSelector Selector.QRunning offset "" in
+      do🞵 𝓡.EnableSelector Selector.QLookup offset "" in
+      do🞵 𝓡.EnableSelector Selector.QRunning offset "" in
       enable_lookup_running_rows (offset + 1) count
   end.
 
 Definition synthesize_alpha_lookup
     (region : RegionId.t)
     : 𝓛 columns RegionId.t LookupResult.t :=
-  ℒ.InNamespace "Lookup range check alpha_0 + 2^130 - t_p" (
-    ℒ.AddRegion region "Witness element" (fun region =>
+  𝓛.InNamespace "Lookup range check alpha_0 + 2^130 - t_p" (
+    𝓛.AddRegion region "Witness element" (fun region =>
       let z_0 := Cell.advice region Advice.A9 0 in
       do🞵 enable_lookup_running_rows 0 13%nat in
       let z_13 := Cell.advice region Advice.A9 13 in
@@ -913,31 +900,31 @@ Definition synthesize_canonicity_checks
     (result : BaseFieldFixedResult.t)
     (lookup : LookupResult.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion region "Canonicity checks" (fun region =>
-    do🞵 ℛ.EnableSelector Selector.QMulFixedBaseField 1 "" in
+  𝓛.AddRegion region "Canonicity checks" (fun region =>
+    do🞵 𝓡.EnableSelector Selector.QMulFixedBaseField 1 "" in
     let alpha_target := Cell.advice region Advice.A6 0 in
     do🞵
-      ℛ.Copy alpha_target result.(BaseFieldFixedResult.alpha) in
+      𝓡.Copy alpha_target result.(BaseFieldFixedResult.alpha) in
     let z_84_alpha_target := Cell.advice region Advice.A8 0 in
     do🞵
-      ℛ.Copy z_84_alpha_target result.(BaseFieldFixedResult.z_84_alpha) in
+      𝓡.Copy z_84_alpha_target result.(BaseFieldFixedResult.z_84_alpha) in
     let alpha_0_prime_target := Cell.advice region Advice.A6 1 in
-    do🞵 ℛ.Copy alpha_0_prime_target lookup.(LookupResult.z_0) in
+    do🞵 𝓡.Copy alpha_0_prime_target lookup.(LookupResult.z_0) in
     let z_13_alpha_0_prime_target := Cell.advice region Advice.A6 2 in
     do🞵
-      ℛ.Copy z_13_alpha_0_prime_target lookup.(LookupResult.z_13) in
+      𝓡.Copy z_13_alpha_0_prime_target lookup.(LookupResult.z_13) in
     let z_44_alpha_target := Cell.advice region Advice.A7 2 in
     do🞵
-      ℛ.Copy z_44_alpha_target result.(BaseFieldFixedResult.z_44_alpha) in
+      𝓡.Copy z_44_alpha_target result.(BaseFieldFixedResult.z_44_alpha) in
     let z_43_alpha_target := Cell.advice region Advice.A8 2 in
     do🞵
-      ℛ.Copy z_43_alpha_target result.(BaseFieldFixedResult.z_43_alpha) in
+      𝓡.Copy z_43_alpha_target result.(BaseFieldFixedResult.z_43_alpha) in
     return🞵 tt).
 
 Definition synthesize_base_field_fixed_base_mul_nullifier_k
     (scalar : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.InNamespace "base-field elem fixed-base mul of NullifierK" (
+  𝓛.InNamespace "base-field elem fixed-base mul of NullifierK" (
     let🞵 result :=
       synthesize_base_field_fixed_base_mul_incomplete_region
         (nullifier_region RegionId.Nullifier.BaseFieldIncomplete)
@@ -958,14 +945,14 @@ Definition synthesize_base_field_fixed_base_mul_nullifier_k
 Definition synthesize_value_commit_orchard
     (magnitude sign : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
-  ℒ.InNamespace "cv_net = ValueCommit^Orchard_rcv(v_net)" (
+  𝓛.InNamespace "cv_net = ValueCommit^Orchard_rcv(v_net)" (
     let🞵 value_commit_v :=
-      ℒ.InNamespace "[v] ValueCommitV" (
-        ℒ.InNamespace "short fixed-base mul of ValueCommitV" (
+      𝓛.InNamespace "[v] ValueCommitV" (
+        𝓛.InNamespace "short fixed-base mul of ValueCommitV" (
           synthesize_short_fixed_base_mul magnitude sign)) in
     let🞵 blind :=
-      ℒ.InNamespace "[rcv] ValueCommitR" (
-        ℒ.InNamespace "fixed-base mul of ValueCommitR" (
+      𝓛.InNamespace "[rcv] ValueCommitR" (
+        𝓛.InNamespace "fixed-base mul of ValueCommitR" (
           synthesize_full_fixed_base_mul_value_commit_r)) in
     synthesize_complete_point_add
       (value_commitment_region RegionId.ValueCommitment.CompletePointAdd)
@@ -988,15 +975,15 @@ Definition synthesize_value_commitment
       Advice.A9
       0 in
   do🞵
-    ℒ.InNamespace "v_net" (return🞵 tt) in
+    𝓛.InNamespace "v_net" (return🞵 tt) in
   do🞵
-    ℒ.InNamespace "rcv" (return🞵 tt) in
+    𝓛.InNamespace "rcv" (return🞵 tt) in
   let🞵 cv_net :=
     synthesize_value_commit_orchard magnitude sign in
   do🞵
-    ℒ.ConstrainInstance cv_net.(AssignedPoint.x) Instance_.Primary CV_NET_X in
+    𝓛.ConstrainInstance cv_net.(AssignedPoint.x) Instance_.Primary CV_NET_X in
   do🞵
-    ℒ.ConstrainInstance cv_net.(AssignedPoint.y) Instance_.Primary CV_NET_Y in
+    𝓛.ConstrainInstance cv_net.(AssignedPoint.y) Instance_.Primary CV_NET_Y in
   return🞵 (magnitude, sign).
 
 Definition synthesize_scalar_add
@@ -1004,13 +991,13 @@ Definition synthesize_scalar_add
     (name : string)
     (a b : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace name (
-    ℒ.AddRegion region "c = a + b" (fun region =>
-      do🞵 ℛ.EnableSelector Selector.QAdd 0 "" in
+  𝓛.InNamespace name (
+    𝓛.AddRegion region "c = a + b" (fun region =>
+      do🞵 𝓡.EnableSelector Selector.QAdd 0 "" in
       let a_target := Cell.advice region Advice.A7 0 in
-      do🞵 ℛ.Copy a_target a in
+      do🞵 𝓡.Copy a_target a in
       let b_target := Cell.advice region Advice.A8 0 in
-      do🞵 ℛ.Copy b_target b in
+      do🞵 𝓡.Copy b_target b in
       return🞵 (Cell.advice region Advice.A6 0))).
 
 Definition synthesize_nullifier
@@ -1018,7 +1005,7 @@ Definition synthesize_nullifier
     (cm : AssignedPoint.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   let🞵 nf_old :=
-    ℒ.InNamespace "nf_old = DeriveNullifier_nk(rho_old, psi_old, cm_old)" (
+    𝓛.InNamespace "nf_old = DeriveNullifier_nk(rho_old, psi_old, cm_old)" (
       let🞵 poseidon_output :=
         Garden.Halo2.Gadgets.Poseidon.Pow5.synthesize_hash nk rho in
       let🞵 scalar :=
@@ -1028,7 +1015,7 @@ Definition synthesize_nullifier
           poseidon_output
           psi in
       let🞵 product :=
-        ℒ.InNamespace "[poseidon_output + psi] NullifierK" (
+        𝓛.InNamespace "[poseidon_output + psi] NullifierK" (
           synthesize_base_field_fixed_base_mul_nullifier_k scalar) in
       let🞵 nf :=
         synthesize_complete_point_add
@@ -1043,10 +1030,10 @@ Definition synthesize_spend_authority
     (ak_P : AssignedPoint.t)
     : 𝓛 columns RegionId.t unit :=
   do🞵
-    ℒ.InNamespace "alpha" (return🞵 tt) in
+    𝓛.InNamespace "alpha" (return🞵 tt) in
   let🞵 alpha_commitment :=
-    ℒ.InNamespace "[alpha] SpendAuthG" (
-      ℒ.InNamespace "fixed-base mul of SpendAuthG" (
+    𝓛.InNamespace "[alpha] SpendAuthG" (
+      𝓛.InNamespace "fixed-base mul of SpendAuthG" (
         synthesize_full_fixed_base_mul_spend_auth_g)) in
   let🞵 rk :=
     synthesize_complete_point_add
@@ -1055,9 +1042,9 @@ Definition synthesize_spend_authority
       alpha_commitment
       ak_P in
   do🞵
-    ℒ.ConstrainInstance rk.(AssignedPoint.x) Instance_.Primary RK_X in
+    𝓛.ConstrainInstance rk.(AssignedPoint.x) Instance_.Primary RK_X in
   do🞵
-    ℒ.ConstrainInstance rk.(AssignedPoint.y) Instance_.Primary RK_Y in
+    𝓛.ConstrainInstance rk.(AssignedPoint.y) Instance_.Primary RK_Y in
   return🞵 tt.
 
 Definition synthesize_address_integrity
@@ -1065,14 +1052,14 @@ Definition synthesize_address_integrity
     (g_d_old : AssignedPoint.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   do🞵
-    ℒ.InNamespace "rivk" (return🞵 tt) in
+    𝓛.InNamespace "rivk" (return🞵 tt) in
   let🞵 ivk :=
-    ℒ.InNamespace "CommitIvk" (
+    𝓛.InNamespace "CommitIvk" (
       Garden.Orchard.circuit.commit_ivk.synthesize ak nk) in
   do🞵
-    ℒ.InNamespace "ivk" (return🞵 tt) in
+    𝓛.InNamespace "ivk" (return🞵 tt) in
   let🞵 pk_d_calculated :=
-    ℒ.InNamespace "[ivk] g_d_old" (
+    𝓛.InNamespace "[ivk] g_d_old" (
       Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize
         (address_integrity_mul_region
           RegionId.AddressIntegrity.Mul.VariableBase)
@@ -1090,16 +1077,16 @@ Definition synthesize_address_integrity
       (address_integrity_region RegionId.AddressIntegrity.WitnessPkD)
       "witness pk_d_old" in
   do🞵
-    ℒ.InNamespace "pk_d_old equality" (
-      ℒ.AddRegion
+    𝓛.InNamespace "pk_d_old equality" (
+      𝓛.AddRegion
         (address_integrity_region RegionId.AddressIntegrity.Equality)
         "constrain equal" (fun _ =>
         do🞵
-          ℛ.Copy
+          𝓡.Copy
             pk_d_calculated.(Garden.Halo2.Gadgets.Ecc.chip.mul.MulResult.x)
             pk_d_old.(AssignedPoint.x) in
         do🞵
-          ℛ.Copy
+          𝓡.Copy
             pk_d_calculated.(Garden.Halo2.Gadgets.Ecc.chip.mul.MulResult.y)
             pk_d_old.(AssignedPoint.y) in
         return🞵 tt)) in
@@ -1111,9 +1098,9 @@ Definition synthesize_note_commit_old
     (cm_old : AssignedPoint.t)
     : 𝓛 columns RegionId.t unit :=
   do🞵
-    ℒ.InNamespace "rcm_old" (return🞵 tt) in
+    𝓛.InNamespace "rcm_old" (return🞵 tt) in
   let🞵 cm :=
-    ℒ.InNamespace
+    𝓛.InNamespace
       "g★_d || pk★_d || i2lebsp_{64}(v) || i2lebsp_{255}(rho) || i2lebsp_{255}(psi)"
       (Garden.Orchard.circuit.note_commit.synthesize_old
         g_d_old.(AssignedPoint.x)
@@ -1123,14 +1110,14 @@ Definition synthesize_note_commit_old
         v_old
         rho_old
         psi_old) in
-  ℒ.InNamespace "cm_old equality" (
-    ℒ.AddRegion RegionId.NoteCommitOldEquality "constrain equal" (fun _ =>
+  𝓛.InNamespace "cm_old equality" (
+    𝓛.AddRegion RegionId.NoteCommitOldEquality "constrain equal" (fun _ =>
       do🞵
-        ℛ.Copy
+        𝓡.Copy
           cm.(Garden.Orchard.circuit.note_commit.AssignedPoint.x)
           cm_old.(AssignedPoint.x) in
       do🞵
-        ℛ.Copy
+        𝓡.Copy
           cm.(Garden.Orchard.circuit.note_commit.AssignedPoint.y)
           cm_old.(AssignedPoint.y) in
       return🞵 tt)).
@@ -1153,9 +1140,9 @@ Definition synthesize_note_commit_new
       Advice.A0
       0 in
   do🞵
-    ℒ.InNamespace "rcm_new" (return🞵 tt) in
+    𝓛.InNamespace "rcm_new" (return🞵 tt) in
   let🞵 cm_new :=
-    ℒ.InNamespace
+    𝓛.InNamespace
       "g★_d || pk★_d || i2lebsp_{64}(v) || i2lebsp_{255}(rho) || i2lebsp_{255}(psi)"
       (Garden.Orchard.circuit.note_commit.synthesize_new
         g_d_new_star.(AssignedPoint.x)
@@ -1166,7 +1153,7 @@ Definition synthesize_note_commit_new
         rho_new
         psi_new) in
   do🞵
-    ℒ.ConstrainInstance
+    𝓛.ConstrainInstance
       cm_new.(Garden.Orchard.circuit.note_commit.AssignedPoint.x)
       Instance_.Primary
       CMX in
@@ -1175,29 +1162,29 @@ Definition synthesize_note_commit_new
 Definition synthesize_orchard_gate
     (v_old v_new magnitude sign root : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion RegionId.OrchardCircuitChecks "Orchard circuit checks" (fun region =>
+  𝓛.AddRegion RegionId.OrchardCircuitChecks "Orchard circuit checks" (fun region =>
     let v_old_target := Cell.advice region Advice.A0 0 in
-    do🞵 ℛ.Copy v_old_target v_old in
+    do🞵 𝓡.Copy v_old_target v_old in
     let v_new_target := Cell.advice region Advice.A1 0 in
-    do🞵 ℛ.Copy v_new_target v_new in
+    do🞵 𝓡.Copy v_new_target v_new in
     let magnitude_target := Cell.advice region Advice.A2 0 in
-    do🞵 ℛ.Copy magnitude_target magnitude in
+    do🞵 𝓡.Copy magnitude_target magnitude in
     let sign_target := Cell.advice region Advice.A3 0 in
-    do🞵 ℛ.Copy sign_target sign in
+    do🞵 𝓡.Copy sign_target sign in
     let root_target := Cell.advice region Advice.A4 0 in
-    do🞵 ℛ.Copy root_target root in
+    do🞵 𝓡.Copy root_target root in
     let anchor_target := Cell.advice region Advice.A5 0 in
     let anchor_instance := Cell.instance region Instance_.Primary ANCHOR in
-    do🞵 ℛ.Copy anchor_target anchor_instance in
+    do🞵 𝓡.Copy anchor_target anchor_instance in
     let enable_spends_target := Cell.advice region Advice.A6 0 in
     let enable_spends_instance :=
       Cell.instance region Instance_.Primary ENABLE_SPEND in
-    do🞵 ℛ.Copy enable_spends_target enable_spends_instance in
+    do🞵 𝓡.Copy enable_spends_target enable_spends_instance in
     let enable_outputs_target := Cell.advice region Advice.A7 0 in
     let enable_outputs_instance :=
       Cell.instance region Instance_.Primary ENABLE_OUTPUT in
-    do🞵 ℛ.Copy enable_outputs_target enable_outputs_instance in
-    ℛ.EnableSelector Selector.QOrchard 0 "").
+    do🞵 𝓡.Copy enable_outputs_target enable_outputs_instance in
+    𝓡.EnableSelector Selector.QOrchard 0 "").
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
@@ -1207,7 +1194,7 @@ Definition synthesize
   let🞵 root := synthesize_merkle_path cm_old.(AssignedPoint.x) in
   let🞵 '(magnitude, sign) := synthesize_value_commitment in
   let🞵 rho_new := synthesize_nullifier rho_old psi_old nk cm_old in
-  do🞵 ℒ.ConstrainInstance rho_new Instance_.Primary NF_OLD in
+  do🞵 𝓛.ConstrainInstance rho_new Instance_.Primary NF_OLD in
   do🞵 synthesize_spend_authority ak_P in
   let🞵 pk_d_old := synthesize_address_integrity ak_P.(AssignedPoint.x) nk g_d_old in
   do🞵

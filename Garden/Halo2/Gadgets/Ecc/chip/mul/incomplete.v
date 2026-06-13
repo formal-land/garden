@@ -41,7 +41,6 @@ Definition for_loop
   let lambda2_cur := Expression.Advice lambda_2 Rotation.cur in
   let y_a_cur := y_a x_a x_p lambda_1 lambda_2 Rotation.cur in
   let k := z_cur ➖ (z_prev ● 2) in
-  let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check k in
   let gradient_1 :=
     lambda1_cur ✖️ (x_a_cur ➖ x_p_cur)
       ➖ y_a_cur
@@ -54,67 +53,99 @@ Definition for_loop
   let gradient_2 :=
     lambda2_cur ✖️ (x_a_cur ➖ x_a_next) ➖ y_a_cur ➖ y_a_next in
   [
-    (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
+    (Some "bool_check", Constraint.Boolean k);
     (Some "gradient_1", Constraint.EqualZeroToPrecise gradient_1);
     (Some "secant_line", Constraint.EqualZeroToPrecise secant_line);
     (Some "gradient_2", Constraint.EqualZeroToPrecise gradient_2)
   ].
+
+Definition q_mul_1_checks_gate
+    (q_mul_1 : Selector.t)
+    (x_a x_p lambda_1 lambda_2 : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "q_mul_1 == 1 checks";
+  Gate.constraints :=
+    let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
+    let y_a_witnessed := Expression.Advice lambda_1 Rotation.cur in
+    Constraints.with_selector q_mul_1 [
+      (Some "init y_a",
+        Constraint.Equal y_a_witnessed y_a_next)
+    ];
+|}.
+
+Definition q_mul_2_checks_gate
+    (q_mul_2 : Selector.t)
+    (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "q_mul_2 == 1 checks";
+  Gate.constraints :=
+    let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
+    let x_p_cur := Expression.Advice x_p Rotation.cur in
+    let x_p_next := Expression.Advice x_p Rotation.next in
+    let y_p_cur := Expression.Advice y_p Rotation.cur in
+    let y_p_next := Expression.Advice y_p Rotation.next in
+    let x_p_check := x_p_cur ➖ x_p_next in
+    let y_p_check := y_p_cur ➖ y_p_next in
+    Constraints.with_selector q_mul_2 (
+      [
+        (Some "x_p_check", Constraint.Equal x_p_cur x_p_next);
+        (Some "y_p_check", Constraint.Equal y_p_cur y_p_next)
+      ]
+      ++ for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_next);
+|}.
+
+Definition q_mul_3_checks_gate
+    (q_mul_3 : Selector.t)
+    (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+    : Gate.t columns := {|
+  Gate.name := "q_mul_3 == 1 checks";
+  Gate.constraints :=
+    let y_a_final := Expression.Advice lambda_1 Rotation.next in
+    Constraints.with_selector q_mul_3
+      (for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_final);
+|}.
+
+Definition configure_program
+    (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
+    (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+    : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate (q_mul_1_checks_gate q_mul_1 x_a x_p lambda_1 lambda_2) in
+  do🞵 𝓒.CreateGate (q_mul_2_checks_gate q_mul_2 z x_a x_p y_p lambda_1 lambda_2) in
+  do🞵 𝓒.CreateGate (q_mul_3_checks_gate q_mul_3 z x_a x_p y_p lambda_1 lambda_2) in
+  return🞵 tt.
 
 Definition configure
     (meta : ConstraintSystem.t columns)
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
     (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "q_mul_1 == 1 checks";
-    Gate.constraints :=
-      let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
-      let y_a_witnessed := Expression.Advice lambda_1 Rotation.cur in
-      Constraints.with_selector q_mul_1 [
-        (Some "init y_a",
-          Constraint.EqualZeroToPrecise (y_a_witnessed ➖ y_a_next))
-      ];
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "q_mul_2 == 1 checks";
-    Gate.constraints :=
-      let y_a_next := y_a x_a x_p lambda_1 lambda_2 Rotation.next in
-      let x_p_cur := Expression.Advice x_p Rotation.cur in
-      let x_p_next := Expression.Advice x_p Rotation.next in
-      let y_p_cur := Expression.Advice y_p Rotation.cur in
-      let y_p_next := Expression.Advice y_p Rotation.next in
-      let x_p_check := x_p_cur ➖ x_p_next in
-      let y_p_check := y_p_cur ➖ y_p_next in
-      Constraints.with_selector q_mul_2 (
-        [
-          (Some "x_p_check", Constraint.EqualZeroToPrecise x_p_check);
-          (Some "y_p_check", Constraint.EqualZeroToPrecise y_p_check)
-        ]
-        ++ for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_next);
-  |} in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "q_mul_3 == 1 checks";
-    Gate.constraints :=
-      let y_a_final := Expression.Advice lambda_1 Rotation.next in
-      Constraints.with_selector q_mul_3
-        (for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_final);
-  |} in
-  meta.
+  𝓒.run_unit
+    (configure_program
+      q_mul_1
+      q_mul_2
+      q_mul_3
+      z
+      x_a
+      x_p
+      y_p
+      lambda_1
+      lambda_2)
+    meta.
 
 Definition synthesize
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
     : 𝓛 columns RegionId.t unit :=
   do🞵
-    ℒ.AddRegion
+    𝓛.AddRegion
       (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1)
       "q_mul_1 == 1 checks" (fun _ =>
-      ℛ.EnableSelector q_mul_1 0 "") in
+      𝓡.EnableSelector q_mul_1 0 "") in
   do🞵
-    ℒ.AddRegion
+    𝓛.AddRegion
       (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2)
       "q_mul_2 == 1 checks" (fun _ =>
-      ℛ.EnableSelector q_mul_2 0 "") in
-  ℒ.AddRegion
+      𝓡.EnableSelector q_mul_2 0 "") in
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3)
     "q_mul_3 == 1 checks" (fun _ =>
-    ℛ.EnableSelector q_mul_3 0 "").
+    𝓡.EnableSelector q_mul_3 0 "").

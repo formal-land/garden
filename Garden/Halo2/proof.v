@@ -35,7 +35,7 @@ Definition rotated_row
     (row nb_rows : Z)
     (rotation : Rotation.t)
     : Z :=
-  (row + rotation.(Rotation.offset)) mod nb_rows.
+  row + rotation.(Rotation.offset).
 
 Section Semantics.
   Context {columns : Columns.t}.
@@ -107,6 +107,13 @@ Section Semantics.
     | Constraint.Equal lhs rhs =>
         eval_expression assignment row nb_rows lhs =
           eval_expression assignment row nb_rows rhs
+    | Constraint.Boolean expression =>
+        IsBool.t (eval_expression assignment row nb_rows expression)
+    | Constraint.Range expression range =>
+        0 <= eval_expression assignment row nb_rows expression < Z.of_nat range
+    | Constraint.Either lhs rhs =>
+        eval_constraint assignment row nb_rows lhs \/
+          eval_constraint assignment row nb_rows rhs
     | Constraint.EqualZeroToPrecise expression =>
         eval_expression assignment row nb_rows expression = 0
     end.
@@ -245,5 +252,4 @@ Section Semantics.
         ρ.(Evaluation.nb_rows)
         gates;
   }.
-
 End Semantics.

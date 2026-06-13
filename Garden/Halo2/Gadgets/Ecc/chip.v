@@ -9,34 +9,22 @@ Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.
 Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.
 Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.
 
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.witness_point.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.configure_program in
+  do🞵
+    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.configure_program in
+  return🞵 tt.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.witness_point.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.add.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.configure
-      meta in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
@@ -44,7 +32,7 @@ Definition synthesize
   do🞵 Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.synthesize in
   do🞵 Garden.Halo2.Gadgets.Ecc.chip.add.synthesize in
   let🞵 '(base_x, base_y) :=
-    ℒ.AddRegion
+    𝓛.AddRegion
       (RegionId.GadgetLocal RegionId.GadgetLocal.EccChipDummyBase)
       "variable-base scalar mul dummy base" (fun region =>
       let x := Cell.advice region Advice.A0 0 in

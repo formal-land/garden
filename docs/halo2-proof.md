@@ -50,7 +50,7 @@ Require Import Garden.Plonky3.M.
 
 This evaluator is currently for configured expressions, constraints, gates, and
 constraint systems. The high-level synthesis DSL is now a pair of free-monad
-syntax trees, `ℛ` for region programs and `ℒ` for layouter programs.
+syntax trees, `𝓡` for region programs and `𝓛` for layouter programs.
 `Garden/Halo2/serialize.v` currently gives the executable raw-JSON
 interpretation; the future Prop semantics should interpret the same syntax.
 The proof semantics do not yet define obligations connecting synthesized
@@ -89,12 +89,15 @@ Use the notation:
 ```
 
 Selectors are evaluated at `row mod nb_rows`. Rotated fixed/advice/instance
-queries use:
+queries do not wrap around; they use:
 
 ```coq
 rotated_row row nb_rows rotation =
-  (row + rotation.(Rotation.offset)) mod nb_rows
+  row + rotation.(Rotation.offset)
 ```
+
+Proofs that need predecessor or successor rows should carry the corresponding
+row-bound hypotheses explicitly instead of relying on hidden modulo wrapping.
 
 Expression evaluation returns `Z` reduced modulo the active prime through
 `UnOp.from`, `+F`, `-F`, and `*F`.
@@ -106,6 +109,9 @@ The semantic constraint constructors are:
 ```coq
 Constraint.Select selector constraint
 Constraint.Equal lhs rhs
+Constraint.Boolean expression
+Constraint.Range expression range
+Constraint.Either left right
 Constraint.EqualZeroToPrecise expression
 ```
 
@@ -125,12 +131,30 @@ Constraint.Equal lhs rhs
 means: the two evaluated expressions are equal.
 
 ```coq
+Constraint.Boolean expression
+```
+
+means: the evaluated expression is boolean.
+
+```coq
+Constraint.Range expression range
+```
+
+means: the evaluated expression is in `[0, range)`.
+
+```coq
+Constraint.Either left right
+```
+
+means: either nested constraint holds. This is used for product-zero-style
+constraints after they have been given a proof-facing disjunctive shape.
+
+```coq
 Constraint.EqualZeroToPrecise expression
 ```
 
-means: the evaluated expression is zero. This is still a coarse constructor;
-future passes can replace uses with more semantic constructors when the proof
-needs the stronger shape.
+means: the evaluated expression is zero. This remains as a fallback for
+constraints that have not yet been refined into one of the semantic forms above.
 
 `eval_constraints` and `eval_gates` are `Fixpoint`s that build `/\` directly,
 with a special one-element list case. This is intentional: after `cbn in *`, a
@@ -139,6 +163,31 @@ gate with three constraints should become a three-way conjunction rather than a
 
 Record field projections use clear implicits where possible so expressions such
 as `gate.(Gate.constraints)` do not need explicit column parameters.
+
+## Gate Operation Functions
+
+Configure files should expose named `Gate.t` definitions for each gate created
+by `configure_program`. Proof-facing operation functions belong in sibling
+`*_proof.v` files, following `Pow5_proof.v`.
+
+Use executable `Z` functions and records for gates that compute or reconstruct
+target cells. If a gate is only a range, boolean, canonicity, on-curve, or
+branch-conditional check, keep the named gate but do not invent an output
+function. Shared Z-level helpers for proof-side gate operations live in:
+
+```text
+Garden/Halo2/Gadgets/Utilities_proof.v
+```
+
+For reconstruction constraints, mirror the syntactic target:
+
+```text
+target - expression = 0
+expression - target = 0
+```
+
+becomes an `output` field `target := expression`, using field operations such
+as `+F`, `-F`, `*F`, and `UnOp.from`.
 
 ## Determinism Statements
 

@@ -156,7 +156,6 @@ Module FullRound.
       cbn in *.
     hauto lq: on.
   Qed.
-
 End FullRound.
 
 Module PartialRound.
@@ -187,7 +186,6 @@ Module PartialRound.
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ).
   Admitted.
-
 End PartialRound.
 
 Module PadAndAdd.

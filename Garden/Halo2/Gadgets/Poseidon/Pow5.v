@@ -110,13 +110,16 @@ Definition pad_and_add_gate : Gate.t columns := {|
       ];
   |}.
 
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate full_round_gate in
+  do🞵 𝓒.CreateGate partial_rounds_gate in
+  do🞵 𝓒.CreateGate pad_and_add_gate in
+  return🞵 tt.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta full_round_gate in
-  let meta := ConstraintSystem.create_gate meta partial_rounds_gate in
-  let meta := ConstraintSystem.create_gate meta pad_and_add_gate in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition state_at
     (region : RegionId.t)
@@ -137,14 +140,14 @@ Definition copy_state_to
     (state : State.t)
     : 𝓡 columns RegionId.t unit :=
   let target := state_at region offset in
-  do🞵 ℛ.Copy target.(State.state_0) state.(State.state_0) in
-  do🞵 ℛ.Copy target.(State.state_1) state.(State.state_1) in
-  ℛ.Copy target.(State.state_2) state.(State.state_2).
+  do🞵 𝓡.Copy target.(State.state_0) state.(State.state_0) in
+  do🞵 𝓡.Copy target.(State.state_1) state.(State.state_1) in
+  𝓡.Copy target.(State.state_2) state.(State.state_2).
 
 Definition synthesize_initial_state
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.InNamespace "Poseidon init" (
-    ℒ.AddRegion
+  𝓛.InNamespace "Poseidon init" (
+    𝓛.AddRegion
       (RegionId.Poseidon RegionId.Poseidon.InitialState)
       "initial state for domain ConstantLength<2>"
       (fun region => return🞵 (state_at region 0))).
@@ -160,7 +163,7 @@ Fixpoint assign_round_constant_entries
   | [] => return🞵 tt
   | (column, annotation, value) :: entries =>
       do🞵
-        ℛ.AssignFixed annotation column offset value in
+        𝓡.AssignFixed annotation column offset value in
       assign_round_constant_entries offset entries
   end.
 
@@ -171,7 +174,7 @@ Definition assign_round_constant_row
         .round_constant_row)
     : 𝓡 columns RegionId.t unit :=
   let '(selector, entries) := row in
-  do🞵 ℛ.EnableSelector selector offset "" in
+  do🞵 𝓡.EnableSelector selector offset "" in
   assign_round_constant_entries offset entries.
 
 Fixpoint assign_permutation_rows
@@ -193,16 +196,16 @@ Definition synthesize_add_input_region
     (state : State.t)
     (input_0 input_1 : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.Poseidon RegionId.Poseidon.AddInput)
     "add input for domain ConstantLength<2>" (fun region =>
-    do🞵 ℛ.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
+    do🞵 𝓡.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
     do🞵 copy_state_to region 0 state in
     let state_0 := Cell.advice region Advice.A6 1 in
     let state_1 := Cell.advice region Advice.A7 1 in
     let state_2 := Cell.advice region Advice.A8 1 in
-    do🞵 ℛ.Copy input_0 state_0 in
-    do🞵 ℛ.Copy input_1 state_1 in
+    do🞵 𝓡.Copy input_0 state_0 in
+    do🞵 𝓡.Copy input_1 state_1 in
     let state_0 := Cell.advice region Advice.A6 2 in
     let state_1 := Cell.advice region Advice.A7 2 in
     let state_2 := Cell.advice region Advice.A8 2 in
@@ -215,7 +218,7 @@ Definition synthesize_add_input_region
 Definition synthesize_permute_state
     (state : State.t)
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.Poseidon RegionId.Poseidon.PermuteState)
     "permute state" (fun region =>
     do🞵 copy_state_to region 0 state in
@@ -229,7 +232,7 @@ Definition synthesize_sponge
     (state : State.t)
     (input_0 input_1 : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t State.t :=
-  ℒ.InNamespace "PoseidonSponge" (
+  𝓛.InNamespace "PoseidonSponge" (
     let🞵 state := synthesize_add_input_region state input_0 input_1 in
     synthesize_permute_state state).
 
@@ -237,33 +240,33 @@ Definition synthesize_hash
     (input_0 input_1 : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   let🞵 state := synthesize_initial_state in
-  ℒ.InNamespace "Poseidon hash (nk, rho)" (
-    do🞵 ℒ.InNamespace "absorb_0" (return🞵 tt) in
-    do🞵 ℒ.InNamespace "absorb_1" (return🞵 tt) in
+  𝓛.InNamespace "Poseidon hash (nk, rho)" (
+    do🞵 𝓛.InNamespace "absorb_0" (return🞵 tt) in
+    do🞵 𝓛.InNamespace "absorb_1" (return🞵 tt) in
     let🞵 state :=
-      ℒ.InNamespace "finish absorbing" (
+      𝓛.InNamespace "finish absorbing" (
         synthesize_sponge state input_0 input_1) in
-    do🞵 ℒ.InNamespace "squeeze" (return🞵 tt) in
+    do🞵 𝓛.InNamespace "squeeze" (return🞵 tt) in
     return🞵 state.(State.state_0)).
 
 Definition synthesize_full_round
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion (RegionId.Poseidon RegionId.Poseidon.FullRound) "full round" (fun _ =>
-    ℛ.EnableSelector Selector.QPoseidonFull 0 "").
+  𝓛.AddRegion (RegionId.Poseidon RegionId.Poseidon.FullRound) "full round" (fun _ =>
+    𝓡.EnableSelector Selector.QPoseidonFull 0 "").
 
 Definition synthesize_partial_rounds
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.Poseidon RegionId.Poseidon.PartialRounds)
     "partial rounds" (fun _ =>
-    ℛ.EnableSelector Selector.QPoseidonPartial 0 "").
+    𝓡.EnableSelector Selector.QPoseidonPartial 0 "").
 
 Definition synthesize_pad_and_add
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.Poseidon RegionId.Poseidon.PadAndAdd)
     "pad-and-add" (fun _ =>
-    ℛ.EnableSelector Selector.QPoseidonPadAndAdd 0 "").
+    𝓡.EnableSelector Selector.QPoseidonPadAndAdd 0 "").
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=

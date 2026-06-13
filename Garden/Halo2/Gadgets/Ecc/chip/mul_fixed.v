@@ -48,38 +48,45 @@ Definition coords_check
       ➖ Garden.Halo2.Gadgets.Utilities.square x_p ✖️ x_p
       ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.pallas_b in
   [
-    (Some "check x", Constraint.EqualZeroToPrecise x_check);
-    (Some "check y", Constraint.EqualZeroToPrecise y_check);
+    (Some "check x", Constraint.Equal (interpolated_x window) x_p);
+    (Some "check y",
+      Constraint.Equal
+        (Garden.Halo2.Gadgets.Utilities.square u ➖ y_p)
+        z);
     (Some "on-curve", Constraint.EqualZeroToPrecise on_curve)
   ].
+
+Definition running_sum_coordinates_check_gate : Gate.t columns := {|
+  Gate.name := "Running sum coordinates check";
+  Gate.constraints :=
+    let z_cur := Expression.Advice Advice.A4 Rotation.cur in
+    let z_next := Expression.Advice Advice.A4 Rotation.next in
+    let word :=
+      z_cur ➖
+        (z_next ● Garden.Halo2.Gadgets.Ecc.chip.constants.h) in
+    Constraints.with_selector
+      Selector.QMulFixedRunningSum
+      (coords_check word);
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵
+    Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.configure_program
+      Garden.Halo2.Gadgets.Ecc.chip.constants.fixed_base_window_size
+      Selector.QMulFixedRunningSum
+      Advice.A4 in
+  do🞵 𝓒.CreateGate running_sum_coordinates_check_gate in
+  return🞵 tt.
 
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta :=
-    Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.configure
-      Garden.Halo2.Gadgets.Ecc.chip.constants.fixed_base_window_size
-      meta
-      Selector.QMulFixedRunningSum
-      Advice.A4 in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Running sum coordinates check";
-    Gate.constraints :=
-      let z_cur := Expression.Advice Advice.A4 Rotation.cur in
-      let z_next := Expression.Advice Advice.A4 Rotation.next in
-      let word :=
-        z_cur ➖
-          (z_next ● Garden.Halo2.Gadgets.Ecc.chip.constants.h) in
-      Constraints.with_selector
-        Selector.QMulFixedRunningSum
-        (coords_check word);
-  |} in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
   do🞵 Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.synthesize in
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed)
     "Running sum coordinates check" (fun _ =>
-    ℛ.EnableSelector Selector.QMulFixedRunningSum 0 "").
+    𝓡.EnableSelector Selector.QMulFixedRunningSum 0 "").

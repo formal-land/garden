@@ -72,7 +72,7 @@ Module LookupTableColumn.
   Arguments default_value {_} _.
 End LookupTableColumn.
 
-Module ℛ.
+Module 𝓡.
   (** Free syntax tree for computations inside a Halo2 region.  The
       serializer interprets this syntax into raw assignment/copy events;
       later proofs can interpret the same syntax into a relational
@@ -98,48 +98,17 @@ Module ℛ.
   Arguments EnableSelector {_ _}.
   Arguments AssignFixed {_ _}.
   Arguments Copy {_ _}.
-End ℛ.
+End 𝓡.
 
-Definition 𝓡 := ℛ.t.
-
-Module Monad.
-  Class C (M : Set -> Set) : Set := {
-    ret : forall {A : Set}, A -> M A;
-    bind : forall {A B : Set}, M A -> (A -> M B) -> M B;
-  }.
-End Monad.
-
-Arguments Monad.ret {M} {_} {A} _.
-Arguments Monad.bind {M} {_} {A B} _ _.
+Definition 𝓡 := 𝓡.t.
 
 Global Instance RegionIsMonad {columns : Columns.t} {RegionId : Set}
-    : Monad.C (ℛ.t columns RegionId) := {|
-  Monad.ret := @ℛ.Ret columns RegionId;
-  Monad.bind := @ℛ.Bind columns RegionId;
+    : Monad.C (𝓡.t columns RegionId) := {|
+  Monad.ret := @𝓡.Ret columns RegionId;
+  Monad.bind := @𝓡.Bind columns RegionId;
 |}.
 
-Notation "'return🞵' x" :=
-  (Monad.ret x)
-  (at level 100).
-
-Notation "'let🞵' x ':=' a 'in' b" :=
-  (Monad.bind a (fun x => b))
-  (at level 200, x name, a at level 100, b at level 200).
-
-Notation "'let🞵' ' x ':=' a 'in' b" :=
-  (Monad.bind a (fun x => b))
-  (at level 200, x pattern, a at level 100, b at level 200).
-
-Definition monad_do {M : Set -> Set} `{Monad.C M} {B : Set}
-    (a : M unit)
-    (b : M B) : M B :=
-  Monad.bind a (fun _ => b).
-
-Notation "'do🞵' a 'in' b" :=
-  (Monad.bind a (fun _ : unit => b))
-  (at level 200, a at level 100, b at level 200).
-
-Module ℒ.
+Module 𝓛.
   (** Free syntax tree for layouter-level computations.  These programs
       create named regions and namespaces, while the region body itself is
       represented by [𝓡]. *)
@@ -168,12 +137,12 @@ Module ℒ.
   Arguments ConstrainInstance {_ _}.
   Arguments InitLookupTables {_ _}.
   Arguments InNamespace {_ _ _}.
-End ℒ.
+End 𝓛.
 
-Definition 𝓛 := ℒ.t.
+Definition 𝓛 := 𝓛.t.
 
 Global Instance LayouterIsMonad {columns : Columns.t} {RegionId : Set}
-    : Monad.C (ℒ.t columns RegionId) := {|
-  Monad.ret := @ℒ.Ret columns RegionId;
-  Monad.bind := @ℒ.Bind columns RegionId;
+    : Monad.C (𝓛.t columns RegionId) := {|
+  Monad.ret := @𝓛.Ret columns RegionId;
+  Monad.bind := @𝓛.Bind columns RegionId;
 |}.

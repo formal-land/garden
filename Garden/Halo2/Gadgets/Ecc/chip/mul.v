@@ -9,12 +9,38 @@ Import ListNotations.
 Global Open Scope pstring_scope.
 Global Open Scope Z_scope.
 
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure
-      meta
+Definition lsb_check_gate : Gate.t columns := {|
+  Gate.name := "LSB check";
+  Gate.constraints :=
+    let z_1 := Expression.Advice Advice.A9 Rotation.cur in
+    let z_0 := Expression.Advice Advice.A9 Rotation.next in
+    let x_p := Expression.Advice Advice.A0 Rotation.cur in
+    let y_p := Expression.Advice Advice.A1 Rotation.cur in
+    let base_x := Expression.Advice Advice.A0 Rotation.next in
+    let base_y := Expression.Advice Advice.A1 Rotation.next in
+    let lsb := z_0 ➖ (z_1 ● 2) in
+    let lsb_x :=
+      Garden.Halo2.Gadgets.Utilities.ternary
+        lsb
+        x_p
+        (x_p ➖ base_x) in
+    let lsb_y :=
+      Garden.Halo2.Gadgets.Utilities.ternary
+        lsb
+        y_p
+        (y_p ➕ base_y) in
+    Constraints.with_selector
+      Selector.QMulLsb
+      [
+        (Some "bool_check", Constraint.Boolean lsb);
+        (Some "lsb_x", Constraint.EqualZeroToPrecise lsb_x);
+        (Some "lsb_y", Constraint.EqualZeroToPrecise lsb_y)
+      ];
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure_program
       Selector.QMulIncompleteHi1
       Selector.QMulIncompleteHi2
       Selector.QMulIncompleteHi3
@@ -24,9 +50,8 @@ Definition configure
       Advice.A1
       Advice.A4
       Advice.A5 in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure
-      meta
+  do🞵
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure_program
       Selector.QMulIncompleteLo1
       Selector.QMulIncompleteLo2
       Selector.QMulIncompleteLo3
@@ -36,42 +61,15 @@ Definition configure
       Advice.A1
       Advice.A8
       Advice.A2 in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul.complete.configure
-      meta in
-  let meta :=
-    Garden.Halo2.Gadgets.Ecc.chip.mul.overflow.configure
-      meta in
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "LSB check";
-    Gate.constraints :=
-      let z_1 := Expression.Advice Advice.A9 Rotation.cur in
-      let z_0 := Expression.Advice Advice.A9 Rotation.next in
-      let x_p := Expression.Advice Advice.A0 Rotation.cur in
-      let y_p := Expression.Advice Advice.A1 Rotation.cur in
-      let base_x := Expression.Advice Advice.A0 Rotation.next in
-      let base_y := Expression.Advice Advice.A1 Rotation.next in
-      let lsb := z_0 ➖ (z_1 ● 2) in
-      let bool_check := Garden.Halo2.Gadgets.Utilities.bool_check lsb in
-      let lsb_x :=
-        Garden.Halo2.Gadgets.Utilities.ternary
-          lsb
-          x_p
-          (x_p ➖ base_x) in
-      let lsb_y :=
-        Garden.Halo2.Gadgets.Utilities.ternary
-          lsb
-          y_p
-          (y_p ➕ base_y) in
-      Constraints.with_selector
-        Selector.QMulLsb
-        [
-          (Some "bool_check", Constraint.EqualZeroToPrecise bool_check);
-          (Some "lsb_x", Constraint.EqualZeroToPrecise lsb_x);
-          (Some "lsb_y", Constraint.EqualZeroToPrecise lsb_y)
-        ];
-  |} in
-  meta.
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.complete.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.overflow.configure_program in
+  do🞵 𝓒.CreateGate lsb_check_gate in
+  return🞵 tt.
+
+Definition configure
+    (meta : ConstraintSystem.t columns)
+    : ConstraintSystem.t columns :=
+  𝓒.run_unit configure_program meta.
 
 Fixpoint enable_selector_rows
     (selector : Selector.t)
@@ -81,7 +79,7 @@ Fixpoint enable_selector_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      do🞵 ℛ.EnableSelector selector offset "" in
+      do🞵 𝓡.EnableSelector selector offset "" in
       enable_selector_rows selector (offset + 1) count
   end.
 
@@ -92,8 +90,8 @@ Fixpoint enable_lookup_running_rows
   match count with
   | O => return🞵 tt
   | S count =>
-      do🞵 ℛ.EnableSelector Selector.QLookup offset "" in
-      do🞵 ℛ.EnableSelector Selector.QRunning offset "" in
+      do🞵 𝓡.EnableSelector Selector.QLookup offset "" in
+      do🞵 𝓡.EnableSelector Selector.QRunning offset "" in
       enable_lookup_running_rows (offset + 1) count
   end.
 
@@ -119,155 +117,155 @@ Definition synthesize_variable_base_scalar_mul_region
     (alpha : Cell.t columns RegionId.t)
     (base_x base_y : Cell.t columns RegionId.t)
     : 𝓡 columns RegionId.t MulResult.t :=
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 0 "" in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 0 "" in
   let target := Cell.advice region Advice.A0 0 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let target := Cell.advice region Advice.A1 0 in
-  do🞵 ℛ.Copy target base_y in
+  do🞵 𝓡.Copy target base_y in
   let target := Cell.advice region Advice.A2 0 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let target := Cell.advice region Advice.A3 0 in
-  do🞵 ℛ.Copy target base_y in
+  do🞵 𝓡.Copy target base_y in
   let z_2 := Cell.advice region Advice.A9 2 in
-  do🞵 ℛ.EnableSelector Selector.QMulIncompleteHi1 1 "" in
+  do🞵 𝓡.EnableSelector Selector.QMulIncompleteHi1 1 "" in
   do🞵 enable_selector_rows Selector.QMulIncompleteHi2 2 124%nat in
-  do🞵 ℛ.EnableSelector Selector.QMulIncompleteHi3 126 "" in
+  do🞵 𝓡.EnableSelector Selector.QMulIncompleteHi3 126 "" in
   let z_126 := Cell.advice region Advice.A9 126 in
   let source := Cell.advice region Advice.A9 1 in
   let target := Cell.advice region Advice.A9 1 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 1 in
   let target := Cell.advice region Advice.A3 2 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 1 in
   let target := Cell.advice region Advice.A4 1 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let target := Cell.advice region Advice.A0 2 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let target := Cell.advice region Advice.A1 2 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QMulIncompleteLo1 1 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QMulIncompleteLo1 1 "" in
   do🞵 enable_selector_rows Selector.QMulIncompleteLo2 2 125%nat in
-  do🞵 ℛ.EnableSelector Selector.QMulIncompleteLo3 127 "" in
+  do🞵 𝓡.EnableSelector Selector.QMulIncompleteLo3 127 "" in
   let source := Cell.advice region Advice.A9 126 in
   let target := Cell.advice region Advice.A6 1 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 127 in
   let target := Cell.advice region Advice.A7 2 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A4 127 in
   let target := Cell.advice region Advice.A8 1 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let target := Cell.advice region Advice.A0 2 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let target := Cell.advice region Advice.A1 2 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QMulDecomposeVar 130 "" in
-  do🞵 ℛ.EnableSelector Selector.QMulDecomposeVar 132 "" in
-  do🞵 ℛ.EnableSelector Selector.QMulDecomposeVar 134 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QMulDecomposeVar 130 "" in
+  do🞵 𝓡.EnableSelector Selector.QMulDecomposeVar 132 "" in
+  do🞵 𝓡.EnableSelector Selector.QMulDecomposeVar 134 "" in
   let source := Cell.advice region Advice.A6 127 in
   let target := Cell.advice region Advice.A9 129 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let target := Cell.advice region Advice.A9 130 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 129 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 129 "" in
   let target := Cell.advice region Advice.A0 129 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let source := Cell.advice region Advice.A1 129 in
   let target := Cell.advice region Advice.A1 129 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A7 128 in
   let target := Cell.advice region Advice.A2 129 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A8 128 in
   let target := Cell.advice region Advice.A3 129 in
-  do🞵 ℛ.Copy target source in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 130 "" in
+  do🞵 𝓡.Copy target source in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 130 "" in
   let source := Cell.advice region Advice.A7 128 in
   let target := Cell.advice region Advice.A0 130 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A8 128 in
   let target := Cell.advice region Advice.A1 130 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 130 in
   let target := Cell.advice region Advice.A2 130 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 130 in
   let target := Cell.advice region Advice.A3 130 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let target := Cell.advice region Advice.A9 132 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 131 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 131 "" in
   let target := Cell.advice region Advice.A0 131 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let source := Cell.advice region Advice.A1 131 in
   let target := Cell.advice region Advice.A1 131 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 131 in
   let target := Cell.advice region Advice.A2 131 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 131 in
   let target := Cell.advice region Advice.A3 131 in
-  do🞵 ℛ.Copy target source in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 132 "" in
+  do🞵 𝓡.Copy target source in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 132 "" in
   let source := Cell.advice region Advice.A2 131 in
   let target := Cell.advice region Advice.A0 132 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 131 in
   let target := Cell.advice region Advice.A1 132 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 132 in
   let target := Cell.advice region Advice.A2 132 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 132 in
   let target := Cell.advice region Advice.A3 132 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let target := Cell.advice region Advice.A9 134 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 133 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 133 "" in
   let target := Cell.advice region Advice.A0 133 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let source := Cell.advice region Advice.A1 133 in
   let target := Cell.advice region Advice.A1 133 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 133 in
   let target := Cell.advice region Advice.A2 133 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 133 in
   let target := Cell.advice region Advice.A3 133 in
-  do🞵 ℛ.Copy target source in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 134 "" in
+  do🞵 𝓡.Copy target source in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 134 "" in
   let source := Cell.advice region Advice.A2 133 in
   let target := Cell.advice region Advice.A0 134 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 133 in
   let target := Cell.advice region Advice.A1 134 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 134 in
   let target := Cell.advice region Advice.A2 134 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 134 in
   let target := Cell.advice region Advice.A3 134 in
-  do🞵 ℛ.Copy target source in
-  do🞵 ℛ.EnableSelector Selector.QMulLsb 135 "" in
+  do🞵 𝓡.Copy target source in
+  do🞵 𝓡.EnableSelector Selector.QMulLsb 135 "" in
   let z_136 := Cell.advice region Advice.A9 136 in
   let target := Cell.advice region Advice.A0 136 in
-  do🞵 ℛ.Copy target base_x in
+  do🞵 𝓡.Copy target base_x in
   let target := Cell.advice region Advice.A1 136 in
-  do🞵 ℛ.Copy target base_y in
-  do🞵 ℛ.EnableSelector Selector.QEccAdd 135 "" in
+  do🞵 𝓡.Copy target base_y in
+  do🞵 𝓡.EnableSelector Selector.QEccAdd 135 "" in
   let source := Cell.advice region Advice.A0 135 in
   let target := Cell.advice region Advice.A0 135 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A1 135 in
   let target := Cell.advice region Advice.A1 135 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A2 135 in
   let target := Cell.advice region Advice.A2 135 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let source := Cell.advice region Advice.A3 135 in
   let target := Cell.advice region Advice.A3 135 in
-  do🞵 ℛ.Copy target source in
+  do🞵 𝓡.Copy target source in
   let x := Cell.advice region Advice.A2 136 in
   let y := Cell.advice region Advice.A3 136 in
   return🞵 {|
@@ -285,11 +283,11 @@ Definition synthesize_running_sum_decomposition
     (region : RegionId.t)
     (s : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
-  ℒ.InNamespace "decompose s_{0..=129}" (
-    ℒ.InNamespace "Decompose low 130 bits of s" (
-      ℒ.AddRegion region "13 words range check" (fun region =>
+  𝓛.InNamespace "decompose s_{0..=129}" (
+    𝓛.InNamespace "Decompose low 130 bits of s" (
+      𝓛.AddRegion region "13 words range check" (fun region =>
         let target := Cell.advice region Advice.A9 0 in
-        do🞵 ℛ.Copy target s in
+        do🞵 𝓡.Copy target s in
         do🞵 enable_lookup_running_rows 0 13%nat in
         return🞵 (Cell.advice region Advice.A9 13)))).
 
@@ -297,9 +295,9 @@ Definition synthesize_overflow_check
     (overflow_s_region overflow_lookup_region overflow_check_region : RegionId.t)
     (sources : OverflowSources.t)
     : 𝓛 columns RegionId.t unit :=
-  ℒ.InNamespace "overflow check" (
+  𝓛.InNamespace "overflow check" (
     let🞵 s :=
-      ℒ.AddRegion
+      𝓛.AddRegion
         overflow_s_region
         "s = alpha + k_254 ⋅ 2^130" (fun region =>
         return🞵 (Cell.advice region Advice.A6 0)) in
@@ -307,22 +305,22 @@ Definition synthesize_overflow_check
       synthesize_running_sum_decomposition
         overflow_lookup_region
         s in
-    ℒ.AddRegion
+    𝓛.AddRegion
       overflow_check_region
       "overflow check" (fun region =>
-      do🞵 ℛ.EnableSelector Selector.QMulOverflow 1 "" in
+      do🞵 𝓡.EnableSelector Selector.QMulOverflow 1 "" in
       let target := Cell.advice region Advice.A6 0 in
-      do🞵 ℛ.Copy target sources.(OverflowSources.z_136) in
+      do🞵 𝓡.Copy target sources.(OverflowSources.z_136) in
       let target := Cell.advice region Advice.A6 1 in
-      do🞵 ℛ.Copy target sources.(OverflowSources.z_126) in
+      do🞵 𝓡.Copy target sources.(OverflowSources.z_126) in
       let target := Cell.advice region Advice.A7 0 in
-      do🞵 ℛ.Copy target sources.(OverflowSources.z_2) in
+      do🞵 𝓡.Copy target sources.(OverflowSources.z_2) in
       let target := Cell.advice region Advice.A7 1 in
-      do🞵 ℛ.Copy target sources.(OverflowSources.alpha) in
+      do🞵 𝓡.Copy target sources.(OverflowSources.alpha) in
       let target := Cell.advice region Advice.A7 2 in
-      do🞵 ℛ.Copy target z_13 in
+      do🞵 𝓡.Copy target z_13 in
       let target := Cell.advice region Advice.A8 1 in
-      do🞵 ℛ.Copy target s in
+      do🞵 𝓡.Copy target s in
       return🞵 tt)).
 
 Definition synthesize
@@ -333,9 +331,9 @@ Definition synthesize
     (alpha : Cell.t columns RegionId.t)
     (base_x base_y : Cell.t columns RegionId.t)
     : 𝓛 columns RegionId.t MulResult.t :=
-  ℒ.InNamespace "variable-base scalar mul" (
+  𝓛.InNamespace "variable-base scalar mul" (
     let🞵 result :=
-      ℒ.AddRegion
+      𝓛.AddRegion
         variable_base_region
         "variable-base scalar mul"
         (fun region =>

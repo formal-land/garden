@@ -7,30 +7,34 @@ Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.
 Import ListNotations.
 Global Open Scope pstring_scope.
 
+Definition full_width_fixed_base_scalar_mul_gate : Gate.t columns := {|
+  Gate.name := "Full-width fixed-base scalar mul";
+  Gate.constraints :=
+    let window := Expression.Advice Advice.A4 Rotation.cur in
+    Constraints.with_selector
+      Selector.QMulFixedFull
+      (Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.coords_check
+        window
+      ++ [
+        (Some "window range check",
+          Constraint.Range
+            window
+            Garden.Halo2.Gadgets.Ecc.chip.constants.h_nat)
+      ]);
+|}.
+
+Definition configure_program : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate full_width_fixed_base_scalar_mul_gate in
+  return🞵 tt.
+
 Definition configure
     (meta : ConstraintSystem.t columns)
     : ConstraintSystem.t columns :=
-  let meta := ConstraintSystem.create_gate meta {|
-    Gate.name := "Full-width fixed-base scalar mul";
-    Gate.constraints :=
-      let window := Expression.Advice Advice.A4 Rotation.cur in
-      Constraints.with_selector
-        Selector.QMulFixedFull
-        (Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.coords_check
-          window
-        ++ [
-          (Some "window range check",
-            Constraint.EqualZeroToPrecise
-              (Garden.Halo2.Gadgets.Utilities.range_check
-                window
-                Garden.Halo2.Gadgets.Ecc.chip.constants.h_nat))
-        ]);
-  |} in
-  meta.
+  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  ℒ.AddRegion
+  𝓛.AddRegion
     (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedFullWidth)
     "Full-width fixed-base scalar mul" (fun _ =>
-    ℛ.EnableSelector Selector.QMulFixedFull 0 "").
+    𝓡.EnableSelector Selector.QMulFixedFull 0 "").
