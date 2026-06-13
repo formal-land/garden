@@ -38,9 +38,9 @@ Definition lsb_check_gate : Gate.t columns := {|
       ];
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵
-    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure_program
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure
       Selector.QMulIncompleteHi1
       Selector.QMulIncompleteHi2
       Selector.QMulIncompleteHi3
@@ -51,7 +51,7 @@ Definition configure_program : 𝓒 columns unit :=
       Advice.A4
       Advice.A5 in
   do🞵
-    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure_program
+    Garden.Halo2.Gadgets.Ecc.chip.mul.incomplete.configure
       Selector.QMulIncompleteLo1
       Selector.QMulIncompleteLo2
       Selector.QMulIncompleteLo3
@@ -61,15 +61,10 @@ Definition configure_program : 𝓒 columns unit :=
       Advice.A1
       Advice.A8
       Advice.A2 in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.complete.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.overflow.configure_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.complete.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.overflow.configure in
   do🞵 𝓒.CreateGate lsb_check_gate in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Fixpoint enable_selector_rows
     (selector : Selector.t)

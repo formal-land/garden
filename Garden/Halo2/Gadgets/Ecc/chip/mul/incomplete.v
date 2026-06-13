@@ -105,7 +105,7 @@ Definition q_mul_3_checks_gate
       (for_loop z x_a x_p y_p lambda_1 lambda_2 y_a_final);
 |}.
 
-Definition configure_program
+Definition configure
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
     (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
     : 𝓒 columns unit :=
@@ -113,24 +113,6 @@ Definition configure_program
   do🞵 𝓒.CreateGate (q_mul_2_checks_gate q_mul_2 z x_a x_p y_p lambda_1 lambda_2) in
   do🞵 𝓒.CreateGate (q_mul_3_checks_gate q_mul_3 z x_a x_p y_p lambda_1 lambda_2) in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
-    (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_program
-      q_mul_1
-      q_mul_2
-      q_mul_3
-      z
-      x_a
-      x_p
-      y_p
-      lambda_1
-      lambda_2)
-    meta.
 
 Definition synthesize
     (q_mul_1 q_mul_2 q_mul_3 : Selector.t)

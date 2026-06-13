@@ -214,32 +214,27 @@ Definition orchard_circuit_checks_gate : Gate.t columns := {|
     ];
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate orchard_circuit_checks_gate in
-  do🞵 Garden.Orchard.circuit.gadget.add_chip.configure_program in
+  do🞵 Garden.Orchard.circuit.gadget.add_chip.configure in
   do🞵
-    Garden.Halo2.Gadgets.LookupRangeCheck.configure_program
+    Garden.Halo2.Gadgets.LookupRangeCheck.configure
       10
       Selector.QLookup
       Selector.QRunning
       Selector.QBitshift
       Advice.A9
       Lookup.TableIdx in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Poseidon.Pow5.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1_program in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1_program in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2_program in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2_program in
-  do🞵 Garden.Orchard.circuit.commit_ivk.configure_program in
-  do🞵 Garden.Orchard.circuit.note_commit.configure_old_program in
-  do🞵 Garden.Orchard.circuit.note_commit.configure_new_program in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.configure in
+  do🞵 Garden.Halo2.Gadgets.Poseidon.Pow5.configure in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1 in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1 in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2 in
+  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2 in
+  do🞵 Garden.Orchard.circuit.commit_ivk.configure in
+  do🞵 Garden.Orchard.circuit.note_commit.configure_old in
+  do🞵 Garden.Orchard.circuit.note_commit.configure_new in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Definition synthesize_range_check
     : 𝓛 columns RegionId.t unit :=

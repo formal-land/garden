@@ -167,7 +167,7 @@ as `gate.(Gate.constraints)` do not need explicit column parameters.
 ## Gate Operation Functions
 
 Configure files should expose named `Gate.t` definitions for each gate created
-by `configure_program`. Proof-facing operation functions belong in sibling
+by the monadic `configure`. Proof-facing operation functions belong in sibling
 `*_proof.v` files, following `Pow5_proof.v`.
 
 Use executable `Z` functions and records for gates that compute or reconstruct

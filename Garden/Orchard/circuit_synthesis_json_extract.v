@@ -15,7 +15,8 @@ Extract Constant PrimString.string => "Pstring.t".
 Definition model_configure : ConstraintSystem.t Configure.indexed_columns :=
   Configure.to_indexed
     Garden.Orchard.columns.Index.indices
-    (Garden.Orchard.circuit.configure
+    (𝓒.run_unit
+      Garden.Orchard.circuit.configure
       (@ConstraintSystem.empty Garden.Orchard.columns.columns)).
 
 Definition model_synthesis_events : list Raw.Event.t :=

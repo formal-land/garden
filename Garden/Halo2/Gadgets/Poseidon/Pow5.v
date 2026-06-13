@@ -110,16 +110,11 @@ Definition pad_and_add_gate : Gate.t columns := {|
       ];
   |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate full_round_gate in
   do🞵 𝓒.CreateGate partial_rounds_gate in
   do🞵 𝓒.CreateGate pad_and_add_gate in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Definition state_at
     (region : RegionId.t)

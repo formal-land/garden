@@ -30,24 +30,15 @@ Definition cond_swap_gate
     ];
 |}.
 
-Definition configure_instance_program
+Definition configure_instance
     (q_swap : Selector.t)
     (a b a_swapped b_swapped swap : Advice.t)
     : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate (cond_swap_gate q_swap a b a_swapped b_swapped swap) in
   return🞵 tt.
 
-Definition configure_instance
-    (meta : ConstraintSystem.t columns)
-    (q_swap : Selector.t)
-    (a b a_swapped b_swapped swap : Advice.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_instance_program q_swap a b a_swapped b_swapped swap)
-    meta.
-
-Definition configure_1_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_1 : 𝓒 columns unit :=
+  configure_instance
     Selector.QCondSwap1
     Advice.A0
     Advice.A1
@@ -55,24 +46,14 @@ Definition configure_1_program : 𝓒 columns unit :=
     Advice.A3
     Advice.A4.
 
-Definition configure_1
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_1_program meta.
-
-Definition configure_2_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_2 : 𝓒 columns unit :=
+  configure_instance
     Selector.QCondSwap2
     Advice.A5
     Advice.A6
     Advice.A7
     Advice.A8
     Advice.A9.
-
-Definition configure_2
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_2_program meta.
 
 Definition synthesize_instance
     (q_swap : Selector.t)

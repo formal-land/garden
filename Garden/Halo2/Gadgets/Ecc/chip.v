@@ -9,22 +9,17 @@ Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.
 Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.
 Require Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.
 
-Definition configure_program : 𝓒 columns unit :=
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.witness_point.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.configure_program in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.configure_program in
+Definition configure : 𝓒 columns unit :=
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.witness_point.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add_incomplete.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.add.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.full_width.configure in
+  do🞵 Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.short.configure in
   do🞵
-    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.configure_program in
+    Garden.Halo2.Gadgets.Ecc.chip.mul_fixed.base_field_elem.configure in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=

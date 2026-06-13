@@ -200,40 +200,28 @@ while ordinary fixed columns start after them. This mirrors Halo2's
 
 ## Configure Programs
 
-Rust `configure` mutates `meta`. In Rocq, write a configure program of type
-`𝓒 columns unit` and keep a wrapper named `configure` for compatibility:
+Rust `configure` mutates `meta`. In Rocq, write `configure` as a monadic
+configure program of type `𝓒 columns unit`:
 
 ```coq
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate {| ... |} in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 ```
 
 For polymorphic gadgets, make `configure` polymorphic in `columns` and pass the
-used selector and advice columns as parameters. The corresponding
-`configure_program` should take the same parameters except `meta`:
+used selector and advice columns as parameters:
 
 ```coq
-Definition configure_program {columns : Columns.t}
+Definition configure {columns : Columns.t}
     (q_add : columns.(Columns.Selector))
     (a b c : columns.(Columns.Advice))
     : 𝓒 columns unit := ...
-
-Definition configure {columns : Columns.t}
-    (meta : ConstraintSystem.t columns)
-    (q_add : columns.(Columns.Selector))
-    (a b c : columns.(Columns.Advice))
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit (configure_program q_add a b c) meta.
 ```
 
-Nested configure calls should sequence the child `configure_program` with
-`do🞵`; do not call the threaded wrapper from another configure program.
+Nested configure calls should sequence the child `configure` with `do🞵`.
+Call `𝓒.run_unit` only at extraction or comparison boundaries that need an
+actual `ConstraintSystem.t`.
 
 For Orchard-only gadgets, use the absolute Orchard columns directly:
 
@@ -241,9 +229,9 @@ For Orchard-only gadgets, use the absolute Orchard columns directly:
 Require Import Garden.Orchard.columns.
 
 Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
+    : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate name_gate in
+  return🞵 tt.
 ```
 
 This is the current style for the ECC, Poseidon, Sinsemilla, and Merkle
@@ -537,7 +525,7 @@ Definition name_gate : Gate.t columns := {|
     ];
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate name_gate in
   return🞵 tt.
 ```
@@ -554,7 +542,7 @@ Definition name_gate {columns : Columns.t}
   Gate.constraints := ...;
 |}.
 
-Definition configure_program {columns : Columns.t}
+Definition configure {columns : Columns.t}
     (q : columns.(Columns.Selector))
     (a : columns.(Columns.Advice))
     : 𝓒 columns unit :=

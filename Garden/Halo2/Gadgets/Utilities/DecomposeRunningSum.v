@@ -23,26 +23,13 @@ Definition range_check_gate {columns : Columns.t}
     ];
 |}.
 
-Definition configure_program {columns : Columns.t}
+Definition configure {columns : Columns.t}
     (window_num_bits : Z)
     (q_range_check : columns.(Columns.Selector))
     (z : columns.(Columns.Advice))
     : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate (range_check_gate window_num_bits q_range_check z) in
   return🞵 tt.
-
-Definition configure {columns : Columns.t}
-    (window_num_bits : Z)
-    (meta : ConstraintSystem.t columns)
-    (q_range_check : columns.(Columns.Selector))
-    (z : columns.(Columns.Advice))
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_program
-      window_num_bits
-      q_range_check
-      z)
-    meta.
 
 Definition synthesize {columns : Columns.t} {RegionId : Set}
     : 𝓛 columns RegionId unit :=

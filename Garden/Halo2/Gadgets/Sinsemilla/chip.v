@@ -42,7 +42,7 @@ Definition q_s3
   let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
   q_s2 ✖️ (q_s2 ➖ Expression.Constant 1).
 
-Definition configure_generator_table_program
+Definition configure_generator_table
     (q_sinsemilla1 : Selector.t)
     (q_sinsemilla2 : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
@@ -73,23 +73,6 @@ Definition configure_generator_table_program
       ];
   |} in
   return🞵 tt.
-
-Definition configure_generator_table
-    (meta : ConstraintSystem.t columns)
-    (q_sinsemilla1 : Selector.t)
-    (q_sinsemilla2 : Fixed.t)
-    (x_a x_p bits lambda_1 lambda_2 : Advice.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_generator_table_program
-      q_sinsemilla1
-      q_sinsemilla2
-      x_a
-      x_p
-      bits
-      lambda_1
-      lambda_2)
-    meta.
 
 Definition initial_y_q_gate
     (q_sinsemilla4 : Selector.t)
@@ -139,13 +122,13 @@ Definition sinsemilla_gate
     ];
 |}.
 
-Definition configure_instance_program
+Definition configure_instance
     (q_sinsemilla1 q_sinsemilla4 : Selector.t)
     (q_sinsemilla2 fixed_y_q : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     : 𝓒 columns unit :=
   do🞵
-    configure_generator_table_program
+    configure_generator_table
       q_sinsemilla1
       q_sinsemilla2
       x_a
@@ -161,27 +144,8 @@ Definition configure_instance_program
       (sinsemilla_gate q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2) in
   return🞵 tt.
 
-Definition configure_instance
-    (meta : ConstraintSystem.t columns)
-    (q_sinsemilla1 q_sinsemilla4 : Selector.t)
-    (q_sinsemilla2 fixed_y_q : Fixed.t)
-    (x_a x_p bits lambda_1 lambda_2 : Advice.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_instance_program
-      q_sinsemilla1
-      q_sinsemilla4
-      q_sinsemilla2
-      fixed_y_q
-      x_a
-      x_p
-      bits
-      lambda_1
-      lambda_2)
-    meta.
-
-Definition configure_1_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_1 : 𝓒 columns unit :=
+  configure_instance
     Selector.QSinsemilla1_1
     Selector.QSinsemilla4_1
     Fixed.QSinsemilla2_1
@@ -192,13 +156,8 @@ Definition configure_1_program : 𝓒 columns unit :=
     Advice.A3
     Advice.A4.
 
-Definition configure_1
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_1_program meta.
-
-Definition configure_2_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_2 : 𝓒 columns unit :=
+  configure_instance
     Selector.QSinsemilla1_2
     Selector.QSinsemilla4_2
     Fixed.QSinsemilla2_2
@@ -208,11 +167,6 @@ Definition configure_2_program : 𝓒 columns unit :=
     Advice.A7
     Advice.A8
     Advice.A9.
-
-Definition configure_2
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_2_program meta.
 
 Definition sinsemilla_s_x (index : Z) : Z :=
   Garden.Halo2.Gadgets.Sinsemilla.SConstants.x index.

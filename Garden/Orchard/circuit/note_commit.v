@@ -505,7 +505,7 @@ Definition y_coordinate_checks_gate
     ];
 |}.
 
-Definition configure_instance_program
+Definition configure_instance
     (q_b q_d q_e q_g q_h
       q_gd q_pkd q_value q_rho q_psi q_y_canon : Selector.t)
     : 𝓒 columns unit :=
@@ -522,28 +522,8 @@ Definition configure_instance_program
   do🞵 𝓒.CreateGate (y_coordinate_checks_gate q_y_canon) in
   return🞵 tt.
 
-Definition configure_instance
-    (meta : ConstraintSystem.t columns)
-    (q_b q_d q_e q_g q_h
-      q_gd q_pkd q_value q_rho q_psi q_y_canon : Selector.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_instance_program
-      q_b
-      q_d
-      q_e
-      q_g
-      q_h
-      q_gd
-      q_pkd
-      q_value
-      q_rho
-      q_psi
-      q_y_canon)
-    meta.
-
-Definition configure_old_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_old : 𝓒 columns unit :=
+  configure_instance
     Selector.QNoteCommitOldB
     Selector.QNoteCommitOldD
     Selector.QNoteCommitOldE
@@ -556,13 +536,8 @@ Definition configure_old_program : 𝓒 columns unit :=
     Selector.QNoteCommitOldPsi
     Selector.QNoteCommitOldYCanon.
 
-Definition configure_old
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_old_program meta.
-
-Definition configure_new_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_new : 𝓒 columns unit :=
+  configure_instance
     Selector.QNoteCommitNewB
     Selector.QNoteCommitNewD
     Selector.QNoteCommitNewE
@@ -574,11 +549,6 @@ Definition configure_new_program : 𝓒 columns unit :=
     Selector.QNoteCommitNewRho
     Selector.QNoteCommitNewPsi
     Selector.QNoteCommitNewYCanon.
-
-Definition configure_new
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_new_program meta.
 
 Definition witness_message_piece
     (region : RegionId.t)

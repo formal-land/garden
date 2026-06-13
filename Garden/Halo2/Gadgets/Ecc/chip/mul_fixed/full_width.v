@@ -23,14 +23,9 @@ Definition full_width_fixed_base_scalar_mul_gate : Gate.t columns := {|
       ]);
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate full_width_fixed_base_scalar_mul_gate in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=

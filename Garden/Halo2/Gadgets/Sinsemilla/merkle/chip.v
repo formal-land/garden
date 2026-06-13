@@ -42,7 +42,7 @@ Definition decomposition_check_gate
     ];
 |}.
 
-Definition configure_instance_program
+Definition configure_instance
     (q_decompose : Selector.t)
     (configure_cond_swap : 𝓒 columns unit)
     (a_col b_col c_col left_col right_col : Advice.t)
@@ -53,52 +53,25 @@ Definition configure_instance_program
       (decomposition_check_gate q_decompose a_col b_col c_col left_col right_col) in
   return🞵 tt.
 
-Definition configure_instance
-    (meta : ConstraintSystem.t columns)
-    (q_decompose : Selector.t)
-    (configure_cond_swap : 𝓒 columns unit)
-    (a_col b_col c_col left_col right_col : Advice.t)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_instance_program
-      q_decompose
-      configure_cond_swap
-      a_col
-      b_col
-      c_col
-      left_col
-      right_col)
-    meta.
-
-Definition configure_1_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_1 : 𝓒 columns unit :=
+  configure_instance
     Selector.QMerkleDecompose1
-    Garden.Halo2.Gadgets.Utilities.CondSwap.configure_1_program
+    Garden.Halo2.Gadgets.Utilities.CondSwap.configure_1
     Advice.A0
     Advice.A1
     Advice.A2
     Advice.A3
     Advice.A4.
 
-Definition configure_1
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_1_program meta.
-
-Definition configure_2_program : 𝓒 columns unit :=
-  configure_instance_program
+Definition configure_2 : 𝓒 columns unit :=
+  configure_instance
     Selector.QMerkleDecompose2
-    Garden.Halo2.Gadgets.Utilities.CondSwap.configure_2_program
+    Garden.Halo2.Gadgets.Utilities.CondSwap.configure_2
     Advice.A5
     Advice.A6
     Advice.A7
     Advice.A8
     Advice.A9.
-
-Definition configure_2
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_2_program meta.
 
 Definition synthesize_instance
     (q_decompose : Selector.t)

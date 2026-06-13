@@ -109,14 +109,9 @@ Definition commit_ivk_canonicity_check_gate : Gate.t columns := {|
     ];
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate commit_ivk_canonicity_check_gate in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Module AssignedPoint.
   Record t : Set := {

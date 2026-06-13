@@ -69,19 +69,14 @@ Definition running_sum_coordinates_check_gate : Gate.t columns := {|
       (coords_check word);
 |}.
 
-Definition configure_program : 𝓒 columns unit :=
+Definition configure : 𝓒 columns unit :=
   do🞵
-    Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.configure_program
+    Garden.Halo2.Gadgets.Utilities.DecomposeRunningSum.configure
       Garden.Halo2.Gadgets.Ecc.chip.constants.fixed_base_window_size
       Selector.QMulFixedRunningSum
       Advice.A4 in
   do🞵 𝓒.CreateGate running_sum_coordinates_check_gate in
   return🞵 tt.
-
-Definition configure
-    (meta : ConstraintSystem.t columns)
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit configure_program meta.
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=

@@ -24,7 +24,7 @@ Definition short_lookup_bitshift_gate {columns : Columns.t}
     ];
 |}.
 
-Definition configure_program {columns : Columns.t}
+Definition configure {columns : Columns.t}
     (k : Z)
     (q_lookup q_running q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
@@ -51,23 +51,6 @@ Definition configure_program {columns : Columns.t}
   |} in
   do🞵 𝓒.CreateGate (short_lookup_bitshift_gate k q_bitshift running_sum) in
   return🞵 tt.
-
-Definition configure {columns : Columns.t}
-    (k : Z)
-    (meta : ConstraintSystem.t columns)
-    (q_lookup q_running q_bitshift : columns.(Columns.Selector))
-    (running_sum : columns.(Columns.Advice))
-    (table_idx : columns.(Columns.Lookup))
-    : ConstraintSystem.t columns :=
-  𝓒.run_unit
-    (configure_program
-      k
-      q_lookup
-      q_running
-      q_bitshift
-      running_sum
-      table_idx)
-    meta.
 
 Definition synthesize {columns : Columns.t} {RegionId : Set}
     : 𝓛 columns RegionId unit :=
