@@ -63,15 +63,135 @@ Definition mds_mul : State.t -> State.t :=
 Definition mds_inv_mul : State.t -> State.t :=
   matrix_mul P128Pow5T3.mds_inv.
 
+Module MatrixInverse.
+  (** A sum of three reduced terms collapses to a single modulo. *)
+  Lemma add3_mod (u v w : Z) :
+      ((u mod Primes.pallas_p + v mod Primes.pallas_p) mod Primes.pallas_p +
+        w mod Primes.pallas_p) mod Primes.pallas_p =
+        (u + v + w) mod Primes.pallas_p.
+  Proof.
+    pose proof (prime_range (p := Primes.pallas_p)).
+    now rewrite (Z.add_mod (u + v) w), (Z.add_mod u v) by lia.
+  Qed.
+
+  (** A linear combination of reduced inputs is the reduced integer
+      dot-product. *)
+  Lemma lin_mod (c0 c1 c2 y0 y1 y2 : Z) :
+      c0 *F UnOp.from y0 +F c1 *F UnOp.from y1 +F c2 *F UnOp.from y2 =
+        (c0 * y0 + c1 * y1 + c2 * y2) mod Primes.pallas_p.
+  Proof.
+    unfold BinOp.add, BinOp.mul, UnOp.from.
+    rewrite !Zmult_mod_idemp_r.
+    apply add3_mod.
+  Qed.
+
+  (** Each coordinate of the composition of two linear maps collapses, modulo
+      [p], to a single dot-product of integers applied to the initial
+      coordinates. *)
+  Lemma compose_coordinate_eq
+      (a0 a1 a2 b00 b01 b02 b10 b11 b12 b20 b21 b22 x0 x1 x2 : Z) :
+      a0 *F (b00 *F UnOp.from x0 +F b01 *F UnOp.from x1 +F b02 *F UnOp.from x2) +F
+      a1 *F (b10 *F UnOp.from x0 +F b11 *F UnOp.from x1 +F b12 *F UnOp.from x2) +F
+      a2 *F (b20 *F UnOp.from x0 +F b21 *F UnOp.from x1 +F b22 *F UnOp.from x2) =
+      ((a0 * b00 + a1 * b10 + a2 * b20) * x0 +
+       (a0 * b01 + a1 * b11 + a2 * b21) * x1 +
+       (a0 * b02 + a1 * b12 + a2 * b22) * x2) mod Primes.pallas_p.
+  Proof.
+    rewrite !lin_mod.
+    unfold BinOp.add, BinOp.mul.
+    rewrite !Zmult_mod_idemp_r.
+    rewrite add3_mod.
+    f_equal; ring.
+  Qed.
+
+  (** A dot-product whose coefficients reduce to [(1, 0, 0)] modulo [p]
+      returns its first argument modulo [p]. *)
+  Lemma identity_row_0 (s0 s1 s2 x0 x1 x2 : Z)
+      (Hs0 : s0 mod Primes.pallas_p = 1)
+      (Hs1 : s1 mod Primes.pallas_p = 0)
+      (Hs2 : s2 mod Primes.pallas_p = 0) :
+      (s0 * x0 + s1 * x1 + s2 * x2) mod Primes.pallas_p =
+        x0 mod Primes.pallas_p.
+  Proof.
+    pose proof (prime_range (p := Primes.pallas_p)).
+    rewrite Z.add_mod by lia.
+    rewrite (Z.add_mod (s0 * x0)) by lia.
+    rewrite (Z.mul_mod s0), (Z.mul_mod s1), (Z.mul_mod s2) by lia.
+    rewrite Hs0, Hs1, Hs2.
+    rewrite Z.mul_1_l, !Z.mul_0_l, !Zmod_0_l, !Z.add_0_r, !Zmod_mod.
+    reflexivity.
+  Qed.
+
+  Lemma identity_row_1 (s0 s1 s2 x0 x1 x2 : Z)
+      (Hs0 : s0 mod Primes.pallas_p = 0)
+      (Hs1 : s1 mod Primes.pallas_p = 1)
+      (Hs2 : s2 mod Primes.pallas_p = 0) :
+      (s0 * x0 + s1 * x1 + s2 * x2) mod Primes.pallas_p =
+        x1 mod Primes.pallas_p.
+  Proof.
+    replace (s0 * x0 + s1 * x1 + s2 * x2)
+      with (s1 * x1 + s0 * x0 + s2 * x2)
+      by ring.
+    now apply identity_row_0.
+  Qed.
+
+  Lemma identity_row_2 (s0 s1 s2 x0 x1 x2 : Z)
+      (Hs0 : s0 mod Primes.pallas_p = 0)
+      (Hs1 : s1 mod Primes.pallas_p = 0)
+      (Hs2 : s2 mod Primes.pallas_p = 1) :
+      (s0 * x0 + s1 * x1 + s2 * x2) mod Primes.pallas_p =
+        x2 mod Primes.pallas_p.
+  Proof.
+    replace (s0 * x0 + s1 * x1 + s2 * x2)
+      with (s2 * x2 + s0 * x0 + s1 * x1)
+      by ring.
+    now apply identity_row_0.
+  Qed.
+
+  (** Composing two [matrix_mul] whose integer product reduces to the
+      identity matrix modulo [p] gives back the reduced state. *)
+  Lemma matrix_compose_identity
+      (a00 a01 a02 a10 a11 a12 a20 a21 a22 : Z)
+      (b00 b01 b02 b10 b11 b12 b20 b21 b22 : Z)
+      (H00 : (a00 * b00 + a01 * b10 + a02 * b20) mod Primes.pallas_p = 1)
+      (H01 : (a00 * b01 + a01 * b11 + a02 * b21) mod Primes.pallas_p = 0)
+      (H02 : (a00 * b02 + a01 * b12 + a02 * b22) mod Primes.pallas_p = 0)
+      (H10 : (a10 * b00 + a11 * b10 + a12 * b20) mod Primes.pallas_p = 0)
+      (H11 : (a10 * b01 + a11 * b11 + a12 * b21) mod Primes.pallas_p = 1)
+      (H12 : (a10 * b02 + a11 * b12 + a12 * b22) mod Primes.pallas_p = 0)
+      (H20 : (a20 * b00 + a21 * b10 + a22 * b20) mod Primes.pallas_p = 0)
+      (H21 : (a20 * b01 + a21 * b11 + a22 * b21) mod Primes.pallas_p = 0)
+      (H22 : (a20 * b02 + a21 * b12 + a22 * b22) mod Primes.pallas_p = 1)
+      (state : State.t) :
+      matrix_mul [ [a00; a01; a02]; [a10; a11; a12]; [a20; a21; a22] ]
+        (matrix_mul [ [b00; b01; b02]; [b10; b11; b12]; [b20; b21; b22] ]
+          (M.map_mod state)) =
+        M.map_mod state.
+  Proof.
+    unfold matrix_mul, lin, coeff, P128Pow5T3.get.
+    with_strategy opaque [BinOp.add BinOp.mul UnOp.from] cbn.
+    f_equal; rewrite compose_coordinate_eq; unfold UnOp.from.
+    - now apply identity_row_0.
+    - now apply identity_row_1.
+    - now apply identity_row_2.
+  Qed.
+End MatrixInverse.
+
 Lemma mds_mul_mds_inv_identity (state : State.t) :
     mds_mul (mds_inv_mul (M.map_mod state)) =
       M.map_mod state.
-Admitted.
+Proof.
+  unfold mds_mul, mds_inv_mul, P128Pow5T3.mds, P128Pow5T3.mds_inv.
+  apply MatrixInverse.matrix_compose_identity; now vm_compute.
+Qed.
 
 Lemma mds_inv_mul_mds_identity (state : State.t) :
     mds_inv_mul (mds_mul (M.map_mod state)) =
       M.map_mod state.
-Admitted.
+Proof.
+  unfold mds_mul, mds_inv_mul, P128Pow5T3.mds, P128Pow5T3.mds_inv.
+  apply MatrixInverse.matrix_compose_identity; now vm_compute.
+Qed.
 
 Lemma mds_inv_mul_injective
     (left right : State.t)
