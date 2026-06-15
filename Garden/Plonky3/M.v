@@ -145,7 +145,11 @@ Module InField.
   }.
 
   Global Instance mod_is_in_field {p} `{Prime p} (z : Z) : InField.C (z mod p).
-  Admitted.
+  Proof.
+    constructor.
+    pose proof (prime_range (p := p)).
+    now rewrite Z.mod_mod by lia.
+  Qed.
 End InField.
 
 Module Array.
@@ -567,18 +571,36 @@ Proof.
   { rewrite <- (Z.mod_unique x p 0 x) in *; lia. }
 Qed.
 
-(* TODO: prove directly from standard-library modular arithmetic facts. *)
 Lemma sub_zero_equiv {p} `{Prime p} (x y : Z) :
   BinOp.sub x y = 0 <->
   UnOp.from x = UnOp.from y.
 Proof.
-Admitted.
+  unfold BinOp.sub, UnOp.from.
+  symmetry.
+  apply Z.cong_iff_0.
+Qed.
+
+Lemma sum_for_in_zero_to_n_aux_zeros_eq {p} `{Prime p} (N : nat) (f : Z -> Z)
+    (H_body : forall (i : Z), 0 <= i < Z.of_nat N -> f i = 0) :
+  sum_for_in_zero_to_n_aux N f = 0.
+Proof.
+  pose proof (prime_range (p := p)).
+  induction N; cbn; [reflexivity|].
+  rewrite IHN by (intros; apply H_body; lia).
+  rewrite H_body by lia.
+  unfold BinOp.add.
+  rewrite Z.add_0_l.
+  apply Z.mod_0_l; lia.
+Qed.
 
 Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
     (H_body : forall (i : Z), 0 <= i < N -> f i = 0) :
   M.sum_for_in_zero_to_n N f = 0.
 Proof.
-Admitted.
+  unfold M.sum_for_in_zero_to_n.
+  apply sum_for_in_zero_to_n_aux_zeros_eq.
+  intros; apply H_body; lia.
+Qed.
 
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
@@ -590,7 +612,10 @@ Module FieldRewrite.
 
   Lemma from_one {p} `{Prime p} : UnOp.from 1 = 1.
   Proof.
-  Admitted.
+    unfold UnOp.from.
+    pose proof (prime_range (p := p)).
+    apply Z.mod_1_l; lia.
+  Qed.
   Global Hint Rewrite @from_one : field_rewrite.
 
   Lemma from_bool {p} `{Prime p} (x : bool) :
@@ -796,6 +821,20 @@ Module Limbs.
     now FieldRewrite.run.
   Qed.
 
+  (** A fold only depends on the values of the function at the elements of the list. *)
+  Lemma fold_ext_in {A : Set} (g1 g2 : Z -> A -> Z) (l : list A) :
+    forall acc : Z,
+    (forall x, Lists.List.In x l -> forall a, g1 a x = g2 a x) ->
+    Lists.List.fold_left g1 l acc = Lists.List.fold_left g2 l acc.
+  Proof.
+    induction l; cbn; intros acc H_in; [reflexivity|].
+    rewrite (H_in a) by now left.
+    apply IHl.
+    intros x Hx a'.
+    apply H_in.
+    now right.
+  Qed.
+
   Lemma of_Z_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
       (f1 f2 : Z -> Z)
       (H_f1_f2_eq :
@@ -808,7 +847,12 @@ Module Limbs.
     of_Z_bools BITS_PER_LIMB f1 limb =
     of_Z_bools BITS_PER_LIMB f2 limb.
   Proof.
-  Admitted.
+    unfold of_Z_bools.
+    apply fold_ext_in.
+    intros z Hz a.
+    apply Lists.List.in_rev, Lists.List.in_seq in Hz.
+    rewrite H_f1_f2_eq; [reflexivity|nia].
+  Qed.
 
   (** Convert an array of bools to an array of limbs. *)
   Definition of_bools (BITS_PER_LIMB : Z)
@@ -826,6 +870,33 @@ Module Limbs.
       (2 * acc) + Z.b2z (f z)
     ) l 0.
 
+  (** As long as the accumulator stays below [p], the field fold computes the same
+      thing as the plain integer fold. *)
+  Lemma fold_bits_eq_aux {p} `{Prime p} (f : Z -> bool) (l : list nat) :
+    forall acc : Z,
+    0 <= acc ->
+    (acc + 1) * 2 ^ (Z.of_nat (List.length l)) <= p ->
+    Lists.List.fold_left (fun acc z => (2 *F acc) +F Z.b2z (f (Z.of_nat z))) l acc =
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f (Z.of_nat z))) l acc.
+  Proof.
+    induction l; intros acc H_acc H_bound; [reflexivity|].
+    rewrite Lists.List.length_cons, Nat2Z.inj_succ, Z.pow_succ_r in H_bound by lia.
+    assert (H_pow : 0 < 2 ^ (Z.of_nat (List.length l))) by (apply Z.pow_pos_nonneg; lia).
+    assert (H_b : 0 <= Z.b2z (f (Z.of_nat a)) <= 1) by (destruct (f (Z.of_nat a)); cbn; lia).
+    cbn [Lists.List.fold_left].
+    assert (H_step : (2 *F acc) +F Z.b2z (f (Z.of_nat a)) = 2 * acc + Z.b2z (f (Z.of_nat a))). {
+      unfold BinOp.add, BinOp.mul.
+      rewrite (Z.mod_small (2 * acc)) by nia.
+      apply Z.mod_small; nia.
+    }
+    rewrite H_step.
+    set (b := Z.b2z (f (Z.of_nat a))) in *.
+    set (q := 2 ^ Z.of_nat (List.length l)) in *.
+    apply IHl; fold q; [lia|].
+    assert (H_le : 2 * acc + b + 1 <= 2 * (acc + 1)) by lia.
+    nia.
+  Qed.
+
   Lemma of_bools_eq_of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
       (H_p : 2 ^ BITS_PER_LIMB < p)
       (f : Z -> bool)
@@ -833,7 +904,18 @@ Module Limbs.
     of_bools BITS_PER_LIMB f limb =
     of_Z_bools BITS_PER_LIMB (fun z => Z.b2z (f z)) limb.
   Proof.
-  Admitted.
+    pose proof (prime_range (p := p)).
+    unfold of_bools, of_Z_bools.
+    symmetry.
+    apply fold_bits_eq_aux; [lia|].
+    rewrite Lists.List.length_rev, Lists.List.length_seq.
+    assert (H_pow_le : 2 ^ Z.of_nat (Z.to_nat BITS_PER_LIMB) <= Z.max 1 (2 ^ BITS_PER_LIMB)). {
+      destruct (Z.le_gt_cases 0 BITS_PER_LIMB).
+      - rewrite Z2Nat.id by lia; lia.
+      - replace (Z.to_nat BITS_PER_LIMB) with 0%nat by lia; cbn; lia.
+    }
+    nia.
+  Qed.
 
   Lemma of_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
       (f1 f2 : Z -> bool)
@@ -842,12 +924,45 @@ Module Limbs.
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
         f1 z = f2 z
       )
-      (limb : Z) :
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
     of_bools BITS_PER_LIMB f1 limb =
     of_bools BITS_PER_LIMB f2 limb.
-  Admitted.
+  Proof.
+    unfold of_bools.
+    apply fold_ext_in.
+    intros z Hz a.
+    apply Lists.List.in_rev, Lists.List.in_seq in Hz.
+    rewrite H_f1_f2_eq; [reflexivity|nia].
+  Qed.
+
+  (** The bits of one limb, most-significant first, determine the value of the limb
+      injectively: two bit functions giving the same limb values are equal bitwise. *)
+  Lemma bits_fold_inj (f1 f2 : Z -> bool) :
+    forall (n s : nat),
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f1 (Z.of_nat z)))
+      (Lists.List.rev (Lists.List.seq s n)) 0 =
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f2 (Z.of_nat z)))
+      (Lists.List.rev (Lists.List.seq s n)) 0 ->
+    forall k : nat, (s <= k < s + n)%nat -> f1 (Z.of_nat k) = f2 (Z.of_nat k).
+  Proof.
+    induction n; intros s H_eq k H_k; [lia|].
+    cbn [Lists.List.seq Lists.List.rev] in H_eq.
+    rewrite 2 Lists.List.fold_left_app in H_eq.
+    cbn [Lists.List.fold_left] in H_eq.
+    set (V1 := Lists.List.fold_left _ (Lists.List.rev (Lists.List.seq (S s) n)) 0) in H_eq.
+    set (V2 := Lists.List.fold_left _ (Lists.List.rev (Lists.List.seq (S s) n)) 0) in H_eq.
+    assert (H_b1 : 0 <= Z.b2z (f1 (Z.of_nat s)) <= 1) by (destruct (f1 (Z.of_nat s)); cbn; lia).
+    assert (H_b2 : 0 <= Z.b2z (f2 (Z.of_nat s)) <= 1) by (destruct (f2 (Z.of_nat s)); cbn; lia).
+    assert (H_bits : Z.b2z (f1 (Z.of_nat s)) = Z.b2z (f2 (Z.of_nat s)) /\ V1 = V2) by lia.
+    destruct H_bits as [H_bit H_V].
+    destruct (Nat.eq_dec k s) as [->|H_ne].
+    { destruct (f1 (Z.of_nat s)), (f2 (Z.of_nat s)); cbn in H_bit; congruence || lia. }
+    { apply (IHn (S s)); [exact H_V|lia]. }
+  Qed.
 
   Lemma limbs_eq_implies_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (H_bits_per_limb : 0 < BITS_PER_LIMB)
       (f1 f2 : Z -> bool)
       (H_limbs :
         forall (limb : Z),
@@ -858,7 +973,23 @@ Module Limbs.
     forall (z : Z),
     0 <= z < NB_LIMBS * BITS_PER_LIMB ->
     f1 z = f2 z.
-  Admitted.
+  Proof.
+    intros z H_z.
+    assert (H_limb : 0 <= z / BITS_PER_LIMB < NB_LIMBS). {
+      split.
+      - apply Z.div_pos; lia.
+      - apply Z.div_lt_upper_bound; lia.
+    }
+    specialize (H_limbs (z / BITS_PER_LIMB) H_limb).
+    unfold of_bools in H_limbs.
+    replace z with (Z.of_nat (Z.to_nat z)) by lia.
+    apply (bits_fold_inj f1 f2 (Z.to_nat BITS_PER_LIMB) (Z.to_nat (z / BITS_PER_LIMB * BITS_PER_LIMB))).
+    { exact H_limbs. }
+    { pose proof (Z.mul_div_le z BITS_PER_LIMB).
+      pose proof (Z.mod_pos_bound z BITS_PER_LIMB ltac:(lia)).
+      pose proof (Z.div_mod z BITS_PER_LIMB ltac:(lia)).
+      lia. }
+  Qed.
 End Limbs.
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
@@ -1151,12 +1282,17 @@ Axiom binary_chinese_remainder_alt : forall (p q x t : Z),
   x mod (p * q) = t mod (p * q).
 
 Lemma mod_0_range (k : Z) (x : Z) :
-    k > 0 -> 
+    k > 0 ->
     -k < x < k ->
     x mod k = 0 ->
     x = 0.
 Proof.
-Admitted.
+  intros.
+  apply Z.mod_divide in H1; [|lia].
+  destruct H1 as [c ->].
+  assert (c = 0) by nia.
+  lia.
+Qed.
 
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
