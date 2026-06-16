@@ -41,8 +41,8 @@ Module Type PrimeField.
   Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
   Axiom mul_comm : forall a b, mul a b = mul b a.
   Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Axiom add_zero : forall a, add a zero = a.
-  Axiom mul_one : forall a, mul a one = a.
+  Axiom add_zero : forall a, add a zero = mod_p a.
+  Axiom mul_one : forall a, mul a one = mod_p a.
   Axiom mul_zero : forall a, mul a zero = zero.
   Axiom add_neg : forall a, add a (neg a) = zero.
   Axiom sub_def : forall a b, sub a b = add a (neg b).
@@ -98,37 +98,70 @@ Module MakePrimeField (P : PrimeParameter) <: PrimeField.
   Qed.
   
   Lemma add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Proof. Admitted.
-  
+  Proof.
+    intros a b c. unfold add, mod_p.
+    rewrite Zplus_mod_idemp_l, Zplus_mod_idemp_r, Z.add_assoc.
+    reflexivity.
+  Qed.
+
   Lemma mul_comm : forall a b, mul a b = mul b a.
-  Proof. Admitted.
-  
+  Proof.
+    intros a b. unfold mul, mod_p.
+    rewrite Z.mul_comm. reflexivity.
+  Qed.
+
   Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Proof. Admitted.
-  
-  Lemma add_zero : forall a, add a zero = a.
-  Proof. Admitted.
-  
-  Lemma mul_one : forall a, mul a one = a.
-  Proof. Admitted.
-  
+  Proof.
+    intros a b c. unfold mul, mod_p.
+    rewrite Zmult_mod_idemp_l, Zmult_mod_idemp_r, Z.mul_assoc.
+    reflexivity.
+  Qed.
+
+  Lemma add_zero : forall a, add a zero = mod_p a.
+  Proof.
+    intros a. unfold add, zero.
+    rewrite Z.add_0_r. reflexivity.
+  Qed.
+
+  Lemma mul_one : forall a, mul a one = mod_p a.
+  Proof.
+    intros a. unfold mul, one.
+    rewrite Z.mul_1_r. reflexivity.
+  Qed.
+
   Lemma mul_zero : forall a, mul a zero = zero.
-  Proof. Admitted.
-  
+  Proof.
+    intros a. unfold mul, zero, mod_p.
+    rewrite Z.mul_0_r. apply Zmod_0_l.
+  Qed.
+
   Lemma add_neg : forall a, add a (neg a) = zero.
-  Proof. Admitted.
-  
+  Proof.
+    intros a. unfold add, neg, zero, mod_p.
+    rewrite Zplus_mod_idemp_r.
+    replace (a + (p - a)) with p by ring.
+    apply Z_mod_same_full.
+  Qed.
+
   Lemma sub_def : forall a b, sub a b = add a (neg b).
-  Proof. Admitted.
-  
+  Proof.
+    intros a b. unfold sub, add, neg, mod_p.
+    rewrite Zplus_mod_idemp_r.
+    f_equal. ring.
+  Qed.
+
   Lemma div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
-  Proof. Admitted.
-  
+  Proof. reflexivity. Qed.
+
   Lemma mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
   Proof. Admitted.
-  
+
   Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-  Proof. Admitted.
+  Proof.
+    intros a b c. unfold mul, add, mod_p.
+    rewrite Zmult_mod_idemp_r, <- Zplus_mod.
+    f_equal. ring.
+  Qed.
   
   Lemma of_bool_true : of_bool true = one.
   Proof. unfold of_bool, one. reflexivity. Qed.

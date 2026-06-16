@@ -619,7 +619,7 @@ Proof.
     rewrite a_prime_prime_0_0_bits_bools by assumption; f_equal.
     rewrite <- H_a_prime_prime_bits by lia.
     generalize z H_z; clear z H_z.
-    apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); intros.
+    apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); [reflexivity|intros].
     rewrite <- a_prime_prime0 by (assumption || lia).
     rewrite <- a_prime_prime_0_0_limbs by assumption.
     reflexivity.
@@ -642,11 +642,11 @@ Proof.
   unfold Array.get.
   destruct ((y =? 0) && (x =? 0)).
   { rewrite a_prime_prime_prime_0_0_limbs by eassumption.
-    apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); intros.
+    apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); [intros|assumption].
     now apply H_a_prime_prime_prime_0_0.
   }
   { rewrite a_prime_prime0 by assumption.
-    apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); intros.
+    apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); [intros|assumption].
     now apply H_a_prime_prime_bits.
   }
 Qed.
@@ -739,7 +739,7 @@ Proof.
         easy.
       }
       rewrite H_preimages by (unfold NUM_ROUNDS; lia).
-      apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB).
+      apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); [|assumption].
       intros z H_z.
       cbn - [Z.mul ComputeKeccak.compute_round].
       now match goal with
@@ -816,7 +816,7 @@ Proof.
     replace 23 with (final_index mod NUM_ROUNDS) by (unfold final_index, NUM_ROUNDS; lia).
     now apply H_round_flags.
   }
-  apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); intros z H_z.
+  apply (Limbs.of_bools_eq U64_LIMBS BITS_PER_LIMB); [intros z H_z|assumption].
   unfold ComputeKeccak.compute_keccak.
   replace (final_index mod NUM_ROUNDS) with 23 by (unfold final_index, NUM_ROUNDS; lia).
   replace (Z.to_nat NUM_ROUNDS) with (S (Z.to_nat 23)) by reflexivity.

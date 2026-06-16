@@ -346,7 +346,7 @@ Module a_a_prime_c_c_prime.
       pose proof (H_run y H_y x H_x) as [_ H_run_x_y]; clear H_run.
       pose proof (H_a x ltac:(assumption) y ltac:(assumption)) as H_a_x_y; clear H_a.
       generalize z H_z; clear z H_z.
-      apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); trivial.
+      apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); [reflexivity|]; trivial.
       intros limb H_limb.
       rewrite <- H_a_x_y by assumption; clear H_a_x_y.
       cbn - [Limbs.of_bools].
