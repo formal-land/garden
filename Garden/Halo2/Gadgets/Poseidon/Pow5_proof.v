@@ -203,28 +203,13 @@ Proof.
   now rewrite H.
 Qed.
 
-Lemma mul_from_comm (a b : Z) :
-    a *F b = b *F UnOp.from a.
-Proof.
-  unfold BinOp.mul, UnOp.from.
-  rewrite Zmult_mod_idemp_r.
-  f_equal; ring.
-Qed.
-
 Lemma dot3 (c0 c1 c2 x0 x1 x2 : Z) :
     c0 *F x0 +F c1 *F x1 +F c2 *F x2 =
     x0 *F UnOp.from c0 +F x1 *F UnOp.from c1 +F x2 *F UnOp.from c2.
 Proof.
-  rewrite (mul_from_comm c0 x0), (mul_from_comm c1 x1), (mul_from_comm c2 x2).
-  reflexivity.
-Qed.
-
-(** Reduction modulo [p] is idempotent. *)
-Lemma from_idem (x : Z) :
-    UnOp.from (UnOp.from x) = UnOp.from x.
-Proof.
-  unfold UnOp.from.
-  apply Zmod_mod.
+  FieldRewrite.run.
+  now unfold BinOp.mul;
+    rewrite (Z.mul_comm c0 x0), (Z.mul_comm c1 x1), (Z.mul_comm c2 x2).
 Qed.
 
 Lemma mds_roundtrip (state : State.t)
@@ -440,7 +425,8 @@ Module PartialRound.
       State.x0 := n0; State.x1 := n1; State.x2 := n2;
     |})).
     - symmetry.
-      apply mds_roundtrip; cbn [State.x0 State.x1 State.x2]; apply from_idem.
+      apply mds_roundtrip; cbn [State.x0 State.x1 State.x2];
+        apply FieldRewrite.from_from.
     - unfold output.
       rewrite !Ha.
       cbn [State.x0 State.x1 State.x2].
