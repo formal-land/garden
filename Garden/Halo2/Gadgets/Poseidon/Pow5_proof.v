@@ -203,6 +203,42 @@ Proof.
   now rewrite H.
 Qed.
 
+Lemma mul_from_comm (a b : Z) :
+    a *F b = b *F UnOp.from a.
+Proof.
+  unfold BinOp.mul, UnOp.from.
+  rewrite Zmult_mod_idemp_r.
+  f_equal; ring.
+Qed.
+
+Lemma dot3 (c0 c1 c2 x0 x1 x2 : Z) :
+    c0 *F x0 +F c1 *F x1 +F c2 *F x2 =
+    x0 *F UnOp.from c0 +F x1 *F UnOp.from c1 +F x2 *F UnOp.from c2.
+Proof.
+  rewrite (mul_from_comm c0 x0), (mul_from_comm c1 x1), (mul_from_comm c2 x2).
+  reflexivity.
+Qed.
+
+(** Reduction modulo [p] is idempotent. *)
+Lemma from_idem (x : Z) :
+    UnOp.from (UnOp.from x) = UnOp.from x.
+Proof.
+  unfold UnOp.from.
+  apply Zmod_mod.
+Qed.
+
+Lemma mds_roundtrip (state : State.t)
+    (H0 : UnOp.from state.(State.x0) = state.(State.x0))
+    (H1 : UnOp.from state.(State.x1) = state.(State.x1))
+    (H2 : UnOp.from state.(State.x2) = state.(State.x2)) :
+    mds_mul (mds_inv_mul state) = state.
+Proof.
+  assert (Hmm : M.map_mod state = state).
+  { destruct state; cbn in *; now rewrite H0, H1, H2. }
+  rewrite <- Hmm.
+  apply mds_mul_mds_inv_identity.
+Qed.
+
 Definition pow5 (value : Z) : Z :=
   let value_2 := value *F value in
   let value_4 := value_2 *F value_2 in
@@ -279,12 +315,28 @@ Module FullRound.
 End FullRound.
 
 Module PartialRound.
+  Definition sbox_partial (state : State.t) : State.t := {|
+    State.x0 := pow5 state.(State.x0);
+    State.x1 := state.(State.x1);
+    State.x2 := state.(State.x2);
+  |}.
+
   Definition output
       (state_0 state_1 state_2 : Z)
       (round_constant_a_0 round_constant_a_1 round_constant_a_2 : Z)
       (round_constant_b_0 round_constant_b_1 round_constant_b_2 : Z)
-      : State.t.
-  Admitted.
+      : State.t :=
+    let after_a :=
+      mds_mul (sbox_partial {|
+        State.x0 := state_0 +F round_constant_a_0;
+        State.x1 := state_1 +F round_constant_a_1;
+        State.x2 := state_2 +F round_constant_a_2;
+      |}) in
+    mds_mul (sbox_partial {|
+      State.x0 := after_a.(State.x0) +F round_constant_b_0;
+      State.x1 := after_a.(State.x1) +F round_constant_b_1;
+      State.x2 := after_a.(State.x2) +F round_constant_b_2;
+    |}).
 
   Theorem deterministic
       (ρ : Evaluation.t columns)
@@ -305,7 +357,101 @@ Module PartialRound.
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ ρ)
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ).
-  Admitted.
+  Proof.
+    unfold Pow5.partial_rounds_gate in Hgate.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from
+      P128Pow5T3.mds_coeff P128Pow5T3.mds_inv_coeff]
+      cbn in Hgate.
+    destruct Hgate as (h1 & h2 & h3 & h4).
+    specialize (h1 Hselector).
+    specialize (h2 Hselector).
+    specialize (h3 Hselector).
+    specialize (h4 Hselector).
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from
+      P128Pow5T3.mds_coeff P128Pow5T3.mds_inv_coeff
+      output sbox_partial pow5 mds_mul mds_inv_mul matrix_mul lin coeff]
+      cbn.
+    set (asg := ρ.(Evaluation.assignment)) in *.
+    set (row := ρ.(Evaluation.row)) in *.
+    set (nbr := ρ.(Evaluation.nb_rows)) in *.
+    set (s0 := UnOp.from (asg.(Assignment.advice) Advice.A6
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (s1 := UnOp.from (asg.(Assignment.advice) Advice.A7
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (s2 := UnOp.from (asg.(Assignment.advice) Advice.A8
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (a0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs2
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (a1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs3
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (a2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs4
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (b0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs5
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (b1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs6
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (b2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs7
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (m0 := UnOp.from (asg.(Assignment.advice) Advice.A5
+      (rotated_row row nbr Rotation.cur))) in *.
+    set (n0 := UnOp.from (asg.(Assignment.advice) Advice.A6
+      (rotated_row row nbr Rotation.next))) in *.
+    set (n1 := UnOp.from (asg.(Assignment.advice) Advice.A7
+      (rotated_row row nbr Rotation.next))) in *.
+    set (n2 := UnOp.from (asg.(Assignment.advice) Advice.A8
+      (rotated_row row nbr Rotation.next))) in *.
+    (* Fold the [pow5] applications back so the round S-boxes are visible. *)
+    assert (h1' : pow5 (s0 +F a0) = m0) by exact h1.
+    assert (h2' :
+      pow5 (m0 *F UnOp.from (mds_coeff 0 0) +F
+            (s1 +F a1) *F UnOp.from (mds_coeff 0 1) +F
+            (s2 +F a2) *F UnOp.from (mds_coeff 0 2) +F b0) =
+      n0 *F UnOp.from (mds_inv_coeff 0 0) +F
+      n1 *F UnOp.from (mds_inv_coeff 0 1) +F
+      n2 *F UnOp.from (mds_inv_coeff 0 2)) by exact h2.
+    clear h1 h2.
+    (* Round a followed by the MDS matrix maps the input state to the
+       intermediate state read off the partial-round constraints. *)
+    assert (Ha :
+      mds_mul (sbox_partial {|
+        State.x0 := s0 +F a0;
+        State.x1 := s1 +F a1;
+        State.x2 := s2 +F a2;
+      |}) = {|
+        State.x0 := m0 *F UnOp.from (mds_coeff 0 0) +F
+          (s1 +F a1) *F UnOp.from (mds_coeff 0 1) +F
+          (s2 +F a2) *F UnOp.from (mds_coeff 0 2);
+        State.x1 := m0 *F UnOp.from (mds_coeff 1 0) +F
+          (s1 +F a1) *F UnOp.from (mds_coeff 1 1) +F
+          (s2 +F a2) *F UnOp.from (mds_coeff 1 2);
+        State.x2 := m0 *F UnOp.from (mds_coeff 2 0) +F
+          (s1 +F a1) *F UnOp.from (mds_coeff 2 1) +F
+          (s2 +F a2) *F UnOp.from (mds_coeff 2 2);
+      |}).
+    {
+      unfold mds_mul, matrix_mul, lin, sbox_partial.
+      cbn [State.x0 State.x1 State.x2].
+      rewrite h1'.
+      f_equal; apply dot3.
+    }
+    (* The next-row state is the MDS-inverse image of round b's S-box output,
+       so applying the MDS matrix recovers it. *)
+    transitivity (mds_mul (mds_inv_mul {|
+      State.x0 := n0; State.x1 := n1; State.x2 := n2;
+    |})).
+    - symmetry.
+      apply mds_roundtrip; cbn [State.x0 State.x1 State.x2]; apply from_idem.
+    - unfold output.
+      rewrite !Ha.
+      cbn [State.x0 State.x1 State.x2].
+      f_equal.
+      unfold mds_inv_mul, matrix_mul, lin, sbox_partial.
+      cbn [State.x0 State.x1 State.x2].
+      f_equal.
+      + rewrite dot3, h2'. reflexivity.
+      + rewrite dot3, h3 at 1. reflexivity.
+      + rewrite dot3, h4 at 1. reflexivity.
+  Qed.
 End PartialRound.
 
 Module PadAndAdd.
