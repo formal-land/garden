@@ -1,5 +1,5 @@
 Require Garden.Orchard.circuit.commit_ivk.
-Require Garden.Halo2.Gadgets.Ecc.chip.constants.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.
@@ -27,10 +27,10 @@ Module CommitIvkCanonicityCheck.
       d_1 *F UnOp.from (2 ^ 254);
     a_prime :=
       a +F UnOp.from (2 ^ 130) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
     b2_c_prime :=
       b_2 +F c *F UnOp.from (2 ^ 5) +F
         UnOp.from (2 ^ 140) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
   |}.
 End CommitIvkCanonicityCheck.

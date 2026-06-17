@@ -1,16 +1,16 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Garden.Halo2.serialize.
-Require Garden.Halo2.Gadgets.LookupRangeCheck.
-Require Garden.Halo2.Gadgets.Ecc.chip.
-Require Garden.Halo2.Gadgets.Poseidon.Pow5.
-Require Garden.Halo2.Gadgets.Sinsemilla.chip.
-Require Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.
+Require Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.
+Require Garden.Halo2.halo2_gadgets.poseidon.pow5.
+Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
+Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
 Require Import Garden.Orchard.columns.
-Require Garden.Orchard.FixedBases.NullifierK.
-Require Garden.Orchard.FixedBases.SpendAuthG.
-Require Garden.Orchard.FixedBases.ValueCommitR.
-Require Garden.Orchard.FixedBases.ValueCommitV.
+Require Garden.Orchard.constants.fixed_bases.nullifier_k.
+Require Garden.Orchard.constants.fixed_bases.spend_auth_g.
+Require Garden.Orchard.constants.fixed_bases.value_commit_r.
+Require Garden.Orchard.constants.fixed_bases.value_commit_v.
 Require Garden.Orchard.circuit.commit_ivk.
 Require Garden.Orchard.circuit.gadget.add_chip.
 Require Garden.Orchard.circuit.note_commit.
@@ -218,19 +218,19 @@ Definition configure : 𝓒 columns unit :=
   do🞵 𝓒.CreateGate orchard_circuit_checks_gate in
   do🞵 Garden.Orchard.circuit.gadget.add_chip.configure in
   do🞵
-    Garden.Halo2.Gadgets.LookupRangeCheck.configure
+    Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.configure
       10
       Selector.QLookup
       Selector.QRunning
       Selector.QBitshift
       Advice.A9
       Lookup.TableIdx in
-  do🞵 Garden.Halo2.Gadgets.Ecc.chip.configure in
-  do🞵 Garden.Halo2.Gadgets.Poseidon.Pow5.configure in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_1 in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_1 in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.configure_2 in
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.merkle.chip.configure_2 in
+  do🞵 Garden.Halo2.halo2_gadgets.ecc.chip.configure in
+  do🞵 Garden.Halo2.halo2_gadgets.poseidon.pow5.configure in
+  do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.chip.configure_1 in
+  do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.configure_1 in
+  do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.chip.configure_2 in
+  do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.configure_2 in
   do🞵 Garden.Orchard.circuit.commit_ivk.configure in
   do🞵 Garden.Orchard.circuit.note_commit.configure_old in
   do🞵 Garden.Orchard.circuit.note_commit.configure_new in
@@ -238,7 +238,7 @@ Definition configure : 𝓒 columns unit :=
 
 Definition synthesize_range_check
     : 𝓛 columns RegionId.t unit :=
-  Garden.Halo2.Gadgets.LookupRangeCheck.synthesize.
+  Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize.
 
 Definition assign_free_advice
     (region : RegionId.t)
@@ -466,7 +466,7 @@ Definition synthesize_merkle_hash_layer_1
         Advice.A6 in
     let🞵 b1 :=
       𝓛.InNamespace "b_1" (
-        Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
+        Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB1)
           "Range check 5 bits"
           Selector.QLookup
@@ -474,7 +474,7 @@ Definition synthesize_merkle_hash_layer_1
           Advice.A9) in
     let🞵 b2 :=
       𝓛.InNamespace "b_2" (
-        Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
+        Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB2)
           "Range check 5 bits"
           Selector.QLookup
@@ -492,7 +492,7 @@ Definition synthesize_merkle_hash_layer_1
         Advice.A6 in
     let🞵 hash :=
       𝓛.InNamespace (hash_at_l_name layer) (
-        Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_1
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.synthesize_hash_to_point_1
           (merkle_region layer RegionId.Merkle.Region.HashToPoint)
           merkle_q_x
           merkle_q_y
@@ -509,9 +509,9 @@ Definition synthesize_merkle_hash_layer_1
         pair.(AssignedPair.right)
         b1
         b2
-        hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_a)
-        hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_b) in
-    return🞵 hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.x)).
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_a)
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_b) in
+    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x)).
 
 Definition synthesize_merkle_hash_layer_2
     (layer : Z)
@@ -525,7 +525,7 @@ Definition synthesize_merkle_hash_layer_2
         Advice.A7 in
     let🞵 b1 :=
       𝓛.InNamespace "b_1" (
-        Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
+        Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB1)
           "Range check 5 bits"
           Selector.QLookup
@@ -533,7 +533,7 @@ Definition synthesize_merkle_hash_layer_2
           Advice.A9) in
     let🞵 b2 :=
       𝓛.InNamespace "b_2" (
-        Garden.Halo2.Gadgets.LookupRangeCheck.synthesize_short
+        Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
           (merkle_region layer RegionId.Merkle.Region.RangeB2)
           "Range check 5 bits"
           Selector.QLookup
@@ -551,7 +551,7 @@ Definition synthesize_merkle_hash_layer_2
         Advice.A7 in
     let🞵 hash :=
       𝓛.InNamespace (hash_at_l_name layer) (
-        Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_2
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.synthesize_hash_to_point_2
           (merkle_region layer RegionId.Merkle.Region.HashToPoint)
           merkle_q_x
           merkle_q_y
@@ -568,9 +568,9 @@ Definition synthesize_merkle_hash_layer_2
         pair.(AssignedPair.right)
         b1
         b2
-        hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_a)
-        hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_b) in
-    return🞵 hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.x)).
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_a)
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_b) in
+    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x)).
 
 Definition synthesize_merkle_layer
     (layer : Z)
@@ -697,7 +697,7 @@ Definition synthesize_short_fixed_base_mul_incomplete_region
       assign_fixed_rows_with_selector
         Selector.QMulFixedRunningSum
         0
-        Garden.Orchard.FixedBases.ValueCommitV.short_fixed_rows in
+        Garden.Orchard.constants.fixed_bases.value_commit_v.short_fixed_rows in
     let🞵 acc := assign_mul_fixed_window region 0 in
     let🞵 acc := assign_incomplete_additions region 1 20%nat acc in
     let🞵 mul_b := assign_mul_fixed_window region 21 in
@@ -802,7 +802,7 @@ Definition synthesize_full_fixed_base_mul_value_commit_r
   let🞵 result :=
     synthesize_full_fixed_base_mul_incomplete_region_with_rows
       (value_commitment_region RegionId.ValueCommitment.ValueCommitRIncomplete)
-      Garden.Orchard.FixedBases.ValueCommitR.full_fixed_rows in
+      Garden.Orchard.constants.fixed_bases.value_commit_r.full_fixed_rows in
   synthesize_full_fixed_base_mul_last_region
     (value_commitment_region RegionId.ValueCommitment.ValueCommitRLast)
     result.
@@ -812,7 +812,7 @@ Definition synthesize_full_fixed_base_mul_spend_auth_g
   let🞵 result :=
     synthesize_full_fixed_base_mul_incomplete_region_with_rows
       (spend_authority_region RegionId.SpendAuthority.FullFixedIncomplete)
-      Garden.Orchard.FixedBases.SpendAuthG.full_fixed_rows in
+      Garden.Orchard.constants.fixed_bases.spend_auth_g.full_fixed_rows in
   synthesize_full_fixed_base_mul_last_region
     (spend_authority_region RegionId.SpendAuthority.FullFixedLast)
     result.
@@ -842,7 +842,7 @@ Definition synthesize_base_field_fixed_base_mul_incomplete_region
         assign_fixed_rows_with_selector
           Selector.QMulFixedRunningSum
           0
-          Garden.Orchard.FixedBases.NullifierK.base_field_fixed_rows in
+          Garden.Orchard.constants.fixed_bases.nullifier_k.base_field_fixed_rows in
       let🞵 acc := assign_mul_fixed_window region 0 in
       let🞵 acc := assign_incomplete_additions region 1 83%nat acc in
       let🞵 mul_b := assign_mul_fixed_window region 84 in
@@ -1002,7 +1002,7 @@ Definition synthesize_nullifier
   let🞵 nf_old :=
     𝓛.InNamespace "nf_old = DeriveNullifier_nk(rho_old, psi_old, cm_old)" (
       let🞵 poseidon_output :=
-        Garden.Halo2.Gadgets.Poseidon.Pow5.synthesize_hash nk rho in
+        Garden.Halo2.halo2_gadgets.poseidon.pow5.synthesize_hash nk rho in
       let🞵 scalar :=
         synthesize_scalar_add
           (nullifier_region RegionId.Nullifier.ScalarAdd)
@@ -1055,7 +1055,7 @@ Definition synthesize_address_integrity
     𝓛.InNamespace "ivk" (return🞵 tt) in
   let🞵 pk_d_calculated :=
     𝓛.InNamespace "[ivk] g_d_old" (
-      Garden.Halo2.Gadgets.Ecc.chip.mul.synthesize
+      Garden.Halo2.halo2_gadgets.ecc.chip.mul.synthesize
         (address_integrity_mul_region
           RegionId.AddressIntegrity.Mul.VariableBase)
         (address_integrity_mul_region
@@ -1078,11 +1078,11 @@ Definition synthesize_address_integrity
         "constrain equal" (fun _ =>
         do🞵
           𝓡.Copy
-            pk_d_calculated.(Garden.Halo2.Gadgets.Ecc.chip.mul.MulResult.x)
+            pk_d_calculated.(Garden.Halo2.halo2_gadgets.ecc.chip.mul.MulResult.x)
             pk_d_old.(AssignedPoint.x) in
         do🞵
           𝓡.Copy
-            pk_d_calculated.(Garden.Halo2.Gadgets.Ecc.chip.mul.MulResult.y)
+            pk_d_calculated.(Garden.Halo2.halo2_gadgets.ecc.chip.mul.MulResult.y)
             pk_d_old.(AssignedPoint.y) in
         return🞵 tt)) in
   return🞵 pk_d_old.
@@ -1183,7 +1183,7 @@ Definition synthesize_orchard_gate
 
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  do🞵 Garden.Halo2.Gadgets.Sinsemilla.chip.load_generator_table in
+  do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table in
   let🞵 '(psi_old, rho_old, cm_old, g_d_old, ak_P, nk, v_old, v_new) :=
     synthesize_witness_inputs in
   let🞵 root := synthesize_merkle_path cm_old.(AssignedPoint.x) in
