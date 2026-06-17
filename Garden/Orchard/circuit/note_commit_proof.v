@@ -1,5 +1,5 @@
 Require Garden.Orchard.circuit.note_commit.
-Require Garden.Halo2.Gadgets.Ecc.chip.constants.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.
@@ -85,7 +85,7 @@ Module InputGD.
       b_1 *F UnOp.from (2 ^ 254);
     a_prime :=
       a +F UnOp.from (2 ^ 130) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
   |}.
 End InputGD.
 
@@ -104,7 +104,7 @@ Module InputPKD.
     b3_c_prime :=
       b_3 +F c *F UnOp.from (2 ^ 4) +F
         UnOp.from (2 ^ 140) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
   |}.
 End InputPKD.
 
@@ -137,7 +137,7 @@ Module InputRho.
     e1_f_prime :=
       e_1 +F f *F UnOp.from (2 ^ 4) +F
         UnOp.from (2 ^ 140) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
   |}.
 End InputRho.
 
@@ -157,7 +157,7 @@ Module InputPsi.
     g1_g2_prime :=
       g_1 +F g_2 *F UnOp.from (2 ^ 9) +F
         UnOp.from (2 ^ 130) -F
-        UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+        UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
   |}.
 End InputPsi.
 
@@ -180,6 +180,6 @@ Module YCoordinateChecks.
         k_3 *F UnOp.from (2 ^ 254);
       j_prime :=
         j +F UnOp.from (2 ^ 130) -F
-          UnOp.from Garden.Halo2.Gadgets.Ecc.chip.constants.t_p;
+          UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
     |}.
 End YCoordinateChecks.

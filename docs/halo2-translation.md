@@ -71,26 +71,33 @@ orchard/src/circuit/note_commit.rs
   -> Garden/Orchard/circuit/note_commit.v
 
 halo2_gadgets/src/utilities/lookup_range_check.rs
-  -> Garden/Halo2/Gadgets/LookupRangeCheck.v
+  -> Garden/Halo2/halo2_gadgets/utilities/lookup_range_check.v
 
 halo2_gadgets/src/ecc/chip/*.rs
-  -> Garden/Halo2/Gadgets/Ecc/chip/*.v
+  -> Garden/Halo2/halo2_gadgets/ecc/chip/*.v
 
 halo2_gadgets/src/poseidon/pow5.rs
-  -> Garden/Halo2/Gadgets/Poseidon/Pow5.v
+  -> Garden/Halo2/halo2_gadgets/poseidon/pow5.v
 
 halo2_poseidon/src/p128pow5t3.rs and halo2_poseidon/src/fp.rs
-  -> Garden/Halo2/Gadgets/Poseidon/P128Pow5T3.v
+  -> Garden/Halo2/halo2_poseidon/p128pow5t3.v
 
 halo2_gadgets/src/sinsemilla/chip.rs
-  -> Garden/Halo2/Gadgets/Sinsemilla/chip.v
+  -> Garden/Halo2/halo2_gadgets/sinsemilla/chip.v
 
 halo2_gadgets/src/sinsemilla/merkle/chip.rs
-  -> Garden/Halo2/Gadgets/Sinsemilla/merkle/chip.v
+  -> Garden/Halo2/halo2_gadgets/sinsemilla/merkle/chip.v
 
 halo2_gadgets/src/utilities/cond_swap.rs
-  -> Garden/Halo2/Gadgets/Utilities/CondSwap.v
+  -> Garden/Halo2/halo2_gadgets/utilities/cond_swap.v
+
+orchard/src/constants/fixed_bases/*.rs
+  -> Garden/Orchard/constants/fixed_bases/*.v
 ```
+
+Rust source snapshots are copied beside the translated Rocq files using the
+same Rust filenames. These `.rs` files are for review and traceability only;
+they are not part of the Rocq build.
 
 When Rust submodules need to share translated column bundles without creating
 cycles, put those bundles in a small local `common.v` file under the mirrored
@@ -339,7 +346,7 @@ Large fixed-table data should be produced by structured Rocq model code rather
 than pasted generated Rocq traces. Table and fill-from-row replay are currently
 deferred in the free-monad synthesis model.
 
-`Garden/Halo2/Gadgets/Sinsemilla/SConstants.v` contains the translated
+`Garden/Halo2/halo2_gadgets/sinsemilla/sinsemilla_s.v` contains the translated
 `SINSEMILLA_S` coordinate table from the Rust `sinsemilla` crate. This is data
 used by the structured table loader, not a raw generated synthesis event dump.
 
@@ -648,7 +655,7 @@ Shared algebraic helpers that correspond to `halo2_gadgets/src/utilities.rs`
 live in:
 
 ```text
-Garden/Halo2/Gadgets/Utilities.v
+Garden/Halo2/halo2_gadgets/utilities.v
 ```
 
 Examples include `square`, `range_check`, `bool_check`, `ternary`, and

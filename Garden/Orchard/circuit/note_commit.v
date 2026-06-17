@@ -1,10 +1,10 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
-Require Garden.Halo2.Gadgets.Utilities.
-Require Garden.Halo2.Gadgets.Ecc.chip.constants.
-Require Garden.Halo2.Gadgets.Sinsemilla.chip.
-Require Garden.Orchard.FixedBases.NoteCommitR.
+Require Garden.Halo2.halo2_gadgets.utilities.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
+Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
+Require Garden.Orchard.constants.fixed_bases.note_commit_r.
 
 Import ListNotations.
 Global Open Scope pstring_scope.
@@ -150,7 +150,7 @@ Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
       assign_fixed_rows_with_selector
         Selector.QMulFixedFull
         0
-        Garden.Orchard.FixedBases.NoteCommitR.full_fixed_rows in
+        Garden.Orchard.constants.fixed_bases.note_commit_r.full_fixed_rows in
     let🞵 acc := assign_mul_fixed_window region 0 in
     let🞵 acc := assign_incomplete_additions region 1 83%nat acc in
     let🞵 mul_b := assign_mul_fixed_window region 84 in
@@ -180,7 +180,7 @@ Definition synthesize_full_fixed_base_mul_note_commit_r
     result.
 
 Definition t_p_expr : Expression.t columns :=
-  Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p.
+  Expression.Constant Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p.
 
 Definition q_note_commit_m_x : Z :=
   10629404576683096409262958701336170057000067777256141967953463442979689100381.
@@ -779,8 +779,8 @@ Definition synthesize_instance
       let🞵 m_hash :=
         𝓛.InNamespace "M" (
           (if use_second_sinsemilla
-           then Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit_2
-           else Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_note_commit)
+           then Garden.Halo2.halo2_gadgets.sinsemilla.chip.synthesize_hash_to_point_note_commit_2
+           else Garden.Halo2.halo2_gadgets.sinsemilla.chip.synthesize_hash_to_point_note_commit)
             (note_commit_region which RegionId.NoteCommit.HashToPoint)
             q_note_commit_m_x
             q_note_commit_m_y
@@ -794,9 +794,9 @@ Definition synthesize_instance
             h) in
       let m := {|
         AssignedPoint.x :=
-          m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.x);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x);
         AssignedPoint.y :=
-          m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.y);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.y);
       |} in
       let🞵 cm :=
         𝓛.InNamespace "M + [r] R" (
@@ -860,7 +860,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           d_3_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_d) in
       return🞵 d_0) in
   do🞵
     𝓛.AddRegion
@@ -888,7 +888,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           g_2_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_g) in
       return🞵 g_0) in
   let🞵 h_1 :=
     𝓛.AddRegion
@@ -920,7 +920,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           z13_a_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_a) in
       let z13_a_prime_target := Cell.advice region Advice.A9 1 in
       do🞵
         𝓡.Copy z13_a_prime_target x_gd_lookup.(LookupResult.z_end) in
@@ -944,7 +944,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           z13_c_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_c) in
       let z14_b3_c_prime_target := Cell.advice region Advice.A9 1 in
       do🞵
         𝓡.Copy z14_b3_c_prime_target x_pkd_lookup.(LookupResult.z_end) in
@@ -961,7 +961,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           d3_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_d) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_d) in
       let e_0_target := Cell.advice region Advice.A9 0 in
       do🞵 𝓡.Copy e_0_target e_0 in
       𝓡.EnableSelector q_value 0 "") in
@@ -984,7 +984,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           z13_f_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_f) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_f) in
       let z14_e1_f_prime_target := Cell.advice region Advice.A9 1 in
       do🞵
         𝓡.Copy z14_e1_f_prime_target rho_lookup.(LookupResult.z_end) in
@@ -1005,7 +1005,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           g_2_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z1_g) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_g) in
       let g1_g2_prime_target := Cell.advice region Advice.A8 1 in
       do🞵
         𝓡.Copy g1_g2_prime_target psi_lookup.(LookupResult.z_0) in
@@ -1013,7 +1013,7 @@ Definition synthesize_instance
       do🞵
         𝓡.Copy
           z13_g_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_g) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_g) in
       let z13_g1_g2_prime_target := Cell.advice region Advice.A9 1 in
       do🞵
         𝓡.Copy z13_g1_g2_prime_target psi_lookup.(LookupResult.z_end) in

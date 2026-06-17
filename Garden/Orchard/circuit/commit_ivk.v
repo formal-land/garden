@@ -1,10 +1,10 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Orchard.columns.
-Require Garden.Halo2.Gadgets.Utilities.
-Require Garden.Halo2.Gadgets.Ecc.chip.constants.
-Require Garden.Halo2.Gadgets.Sinsemilla.chip.
-Require Garden.Orchard.FixedBases.CommitIvkR.
+Require Garden.Halo2.halo2_gadgets.utilities.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
+Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
+Require Garden.Orchard.constants.fixed_bases.commit_ivk_r.
 
 Import ListNotations.
 Global Open Scope pstring_scope.
@@ -43,7 +43,7 @@ Definition commit_ivk_canonicity_check_gate : Gate.t columns := {|
     let z13_a_check := b_1 ✖️ z13_a in
     let a_prime_check :=
       a ➕ Expression.Constant (2 ^ 130)
-        ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p
+        ➖ Expression.Constant Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p
         ➖ a_prime in
     let z13_c := Expression.Advice Advice.A6 Rotation.next in
     let b2_c_prime := Expression.Advice Advice.A7 Rotation.next in
@@ -52,7 +52,7 @@ Definition commit_ivk_canonicity_check_gate : Gate.t columns := {|
     let z13_c_check := d_1 ✖️ z13_c in
     let b2_c_prime_check :=
       b_2 ➕ (c ● (2 ^ 5)) ➕ Expression.Constant (2 ^ 140)
-        ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p
+        ➖ Expression.Constant Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p
         ➖ b2_c_prime in
     Constraints.with_selector Selector.QCommitIvk [
       (Some "b1_bool_check", Constraint.Boolean b_1);
@@ -83,7 +83,7 @@ Definition commit_ivk_canonicity_check_gate : Gate.t columns := {|
       (Some "a_prime_check",
         Constraint.Equal
           (a ➕ Expression.Constant (2 ^ 130)
-            ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p)
+            ➖ Expression.Constant Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p)
           a_prime);
       (Some "z13_a_prime",
         Constraint.Either
@@ -100,7 +100,7 @@ Definition commit_ivk_canonicity_check_gate : Gate.t columns := {|
       (Some "b2_c_prime_check",
         Constraint.Equal
           (b_2 ➕ (c ● (2 ^ 5)) ➕ Expression.Constant (2 ^ 140)
-            ➖ Expression.Constant Garden.Halo2.Gadgets.Ecc.chip.constants.t_p)
+            ➖ Expression.Constant Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p)
           b2_c_prime);
       (Some "z14_b2_c_prime",
         Constraint.Either
@@ -240,7 +240,7 @@ Definition synthesize_full_fixed_base_mul_incomplete_region
       assign_fixed_rows_with_selector
         Selector.QMulFixedFull
         0
-        Garden.Orchard.FixedBases.CommitIvkR.full_fixed_rows in
+        Garden.Orchard.constants.fixed_bases.commit_ivk_r.full_fixed_rows in
     let🞵 acc := assign_mul_fixed_window region 0 in
     let🞵 acc := assign_incomplete_additions region 1 83%nat acc in
     let🞵 mul_b := assign_mul_fixed_window region 84 in
@@ -327,7 +327,7 @@ Definition assign_cells_used_in_canonicity_gate
     (ak nk : Cell.t columns RegionId.t)
     (a b c d : Cell.t columns RegionId.t)
     (b_0 b_2 d_0 : Cell.t columns RegionId.t)
-    (hash : Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.t)
+    (hash : Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.t)
     (ak_lookup nk_lookup : LookupResult.t)
     : 𝓛 columns RegionId.t unit :=
   𝓛.InNamespace "Assign cells used in canonicity gate" (
@@ -347,7 +347,7 @@ Definition assign_cells_used_in_canonicity_gate
       do🞵
         𝓡.Copy
           z13_a_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_a) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_a) in
       let a_prime_target := Cell.advice region Advice.A7 0 in
       do🞵
         𝓡.Copy a_prime_target ak_lookup.(LookupResult.z_0) in
@@ -366,7 +366,7 @@ Definition assign_cells_used_in_canonicity_gate
       do🞵
         𝓡.Copy
           z13_c_target
-          hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.z13_c) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_c) in
       let b2_c_prime_target := Cell.advice region Advice.A7 1 in
       do🞵
         𝓡.Copy b2_c_prime_target nk_lookup.(LookupResult.z_0) in
@@ -412,7 +412,7 @@ Definition synthesize
             synthesize_full_fixed_base_mul_commit_ivk_r)) in
       let🞵 m_hash :=
         𝓛.InNamespace "M" (
-          Garden.Halo2.Gadgets.Sinsemilla.chip.synthesize_hash_to_point_commit_ivk
+          Garden.Halo2.halo2_gadgets.sinsemilla.chip.synthesize_hash_to_point_commit_ivk
             (commit_ivk_region RegionId.CommitIvk.HashToPoint)
             q_commit_ivk_m_x
             q_commit_ivk_m_y
@@ -422,9 +422,9 @@ Definition synthesize
             d) in
       let m := {|
         AssignedPoint.x :=
-          m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.x);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x);
         AssignedPoint.y :=
-          m_hash.(Garden.Halo2.Gadgets.Sinsemilla.chip.HashResult.y);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.y);
       |} in
       let🞵 ivk :=
         𝓛.InNamespace "M + [r] R" (

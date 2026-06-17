@@ -98,7 +98,7 @@ To compile one Rocq file directly, run from `garden/Garden` and keep the same
 logical load path:
 
 ```sh
-opam exec -- coqc -impredicative-set -R . Garden Halo2/Gadgets/Poseidon/Pow5_proof.v
+opam exec -- coqc -impredicative-set -R . Garden Halo2/halo2_gadgets/poseidon/pow5_proof.v
 ```
 
 The current Halo2/Orchard proof work is checked with `-impredicative-set`.

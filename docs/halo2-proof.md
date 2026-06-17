@@ -15,13 +15,13 @@ Garden/Halo2/proof.v
 Poseidon proof work currently lives in:
 
 ```text
-Garden/Halo2/Gadgets/Poseidon/Pow5_proof.v
+Garden/Halo2/halo2_gadgets/poseidon/pow5_proof.v
 ```
 
 The translated Poseidon configure gates live in:
 
 ```text
-Garden/Halo2/Gadgets/Poseidon/Pow5.v
+Garden/Halo2/halo2_gadgets/poseidon/pow5.v
 ```
 
 The high-level synthesis DSL lives in:
@@ -168,7 +168,7 @@ as `gate.(Gate.constraints)` do not need explicit column parameters.
 
 Configure files should expose named `Gate.t` definitions for each gate created
 by the monadic `configure`. Proof-facing operation functions belong in sibling
-`*_proof.v` files, following `Pow5_proof.v`.
+`*_proof.v` files, following `pow5_proof.v`.
 
 Use executable `Z` functions and records for gates that compute or reconstruct
 target cells. If a gate is only a range, boolean, canonicity, on-curve, or
@@ -176,7 +176,7 @@ branch-conditional check, keep the named gate but do not invent an output
 function. Shared Z-level helpers for proof-side gate operations live in:
 
 ```text
-Garden/Halo2/Gadgets/Utilities_proof.v
+Garden/Halo2/halo2_gadgets/utilities_proof.v
 ```
 
 For reconstruction constraints, mirror the syntactic target:
@@ -221,20 +221,20 @@ Name theorem hypotheses as they would appear after `intros`, for example
 
 ## Poseidon Full Round
 
-The full round gate in `Pow5.v` constrains:
+The full round gate in `pow5.v` constrains:
 
 ```text
 next[row] = MDS[row] * pow5(state + round_constant)
 ```
 
-In `Pow5_proof.v`, `FullRound.output` is defined as an executable state-level
+In `pow5_proof.v`, `FullRound.output` is defined as an executable state-level
 function. Its helper `output_coordinate` intentionally mirrors the translated
 gate expression:
 
 ```coq
-state_0_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 0) +F
-state_1_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 1) +F
-state_2_sbox *F UnOp.from (P128Pow5T3.mds_coeff row 2)
+state_0_sbox *F UnOp.from (p128pow5t3.mds_coeff row 0) +F
+state_1_sbox *F UnOp.from (p128pow5t3.mds_coeff row 1) +F
+state_2_sbox *F UnOp.from (p128pow5t3.mds_coeff row 2)
 ```
 
 This syntactic alignment avoids needing field commutativity just to connect the
@@ -309,7 +309,7 @@ computed output record.
 
 ## MDS Matrix Facts
 
-`Pow5_proof.v` contains matrix helpers:
+`pow5_proof.v` contains matrix helpers:
 
 ```coq
 mds_mul
@@ -393,7 +393,7 @@ hauto lq: on.
 From `garden/Garden`, compile one file with:
 
 ```sh
-opam exec -- coqc -impredicative-set -R . Garden Halo2/Gadgets/Poseidon/Pow5_proof.v
+opam exec -- coqc -impredicative-set -R . Garden Halo2/halo2_gadgets/poseidon/pow5_proof.v
 ```
 
 The project currently uses `-impredicative-set` for these checks.
