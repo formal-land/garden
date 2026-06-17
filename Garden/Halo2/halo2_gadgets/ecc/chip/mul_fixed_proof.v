@@ -1,8 +1,13 @@
+Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
+Require Import Garden.Orchard.columns.
 Require Import Garden.Plonky3.M.
+
+#[local] Existing Instance Primes.PallasPIsPrime.
 
 Global Open Scope Z_scope.
 
@@ -38,4 +43,36 @@ Module RunningSumCoordinatesCheck.
         z_next *F
           UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.h in
     CoordsCheck.output c0 c1 c2 c3 c4 c5 c6 c7 window u fixed_z.
+
+  (* The fixed-base coordinates [(x_p, y_p)] on advice columns A0/A1 are
+     uniquely determined by the row's Lagrange-interpolation fixed coefficients,
+     the running-sum cells [z_cur]/[z_next] on A4, the witness [u] on A5, and the
+     fixed [z] coefficient, as constrained by [running_sum_coordinates_check_gate]. *)
+  Theorem deterministic
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QMulFixedRunningSum ⟧ ρ <> 0)
+      (Hgate :
+        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed
+            .running_sum_coordinates_check_gate ⟧ ρ) :
+      {|
+        Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
+          ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ;
+        Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
+          ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ;
+      |} =
+        output
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A4 Rotation.next ⟧ ρ)
+          (⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ ρ).
+  Proof.
+  Admitted.
 End RunningSumCoordinatesCheck.
