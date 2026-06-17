@@ -343,9 +343,9 @@ Module PartialRound.
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
           (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ).
   Proof.
-    unfold Pow5.partial_rounds_gate in Hgate.
+    unfold pow5.partial_rounds_gate in Hgate.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from
-      P128Pow5T3.mds_coeff P128Pow5T3.mds_inv_coeff]
+      p128pow5t3.mds_coeff p128pow5t3.mds_inv_coeff]
       cbn in Hgate.
     destruct Hgate as (h1 & h2 & h3 & h4).
     specialize (h1 Hselector).
@@ -353,7 +353,7 @@ Module PartialRound.
     specialize (h3 Hselector).
     specialize (h4 Hselector).
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from
-      P128Pow5T3.mds_coeff P128Pow5T3.mds_inv_coeff
+      p128pow5t3.mds_coeff p128pow5t3.mds_inv_coeff
       output sbox_partial pow5 mds_mul mds_inv_mul matrix_mul lin coeff]
       cbn.
     set (asg := ρ.(Evaluation.assignment)) in *.
