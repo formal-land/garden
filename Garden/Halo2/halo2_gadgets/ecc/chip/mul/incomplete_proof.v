@@ -62,7 +62,12 @@ Module QMul1Checks.
           (⟦ Expression.Advice lambda_1 Rotation.next ⟧ ρ)
           (⟦ Expression.Advice lambda_2 Rotation.next ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output, y_a, x_r, square.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from Primes.pallas_p]
+      cbn in *.
+    f_equal.
+    exact (Hgate Hselector).
+  Qed.
 End QMul1Checks.
 
 Module QMul2Checks.
@@ -103,7 +108,17 @@ Module QMul2Checks.
           (⟦ Expression.Advice lambda_1 Rotation.cur ⟧ ρ)
           (⟦ Expression.Advice lambda_2 Rotation.cur ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output, next_x_a, x_r, square.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
+    destruct Hgate as (hxp & hyp & _ & _ & hsec & _).
+    specialize (hxp Hselector).
+    specialize (hyp Hselector).
+    specialize (hsec Hselector).
+    f_equal.
+    - (* [x_p] is copied unchanged. *) now symmetry.
+    - (* [y_p] is copied unchanged. *) now symmetry.
+    - (* [x_a] on the next row is the secant-line image. *) field_solve.
+  Qed.
 End QMul2Checks.
 
 Module QMul3Checks.
@@ -137,5 +152,11 @@ Module QMul3Checks.
           (⟦ Expression.Advice lambda_1 Rotation.cur ⟧ ρ)
           (⟦ Expression.Advice lambda_2 Rotation.cur ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output, next_x_a, x_r, square.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
+    destruct Hgate as (_ & _ & hsec & _).
+    specialize (hsec Hselector).
+    f_equal.
+    field_solve.
+  Qed.
 End QMul3Checks.

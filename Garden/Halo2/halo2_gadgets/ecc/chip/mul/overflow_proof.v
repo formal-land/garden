@@ -42,5 +42,23 @@ Module OverflowChecks.
           (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
           (⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from Primes.pallas_p]
+      cbn in *.
+    destruct Hgate as (h1 & h2 & _ & _ & _).
+    specialize (h1 Hselector).
+    specialize (h2 Hselector).
+    (* [s_check] gives [s] up to the identity [2^124 * 2^6 = 2^130]. *)
+    assert (Hpow : UnOp.from 21267647932558653966460912964485513216 *F UnOp.from 64 =
+        UnOp.from 1361129467683753853853498429727072845824).
+    { unfold BinOp.mul, UnOp.from.
+      now rewrite Zmult_mod_idemp_l, Zmult_mod_idemp_r. }
+    (* [recovery] gives [z_0] by moving [alpha] back across the subtraction. *)
+    assert (add_sub_cancel : forall z alpha : Z, alpha +F (z -F alpha) = UnOp.from z).
+    { intros z alpha. unfold BinOp.add, BinOp.sub, UnOp.from.
+      rewrite Zplus_mod_idemp_r. f_equal. ring. }
+    f_equal.
+    - rewrite h1. now rewrite Hpow.
+    - now rewrite <- h2, add_sub_cancel, FieldRewrite.from_from.
+  Qed.
 End OverflowChecks.

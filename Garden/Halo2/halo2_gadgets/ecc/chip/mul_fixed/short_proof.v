@@ -36,5 +36,10 @@ Module ShortFixedBaseMul.
           (⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ)
           (⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
+    destruct Hgate as (_ & _ & _ & h4).
+    specialize (h4 Hselector).
+    now rewrite h4.
+  Qed.
 End ShortFixedBaseMul.
