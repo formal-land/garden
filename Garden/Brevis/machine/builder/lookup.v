@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Brevis.M.
 Require Import Garden.Brevis.compiler.riscv.opcode.
 Require Import Garden.Brevis.machine.lookup.

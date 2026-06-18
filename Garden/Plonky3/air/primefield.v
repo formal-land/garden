@@ -1,5 +1,6 @@
 Require Import Stdlib.ZArith.ZArith.
-Require Import Plonky3.M.
+Require Import Garden.Field.Field.
+Require Import Garden.Field.Fermat.
 Require Import Stdlib.ZArith.Znumtheory.
 Open Scope Z_scope.
 
@@ -47,7 +48,10 @@ Module Type PrimeField.
   Axiom add_neg : forall a, add a (neg a) = zero.
   Axiom sub_def : forall a b, sub a b = add a (neg b).
   Axiom div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
-  Axiom mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
+  (* The hypothesis requires the reduced value [mod_p a] to be nonzero; the bare
+     integer disequality [a <> zero] does not suffice, since e.g. [a = p] reduces
+     to zero. *)
+  Axiom mul_inv : forall a c, mod_p a <> zero -> mul a (inv a c) = one.
   Axiom distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   Axiom of_bool_true : of_bool true = one.
   Axiom of_bool_false : of_bool false = zero.
@@ -153,8 +157,14 @@ Module MakePrimeField (P : PrimeParameter) <: PrimeField.
   Lemma div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
   Proof. reflexivity. Qed.
 
-  Lemma mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
-  Proof. Admitted.
+  Lemma mul_inv : forall a c, mod_p a <> zero -> mul a (inv a c) = one.
+  Proof.
+    intros a c Hnz.
+    unfold mul, inv, mod_p, one, zero in *.
+    apply Fermat.inv_correct_gen.
+    - exact p_prime.
+    - exact Hnz.
+  Qed.
 
   Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   Proof.

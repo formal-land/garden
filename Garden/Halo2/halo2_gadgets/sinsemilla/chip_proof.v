@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
+Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Import Garden.Plonky3.M.
 

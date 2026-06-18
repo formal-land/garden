@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Brevis.primitives.consts.
 
 Module Word.
@@ -6,7 +7,7 @@ Module Word.
   Definition t := Array.t Z WORD_SIZE.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod t := {
-    map_mod x := M.map_mod x;
+    map_mod x := Field.map_mod x;
   }.
 
   Global Instance IsGenerate : MGenerate.C t :=

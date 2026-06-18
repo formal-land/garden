@@ -1,4 +1,5 @@
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.base_field_elem.
+Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Import Garden.Plonky3.M.
 

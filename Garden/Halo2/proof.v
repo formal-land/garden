@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 
 Import ListNotations.

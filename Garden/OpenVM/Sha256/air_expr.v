@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.MExpr.
 Require Import Garden.OpenVM.primitives.bitwise_op_lookup.
 Require Import Garden.OpenVM.primitives.encoder.

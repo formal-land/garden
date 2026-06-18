@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 
 (** For word and bytes *)
 Definition BYTE_SIZE : Z := 8.
