@@ -33,5 +33,8 @@ Module LsbCheck.
           (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)
           (⟦ Expression.Advice Advice.A9 Rotation.cur ⟧ ρ)).(lsb).
   Proof.
-  Admitted.
+    unfold output; cbn.
+    destruct Hgate as (hbool & _).
+    exact (hbool Hselector).
+  Qed.
 End LsbCheck.

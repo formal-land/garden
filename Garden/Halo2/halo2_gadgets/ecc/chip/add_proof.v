@@ -4,7 +4,10 @@ Require Garden.Halo2.halo2_gadgets.ecc.chip.add.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Field.Field.
+Require Import Garden.Field.FieldLemmas.
+Require Import Garden.Field.FieldDiv.
 Require Import Garden.Plonky3.M.
+Require Import Stdlib.Bool.Bool.
 
 #[local] Existing Instance Primes.PallasPIsPrime.
 
@@ -70,5 +73,175 @@ Module CompleteAddition.
        [y <> 0], from [Garden.Field.FieldDiv]) determines [lambda] in the
        generic/doubling case, and the exceptional cases are read directly off
        the gate constraints. *)
-  Admitted.
+    unfold output, square.
+    with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from] cbn.
+    with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]
+      cbn in Hgate.
+    set (A := ρ.(Evaluation.assignment).(Assignment.advice)) in *.
+    set (rc := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
+      Rotation.cur) in *.
+    set (rn := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
+      Rotation.next) in *.
+    set (xp := UnOp.from (A Advice.A0 rc)) in *.
+    set (yp := UnOp.from (A Advice.A1 rc)) in *.
+    set (xq := UnOp.from (A Advice.A2 rc)) in *.
+    set (yq := UnOp.from (A Advice.A3 rc)) in *.
+    set (lam := UnOp.from (A Advice.A4 rc)) in *.
+    set (alpha := UnOp.from (A Advice.A5 rc)) in *.
+    set (beta := UnOp.from (A Advice.A6 rc)) in *.
+    set (gamma := UnOp.from (A Advice.A7 rc)) in *.
+    set (delta := UnOp.from (A Advice.A8 rc)) in *.
+    set (XR := UnOp.from (A Advice.A2 rn)) in *.
+    set (YR := UnOp.from (A Advice.A3 rn)) in *.
+    destruct Hgate as (Hc1 & Hc2 & Hc3a & Hc3b & Hc3c & Hc3d &
+      Hc4a & Hc4b & Hc5a & Hc5b & Hc6a & Hc6b).
+    specialize (Hc1 Hselector); specialize (Hc2 Hselector);
+    specialize (Hc3a Hselector); specialize (Hc3b Hselector);
+    specialize (Hc3c Hselector); specialize (Hc3d Hselector);
+    specialize (Hc4a Hselector); specialize (Hc4b Hselector);
+    specialize (Hc5a Hselector); specialize (Hc5b Hselector);
+    specialize (Hc6a Hselector); specialize (Hc6b Hselector).
+    assert (Ixp : UnOp.from xp = xp) by (unfold xp; apply FieldRewrite.from_from).
+    assert (Iyp : UnOp.from yp = yp) by (unfold yp; apply FieldRewrite.from_from).
+    assert (Ixq : UnOp.from xq = xq) by (unfold xq; apply FieldRewrite.from_from).
+    assert (Iyq : UnOp.from yq = yq) by (unfold yq; apply FieldRewrite.from_from).
+    assert (IXR : UnOp.from XR = XR) by (unfold XR; apply FieldRewrite.from_from).
+    assert (IYR : UnOp.from YR = YR) by (unfold YR; apply FieldRewrite.from_from).
+    (* P = O: the result is Q. *)
+    destruct (xp =? 0) eqn:Exp0.
+    { apply Z.eqb_eq in Exp0.
+      rewrite Exp0 in Hc4a, Hc4b.
+      autorewrite with field_rewrite in Hc4a, Hc4b.
+      apply sub_zero_equiv in Hc4a, Hc4b.
+      f_equal;
+        [ rewrite <- IXR, <- Ixq; exact Hc4a
+        | rewrite <- IYR, <- Iyq; exact Hc4b ]. }
+    apply Z.eqb_neq in Exp0.
+    assert (Nxp : UnOp.from xp <> 0) by (rewrite Ixp; exact Exp0).
+    (* Q = O: the result is P. *)
+    destruct (xq =? 0) eqn:Exq0.
+    { apply Z.eqb_eq in Exq0.
+      rewrite Exq0 in Hc5a, Hc5b.
+      autorewrite with field_rewrite in Hc5a, Hc5b.
+      apply sub_zero_equiv in Hc5a, Hc5b.
+      f_equal;
+        [ rewrite <- IXR, <- Ixp; exact Hc5a
+        | rewrite <- IYR, <- Iyp; exact Hc5b ]. }
+    apply Z.eqb_neq in Exq0.
+    assert (Nxq : UnOp.from xq <> 0) by (rewrite Ixq; exact Exq0).
+    (* P = -Q: the result is the identity (0, 0). *)
+    destruct ((xp =? xq) && (yp +F yq =? 0)) eqn:Epmq.
+    { apply Bool.andb_true_iff in Epmq. destruct Epmq as [Exy Eyy].
+      apply Z.eqb_eq in Exy. apply Z.eqb_eq in Eyy.
+      assert (H1 : xq -F xp = 0)
+        by (apply sub_zero_equiv; rewrite Exy; reflexivity).
+      assert (H2 : yq +F yp = 0) by (rewrite field_add_comm; exact Eyy).
+      (* The witnessed-inverse selector vanishes: the factor reduces to 1. *)
+      assert (Hfac : UnOp.from
+        (UnOp.from 1 -F (xq -F xp) *F alpha -F (yq +F yp) *F delta) <> 0).
+      { rewrite H1, H2. autorewrite with field_rewrite. discriminate. }
+      apply (field_mul_eq_zero_cancel _ _ Hfac) in Hc6a.
+      apply (field_mul_eq_zero_cancel _ _ Hfac) in Hc6b.
+      f_equal;
+        [ rewrite <- IXR; exact Hc6a | rewrite <- IYR; exact Hc6b ]. }
+    apply Bool.andb_false_iff in Epmq.
+    destruct (xp =? xq) eqn:Exy.
+    { (* Doubling: x_p = x_q (and y_p + y_q <> 0). *)
+      assert (Eyy : (yp +F yq =? 0) = false)
+        by (destruct Epmq as [E | E]; [ congruence | exact E ]).
+      apply Z.eqb_neq in Eyy.
+      apply Z.eqb_eq in Exy.
+      set (Lo := BinOp.div (UnOp.from 3 *F (xp *F xp)) (UnOp.from 2 *F yp)) in *.
+      assert (H2nz : UnOp.from (UnOp.from 2) <> 0)
+        by (rewrite FieldRewrite.from_from; intro Hh; vm_compute in Hh; discriminate).
+      assert (H3nz : UnOp.from (UnOp.from 3) <> 0)
+        by (rewrite FieldRewrite.from_from; intro Hh; vm_compute in Hh; discriminate).
+      assert (Hqp0 : xq -F xp = 0)
+        by (apply sub_zero_equiv; rewrite Exy; reflexivity).
+      (* The tangent selector reduces to 1, so the tangent line is forced. *)
+      assert (Hfac : UnOp.from (UnOp.from 1 -F (xq -F xp) *F alpha) <> 0).
+      { rewrite Hqp0. autorewrite with field_rewrite. discriminate. }
+      apply (field_mul_eq_zero_cancel _ _ Hfac) in Hc2.
+      rewrite FieldRewrite.from_sub in Hc2.
+      apply sub_zero_equiv in Hc2.
+      rewrite FieldRewrite.from_mul, FieldRewrite.from_mul in Hc2.
+      (* Hc2 : (UnOp.from 2 *F yp) *F lam = UnOp.from 3 *F (xp *F xp) *)
+      assert (Nyp : UnOp.from yp <> 0).
+      { intro Hy.
+        assert (Htyp : UnOp.from (UnOp.from 2 *F yp) = 0).
+        { rewrite FieldRewrite.from_mul.
+          apply mul_zero_implies_zero. right. exact Hy. }
+        assert (HLHS : (UnOp.from 2 *F yp) *F lam = 0)
+          by (apply mul_zero_implies_zero; left; exact Htyp).
+        assert (H0 : UnOp.from 3 *F (xp *F xp) = 0)
+          by exact (eq_trans (eq_sym Hc2) HLHS).
+        apply (field_mul_eq_zero_cancel _ _ H3nz) in H0.
+        rewrite FieldRewrite.from_mul in H0.
+        apply (field_mul_eq_zero_cancel _ _ Nxp) in H0.
+        exact (Nxp H0). }
+      assert (Ntd : UnOp.from (UnOp.from 2 *F yp) <> 0)
+        by (apply field_from_mul_nonzero; [ exact H2nz | exact Nyp ]).
+      assert (Hldiv : Lo *F (UnOp.from 2 *F yp) = UnOp.from 3 *F (xp *F xp)).
+      { unfold Lo. rewrite div_mul.
+        - exact (FieldRewrite.from_mul (UnOp.from 3) (xp *F xp)).
+        - unfold Primes.pallas_p, Primes.t_p; lia.
+        - exact Ntd. }
+      assert (Hlam_eq : UnOp.from lam = UnOp.from Lo).
+      { apply (field_mul_cancel_r lam Lo (UnOp.from 2 *F yp) Ntd).
+        exact (eq_trans (field_mul_comm lam (UnOp.from 2 *F yp))
+          (eq_trans Hc2 (eq_sym Hldiv))). }
+      assert (Nyqp : UnOp.from (yq +F yp) <> 0)
+        by (rewrite field_add_comm, FieldRewrite.from_add; exact Eyy).
+      assert (Hpfx : UnOp.from (xp *F xq *F (yq +F yp)) <> 0)
+        by (apply field_from_mul_nonzero;
+            [ apply field_from_mul_nonzero; assumption | exact Nyqp ]).
+      apply (field_mul_eq_zero_cancel _ _ Hpfx) in Hc3c.
+      apply (field_mul_eq_zero_cancel _ _ Hpfx) in Hc3d.
+      assert (HXR' : XR = lam *F lam -F xp -F xq)
+        by (apply (field_solve_xr (lam *F lam) xp xq XR IXR); exact Hc3c).
+      assert (HYR' : YR = lam *F (xp -F XR) -F yp)
+        by (apply (field_solve_yr (lam *F (xp -F XR)) yp YR IYR); exact Hc3d).
+      assert (HXR : XR = Lo *F Lo -F xp -F xq).
+      { rewrite HXR'. now rewrite (field_mul_cong lam lam Lo Lo Hlam_eq Hlam_eq). }
+      set (xrout := Lo *F Lo -F xp -F xq) in *.
+      rewrite <- HXR.
+      f_equal.
+      rewrite HYR'.
+      now rewrite (field_mul_cong lam (xp -F XR) Lo (xp -F XR) Hlam_eq eq_refl). }
+    { (* Generic: x_p <> x_q. *)
+      apply Z.eqb_neq in Exy.
+      set (Lo := BinOp.div (yq -F yp) (xq -F xp)) in *.
+      assert (Nqp : UnOp.from (xq -F xp) <> 0).
+      { rewrite FieldRewrite.from_sub. intro Hh. apply sub_zero_equiv in Hh.
+        rewrite Ixq, Ixp in Hh. exact (Exy (eq_sym Hh)). }
+      assert (Hldiv : Lo *F (xq -F xp) = yq -F yp).
+      { unfold Lo. rewrite div_mul.
+        - exact (FieldRewrite.from_sub yq yp).
+        - unfold Primes.pallas_p, Primes.t_p; lia.
+        - exact Nqp. }
+      apply (field_mul_eq_zero_cancel _ _ Nqp) in Hc1.
+      rewrite FieldRewrite.from_sub in Hc1.
+      apply sub_zero_equiv in Hc1.
+      rewrite FieldRewrite.from_mul, FieldRewrite.from_sub in Hc1.
+      assert (Hlam_eq : UnOp.from lam = UnOp.from Lo).
+      { apply (field_mul_cancel_r lam Lo (xq -F xp) Nqp).
+        exact (eq_trans (field_mul_comm lam (xq -F xp))
+          (eq_trans Hc1 (eq_sym Hldiv))). }
+      assert (Hpfx : UnOp.from (xp *F xq *F (xq -F xp)) <> 0)
+        by (apply field_from_mul_nonzero;
+            [ apply field_from_mul_nonzero; assumption | exact Nqp ]).
+      apply (field_mul_eq_zero_cancel _ _ Hpfx) in Hc3a.
+      apply (field_mul_eq_zero_cancel _ _ Hpfx) in Hc3b.
+      assert (HXR' : XR = lam *F lam -F xp -F xq)
+        by (apply (field_solve_xr (lam *F lam) xp xq XR IXR); exact Hc3a).
+      assert (HYR' : YR = lam *F (xp -F XR) -F yp)
+        by (apply (field_solve_yr (lam *F (xp -F XR)) yp YR IYR); exact Hc3b).
+      assert (HXR : XR = Lo *F Lo -F xp -F xq).
+      { rewrite HXR'. now rewrite (field_mul_cong lam lam Lo Lo Hlam_eq Hlam_eq). }
+      set (xrout := Lo *F Lo -F xp -F xq) in *.
+      rewrite <- HXR.
+      f_equal.
+      rewrite HYR'.
+      now rewrite (field_mul_cong lam (xp -F XR) Lo (xp -F XR) Hlam_eq eq_refl). }
+  Qed.
 End CompleteAddition.

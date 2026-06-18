@@ -35,5 +35,8 @@ Module DecomposeScalarComplete.
           (⟦ Expression.Advice Advice.A9 Rotation.prev ⟧ ρ)
           (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)).(k).
   Proof.
-  Admitted.
+    unfold output; cbn.
+    destruct Hgate as (hbool & _).
+    exact (hbool Hselector).
+  Qed.
 End DecomposeScalarComplete.
