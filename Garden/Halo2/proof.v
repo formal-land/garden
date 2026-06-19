@@ -19,7 +19,6 @@ Module Evaluation.
   Record t {columns : Columns.t} : Set := {
     assignment : Assignment.t columns;
     row : Z;
-    nb_rows : Z;
   }.
   Arguments t : clear implicits.
 
@@ -33,7 +32,7 @@ Notation "⟦ x ⟧ ρ" := (Evaluation.eval ρ x)
   (at level 10, x at level 200, ρ at level 9).
 
 Definition rotated_row
-    (row nb_rows : Z)
+    (row : Z)
     (rotation : Rotation.t)
     : Z :=
   row + rotation.(Rotation.offset).
@@ -45,144 +44,130 @@ Section Semantics.
 
   Definition eval_selector
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (selector : columns.(Columns.Selector))
       : Z :=
     UnOp.from
-      (assignment.(Assignment.selector) selector (row mod nb_rows)).
+      (assignment.(Assignment.selector) selector row).
 
   Fixpoint eval_expression
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (expression : Expression.t columns)
       : Z :=
     match expression with
     | Expression.Constant value =>
         UnOp.from value
     | Expression.Selector selector =>
-        eval_selector assignment row nb_rows selector
+        eval_selector assignment row selector
     | Expression.Fixed fixed rotation =>
         UnOp.from
           (assignment.(Assignment.fixed)
             fixed
-            (rotated_row row nb_rows rotation))
+            (rotated_row row rotation))
     | Expression.Advice advice rotation =>
         UnOp.from
           (assignment.(Assignment.advice)
             advice
-            (rotated_row row nb_rows rotation))
+            (rotated_row row rotation))
     | Expression.Instance_ instance rotation =>
         UnOp.from
           (assignment.(Assignment.instance_)
             instance
-            (rotated_row row nb_rows rotation))
+            (rotated_row row rotation))
     | Expression.Sum lhs (Expression.Negated rhs) =>
         BinOp.sub
-          (eval_expression assignment row nb_rows lhs)
-          (eval_expression assignment row nb_rows rhs)
+          (eval_expression assignment row lhs)
+          (eval_expression assignment row rhs)
     | Expression.Negated expression =>
-        UnOp.opp (eval_expression assignment row nb_rows expression)
+        UnOp.opp (eval_expression assignment row expression)
     | Expression.Sum lhs rhs =>
         BinOp.add
-          (eval_expression assignment row nb_rows lhs)
-          (eval_expression assignment row nb_rows rhs)
+          (eval_expression assignment row lhs)
+          (eval_expression assignment row rhs)
     | Expression.Product lhs rhs =>
         BinOp.mul
-          (eval_expression assignment row nb_rows lhs)
-          (eval_expression assignment row nb_rows rhs)
+          (eval_expression assignment row lhs)
+          (eval_expression assignment row rhs)
     | Expression.Scaled expression scale =>
         BinOp.mul
-          (eval_expression assignment row nb_rows expression)
+          (eval_expression assignment row expression)
           (UnOp.from scale)
     end.
 
   Fixpoint eval_constraint
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (constraint : Constraint.t columns)
       : Prop :=
     match constraint with
     | Constraint.Select selector constraint =>
-        eval_selector assignment row nb_rows selector <> 0 ->
-          eval_constraint assignment row nb_rows constraint
+        eval_selector assignment row selector <> 0 ->
+          eval_constraint assignment row constraint
     | Constraint.Equal lhs rhs =>
-        eval_expression assignment row nb_rows lhs =
-          eval_expression assignment row nb_rows rhs
+        eval_expression assignment row lhs =
+          eval_expression assignment row rhs
     | Constraint.Boolean expression =>
-        IsBool.t (eval_expression assignment row nb_rows expression)
+        IsBool.t (eval_expression assignment row expression)
     | Constraint.Range expression range =>
-        0 <= eval_expression assignment row nb_rows expression < Z.of_nat range
+        0 <= eval_expression assignment row expression < Z.of_nat range
     | Constraint.Either lhs rhs =>
-        eval_constraint assignment row nb_rows lhs \/
-          eval_constraint assignment row nb_rows rhs
+        eval_constraint assignment row lhs \/
+          eval_constraint assignment row rhs
     | Constraint.EqualZeroToPrecise expression =>
-        eval_expression assignment row nb_rows expression = 0
+        eval_expression assignment row expression = 0
     end.
-  Arguments eval_constraint _ _ _ _ /.
+  Arguments eval_constraint _ _ _ /.
 
   Definition eval_named_constraint
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (constraint : option string * Constraint.t columns)
       : Prop :=
     let '(_, constraint) := constraint in
-    eval_constraint assignment row nb_rows constraint.
-  Arguments eval_named_constraint _ _ _ _ /.
+    eval_constraint assignment row constraint.
+  Arguments eval_named_constraint _ _ _ /.
 
   Fixpoint eval_constraints
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (constraints : Constraints.t columns)
       : Prop :=
     match constraints with
     | [] => True
     | [constraint] =>
-        eval_named_constraint assignment row nb_rows constraint
+        eval_named_constraint assignment row constraint
     | constraint :: constraints =>
-        eval_named_constraint assignment row nb_rows constraint /\
-        eval_constraints assignment row nb_rows constraints
+        eval_named_constraint assignment row constraint /\
+        eval_constraints assignment row constraints
     end.
-  Arguments eval_constraints _ _ _ _ /.
+  Arguments eval_constraints _ _ _ /.
 
   Definition eval_gate
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (gate : Gate.t columns)
       : Prop :=
     eval_constraints
       assignment
       row
-      nb_rows
       gate.(Gate.constraints).
-  Arguments eval_gate _ _ _ _ /.
+  Arguments eval_gate _ _ _ /.
 
   Fixpoint eval_gates
       (assignment : Assignment.t columns)
-      (row nb_rows : Z)
+      (row : Z)
       (gates : list (Gate.t columns))
       : Prop :=
     match gates with
     | [] => True
     | [gate] =>
-        eval_gate assignment row nb_rows gate
+        eval_gate assignment row gate
     | gate :: gates =>
-        eval_gate assignment row nb_rows gate /\
-        eval_gates assignment row nb_rows gates
+        eval_gate assignment row gate /\
+        eval_gates assignment row gates
     end.
-  Arguments eval_gates _ _ _ _ /.
-
-  Definition eval_constraint_system_gates
-      (assignment : Assignment.t columns)
-      (nb_rows : Z)
-      (system : ConstraintSystem.t columns)
-      : Prop :=
-    forall row,
-      0 <= row < nb_rows ->
-      eval_gates
-        assignment
-        row
-        nb_rows
-        system.(ConstraintSystem.gates).
+  Arguments eval_gates _ _ _ /.
 
   Global Instance SelectorIsEvaluable :
       Evaluation.C columns.(Columns.Selector) Z := {
@@ -190,7 +175,6 @@ Section Semantics.
       eval_selector
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         selector;
   }.
 
@@ -200,7 +184,6 @@ Section Semantics.
       eval_expression
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         expression;
   }.
 
@@ -210,7 +193,6 @@ Section Semantics.
       eval_constraint
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         constraint;
   }.
 
@@ -220,7 +202,6 @@ Section Semantics.
       eval_named_constraint
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         constraint;
   }.
 
@@ -230,7 +211,6 @@ Section Semantics.
       eval_constraints
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         constraints;
   }.
 
@@ -240,7 +220,6 @@ Section Semantics.
       eval_gate
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         gate;
   }.
 
@@ -250,7 +229,6 @@ Section Semantics.
       eval_gates
         ρ.(Evaluation.assignment)
         ρ.(Evaluation.row)
-        ρ.(Evaluation.nb_rows)
         gates;
   }.
 End Semantics.

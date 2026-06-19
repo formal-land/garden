@@ -359,33 +359,32 @@ Module PartialRound.
       cbn.
     set (asg := ρ.(Evaluation.assignment)) in *.
     set (row := ρ.(Evaluation.row)) in *.
-    set (nbr := ρ.(Evaluation.nb_rows)) in *.
     set (s0 := UnOp.from (asg.(Assignment.advice) Advice.A6
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (s1 := UnOp.from (asg.(Assignment.advice) Advice.A7
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (s2 := UnOp.from (asg.(Assignment.advice) Advice.A8
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (a0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs2
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (a1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs3
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (a2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs4
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (b0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs5
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (b1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs6
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (b2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs7
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (m0 := UnOp.from (asg.(Assignment.advice) Advice.A5
-      (rotated_row row nbr Rotation.cur))) in *.
+      (rotated_row row Rotation.cur))) in *.
     set (n0 := UnOp.from (asg.(Assignment.advice) Advice.A6
-      (rotated_row row nbr Rotation.next))) in *.
+      (rotated_row row Rotation.next))) in *.
     set (n1 := UnOp.from (asg.(Assignment.advice) Advice.A7
-      (rotated_row row nbr Rotation.next))) in *.
+      (rotated_row row Rotation.next))) in *.
     set (n2 := UnOp.from (asg.(Assignment.advice) Advice.A8
-      (rotated_row row nbr Rotation.next))) in *.
+      (rotated_row row Rotation.next))) in *.
     (* Fold the [pow5] applications back so the round S-boxes are visible. *)
     assert (h1' : pow5 (s0 +F a0) = m0) by exact h1.
     assert (h2' :

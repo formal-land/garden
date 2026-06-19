@@ -78,10 +78,8 @@ Module CompleteAddition.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]
       cbn in Hgate.
     set (A := ρ.(Evaluation.assignment).(Assignment.advice)) in *.
-    set (rc := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.cur) in *.
-    set (rn := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.next) in *.
+    set (rc := rotated_row ρ.(Evaluation.row) Rotation.cur) in *.
+    set (rn := rotated_row ρ.(Evaluation.row) Rotation.next) in *.
     set (xp := UnOp.from (A Advice.A0 rc)) in *.
     set (yp := UnOp.from (A Advice.A1 rc)) in *.
     set (xq := UnOp.from (A Advice.A2 rc)) in *.
