@@ -55,5 +55,20 @@ Module CanonicityChecks.
           (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
           (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(alpha_0_prime).
   Proof.
-  Admitted.
+    unfold output.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
+    destruct Hgate as (_ & _ & _ & _ & hrange & hbool & hz84 & halpha0).
+    specialize (hrange Hselector).
+    specialize (hbool Hselector).
+    specialize (hz84 Hselector).
+    specialize (halpha0 Hselector).
+    split; [exact hbool |].
+    split; [exact hrange |].
+    split.
+    - (* [z_84_alpha] reconstruction cell. *) exact hz84.
+    - (* [alpha_0_prime] reconstruction cell: the gate computes [alpha_0] from
+         the [z_84_alpha] cell (A8.prev), [output] from the reconstructed value;
+         [hz84] bridges the two. *)
+      rewrite <- hz84. exact halpha0.
+  Qed.
 End CanonicityChecks.
