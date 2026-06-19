@@ -49,30 +49,30 @@ Module RunningSumCoordinatesCheck.
      the running-sum cells [z_cur]/[z_next] on A4, the witness [u] on A5, and the
      fixed [z] coefficient, as constrained by [running_sum_coordinates_check_gate]. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QMulFixedRunningSum ⟧ ρ <> 0)
+      (Γ : Assignment.t columns) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulFixedRunningSum ⟧ row <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed
-            .running_sum_coordinates_check_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed
+            .running_sum_coordinates_check_gate ⟧ row) :
       {|
         Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
-          ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ;
+          Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ row;
         Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
-          ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ;
+          Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ row;
       |} =
         output
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A4 Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.next ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ row).
   Proof.
     unfold output, RunningSumCoordinatesCheck.output, CoordsCheck.output,
       interpolated_x, square, pow_nat.

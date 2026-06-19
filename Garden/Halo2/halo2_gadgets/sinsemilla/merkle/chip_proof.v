@@ -41,27 +41,27 @@ Module DecompositionCheck.
        a_whole = a_col.cur,  b_whole = b_col.cur,  c_whole = c_col.cur,
        a_1     = a_col.next, b_1     = c_col.next, b_2     = left_col.next. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
+      (Γ : Assignment.t columns) (row : Z)
       (q_decompose : Selector.t)
       (a_col b_col c_col left_col right_col : Advice.t)
-      (Hselector : ⟦ q_decompose ⟧ ρ <> 0)
+      (Hselector : Γ ⊢ ⟦ q_decompose ⟧ row <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip
             .decomposition_check_gate
-              q_decompose a_col b_col c_col left_col right_col ⟧ ρ) :
+              q_decompose a_col b_col c_col left_col right_col ⟧ row) :
       {|
-        l_whole := ⟦ Expression.Advice right_col Rotation.next ⟧ ρ;
-        left_node := ⟦ Expression.Advice left_col Rotation.cur ⟧ ρ;
-        right_node := ⟦ Expression.Advice right_col Rotation.cur ⟧ ρ;
-        z1_b := ⟦ Expression.Advice b_col Rotation.next ⟧ ρ;
+        l_whole := Γ ⊢ ⟦ Expression.Advice right_col Rotation.next ⟧ row;
+        left_node := Γ ⊢ ⟦ Expression.Advice left_col Rotation.cur ⟧ row;
+        right_node := Γ ⊢ ⟦ Expression.Advice right_col Rotation.cur ⟧ row;
+        z1_b := Γ ⊢ ⟦ Expression.Advice b_col Rotation.next ⟧ row;
       |} =
         output
-          (⟦ Expression.Advice a_col Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice b_col Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice c_col Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice a_col Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice c_col Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice left_col Rotation.next ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice a_col Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice b_col Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice c_col Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice a_col Rotation.next ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice c_col Rotation.next ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice left_col Rotation.next ⟧ row).
   Proof.
     (* Each of the four reconstruction cells is fixed by one constraint, all
        linear once the radix constants [2^5], [2^10], [2^240] are exposed:

@@ -25,15 +25,15 @@ Module DecomposeScalarComplete.
      intermediate scalar, not a stored next-row cell, so there is no
      determinism statement. *)
   Theorem sound
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QMulDecomposeVar ⟧ ρ <> 0)
+      (Γ : Assignment.t columns) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulDecomposeVar ⟧ row <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.complete
-            .decompose_scalar_complete_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.complete
+            .decompose_scalar_complete_gate ⟧ row) :
       IsBool.t
         (output
-          (⟦ Expression.Advice Advice.A9 Rotation.prev ⟧ ρ)
-          (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)).(k).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.prev ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.next ⟧ row)).(k).
   Proof.
     unfold output; cbn.
     destruct Hgate as (hbool & _).

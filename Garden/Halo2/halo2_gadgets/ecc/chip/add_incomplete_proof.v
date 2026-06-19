@@ -34,23 +34,23 @@ Module IncompleteAddition.
      [(x_q, y_q)] on A2/A3, given distinct x-coordinates [x_p <> x_q] (the gate
      is degenerate at [x_p = x_q], leaving the next-row cells free). *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QAddIncomplete ⟧ ρ <> 0)
+      (Γ : Assignment.t columns) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QAddIncomplete ⟧ row <> 0)
       (Hx_distinct :
-        ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ <>
-        ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ ρ)
+        Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ row <>
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ row)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete
-            .incomplete_addition_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete
+            .incomplete_addition_gate ⟧ row) :
       {|
-        Point.x := ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ ρ;
-        Point.y := ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ ρ;
+        Point.x := Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ row;
+        Point.y := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ row;
       |} =
         output
-          (⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ row).
   Proof.
     (* [Hx_distinct] gives [x_p -F x_q <> 0], so the field-division law
        ([BinOp.div x y *F y = x] for [y <> 0], from [Garden.Field.FieldDiv])
@@ -58,9 +58,9 @@ Module IncompleteAddition.
     unfold output, square.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]
       cbn in *.
-    set (A := ρ.(Evaluation.assignment).(Assignment.advice)) in *.
-    set (rc := rotated_row ρ.(Evaluation.row) Rotation.cur) in *.
-    set (rn := rotated_row ρ.(Evaluation.row) Rotation.next) in *.
+    set (A := Γ.(Assignment.advice)) in *.
+    set (rc := rotated_row row Rotation.cur) in *.
+    set (rn := rotated_row row Rotation.next) in *.
     set (xp := UnOp.from (A Advice.A0 rc)) in *.
     set (yp := UnOp.from (A Advice.A1 rc)) in *.
     set (xq := UnOp.from (A Advice.A2 rc)) in *.

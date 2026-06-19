@@ -24,17 +24,17 @@ Module ShortFixedBaseMul.
      [y_p] on A1 and the witnessed [sign] on A4, via the "negation_check"
      constraint of [short_fixed_base_mul_gate]. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QMulFixedShort ⟧ ρ <> 0)
+      (Γ : Assignment.t columns) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulFixedShort ⟧ row <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short
-            .short_fixed_base_mul_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short
+            .short_fixed_base_mul_gate ⟧ row) :
       {|
-        y_a := ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ ρ;
+        y_a := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ row;
       |} =
         output
-          (⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ row).
   Proof.
     unfold output.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.

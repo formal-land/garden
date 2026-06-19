@@ -16,19 +16,13 @@ Module Assignment.
 End Assignment.
 
 Module Evaluation.
-  Record t {columns : Columns.t} : Set := {
-    assignment : Assignment.t columns;
-    row : Z;
-  }.
-  Arguments t : clear implicits.
-
   Class C {columns : Columns.t} {p : Z} `{Prime p}
-      (A B : Type) : Type := {
-    eval : t columns -> A -> B;
+      (Index A B : Type) : Type := {
+    eval : Assignment.t columns -> Index -> A -> B;
   }.
 End Evaluation.
 
-Notation "⟦ x ⟧ ρ" := (Evaluation.eval ρ x)
+Notation "Γ ⊢ ⟦ x ⟧ ρ" := (Evaluation.eval Γ ρ x)
   (at level 10, x at level 200, ρ at level 9).
 
 Definition rotated_row
@@ -170,65 +164,44 @@ Section Semantics.
   Arguments eval_gates _ _ _ /.
 
   Global Instance SelectorIsEvaluable :
-      Evaluation.C columns.(Columns.Selector) Z := {
-    Evaluation.eval ρ selector :=
-      eval_selector
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        selector;
+      Evaluation.C Z columns.(Columns.Selector) Z := {
+    Evaluation.eval Γ row selector :=
+      eval_selector Γ row selector;
   }.
 
   Global Instance ExpressionIsEvaluable :
-      Evaluation.C (Expression.t columns) Z := {
-    Evaluation.eval ρ expression :=
-      eval_expression
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        expression;
+      Evaluation.C Z (Expression.t columns) Z := {
+    Evaluation.eval Γ row expression :=
+      eval_expression Γ row expression;
   }.
 
   Global Instance ConstraintIsEvaluable :
-      Evaluation.C (Constraint.t columns) Prop := {
-    Evaluation.eval ρ constraint :=
-      eval_constraint
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        constraint;
+      Evaluation.C Z (Constraint.t columns) Prop := {
+    Evaluation.eval Γ row constraint :=
+      eval_constraint Γ row constraint;
   }.
 
   Global Instance NamedConstraintIsEvaluable :
-      Evaluation.C (option string * Constraint.t columns) Prop := {
-    Evaluation.eval ρ constraint :=
-      eval_named_constraint
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        constraint;
+      Evaluation.C Z (option string * Constraint.t columns) Prop := {
+    Evaluation.eval Γ row constraint :=
+      eval_named_constraint Γ row constraint;
   }.
 
   Global Instance ConstraintsIsEvaluable :
-      Evaluation.C (Constraints.t columns) Prop := {
-    Evaluation.eval ρ constraints :=
-      eval_constraints
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        constraints;
+      Evaluation.C Z (Constraints.t columns) Prop := {
+    Evaluation.eval Γ row constraints :=
+      eval_constraints Γ row constraints;
   }.
 
   Global Instance GateIsEvaluable :
-      Evaluation.C (Gate.t columns) Prop := {
-    Evaluation.eval ρ gate :=
-      eval_gate
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        gate;
+      Evaluation.C Z (Gate.t columns) Prop := {
+    Evaluation.eval Γ row gate :=
+      eval_gate Γ row gate;
   }.
 
   Global Instance GatesIsEvaluable :
-      Evaluation.C (list (Gate.t columns)) Prop := {
-    Evaluation.eval ρ gates :=
-      eval_gates
-        ρ.(Evaluation.assignment)
-        ρ.(Evaluation.row)
-        gates;
+      Evaluation.C Z (list (Gate.t columns)) Prop := {
+    Evaluation.eval Γ row gates :=
+      eval_gates Γ row gates;
   }.
 End Semantics.

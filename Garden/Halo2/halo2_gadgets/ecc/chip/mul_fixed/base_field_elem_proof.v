@@ -37,23 +37,23 @@ Module CanonicityChecks.
      constraints are canonicity bounds on intermediate scalars that are not
      stored in dedicated cells, so they are not part of this statement. *)
   Theorem sound
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QMulFixedBaseField ⟧ ρ <> 0)
+      (Γ : Assignment.t columns) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulFixedBaseField ⟧ row <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.base_field_elem
-            .canonicity_checks_gate ⟧ ρ) :
-      IsBool.t (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ) /\
-      0 <= ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ < Z.of_nat 4 /\
-      ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ ρ =
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.base_field_elem
+            .canonicity_checks_gate ⟧ row) :
+      IsBool.t (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row) /\
+      0 <= Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row < Z.of_nat 4 /\
+      Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ row =
         (output
-          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
-          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(z_84_alpha) /\
-      ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ =
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row)).(z_84_alpha) /\
+      Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ row =
         (output
-          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
-          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(alpha_0_prime).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row)
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row)).(alpha_0_prime).
   Proof.
     unfold output.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
