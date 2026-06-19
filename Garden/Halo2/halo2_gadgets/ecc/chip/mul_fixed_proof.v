@@ -74,5 +74,18 @@ Module RunningSumCoordinatesCheck.
           (⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ ρ)
           (⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ ρ).
   Proof.
-  Admitted.
+    unfold output, RunningSumCoordinatesCheck.output, CoordsCheck.output,
+      interpolated_x, square, pow_nat.
+    with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
+    destruct Hgate as (hx & hy & _).
+    specialize (hx Hselector).
+    specialize (hy Hselector).
+    f_equal.
+    - (* [x_p] is the Lagrange interpolation of the fixed coefficients: the
+         configured fold and the proof-level [interpolated_x] coincide after
+         normalising the field operations. *)
+      FieldRewrite.run. symmetry. exact hx.
+    - (* [y_p] is recovered from the [check y] constraint [u^2 - y_p = z]. *)
+      clear hx. field_solve.
+  Qed.
 End RunningSumCoordinatesCheck.
