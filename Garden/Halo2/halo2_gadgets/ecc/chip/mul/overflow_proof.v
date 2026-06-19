@@ -29,18 +29,18 @@ Module OverflowChecks.
      determined by the witnessed [alpha] and [k_254]: [s] is recovered from the
      [s_check] constraint and [z_0] from the [recovery] constraint. *)
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
-      (Hselector : Γ ⊢ ⟦ Selector.QMulOverflow ⟧ row <> 0)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulOverflow ⟧ (region, row) <> 0)
       (Hgate :
         Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.overflow_checks_gate ⟧
-          row) :
+          (region, row)) :
       {|
-        s := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row;
-        z_0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ row;
+        s := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ (region, row);
+        z_0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ (region, row);
       |} =
         output
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ row).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ (region, row)).
   Proof.
     unfold output.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from Primes.pallas_p]

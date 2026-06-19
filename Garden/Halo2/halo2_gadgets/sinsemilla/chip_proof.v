@@ -36,20 +36,20 @@ Module InitialYQ.
      combination of the current-row cells) is forced to twice the fixed seed
      [y_q] by the single "init_y_q_check" constraint of [initial_y_q_gate]. *)
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
       (q_sinsemilla4 : Selector.t)
       (fixed_y_q : Fixed.t)
       (x_a x_p lambda_1 lambda_2 : Advice.t)
-      (Hselector : Γ ⊢ ⟦ q_sinsemilla4 ⟧ row <> 0)
+      (Hselector : Γ ⊢ ⟦ q_sinsemilla4 ⟧ (region, row) <> 0)
       (Hgate :
         Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.sinsemilla.chip
-            .initial_y_q_gate q_sinsemilla4 fixed_y_q x_a x_p lambda_1 lambda_2 ⟧ row) :
+            .initial_y_q_gate q_sinsemilla4 fixed_y_q x_a x_p lambda_1 lambda_2 ⟧ (region, row)) :
       {|
         y_a :=
           Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.sinsemilla.chip
-              .y_a x_a x_p lambda_1 lambda_2 Rotation.cur ⟧ row;
+              .y_a x_a x_p lambda_1 lambda_2 Rotation.cur ⟧ (region, row);
       |} =
-        output (Γ ⊢ ⟦ Expression.Fixed fixed_y_q Rotation.cur ⟧ row).
+        output (Γ ⊢ ⟦ Expression.Fixed fixed_y_q Rotation.cur ⟧ (region, row)).
   Proof.
     (* The single "init_y_q_check" constraint states [y_q * 2 = y_a_cur], which
        is exactly the (flipped) record equality to prove. *)
@@ -81,22 +81,22 @@ Module Sinsemilla.
      [x_a_next = lambda_2^2 - x_r - x_a] directly (no division, no precondition),
      where [x_r = lambda_1^2 - x_a - x_p]. *)
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
       (q_sinsemilla1 : Selector.t)
       (q_sinsemilla2 : Fixed.t)
       (x_a x_p lambda_1 lambda_2 : Advice.t)
-      (Hselector : Γ ⊢ ⟦ q_sinsemilla1 ⟧ row <> 0)
+      (Hselector : Γ ⊢ ⟦ q_sinsemilla1 ⟧ (region, row) <> 0)
       (Hgate :
         Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.sinsemilla.chip
-            .sinsemilla_gate q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2 ⟧ row) :
+            .sinsemilla_gate q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2 ⟧ (region, row)) :
       {|
-        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧ row;
+        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧ (region, row);
       |} =
         output
-          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧ row).
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧ (region, row)).
   Proof.
     (* The "Secant line" constraint gives [lambda_2^2 = x_a_next + x_r + x_a]
        directly; solving for [x_a_next] needs no division and no precondition. *)

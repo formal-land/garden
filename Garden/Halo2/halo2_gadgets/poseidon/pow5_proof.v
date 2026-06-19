@@ -277,21 +277,21 @@ Module FullRound.
   |}.
 
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
-      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonFull ⟧ row <> 0)
-      (Hgate : Γ ⊢ ⟦ pow5.full_round_gate ⟧ row) :
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonFull ⟧ (region, row) <> 0)
+      (Hgate : Γ ⊢ ⟦ pow5.full_round_gate ⟧ (region, row)) :
       {|
-        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ row;
-        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ row;
-        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ row;
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ (region, row);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ (region, row);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ (region, row);
       |} =
         output
-          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ row).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ (region, row)).
   Proof.
     unfold output, output_coordinate, pow5.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
@@ -325,24 +325,24 @@ Module PartialRound.
     |}).
 
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
-      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonPartial ⟧ row <> 0)
-      (Hgate : Γ ⊢ ⟦ pow5.partial_rounds_gate ⟧ row) :
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonPartial ⟧ (region, row) <> 0)
+      (Hgate : Γ ⊢ ⟦ pow5.partial_rounds_gate ⟧ (region, row)) :
       {|
-        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ row;
-        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ row;
-        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ row;
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ (region, row);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ (region, row);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ (region, row);
       |} =
         output
-          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ row).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ (region, row)).
   Proof.
     unfold pow5.partial_rounds_gate in Hgate.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from
@@ -357,32 +357,31 @@ Module PartialRound.
       p128pow5t3.mds_coeff p128pow5t3.mds_inv_coeff
       output sbox_partial pow5 mds_mul mds_inv_mul matrix_mul lin coeff]
       cbn.
-    set (asg := Γ) in *.
-    set (s0 := UnOp.from (asg.(Assignment.advice) Advice.A6
+    set (s0 := UnOp.from (Γ.(Assignment.advice) Advice.A6 region
       (rotated_row row Rotation.cur))) in *.
-    set (s1 := UnOp.from (asg.(Assignment.advice) Advice.A7
+    set (s1 := UnOp.from (Γ.(Assignment.advice) Advice.A7 region
       (rotated_row row Rotation.cur))) in *.
-    set (s2 := UnOp.from (asg.(Assignment.advice) Advice.A8
+    set (s2 := UnOp.from (Γ.(Assignment.advice) Advice.A8 region
       (rotated_row row Rotation.cur))) in *.
-    set (a0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs2
+    set (a0 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs2 region
       (rotated_row row Rotation.cur))) in *.
-    set (a1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs3
+    set (a1 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs3 region
       (rotated_row row Rotation.cur))) in *.
-    set (a2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs4
+    set (a2 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs4 region
       (rotated_row row Rotation.cur))) in *.
-    set (b0 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs5
+    set (b0 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs5 region
       (rotated_row row Rotation.cur))) in *.
-    set (b1 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs6
+    set (b1 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs6 region
       (rotated_row row Rotation.cur))) in *.
-    set (b2 := UnOp.from (asg.(Assignment.fixed) Fixed.LagrangeCoeffs7
+    set (b2 := UnOp.from (Γ.(Assignment.fixed) Fixed.LagrangeCoeffs7 region
       (rotated_row row Rotation.cur))) in *.
-    set (m0 := UnOp.from (asg.(Assignment.advice) Advice.A5
+    set (m0 := UnOp.from (Γ.(Assignment.advice) Advice.A5 region
       (rotated_row row Rotation.cur))) in *.
-    set (n0 := UnOp.from (asg.(Assignment.advice) Advice.A6
+    set (n0 := UnOp.from (Γ.(Assignment.advice) Advice.A6 region
       (rotated_row row Rotation.next))) in *.
-    set (n1 := UnOp.from (asg.(Assignment.advice) Advice.A7
+    set (n1 := UnOp.from (Γ.(Assignment.advice) Advice.A7 region
       (rotated_row row Rotation.next))) in *.
-    set (n2 := UnOp.from (asg.(Assignment.advice) Advice.A8
+    set (n2 := UnOp.from (Γ.(Assignment.advice) Advice.A8 region
       (rotated_row row Rotation.next))) in *.
     (* Fold the [pow5] applications back so the round S-boxes are visible. *)
     assert (h1' : pow5 (s0 +F a0) = m0) by exact h1.
@@ -450,20 +449,20 @@ Module PadAndAdd.
   |}.
 
   Theorem deterministic
-      (Γ : Assignment.t columns) (row : Z)
-      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonPadAndAdd ⟧ row <> 0)
-      (Hgate : Γ ⊢ ⟦ pow5.pad_and_add_gate ⟧ row) :
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QPoseidonPadAndAdd ⟧ (region, row) <> 0)
+      (Hgate : Γ ⊢ ⟦ pow5.pad_and_add_gate ⟧ (region, row)) :
       {|
-        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ row;
-        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ row;
-        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ row;
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧ (region, row);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧ (region, row);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧ (region, row);
       |} =
         output
-          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ row).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (region, row)).
   Proof.
     unfold output.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]

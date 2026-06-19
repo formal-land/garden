@@ -25,13 +25,13 @@ Module LsbCheck.
      meaningful property of the gate; there is no determinism statement because
      [lsb] is an intermediate scalar, not a stored next-row trace cell. *)
   Theorem sound
-      (Γ : Assignment.t columns) (row : Z)
-      (Hselector : Γ ⊢ ⟦ Selector.QMulLsb ⟧ row <> 0)
-      (Hgate : Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.lsb_check_gate ⟧ row) :
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulLsb ⟧ (region, row) <> 0)
+      (Hgate : Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.lsb_check_gate ⟧ (region, row)) :
       IsBool.t
         (output
-          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.next ⟧ row)
-          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.cur ⟧ row)).(lsb).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.next ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A9 Rotation.cur ⟧ (region, row))).(lsb).
   Proof.
     unfold output; cbn.
     destruct Hgate as (hbool & _).
