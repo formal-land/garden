@@ -1,7 +1,12 @@
+Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.proof.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.base_field_elem.
 Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
+Require Import Garden.Orchard.columns.
 Require Import Garden.Plonky3.M.
+
+#[local] Existing Instance Primes.PallasPIsPrime.
 
 Global Open Scope Z_scope.
 
@@ -24,4 +29,31 @@ Module CanonicityChecks.
         alpha_0 +F UnOp.from (2 ^ 130) -F
           UnOp.from Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_p;
     |}.
+
+  (* Soundness of [canonicity_checks_gate]: the directly-constrained facts.
+     [alpha_2] (A8.cur) is boolean and [alpha_1] (A7.cur) is in [0, 4); the two
+     reconstruction cells [z_84_alpha] (A8.prev) and [alpha_0_prime] (A6.cur)
+     equal their [output] values. The remaining "MSB = 1 => ..." conditional
+     constraints are canonicity bounds on intermediate scalars that are not
+     stored in dedicated cells, so they are not part of this statement. *)
+  Theorem sound
+      (ρ : Evaluation.t columns)
+      (Hselector : ⟦ Selector.QMulFixedBaseField ⟧ ρ <> 0)
+      (Hgate :
+        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.base_field_elem
+            .canonicity_checks_gate ⟧ ρ) :
+      IsBool.t (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ) /\
+      0 <= ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ < Z.of_nat 4 /\
+      ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ ρ =
+        (output
+          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(z_84_alpha) /\
+      ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ =
+        (output
+          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(alpha_0_prime).
+  Proof.
+  Admitted.
 End CanonicityChecks.
