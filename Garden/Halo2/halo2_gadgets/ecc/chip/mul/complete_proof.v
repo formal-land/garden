@@ -31,10 +31,9 @@ Module DecomposeScalarComplete.
         ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.complete
             .decompose_scalar_complete_gate ⟧ ρ) :
       IsBool.t
-        (k
-          (output
-            (⟦ Expression.Advice Advice.A9 Rotation.prev ⟧ ρ)
-            (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ))).
+        (output
+          (⟦ Expression.Advice Advice.A9 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)).(k).
   Proof.
   Admitted.
 End DecomposeScalarComplete.

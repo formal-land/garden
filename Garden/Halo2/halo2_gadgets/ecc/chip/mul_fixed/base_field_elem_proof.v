@@ -45,17 +45,15 @@ Module CanonicityChecks.
       IsBool.t (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ) /\
       0 <= ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ < Z.of_nat 4 /\
       ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧ ρ =
-        z_84_alpha
-          (output
-            (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
-            (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
-            (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)) /\
+        (output
+          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(z_84_alpha) /\
       ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧ ρ =
-        alpha_0_prime
-          (output
-            (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
-            (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
-            (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).
+        (output
+          (⟦ Expression.Advice Advice.A6 Rotation.prev ⟧ ρ)
+          (⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ ρ)
+          (⟦ Expression.Advice Advice.A8 Rotation.cur ⟧ ρ)).(alpha_0_prime).
   Proof.
   Admitted.
 End CanonicityChecks.

@@ -29,10 +29,9 @@ Module LsbCheck.
       (Hselector : ⟦ Selector.QMulLsb ⟧ ρ <> 0)
       (Hgate : ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.lsb_check_gate ⟧ ρ) :
       IsBool.t
-        (lsb
-          (output
-            (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)
-            (⟦ Expression.Advice Advice.A9 Rotation.cur ⟧ ρ))).
+        (output
+          (⟦ Expression.Advice Advice.A9 Rotation.next ⟧ ρ)
+          (⟦ Expression.Advice Advice.A9 Rotation.cur ⟧ ρ)).(lsb).
   Proof.
   Admitted.
 End LsbCheck.
