@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 
@@ -114,8 +115,8 @@ End Spec.
 Lemma implies {p} `{Prime p}
     (local' next' : KeccakCols.t)
     (is_first_row is_transition : bool) :
-  let local := M.map_mod local' in
-  let next := M.map_mod next' in
+  let local := Field.map_mod local' in
+  let next := Field.map_mod next' in
   {{ eval_round_flags local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
     Spec.t local next is_first_row is_transition
@@ -166,8 +167,8 @@ Qed.
 Module OlderSpec.
   Lemma spec_first_row {p} `{Prime p}
       (local' next' : KeccakCols.t) :
-    let local := M.map_mod local' in
-    let next := M.map_mod next' in
+    let local := Field.map_mod local' in
+    let next := Field.map_mod next' in
     {{ eval_round_flags local next 1 0 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->
@@ -197,8 +198,8 @@ Module OlderSpec.
 
   Lemma spec_transition {p} `{Prime p}
       (local' next' : KeccakCols.t) :
-    let local := M.map_mod local' in
-    let next := M.map_mod next' in
+    let local := Field.map_mod local' in
+    let next := Field.map_mod next' in
     {{ eval_round_flags local next 0 1 🔽
       tt,
       forall i, 0 <= i < NUM_ROUNDS ->

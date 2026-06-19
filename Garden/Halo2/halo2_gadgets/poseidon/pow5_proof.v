@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Field.Field.
 Require Import Garden.Halo2.proof.
 Require Garden.Halo2.halo2_gadgets.poseidon.pow5.
 Require Import Garden.Halo2.halo2_poseidon.p128pow5t3.
@@ -165,8 +166,8 @@ Module MatrixInverse.
       (state : State.t) :
       matrix_mul [ [a00; a01; a02]; [a10; a11; a12]; [a20; a21; a22] ]
         (matrix_mul [ [b00; b01; b02]; [b10; b11; b12]; [b20; b21; b22] ]
-          (M.map_mod state)) =
-        M.map_mod state.
+          (Field.map_mod state)) =
+        Field.map_mod state.
   Proof.
     unfold matrix_mul, lin, coeff, p128pow5t3.get.
     with_strategy opaque [BinOp.add BinOp.mul UnOp.from] cbn.
@@ -178,16 +179,16 @@ Module MatrixInverse.
 End MatrixInverse.
 
 Lemma mds_mul_mds_inv_identity (state : State.t) :
-    mds_mul (mds_inv_mul (M.map_mod state)) =
-      M.map_mod state.
+    mds_mul (mds_inv_mul (Field.map_mod state)) =
+      Field.map_mod state.
 Proof.
   unfold mds_mul, mds_inv_mul, p128pow5t3.mds, p128pow5t3.mds_inv.
   apply MatrixInverse.matrix_compose_identity; now vm_compute.
 Qed.
 
 Lemma mds_inv_mul_mds_identity (state : State.t) :
-    mds_inv_mul (mds_mul (M.map_mod state)) =
-      M.map_mod state.
+    mds_inv_mul (mds_mul (Field.map_mod state)) =
+      Field.map_mod state.
 Proof.
   unfold mds_mul, mds_inv_mul, p128pow5t3.mds, p128pow5t3.mds_inv.
   apply MatrixInverse.matrix_compose_identity; now vm_compute.
@@ -195,8 +196,8 @@ Qed.
 
 Lemma mds_inv_mul_injective
     (left right : State.t)
-    (H : mds_inv_mul (M.map_mod left) = mds_inv_mul (M.map_mod right)) :
-    M.map_mod left = M.map_mod right.
+    (H : mds_inv_mul (Field.map_mod left) = mds_inv_mul (Field.map_mod right)) :
+    Field.map_mod left = Field.map_mod right.
 Proof.
   rewrite <- (mds_mul_mds_inv_identity left).
   rewrite <- (mds_mul_mds_inv_identity right).
@@ -218,7 +219,7 @@ Lemma mds_roundtrip (state : State.t)
     (H2 : UnOp.from state.(State.x2) = state.(State.x2)) :
     mds_mul (mds_inv_mul state) = state.
 Proof.
-  assert (Hmm : M.map_mod state = state).
+  assert (Hmm : Field.map_mod state = state).
   { destruct state; cbn in *; now rewrite H0, H1, H2. }
   rewrite <- Hmm.
   apply mds_mul_mds_inv_identity.

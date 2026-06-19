@@ -1,4 +1,5 @@
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.

@@ -1,4 +1,5 @@
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width.
+Require Import Garden.Field.Field.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Plonky3.M.

@@ -1,4 +1,5 @@
 Require Import Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Plonky3.MExpr.
 Require Import Plonky3.keccak.air.
 Require Import Plonky3.keccak.columns.
@@ -158,7 +159,7 @@ Proof.
   intros.
   rewrite sum_eq in H_sum_diff.
   fold sum in H_sum_diff.
-  rewrite M.mul_zero_implies_zero_3 in H_sum_diff.
+  rewrite Field.mul_zero_implies_zero_3 in H_sum_diff.
   cbn -[sum] in H_sum_diff.
   replace (UnOp.from (_ -F _))
     with (UnOp.from (sum - Z.b2z b))
@@ -172,7 +173,7 @@ Proof.
     with (UnOp.from (sum - Z.b2z b - 4))
     in H_sum_diff
     by show_equality_modulo.
-  repeat (rewrite M.is_zero_small in H_sum_diff by (destruct_all bool; cbn in *; lia)).
+  repeat (rewrite Field.is_zero_small in H_sum_diff by (destruct_all bool; cbn in *; lia)).
   trivial.
 Qed.
 
@@ -290,8 +291,8 @@ End Post.
 Lemma eval_implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
     (local' next' : KeccakCols.t)
     (is_first_row is_transition : bool) :
-  let local := M.map_mod local' in
-  let next := M.map_mod next' in
+  let local := Field.map_mod local' in
+  let next := Field.map_mod next' in
   {{ eval local next (Z.b2z is_first_row) (Z.b2z is_transition) 🔽
     tt,
     Post.t local next is_first_row is_transition
@@ -527,8 +528,8 @@ Lemma post_implies_round_computation {p} `{Prime p}
     (is_first_row is_transition : bool)
     (a : Array.t (Array.t (Array.t bool 64) 5) 5)
     (round : Z) :
-  let local := M.map_mod local' in
-  let next := M.map_mod next' in
+  let local := Field.map_mod local' in
+  let next := Field.map_mod next' in
   Post.t local next is_first_row is_transition ->
   a.Valid.t local a ->
   0 <= round < NUM_ROUNDS ->
@@ -654,7 +655,7 @@ Qed.
 (** We are computing a full round of Keccak every [NUM_ROUNDS] rows. *)
 Lemma posts_imply {p} `{Prime p} (rows' : Z -> KeccakCols.t)
     (preimages : Z -> Array.t (Array.t (Array.t bool 64) 5) 5) :
-  let rows i := M.map_mod (rows' i) in
+  let rows i := Field.map_mod (rows' i) in
   ( (* We assume we validated the circuit on all the rows. Note that we assume here that we are
        always transitioning. *)
     forall i, 0 <= i ->

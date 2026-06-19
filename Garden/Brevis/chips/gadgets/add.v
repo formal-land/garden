@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Brevis.compiler.word.
 Require Import Garden.Brevis.machine.builder.range_check.
 
@@ -10,8 +11,8 @@ Module AddGadget.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod t := {
     map_mod x := {|
-      value := M.map_mod x.(value);
-      carry := M.map_mod x.(carry);
+      value := Field.map_mod x.(value);
+      carry := Field.map_mod x.(carry);
     |};
   }.
 

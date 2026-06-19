@@ -1,4 +1,5 @@
 Require Garden.Orchard.circuit.commit_ivk.
+Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Import Garden.Plonky3.M.
 

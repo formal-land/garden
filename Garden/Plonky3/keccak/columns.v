@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.keccak.constants.
 
 (*
@@ -31,16 +32,16 @@ Module KeccakCols.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod KeccakCols.t := {
     map_mod x := {|
-      KeccakCols.step_flags := M.map_mod x.(KeccakCols.step_flags);
-      KeccakCols.export := M.map_mod x.(KeccakCols.export);
-      KeccakCols.preimage := M.map_mod x.(KeccakCols.preimage);
-      KeccakCols.a := M.map_mod x.(KeccakCols.a);
-      KeccakCols.c := M.map_mod x.(KeccakCols.c);
-      KeccakCols.c_prime := M.map_mod x.(KeccakCols.c_prime);
-      KeccakCols.a_prime := M.map_mod x.(KeccakCols.a_prime);
-      KeccakCols.a_prime_prime := M.map_mod x.(KeccakCols.a_prime_prime);
-      KeccakCols.a_prime_prime_0_0_bits := M.map_mod x.(KeccakCols.a_prime_prime_0_0_bits);
-      KeccakCols.a_prime_prime_prime_0_0_limbs := M.map_mod x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
+      KeccakCols.step_flags := Field.map_mod x.(KeccakCols.step_flags);
+      KeccakCols.export := Field.map_mod x.(KeccakCols.export);
+      KeccakCols.preimage := Field.map_mod x.(KeccakCols.preimage);
+      KeccakCols.a := Field.map_mod x.(KeccakCols.a);
+      KeccakCols.c := Field.map_mod x.(KeccakCols.c);
+      KeccakCols.c_prime := Field.map_mod x.(KeccakCols.c_prime);
+      KeccakCols.a_prime := Field.map_mod x.(KeccakCols.a_prime);
+      KeccakCols.a_prime_prime := Field.map_mod x.(KeccakCols.a_prime_prime);
+      KeccakCols.a_prime_prime_0_0_bits := Field.map_mod x.(KeccakCols.a_prime_prime_0_0_bits);
+      KeccakCols.a_prime_prime_prime_0_0_limbs := Field.map_mod x.(KeccakCols.a_prime_prime_prime_0_0_limbs);
     |};
   }.
 
@@ -133,7 +134,7 @@ Module Impl_KeccakCols.
       self.(KeccakCols.a_prime_prime).[y].[x].[limb].
 
   Global Instance IsInField {p} `{Prime p} (self' : KeccakCols.t) (y x limb : Z) :
-    let self := M.map_mod self' in
+    let self := Field.map_mod self' in
     InField.C (a_prime_prime_prime self y x limb).
   Proof.
     unfold a_prime_prime_prime; cbn.

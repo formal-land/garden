@@ -1,4 +1,5 @@
 Require Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.

@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.MExpr.
 Require Import Garden.OpenVM.BranchEq.core.
 
@@ -88,8 +89,8 @@ Lemma eval_implies `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (from_pc' : Z)
     (branch_equal_opcode : BranchEqualOpcode.t)
     (H_N : 0 <= NUM_LIMBS) :
-  let local := get_local_with_opcode branch_equal_opcode (M.map_mod local') in
-  let from_pc := M.map_mod from_pc' in
+  let local := get_local_with_opcode branch_equal_opcode (Field.map_mod local') in
+  let from_pc := Field.map_mod from_pc' in
   let expected_cmp_result :=
     get_expected_cmp_result
       branch_equal_opcode
@@ -142,7 +143,7 @@ Proof.
     destruct cmp_eq; cbn; [|trivial].
     intros i H_i.
     pose proof (H_for i H_i) as H_for_i.
-    rewrite <- M.sub_zero_equiv.
+    rewrite <- Field.sub_zero_equiv.
     autorewrite with field_rewrite in H_for_i.
     rewrite <- H_for_i.
     cbn; unfold UnOp.from; show_equality_modulo.
@@ -168,7 +169,7 @@ Proof.
     intros.
     replace (BinOp.sub _ _) with 0. 2: {
       symmetry.
-      rewrite M.sub_zero_equiv.
+      rewrite Field.sub_zero_equiv.
       cbn; autorewrite with field_rewrite.
       hauto l: on.
     }
@@ -205,11 +206,11 @@ Lemma eval_complete `{Prime goldilocks_prime} {NUM_LIMBS : Z}
     (from_pc' : Z)
     (branch_equal_opcode : BranchEqualOpcode.t)
     (H_NUM_LIMBS : 0 <= NUM_LIMBS) :
-  let a := M.map_mod a' in
-  let b := M.map_mod b' in
-  let imm := M.map_mod imm' in
-  let diff_inv_marker := M.map_mod diff_inv_marker' in
-  let from_pc := M.map_mod from_pc' in
+  let a := Field.map_mod a' in
+  let b := Field.map_mod b' in
+  let imm := Field.map_mod imm' in
+  let diff_inv_marker := Field.map_mod diff_inv_marker' in
+  let from_pc := Field.map_mod from_pc' in
   let expected_cmp_result := get_expected_cmp_result branch_equal_opcode a b in
   let local :=
     {|
@@ -285,7 +286,7 @@ Proof.
       apply Complete.AssertZero;
       try reflexivity.
     all:
-      rewrite M.sub_zero_equiv;
+      rewrite Field.sub_zero_equiv;
       now apply H_a_b_eq.
   }
   eapply Complete.Let with (value := tt). {
@@ -301,7 +302,7 @@ Proof.
       set (diff := BinOp.sub _ _).
       replace diff with 0; try reflexivity.
       unfold diff; symmetry.
-      rewrite M.sub_zero_equiv.
+      rewrite Field.sub_zero_equiv.
       hauto lq: on rew: off.
     }
     {

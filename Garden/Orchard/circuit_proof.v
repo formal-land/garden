@@ -1,4 +1,5 @@
 Require Garden.Orchard.circuit.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.
