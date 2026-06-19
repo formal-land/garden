@@ -1,6 +1,7 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
+Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
@@ -62,5 +63,18 @@ Module DecompositionCheck.
           (⟦ Expression.Advice c_col Rotation.next ⟧ ρ)
           (⟦ Expression.Advice left_col Rotation.next ⟧ ρ).
   Proof.
-  Admitted.
+    (* Each of the four reconstruction cells is fixed by one constraint, all
+       linear once the radix constants [2^5], [2^10], [2^240] are exposed:
+       "l_check" pins [l_whole], "left_check" pins [left_node] (using
+       "b1_b2_check" to rewrite the [b] decomposition), "right_check" pins
+       [right_node], "b1_b2_check" pins [z1_b]. *)
+    unfold output.
+    with_strategy opaque [BinOp.add BinOp.sub BinOp.mul UnOp.from] cbn in *.
+    destruct Hgate as (Hc1 & Hc2 & Hc3 & Hc4).
+    specialize (Hc1 Hselector).
+    specialize (Hc2 Hselector).
+    specialize (Hc3 Hselector).
+    specialize (Hc4 Hselector).
+    f_equal; field_solve.
+  Qed.
 End DecompositionCheck.
