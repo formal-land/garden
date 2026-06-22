@@ -46,21 +46,21 @@ Module QMul1Checks.
      determined by the next-row coordinates and gradients, via the "init y_a"
      constraint of [q_mul_1_checks_gate]. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
       (q_mul_1 : Selector.t)
       (x_a x_p lambda_1 lambda_2 : Advice.t)
-      (Hselector : ⟦ q_mul_1 ⟧ ρ <> 0)
+      (Hselector : Γ ⊢ ⟦ q_mul_1 ⟧ (region, row) <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
-            .q_mul_1_checks_gate q_mul_1 x_a x_p lambda_1 lambda_2 ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
+            .q_mul_1_checks_gate q_mul_1 x_a x_p lambda_1 lambda_2 ⟧ (region, row)) :
       {|
-        y_a_witnessed := ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ ρ;
+        y_a_witnessed := Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Advice x_a Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice x_p Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice lambda_1 Rotation.next ⟧ ρ)
-          (⟦ Expression.Advice lambda_2 Rotation.next ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.next ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.next ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.next ⟧ (region, row)).
   Proof.
     unfold output, y_a, x_r, square.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from Primes.pallas_p]
@@ -89,24 +89,24 @@ Module QMul2Checks.
      next accumulator [x_a] is the secant-line image of the current row, so the
      three next-row cells are uniquely determined by the current row. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
       (q_mul_2 : Selector.t)
       (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
-      (Hselector : ⟦ q_mul_2 ⟧ ρ <> 0)
+      (Hselector : Γ ⊢ ⟦ q_mul_2 ⟧ (region, row) <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
-            .q_mul_2_checks_gate q_mul_2 z x_a x_p y_p lambda_1 lambda_2 ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
+            .q_mul_2_checks_gate q_mul_2 z x_a x_p y_p lambda_1 lambda_2 ⟧ (region, row)) :
       {|
-        x_p_next := ⟦ Expression.Advice x_p Rotation.next ⟧ ρ;
-        y_p_next := ⟦ Expression.Advice y_p Rotation.next ⟧ ρ;
-        x_a_next := ⟦ Expression.Advice x_a Rotation.next ⟧ ρ;
+        x_p_next := Γ ⊢ ⟦ Expression.Advice x_p Rotation.next ⟧ (region, row);
+        y_p_next := Γ ⊢ ⟦ Expression.Advice y_p Rotation.next ⟧ (region, row);
+        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Advice x_p Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice y_p Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice x_a Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice lambda_1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice lambda_2 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice y_p Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧ (region, row)).
   Proof.
     unfold output, next_x_a, x_r, square.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.
@@ -136,21 +136,21 @@ Module QMul3Checks.
      current row, uniquely determined by the current-row coordinates and
      gradients via [q_mul_3_checks_gate]. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
       (q_mul_3 : Selector.t)
       (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
-      (Hselector : ⟦ q_mul_3 ⟧ ρ <> 0)
+      (Hselector : Γ ⊢ ⟦ q_mul_3 ⟧ (region, row) <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
-            .q_mul_3_checks_gate q_mul_3 z x_a x_p y_p lambda_1 lambda_2 ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete
+            .q_mul_3_checks_gate q_mul_3 z x_a x_p y_p lambda_1 lambda_2 ⟧ (region, row)) :
       {|
-        x_a_next := ⟦ Expression.Advice x_a Rotation.next ⟧ ρ;
+        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Advice x_a Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice x_p Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice lambda_1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice lambda_2 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧ (region, row)).
   Proof.
     unfold output, next_x_a, x_r, square.
     with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from] cbn in *.

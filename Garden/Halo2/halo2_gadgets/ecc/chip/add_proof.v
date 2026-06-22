@@ -54,20 +54,20 @@ Module CompleteAddition.
   (* The next-row result [(x_r, y_r)] on A2/A3 is determined by the current-row
      inputs [(x_p, y_p)] (A0/A1) and [(x_q, y_q)] (A2/A3) alone. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QEccAdd ⟧ ρ <> 0)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QEccAdd ⟧ (region, row) <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add
-            .complete_addition_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add
+            .complete_addition_gate ⟧ (region, row)) :
       {|
-        Point.x := ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ ρ;
-        Point.y := ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ ρ;
+        Point.x := Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ (region, row);
+        Point.y := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ (region, row)).
   Proof.
     (* Per branch: the field-division law ([BinOp.div x y *F y = x] for
        [y <> 0], from [Garden.Field.FieldDiv]) determines [lambda] in the
@@ -77,22 +77,19 @@ Module CompleteAddition.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from] cbn.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]
       cbn in Hgate.
-    set (A := ρ.(Evaluation.assignment).(Assignment.advice)) in *.
-    set (rc := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.cur) in *.
-    set (rn := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.next) in *.
-    set (xp := UnOp.from (A Advice.A0 rc)) in *.
-    set (yp := UnOp.from (A Advice.A1 rc)) in *.
-    set (xq := UnOp.from (A Advice.A2 rc)) in *.
-    set (yq := UnOp.from (A Advice.A3 rc)) in *.
-    set (lam := UnOp.from (A Advice.A4 rc)) in *.
-    set (alpha := UnOp.from (A Advice.A5 rc)) in *.
-    set (beta := UnOp.from (A Advice.A6 rc)) in *.
-    set (gamma := UnOp.from (A Advice.A7 rc)) in *.
-    set (delta := UnOp.from (A Advice.A8 rc)) in *.
-    set (XR := UnOp.from (A Advice.A2 rn)) in *.
-    set (YR := UnOp.from (A Advice.A3 rn)) in *.
+    set (rc := rotated_row row Rotation.cur) in *.
+    set (rn := rotated_row row Rotation.next) in *.
+    set (xp := UnOp.from (Γ.(Assignment.advice) Advice.A0 region rc)) in *.
+    set (yp := UnOp.from (Γ.(Assignment.advice) Advice.A1 region rc)) in *.
+    set (xq := UnOp.from (Γ.(Assignment.advice) Advice.A2 region rc)) in *.
+    set (yq := UnOp.from (Γ.(Assignment.advice) Advice.A3 region rc)) in *.
+    set (lam := UnOp.from (Γ.(Assignment.advice) Advice.A4 region rc)) in *.
+    set (alpha := UnOp.from (Γ.(Assignment.advice) Advice.A5 region rc)) in *.
+    set (beta := UnOp.from (Γ.(Assignment.advice) Advice.A6 region rc)) in *.
+    set (gamma := UnOp.from (Γ.(Assignment.advice) Advice.A7 region rc)) in *.
+    set (delta := UnOp.from (Γ.(Assignment.advice) Advice.A8 region rc)) in *.
+    set (XR := UnOp.from (Γ.(Assignment.advice) Advice.A2 region rn)) in *.
+    set (YR := UnOp.from (Γ.(Assignment.advice) Advice.A3 region rn)) in *.
     destruct Hgate as (Hc1 & Hc2 & Hc3a & Hc3b & Hc3c & Hc3d &
       Hc4a & Hc4b & Hc5a & Hc5b & Hc6a & Hc6b).
     specialize (Hc1 Hselector); specialize (Hc2 Hselector);

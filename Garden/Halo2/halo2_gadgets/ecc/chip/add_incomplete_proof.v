@@ -34,23 +34,23 @@ Module IncompleteAddition.
      [(x_q, y_q)] on A2/A3, given distinct x-coordinates [x_p <> x_q] (the gate
      is degenerate at [x_p = x_q], leaving the next-row cells free). *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QAddIncomplete ⟧ ρ <> 0)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QAddIncomplete ⟧ (region, row) <> 0)
       (Hx_distinct :
-        ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ <>
-        ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ ρ)
+        Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row) <>
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (region, row))
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete
-            .incomplete_addition_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete
+            .incomplete_addition_gate ⟧ (region, row)) :
       {|
-        Point.x := ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ ρ;
-        Point.y := ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ ρ;
+        Point.x := Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.next ⟧ (region, row);
+        Point.y := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.next ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ (region, row)).
   Proof.
     (* [Hx_distinct] gives [x_p -F x_q <> 0], so the field-division law
        ([BinOp.div x y *F y = x] for [y <> 0], from [Garden.Field.FieldDiv])
@@ -58,17 +58,14 @@ Module IncompleteAddition.
     unfold output, square.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]
       cbn in *.
-    set (A := ρ.(Evaluation.assignment).(Assignment.advice)) in *.
-    set (rc := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.cur) in *.
-    set (rn := rotated_row ρ.(Evaluation.row) ρ.(Evaluation.nb_rows)
-      Rotation.next) in *.
-    set (xp := UnOp.from (A Advice.A0 rc)) in *.
-    set (yp := UnOp.from (A Advice.A1 rc)) in *.
-    set (xq := UnOp.from (A Advice.A2 rc)) in *.
-    set (yq := UnOp.from (A Advice.A3 rc)) in *.
-    set (XR := UnOp.from (A Advice.A2 rn)) in *.
-    set (YR := UnOp.from (A Advice.A3 rn)) in *.
+    set (rc := rotated_row row Rotation.cur) in *.
+    set (rn := rotated_row row Rotation.next) in *.
+    set (xp := UnOp.from (Γ.(Assignment.advice) Advice.A0 region rc)) in *.
+    set (yp := UnOp.from (Γ.(Assignment.advice) Advice.A1 region rc)) in *.
+    set (xq := UnOp.from (Γ.(Assignment.advice) Advice.A2 region rc)) in *.
+    set (yq := UnOp.from (Γ.(Assignment.advice) Advice.A3 region rc)) in *.
+    set (XR := UnOp.from (Γ.(Assignment.advice) Advice.A2 region rn)) in *.
+    set (YR := UnOp.from (Γ.(Assignment.advice) Advice.A3 region rn)) in *.
     destruct Hgate as (Hc1 & Hc2).
     specialize (Hc1 Hselector).
     specialize (Hc2 Hselector).
@@ -104,7 +101,7 @@ Module IncompleteAddition.
     assert (Hxr : XR = L *F L -F xp -F xq).
     { clear Hc1 Hc2 Hlam Hdd Hd. field_solve. }
     set (xrout := L *F L -F xp -F xq) in *.
-    rewrite <- Hxr.
+    rewrite Hxr.
     (* y-coordinate: cancel the [d] factor against the line constraint. *)
     assert (Hy_eq : UnOp.from (YR +F yq) = UnOp.from (L *F (xq -F XR))).
     { apply (field_mul_cancel_r _ _ d Hd).
@@ -114,6 +111,7 @@ Module IncompleteAddition.
         reflexivity. }
     assert (Hlam' : L *F xp -F L *F xq = N).
     { rewrite <- field_mul_sub_distr. exact Hlam. }
+    rewrite Hxr in Hy_eq.
     rewrite field_mul_sub_distr in Hy_eq.
     unfold N in Hlam'.
     f_equal.

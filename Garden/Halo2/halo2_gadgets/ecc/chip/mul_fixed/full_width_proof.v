@@ -21,29 +21,29 @@ Module FullWidthFixedBaseScalarMul.
      by the Lagrange-interpolation fixed coefficients, the window on A4, the
      witness [u] on A5, and the fixed [z], via [full_width_fixed_base_scalar_mul_gate]. *)
   Theorem deterministic
-      (ρ : Evaluation.t columns)
-      (Hselector : ⟦ Selector.QMulFixedFull ⟧ ρ <> 0)
+      {RegionId : Set} (Γ : Assignment.t columns RegionId) (region : RegionId) (row : Z)
+      (Hselector : Γ ⊢ ⟦ Selector.QMulFixedFull ⟧ (region, row) <> 0)
       (Hgate :
-        ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width
-            .full_width_fixed_base_scalar_mul_gate ⟧ ρ) :
+        Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width
+            .full_width_fixed_base_scalar_mul_gate ⟧ (region, row)) :
       {|
         Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
-          ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ ρ;
+          Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row);
         Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
-          ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ ρ;
+          Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ (region, row);
       |} =
         output
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ ρ)
-          (⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ ρ).
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ (region, row))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧ (region, row)).
   Proof.
     unfold output, FullWidthFixedBaseScalarMul.output, CoordsCheck.output,
       interpolated_x, square, pow_nat.
