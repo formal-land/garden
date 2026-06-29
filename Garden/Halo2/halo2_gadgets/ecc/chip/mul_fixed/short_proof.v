@@ -65,5 +65,23 @@ Module ShortFixedBaseMul.
           (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* Selector enabled by [synthesize]. *)
+      cbn in Hfacts.
+      destruct Hfacts as [Hselector Htrivial].
+      exact (enabled_nonzero Γ Selector.QMulFixedShort
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort) 0 Hselector).
+    - (* The short fixed-base mul gate holds, from gate satisfaction. *)
+      assert (Hsystem :
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short.configure
+          ConstraintSystem.empty).(ConstraintSystem.gates)
+        = [Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short.short_fixed_base_mul_gate])
+        by reflexivity.
+      exact (satisfies_gates_single Γ _
+        Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short.short_fixed_base_mul_gate
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort) 0
+        Hsystem Hgates).
+  Qed.
 End ShortFixedBaseMul.

@@ -125,5 +125,47 @@ Module DecompositionCheck.
           (Γ ⊢ ⟦ Expression.Advice left_col Rotation.next ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition) 0
+      q_decompose a_col b_col c_col left_col right_col).
+    - (* [q_decompose] is enabled at offset 0 of the decomposition region; the
+         [cond_swap] sub-program's facts form an opaque prefix, so project past
+         them to reach the selector fact at the tail. *)
+      unfold Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.synthesize_instance
+        in Hfacts.
+      cbn [layouter_facts region_facts layouter_value Monad.bind
+        ConfigureIsMonad LayouterIsMonad] in Hfacts.
+      assert (Happ : forall (Δ : Assignment.t columns RegionId.t)
+          (xs ys : list (Fact.t columns RegionId.t)),
+          interpret_facts Δ (xs ++ ys) -> interpret_facts Δ ys).
+      { intros Δ xs. induction xs as [| x xs IH]; intros ys H.
+        - exact H.
+        - exact (IH ys (proj2 H)). }
+      apply Happ in Hfacts.
+      cbn in Hfacts.
+      destruct Hfacts as [Hsel Htrivial].
+      exact (enabled_nonzero Γ q_decompose
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition)
+        0 Hsel).
+    - (* The decomposition-check gate is the last configured gate (after the
+         opaque [cond_swap] gates), so it occurs in the configured list. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.configure_instance
+            q_decompose configure_cond_swap a_col b_col c_col left_col right_col)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.decomposition_check_gate
+          q_decompose a_col b_col c_col left_col right_col)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition) 0);
+        [| exact Hgates].
+      unfold Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.configure_instance,
+        𝓒.run_unit.
+      cbn [𝓒.run snd Monad.bind ConfigureIsMonad ConstraintSystem.create_gate
+        ConstraintSystem.gates].
+      destruct (𝓒.run configure_cond_swap ConstraintSystem.empty) as [v meta] eqn:E.
+      cbn [𝓒.run snd ConstraintSystem.create_gate ConstraintSystem.gates].
+      apply List.in_or_app. right. left. reflexivity.
+  Qed.
 End DecompositionCheck.

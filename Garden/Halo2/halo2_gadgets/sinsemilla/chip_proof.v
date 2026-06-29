@@ -92,7 +92,28 @@ Module InitialYQ.
           (Γ ⊢ ⟦ Expression.Fixed fixed_y_q Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaInitialY, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    cbn in Hfacts.
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaInitialY) 0
+      q_sinsemilla4 fixed_y_q x_a x_p lambda_1 lambda_2).
+    - (* [q_sinsemilla4] enabled at offset 0 of region [SinsemillaInitialY]. *)
+      destruct Hfacts as (H1 & H4 & Htrivial).
+      exact (enabled_nonzero Γ q_sinsemilla4
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaInitialY) 0 H4).
+    - (* The [initial_y_q] gate is one of the configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.sinsemilla.chip.configure_instance
+            q_sinsemilla1 q_sinsemilla4 q_sinsemilla2 fixed_y_q
+            x_a x_p bits lambda_1 lambda_2)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.sinsemilla.chip.initial_y_q_gate
+          q_sinsemilla4 fixed_y_q x_a x_p lambda_1 lambda_2)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaInitialY) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End InitialYQ.
 
 Module Sinsemilla.
@@ -174,7 +195,28 @@ Module Sinsemilla.
           (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaGate, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    cbn in Hfacts.
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaGate) 0
+      q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2).
+    - (* [q_sinsemilla1] enabled at offset 0 of region [SinsemillaGate]. *)
+      destruct Hfacts as (H1 & H4 & Htrivial).
+      exact (enabled_nonzero Γ q_sinsemilla1
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaGate) 0 H1).
+    - (* The [sinsemilla] gate is one of the configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.sinsemilla.chip.configure_instance
+            q_sinsemilla1 q_sinsemilla4 q_sinsemilla2 fixed_y_q
+            x_a x_p bits lambda_1 lambda_2)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_gate
+          q_sinsemilla1 q_sinsemilla2 x_a x_p lambda_1 lambda_2)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaGate) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End Sinsemilla.
 
 Module GeneratorTable.
@@ -196,6 +238,62 @@ Module GeneratorTable.
   Definition table_rows : Z :=
     layouter_table_rows
       Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table.
+
+  Lemma table_rows_eq :
+    table_rows = 2 ^ Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_k.
+  Proof.
+    unfold table_rows,
+      Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table.
+    cbn [layouter_table_rows List.map
+      Garden.Halo2.Synthesis.LookupTableColumn.values].
+    unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
+    rewrite !List.length_map, !List.length_seq.
+    unfold List.list_max.
+    cbn [fold_right].
+    rewrite Nat.max_0_r, !Nat.max_id.
+    rewrite Z2Nat.id by (apply Z.pow_nonneg; lia).
+    reflexivity.
+  Qed.
+
+  (* The table carried by [Γ] agrees with the concrete [lookup] model on every
+     loaded row [0 <= i < 2 ^ sinsemilla_k], derived from the synthesis facts of
+     running [load_generator_table] — no longer assumed as a free hypothesis. *)
+  Lemma loaded
+      (Γ : Assignment.t columns RegionId.t)
+      (Hload :
+        interpret_facts Γ (layouter_facts
+          Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table))
+      (col : Lookup.t) (i : Z)
+      (Hi : 0 <= i < 2 ^ Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_k) :
+      Γ.(Assignment.lookup) col i = lookup col i.
+  Proof.
+    assert (Hk : (Z.to_nat i <
+        Z.to_nat (2 ^ Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_k))%nat).
+    { apply Z2Nat.inj_lt; [lia | apply Z.pow_nonneg; lia | lia]. }
+    unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table
+      in Hload.
+    cbn [layouter_facts List.map interpret_facts
+      Garden.Halo2.Synthesis.LookupTableColumn.lookup
+      Garden.Halo2.Synthesis.LookupTableColumn.values
+      Garden.Halo2.Synthesis.LookupTableColumn.default_value] in Hload.
+    destruct Hload as (Hidx & Hx & Hy & _).
+    cbn [interpret_fact] in Hidx, Hx, Hy.
+    destruct col; cbn [lookup].
+    - rewrite Hidx. unfold value_at_row,
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
+      rewrite nth_map_seq by exact Hk.
+      apply Z2Nat.id; lia.
+    - rewrite Hx. unfold value_at_row,
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
+      rewrite List.map_map.
+      rewrite nth_map_seq by exact Hk.
+      now rewrite Z2Nat.id by lia.
+    - rewrite Hy. unfold value_at_row,
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
+      rewrite List.map_map.
+      rewrite nth_map_seq by exact Hk.
+      now rewrite Z2Nat.id by lia.
+  Qed.
 
   (* Soundness of the generator-table lookup: on an active row
      ([q_sinsemilla1 = 1]), the three queried slots collapse to the bare
@@ -229,5 +327,48 @@ Module GeneratorTable.
             .generator_table_y_p x_a x_p lambda_1 lambda_2 ⟧ (region, row)) =
           Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_s_y table_row.
   Proof.
-  Admitted.
+    assert (Hsub : BinOp.sub 1 1 = 0).
+    { unfold BinOp.sub. now rewrite Z.sub_diag, Zmod_0_l. }
+    with_strategy opaque [BinOp.add BinOp.sub BinOp.mul UnOp.from table_rows
+      Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_s_x
+      Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_s_y]
+      cbn in Hlookup, Hactive |- *.
+    destruct Hlookup as (table_row & Hbound & Hpairs).
+    rewrite table_rows_eq in Hbound.
+    unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_argument
+      in Hpairs.
+    cbn [LookupArgument.pairs] in Hpairs.
+    rewrite !Forall_cons_iff in Hpairs.
+    destruct Hpairs as (Hidx & Hx & Hy & _).
+    with_strategy opaque [BinOp.add BinOp.sub BinOp.mul UnOp.from
+      Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_s_x
+      Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_s_y]
+      cbn in Hidx, Hx, Hy.
+    (* Replace the abstract table reads by the concrete generator-table model,
+       using the loaded-table facts at the in-range witnessed [table_row]. *)
+    rewrite (loaded Γ Hload Lookup.TableIdx table_row Hbound) in Hidx.
+    rewrite (loaded Γ Hload Lookup.TableX table_row Hbound) in Hx.
+    rewrite (loaded Γ Hload Lookup.TableY table_row Hbound) in Hy.
+    cbn [lookup] in Hidx, Hx, Hy.
+    rewrite !Hactive in Hidx, Hx, Hy.
+    exists table_row.
+    repeat split.
+    - exact (proj1 Hbound).
+    - exact (proj2 Hbound).
+    - (* TableIdx slot: [1 *F word] collapses to the evaluated [word]; the outer
+         [UnOp.from] is absorbed since [eval] already reduces modulo [p]. *)
+      rewrite FieldRewrite.mul_one_left, FieldRewrite.from_sub in Hidx.
+      exact Hidx.
+    - (* TableX slot: the [(1 - 1) *F s0_x] padding term vanishes, leaving the
+         witnessed [x_p]. *)
+      FieldRewrite.run.
+      setoid_rewrite Hsub in Hx.
+      FieldRewrite.run.
+      exact Hx.
+    - (* TableY slot: same collapse for the derived [y_p]. *)
+      FieldRewrite.run.
+      setoid_rewrite Hsub in Hy.
+      FieldRewrite.run.
+      exact Hy.
+  Qed.
 End GeneratorTable.

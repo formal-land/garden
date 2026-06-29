@@ -102,7 +102,27 @@ Module QMul1Checks.
           (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.next ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    cbn in Hfacts.
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1) 0
+      q_mul_1 x_a x_p lambda_1 lambda_2).
+    - (* [q_mul_1] enabled at offset 0 of region [EccMulIncomplete1]. *)
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ q_mul_1
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1) 0 H1).
+    - (* The [q_mul_1] checks gate is the first of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+            q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_1_checks_gate
+          q_mul_1 x_a x_p lambda_1 lambda_2)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End QMul1Checks.
 
 Module QMul2Checks.
@@ -190,7 +210,27 @@ Module QMul2Checks.
           (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    cbn in Hfacts.
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2) 0
+      q_mul_2 z x_a x_p y_p lambda_1 lambda_2).
+    - (* [q_mul_2] enabled at offset 0 of region [EccMulIncomplete2]. *)
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ q_mul_2
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2) 0 H2).
+    - (* The [q_mul_2] checks gate is the second of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+            q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_2_checks_gate
+          q_mul_2 z x_a x_p y_p lambda_1 lambda_2)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End QMul2Checks.
 
 Module QMul3Checks.
@@ -261,5 +301,25 @@ Module QMul3Checks.
           (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    cbn in Hfacts.
+    apply (deterministic Γ
+      (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3) 0
+      q_mul_3 z x_a x_p y_p lambda_1 lambda_2).
+    - (* [q_mul_3] enabled at offset 0 of region [EccMulIncomplete3]. *)
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ q_mul_3
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3) 0 H3).
+    - (* The [q_mul_3] checks gate is the third of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+            q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+          ConstraintSystem.empty)
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_3_checks_gate
+          q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End QMul3Checks.

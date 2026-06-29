@@ -104,5 +104,26 @@ Module FullWidthFixedBaseScalarMul.
           (Γ ⊢ ⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedFullWidth, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* Selector enabled by [synthesize]. *)
+      cbn in Hfacts.
+      destruct Hfacts as [Hselector Htrivial].
+      exact (enabled_nonzero Γ Selector.QMulFixedFull
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedFullWidth) 0 Hselector).
+    - (* The full-width fixed-base scalar mul gate holds, from gate satisfaction. *)
+      assert (Hsystem :
+        (𝓒.run_unit
+          Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width.configure
+          ConstraintSystem.empty).(ConstraintSystem.gates)
+        = [Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width
+            .full_width_fixed_base_scalar_mul_gate])
+        by reflexivity.
+      exact (satisfies_gates_single Γ _
+        Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width
+          .full_width_fixed_base_scalar_mul_gate
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedFullWidth) 0
+        Hsystem Hgates).
+  Qed.
 End FullWidthFixedBaseScalarMul.

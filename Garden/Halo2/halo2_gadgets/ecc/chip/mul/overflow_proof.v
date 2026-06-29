@@ -86,5 +86,23 @@ Module OverflowChecks.
           (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* Selector enabled by [synthesize]. *)
+      cbn in Hfacts.
+      destruct Hfacts as [Hselector Htrivial].
+      exact (enabled_nonzero Γ Selector.QMulOverflow
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck) 0 Hselector).
+    - (* The overflow-checks gate holds, from gate satisfaction. *)
+      assert (Hsystem :
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.configure
+          ConstraintSystem.empty).(ConstraintSystem.gates)
+        = [Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.overflow_checks_gate])
+        by reflexivity.
+      exact (satisfies_gates_single Γ _
+        Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.overflow_checks_gate
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck) 0
+        Hsystem Hgates).
+  Qed.
 End OverflowChecks.

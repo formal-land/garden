@@ -156,5 +156,25 @@ Module IncompleteAddition.
           (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* Selector enabled by [synthesize]. *)
+      cbn in Hfacts.
+      destruct Hfacts as [Hselector Htrivial].
+      exact (enabled_nonzero Γ Selector.QAddIncomplete
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete) 0 Hselector).
+    - (* Distinct x-coordinates are a genuine input requirement. *)
+      exact Hx_distinct.
+    - (* The incomplete-addition gate holds, from gate satisfaction. *)
+      assert (Hsystem :
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.configure
+          ConstraintSystem.empty).(ConstraintSystem.gates)
+        = [Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.incomplete_addition_gate])
+        by reflexivity.
+      exact (satisfies_gates_single Γ _
+        Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.incomplete_addition_gate
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete) 0
+        Hsystem Hgates).
+  Qed.
 End IncompleteAddition.

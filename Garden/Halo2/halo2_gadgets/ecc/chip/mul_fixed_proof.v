@@ -136,5 +136,22 @@ Module RunningSumCoordinatesCheck.
           (Γ ⊢ ⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧
             (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* Selector enabled by [synthesize] ([decompose_running_sum.synthesize]
+         contributes no facts). *)
+      cbn in Hfacts.
+      destruct Hfacts as [Hselector Htrivial].
+      exact (enabled_nonzero Γ Selector.QMulFixedRunningSum
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed) 0 Hselector).
+    - (* The running-sum coordinates-check gate is one of the configured gates
+         (alongside [decompose_running_sum]'s range-check gate). *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.configure
+          ConstraintSystem.empty)
+        Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.running_sum_coordinates_check_gate
+        (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End RunningSumCoordinatesCheck.

@@ -333,7 +333,22 @@ Module FullRound.
           (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧
             (RegionId.Poseidon RegionId.Poseidon.FullRound, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* [QPoseidonFull] enabled at offset 0 of region [Poseidon.FullRound]. *)
+      cbn in Hfacts.
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ Selector.QPoseidonFull
+        (RegionId.Poseidon RegionId.Poseidon.FullRound) 0 H1).
+    - (* The full-round gate is the first of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+          ConstraintSystem.empty)
+        Garden.Halo2.halo2_gadgets.poseidon.pow5.full_round_gate
+        (RegionId.Poseidon RegionId.Poseidon.FullRound) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End FullRound.
 
 Module PartialRound.
@@ -511,7 +526,22 @@ Module PartialRound.
           (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧
             (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* [QPoseidonPartial] enabled at offset 0 of region [Poseidon.PartialRounds]. *)
+      cbn in Hfacts.
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ Selector.QPoseidonPartial
+        (RegionId.Poseidon RegionId.Poseidon.PartialRounds) 0 H2).
+    - (* The partial-rounds gate is the second of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+          ConstraintSystem.empty)
+        Garden.Halo2.halo2_gadgets.poseidon.pow5.partial_rounds_gate
+        (RegionId.Poseidon RegionId.Poseidon.PartialRounds) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End PartialRound.
 
 Module PadAndAdd.
@@ -576,5 +606,20 @@ Module PadAndAdd.
           (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
             (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0)).
   Proof.
-  Admitted.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    apply deterministic.
+    - (* [QPoseidonPadAndAdd] enabled at offset 0 of region [Poseidon.PadAndAdd]. *)
+      cbn in Hfacts.
+      destruct Hfacts as (H1 & H2 & H3 & Htrivial).
+      exact (enabled_nonzero Γ Selector.QPoseidonPadAndAdd
+        (RegionId.Poseidon RegionId.Poseidon.PadAndAdd) 0 H3).
+    - (* The pad-and-add gate is the third of the three configured gates. *)
+      apply (satisfies_gates_at Γ
+        (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+          ConstraintSystem.empty)
+        Garden.Halo2.halo2_gadgets.poseidon.pow5.pad_and_add_gate
+        (RegionId.Poseidon RegionId.Poseidon.PadAndAdd) 0); [| exact Hgates].
+      cbn. tauto.
+  Qed.
 End PadAndAdd.
