@@ -20,6 +20,8 @@ depends: [
   "coq-hammer" {= "1.3.2+9.0"}
   "rocq-mathcomp-algebra" {>= "2.4.0" & < "2.6~"}
   "rocq-smpl" {= "9.0"}
+  "coq-coqprime" {>= "1.6.0"}
+  "coq-fiat-crypto" {>= "0.1.6"}
 ]
 build: [
   [make]
