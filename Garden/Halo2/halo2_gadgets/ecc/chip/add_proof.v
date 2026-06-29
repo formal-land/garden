@@ -5,8 +5,8 @@ Require Garden.Halo2.halo2_gadgets.ecc.chip.add.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Field.Field.
-Require Import Garden.Field.FieldLemmas.
-Require Import Garden.Field.FieldDiv.
+Require Import Garden.Field.Lemmas.
+Require Import Garden.Field.Div.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.Bool.Bool.
 
@@ -71,7 +71,7 @@ Module CompleteAddition.
           (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ (region, row)).
   Proof.
     (* Per branch: the field-division law ([BinOp.div x y *F y = x] for
-       [y <> 0], from [Garden.Field.FieldDiv]) determines [lambda] in the
+       [y <> 0], from [Garden.Field.Div]) determines [lambda] in the
        generic/doubling case, and the exceptional cases are read directly off
        the gate constraints. *)
     unfold output, square.

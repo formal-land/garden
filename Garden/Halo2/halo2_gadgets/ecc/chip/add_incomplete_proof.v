@@ -5,8 +5,8 @@ Require Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Field.Field.
-Require Import Garden.Field.FieldLemmas.
-Require Import Garden.Field.FieldDiv.
+Require Import Garden.Field.Lemmas.
+Require Import Garden.Field.Div.
 Require Import Garden.Plonky3.M.
 
 #[local] Existing Instance Primes.PallasPIsPrime.
@@ -54,7 +54,7 @@ Module IncompleteAddition.
           (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧ (region, row)).
   Proof.
     (* [Hx_distinct] gives [x_p -F x_q <> 0], so the field-division law
-       ([BinOp.div x y *F y = x] for [y <> 0], from [Garden.Field.FieldDiv])
+       ([BinOp.div x y *F y = x] for [y <> 0], from [Garden.Field.Div])
        determines [lambda]; the two gate constraints then pin [(x_r, y_r)]. *)
     unfold output, square.
     with_strategy opaque [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from]

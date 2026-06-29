@@ -4,7 +4,7 @@
     [Z] reduced [mod p]: arithmetic ([UnOp]/[BinOp], notations [+F] [-F] [*F],
     [mod_inverse]), the integral-domain lemma ([mul_zero_implies_zero]), and small
     modular-arithmetic helpers. Companion files:
-    [Field.Fermat] (Fermat's little theorem) and [Field.FieldDiv] (field
+    [Field.Fermat] (Fermat's little theorem) and [Field.Div] (field
     division). *)
 
 Require Export Stdlib.PArith.BinPosDef.
@@ -122,7 +122,7 @@ End InField.
 (* Square-and-multiply modular exponentiation, used for the field inverse. It is
    placed here so that [BinOp.div] can be defined as field division. Its
    correctness ([mod_inverse a p = a ^ (p - 2) mod p] and that it inverts [a]) is
-   proved in [Field.FieldDiv], which relies on Fermat's little theorem. *)
+   proved in [Field.Div], which relies on Fermat's little theorem. *)
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
   | xH => (acc * base) mod modulus
