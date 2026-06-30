@@ -1,5 +1,6 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
+Require Import Garden.Halo2.lemmas.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.

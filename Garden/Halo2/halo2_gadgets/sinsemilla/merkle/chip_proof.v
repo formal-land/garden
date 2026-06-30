@@ -1,5 +1,6 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
+Require Import Garden.Halo2.lemmas.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Orchard.columns.

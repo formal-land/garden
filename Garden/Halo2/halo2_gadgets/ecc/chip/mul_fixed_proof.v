@@ -1,5 +1,6 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
+Require Import Garden.Halo2.lemmas.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Field.Field.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.
@@ -26,10 +27,10 @@ Definition interpolated_x {p : Z} `{Prime p}
 Module CoordsCheck.
   Definition output {p : Z} `{Prime p}
       (c0 c1 c2 c3 c4 c5 c6 c7 window u fixed_z : Z)
-      : Garden.Halo2.halo2_gadgets.utilities_proof.Point.t := {|
-    Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
+      : Garden.Halo2.lemmas.Point.t := {|
+    Garden.Halo2.lemmas.Point.x :=
       interpolated_x c0 c1 c2 c3 c4 c5 c6 c7 window;
-    Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
+    Garden.Halo2.lemmas.Point.y :=
       Garden.Halo2.halo2_gadgets.utilities_proof.square u -F fixed_z;
   |}.
 End CoordsCheck.
@@ -37,7 +38,7 @@ End CoordsCheck.
 Module RunningSumCoordinatesCheck.
   Definition output {p : Z} `{Prime p}
       (c0 c1 c2 c3 c4 c5 c6 c7 z_cur z_next u fixed_z : Z)
-      : Garden.Halo2.halo2_gadgets.utilities_proof.Point.t :=
+      : Garden.Halo2.lemmas.Point.t :=
     let window :=
       z_cur -F
         z_next *F
@@ -55,9 +56,9 @@ Module RunningSumCoordinatesCheck.
         Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed
             .running_sum_coordinates_check_gate ⟧ (region, row)) :
       {|
-        Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
+        Garden.Halo2.lemmas.Point.x :=
           Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row);
-        Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
+        Garden.Halo2.lemmas.Point.y :=
           Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ (region, row);
       |} =
         output

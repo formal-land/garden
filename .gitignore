@@ -1,0 +1,6 @@
+# Linear/non-linear arithmetic solver caches
+.lia.cache
+.nia.cache
+
+# Rocq MCP scratch files
+rocq_mcp_cache_*.v

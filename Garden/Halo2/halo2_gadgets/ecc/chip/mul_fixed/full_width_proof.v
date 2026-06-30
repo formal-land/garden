@@ -1,5 +1,6 @@
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
+Require Import Garden.Halo2.lemmas.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width.
 Require Import Garden.Field.Field.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
@@ -14,7 +15,7 @@ Global Open Scope Z_scope.
 Module FullWidthFixedBaseScalarMul.
   Definition output {p : Z} `{Prime p}
       (c0 c1 c2 c3 c4 c5 c6 c7 window u fixed_z : Z)
-      : Garden.Halo2.halo2_gadgets.utilities_proof.Point.t :=
+      : Garden.Halo2.lemmas.Point.t :=
     CoordsCheck.output c0 c1 c2 c3 c4 c5 c6 c7 window u fixed_z.
 
   (* The full-width fixed-base point [(x_p, y_p)] on A0/A1 is uniquely determined
@@ -27,9 +28,9 @@ Module FullWidthFixedBaseScalarMul.
         Γ ⊢ ⟦ Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width
             .full_width_fixed_base_scalar_mul_gate ⟧ (region, row)) :
       {|
-        Garden.Halo2.halo2_gadgets.utilities_proof.Point.x :=
+        Garden.Halo2.lemmas.Point.x :=
           Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧ (region, row);
-        Garden.Halo2.halo2_gadgets.utilities_proof.Point.y :=
+        Garden.Halo2.lemmas.Point.y :=
           Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧ (region, row);
       |} =
         output

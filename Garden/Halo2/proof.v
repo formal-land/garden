@@ -11,7 +11,8 @@ Module Assignment.
     selector : columns.(Columns.Selector) -> RegionId -> Z -> Z;
     fixed : columns.(Columns.Fixed) -> RegionId -> Z -> Z;
     advice : columns.(Columns.Advice) -> RegionId -> Z -> Z;
-    instance_ : columns.(Columns.Instance_) -> RegionId -> Z -> Z;
+    instance_ : columns.(Columns.Instance_) -> Z -> Z;
+    lookup : columns.(Columns.Lookup) -> Z -> Z;
   }.
   Arguments t : clear implicits.
 End Assignment.
@@ -23,11 +24,33 @@ Module Evaluation.
   }.
 End Evaluation.
 
-Module EvaluationResult.
-  Inductive t (A : Set) : Set :=
-  | Mk (value : A) (facts : Prop).
-  Arguments Mk {_}.
-End EvaluationResult.
+Module Fact.
+  (** A reified atomic fact established by running synthesis.  Keeping facts as
+      data (a [Set]) rather than as a [Prop] side-steps the large-elimination
+      restriction: the synthesis syntax [𝓡]/[𝓛] is non-small, so a
+      [Prop]-valued recursion over it is rejected, but a [Set]-valued one (as in
+      [region_facts]) is fine. *)
+  Inductive t (columns : Columns.t) (RegionId : Set) : Set :=
+  | SelectorOn
+      (selector : columns.(Columns.Selector))
+      (region : RegionId) (offset : Z)
+  | FixedIs
+      (column : columns.(Columns.Fixed))
+      (region : RegionId) (offset : Z) (value : Z)
+  | CellsEqual
+      (left right : Garden.Halo2.Synthesis.Cell.t columns RegionId)
+  | InstanceIs
+      (cell : Garden.Halo2.Synthesis.Cell.t columns RegionId)
+      (instance : columns.(Columns.Instance_)) (row : Z)
+  | LookupTableLoaded
+      (column : columns.(Columns.Lookup))
+      (values : list Z) (default_value : Z).
+  Arguments SelectorOn {_ _}.
+  Arguments FixedIs {_ _}.
+  Arguments CellsEqual {_ _}.
+  Arguments InstanceIs {_ _}.
+  Arguments LookupTableLoaded {_ _}.
+End Fact.
 
 Notation "Γ ⊢ ⟦ x ⟧ ρ" := (Evaluation.eval Γ ρ x)
   (at level 10, x at level 200, ρ at level 9).
@@ -37,6 +60,17 @@ Definition rotated_row
     (rotation : Rotation.t)
     : Z :=
   row + rotation.(Rotation.offset).
+
+(** The value held by a loaded lookup-table column at [row]: the [row]-th entry
+    of [values], or [default_value] past the end.  Mirrors the operational
+    [serialize.v] fill, which assigns [values] and pads the remaining rows with
+    [default_value]. *)
+Definition value_at_row
+    (row : Z)
+    (values : list Z)
+    (default_value : Z)
+    : Z :=
+  List.nth (Z.to_nat row) values default_value.
 
 Section Semantics.
   Context {columns : Columns.t}.
@@ -80,7 +114,6 @@ Section Semantics.
         UnOp.from
           (assignment.(Assignment.instance_)
             instance
-            region
             (rotated_row row rotation))
     | Expression.Sum lhs (Expression.Negated rhs) =>
         BinOp.sub
@@ -194,71 +227,149 @@ Section Semantics.
     | Garden.Halo2.Synthesis.ColumnRef.Instance_ column =>
         assignment.(Assignment.instance_)
           column
-          (Garden.Halo2.Synthesis.Cell.region cell)
           (Garden.Halo2.Synthesis.Cell.row_offset cell)
     end.
 
-  Fixpoint eval_region {A : Set}
-      (assignment : Assignment.t columns RegionId)
+  (** The value computed by a region program.  It depends only on the program
+      structure ([Ret]/[Bind]); the effectful nodes return [tt], so it is
+      independent of the assignment. *)
+  Fixpoint region_value {A : Set}
+      (program : Garden.Halo2.Synthesis.𝓡 columns RegionId A)
+      {struct program}
+      : A :=
+    match program with
+    | Garden.Halo2.Synthesis.𝓡.Ret value => value
+    | Garden.Halo2.Synthesis.𝓡.Bind first second =>
+        region_value (second (region_value first))
+    | Garden.Halo2.Synthesis.𝓡.EnableSelector _ _ _ => tt
+    | Garden.Halo2.Synthesis.𝓡.AssignFixed _ _ _ _ => tt
+    | Garden.Halo2.Synthesis.𝓡.Copy _ _ => tt
+    end.
+
+  (** The facts established by a region program, reified as data.  Keeping facts
+      as a [list] (a [Set]) side-steps the large-elimination restriction: the
+      non-small synthesis syntax [𝓡]/[𝓛] admits no [Prop]-valued recursion.
+      Values threaded through [Bind] come from [region_value]. *)
+  Fixpoint region_facts {A : Set}
       (region : RegionId)
       (program : Garden.Halo2.Synthesis.𝓡 columns RegionId A)
       {struct program}
-      : EvaluationResult.t A :=
+      : list (Fact.t columns RegionId) :=
     match program with
-    | Garden.Halo2.Synthesis.𝓡.Ret value =>
-        EvaluationResult.Mk value True
+    | Garden.Halo2.Synthesis.𝓡.Ret _ => []
     | Garden.Halo2.Synthesis.𝓡.Bind first second =>
-        match eval_region assignment region first with
-        | EvaluationResult.Mk value facts_first =>
-            match eval_region assignment region (second value) with
-            | EvaluationResult.Mk value facts_second =>
-                EvaluationResult.Mk value (facts_first /\ facts_second)
-            end
-        end
+        region_facts region first ++
+        region_facts region (second (region_value first))
     | Garden.Halo2.Synthesis.𝓡.EnableSelector selector offset _ =>
-        EvaluationResult.Mk
-          tt
-          (assignment.(Assignment.selector) selector region offset = 1)
+        [Fact.SelectorOn selector region offset]
     | Garden.Halo2.Synthesis.𝓡.AssignFixed _ column offset value =>
-        EvaluationResult.Mk
-          tt
-          (assignment.(Assignment.fixed) column region offset = value)
+        [Fact.FixedIs column region offset value]
     | Garden.Halo2.Synthesis.𝓡.Copy left_cell right_cell =>
-        EvaluationResult.Mk
-          tt
-          (eval_cell assignment left_cell = eval_cell assignment right_cell)
+        [Fact.CellsEqual left_cell right_cell]
     end.
 
-  Fixpoint eval_layouter {A : Set}
-      (assignment : Assignment.t columns RegionId)
+  Fixpoint layouter_value {A : Set}
       (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
       {struct program}
-      : EvaluationResult.t A :=
+      : A :=
     match program with
-    | Garden.Halo2.Synthesis.𝓛.Ret value =>
-        EvaluationResult.Mk value True
+    | Garden.Halo2.Synthesis.𝓛.Ret value => value
     | Garden.Halo2.Synthesis.𝓛.Bind first second =>
-        match eval_layouter assignment first with
-        | EvaluationResult.Mk value facts_first =>
-            match eval_layouter assignment (second value) with
-            | EvaluationResult.Mk value facts_second =>
-                EvaluationResult.Mk value (facts_first /\ facts_second)
-            end
-        end
+        layouter_value (second (layouter_value first))
     | Garden.Halo2.Synthesis.𝓛.AddRegion region _ region_program =>
-        eval_region assignment region (region_program region)
-    | Garden.Halo2.Synthesis.𝓛.ConstrainInstance cell instance row =>
-        EvaluationResult.Mk
-          tt
-          (eval_cell assignment cell =
-            assignment.(Assignment.instance_)
-              instance
-              (Garden.Halo2.Synthesis.Cell.region cell)
-              row)
-    | Garden.Halo2.Synthesis.𝓛.InitLookupTables _ _ =>
-        EvaluationResult.Mk tt True
+        region_value (region_program region)
+    | Garden.Halo2.Synthesis.𝓛.ConstrainInstance _ _ _ => tt
+    | Garden.Halo2.Synthesis.𝓛.InitLookupTables _ _ => tt
     | Garden.Halo2.Synthesis.𝓛.InNamespace _ nested =>
-        eval_layouter assignment nested
+        layouter_value nested
+    end.
+
+  (** The facts established by a layouter program, reified as data: the copies,
+      fixed/selector assignments and instance constraints from running
+      synthesis. *)
+  Fixpoint layouter_facts {A : Set}
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      {struct program}
+      : list (Fact.t columns RegionId) :=
+    match program with
+    | Garden.Halo2.Synthesis.𝓛.Ret _ => []
+    | Garden.Halo2.Synthesis.𝓛.Bind first second =>
+        layouter_facts first ++
+        layouter_facts (second (layouter_value first))
+    | Garden.Halo2.Synthesis.𝓛.AddRegion region _ region_program =>
+        region_facts region (region_program region)
+    | Garden.Halo2.Synthesis.𝓛.ConstrainInstance cell instance row =>
+        [Fact.InstanceIs cell instance row]
+    | Garden.Halo2.Synthesis.𝓛.InitLookupTables _ entries =>
+        List.map
+          (fun entry =>
+            Fact.LookupTableLoaded
+              entry.(Garden.Halo2.Synthesis.LookupTableColumn.lookup)
+              entry.(Garden.Halo2.Synthesis.LookupTableColumn.values)
+              entry.(Garden.Halo2.Synthesis.LookupTableColumn.default_value))
+          entries
+    | Garden.Halo2.Synthesis.𝓛.InNamespace _ nested =>
+        layouter_facts nested
+    end.
+
+  (** The number of rows of the lookup table loaded by a layouter program, read
+      off the [InitLookupTables] entries — the largest column length.  Supplies
+      the [nb_table_rows] used by [circuit_holds] from the program itself; a
+      program that loads no table gets [0]. *)
+  Fixpoint layouter_table_rows {A : Set}
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      {struct program}
+      : Z :=
+    match program with
+    | Garden.Halo2.Synthesis.𝓛.Ret _ => 0
+    | Garden.Halo2.Synthesis.𝓛.Bind first second =>
+        Z.max
+          (layouter_table_rows first)
+          (layouter_table_rows (second (layouter_value first)))
+    | Garden.Halo2.Synthesis.𝓛.AddRegion _ _ _ => 0
+    | Garden.Halo2.Synthesis.𝓛.ConstrainInstance _ _ _ => 0
+    | Garden.Halo2.Synthesis.𝓛.InitLookupTables _ entries =>
+        Z.of_nat
+          (List.list_max
+            (List.map
+              (fun entry =>
+                List.length
+                  entry.(Garden.Halo2.Synthesis.LookupTableColumn.values))
+              entries))
+    | Garden.Halo2.Synthesis.𝓛.InNamespace _ nested =>
+        layouter_table_rows nested
+    end.
+
+  (** Interpret a reified fact into a [Prop]. *)
+  Definition interpret_fact
+      (assignment : Assignment.t columns RegionId)
+      (fact : Fact.t columns RegionId)
+      : Prop :=
+    match fact with
+    | Fact.SelectorOn selector region offset =>
+        assignment.(Assignment.selector) selector region offset = 1
+    | Fact.FixedIs column region offset value =>
+        assignment.(Assignment.fixed) column region offset = value
+    | Fact.CellsEqual left_cell right_cell =>
+        eval_cell assignment left_cell = eval_cell assignment right_cell
+    | Fact.InstanceIs cell instance row =>
+        eval_cell assignment cell =
+          assignment.(Assignment.instance_) instance row
+    | Fact.LookupTableLoaded column values default_value =>
+        forall row,
+          assignment.(Assignment.lookup) column row =
+            value_at_row row values default_value
+    end.
+
+  Fixpoint interpret_facts
+      (assignment : Assignment.t columns RegionId)
+      (facts : list (Fact.t columns RegionId))
+      : Prop :=
+    match facts with
+    | [] => True
+    | fact :: facts =>
+        interpret_fact assignment fact /\
+        interpret_facts assignment facts
     end.
 
   Global Instance SelectorIsEvaluable :
@@ -304,21 +415,151 @@ Section Semantics.
       eval_gates Γ index gates;
   }.
 
-  Global Instance RegionProgramIsEvaluable {A : Set} :
-      Evaluation.C
-        RegionId
-        (Garden.Halo2.Synthesis.𝓡 columns RegionId A)
-        (EvaluationResult.t A) := {
-    Evaluation.eval Γ region program :=
-      eval_region Γ region program;
-  }.
+  (** The gate part of the prover's guarantee: every gate of the constraint
+      system holds at every [(region, row)].  Because each gate constraint is
+      guarded by its selector ([Constraint.Select]), this is vacuous wherever
+      the selector is 0 — so it states exactly "gates bind on enabled rows".
 
-  Global Instance LayouterProgramIsEvaluable {A : Set} :
-      Evaluation.C
-        unit
-        (Garden.Halo2.Synthesis.𝓛 columns RegionId A)
-        (EvaluationResult.t A) := {
-    Evaluation.eval Γ _ program :=
-      eval_layouter Γ program;
-  }.
+      The quantification ranges over all of [RegionId * Z], the simplest
+      faithful reading of "the prover checks every row": it is not narrowed to
+      each region's actual extent, and rows are unbounded integers with no
+      cyclic domain or blinding-row distinction. *)
+  Definition satisfies_gates
+      (assignment : Assignment.t columns RegionId)
+      (system : ConstraintSystem.t columns)
+      : Prop :=
+    forall (region : RegionId) (row : Z),
+      eval_gates assignment (region, row)
+        system.(ConstraintSystem.gates).
+
+  (** A single lookup argument holds at [index] when the tuple of queried
+      expressions equals some row of the loaded table.  The witnessed row is
+      bounded by [nb_table_rows], the size of the loaded table — this is what
+      gives the lookup its range-check role (only valid table rows satisfy it).
+      [Assignment.lookup] is global (not region-scoped): tables are loaded once
+      and addressed by an absolute [table_row]. *)
+  Definition eval_lookup_argument
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (nb_table_rows : Z)
+      (arg : LookupArgument.t columns)
+      : Prop :=
+    exists table_row,
+      0 <= table_row < nb_table_rows /\
+      List.Forall
+        (fun '(expression, column) =>
+          eval_expression assignment index expression =
+            assignment.(Assignment.lookup) column table_row)
+        arg.(LookupArgument.pairs).
+  Arguments eval_lookup_argument _ _ _ _ /.
+
+  (** The lookup part of the prover's guarantee: every lookup argument of the
+      constraint system holds at every [(region, row)].  The table-row bound
+      [nb_table_rows] is an explicit parameter: the [Γ ⊢ ⟦ x ⟧ index] notation
+      has no slot for it, so [LookupArgument.t] carries no [Evaluation.C]
+      instance. *)
+  Definition satisfies_lookups
+      (assignment : Assignment.t columns RegionId)
+      (nb_table_rows : Z)
+      (system : ConstraintSystem.t columns)
+      : Prop :=
+    forall (region : RegionId) (row : Z),
+      List.Forall
+        (eval_lookup_argument assignment (region, row) nb_table_rows)
+        system.(ConstraintSystem.lookups).
+
+  Definition Satisfies
+      (assignment : Assignment.t columns RegionId)
+      (nb_table_rows : Z)
+      (system : ConstraintSystem.t columns)
+      : Prop :=
+    satisfies_gates assignment system /\
+    satisfies_lookups assignment nb_table_rows system.
+
+  (** What a successful Halo2 proof of a chip gives: the synthesis-time facts
+      (copies, fixed/selector assignments, instance constraints collected by
+      running the layouter program) together with gate/lookup satisfaction of
+      the configured constraint system. *)
+  Definition circuit_holds {A : Set}
+      (assignment : Assignment.t columns RegionId)
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      (system : ConstraintSystem.t columns)
+      : Prop :=
+    interpret_facts assignment (layouter_facts program) /\
+    Satisfies assignment (layouter_table_rows program) system.
+
+  (** Bridge 1: a selector enabled by the synthesis program ([= 1]) evaluates
+      to a non-zero value, discharging the selector hypothesis of a gate
+      lemma. *)
+  Lemma enabled_nonzero
+      (assignment : Assignment.t columns RegionId)
+      (selector : columns.(Columns.Selector))
+      (region : RegionId) (offset : Z)
+      (Henabled :
+        assignment.(Assignment.selector) selector region offset = 1) :
+    eval_selector assignment (region, offset) selector <> 0.
+  Proof.
+    cbn [eval_selector].
+    rewrite Henabled.
+    autorewrite with field_rewrite.
+    discriminate.
+  Qed.
+
+  (** Bridge 2: from gate satisfaction, extract the single gate of a one-gate
+      system at any [(region, row)]. *)
+  Lemma satisfies_gates_single
+      (assignment : Assignment.t columns RegionId)
+      (system : ConstraintSystem.t columns)
+      (gate : Gate.t columns)
+      (region : RegionId) (row : Z)
+      (Hsystem : system.(ConstraintSystem.gates) = [gate])
+      (Hsatisfies : satisfies_gates assignment system) :
+    eval_gate assignment (region, row) gate.
+  Proof.
+    specialize (Hsatisfies region row).
+    rewrite Hsystem in Hsatisfies.
+    exact Hsatisfies.
+  Qed.
+
+  (** Any gate that occurs in an evaluated list of gates holds individually.
+      This is the multi-gate generalization of the singleton reasoning in
+      [satisfies_gates_single]. *)
+  Lemma eval_gates_In
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (gate : Gate.t columns)
+      (gates : list (Gate.t columns))
+      (Hin : List.In gate gates)
+      (Hgates : eval_gates assignment index gates) :
+    eval_gate assignment index gate.
+  Proof.
+    revert Hin Hgates.
+    induction gates as [| g gates IH]; intros Hin Hgates.
+    - destruct Hin.
+    - cbn [List.In] in Hin.
+      destruct Hin as [Heq | Hin].
+      + subst gate.
+        destruct gates as [| g' gates'].
+        * exact Hgates.
+        * exact (proj1 Hgates).
+      + destruct gates as [| g' gates'].
+        * destruct Hin.
+        * exact (IH Hin (proj2 Hgates)).
+  Qed.
+
+  (** Bridge 3: from gate satisfaction, extract any gate of the constraint
+      system at any [(region, row)] — the multi-gate form of
+      [satisfies_gates_single]. *)
+  Lemma satisfies_gates_at
+      (assignment : Assignment.t columns RegionId)
+      (system : ConstraintSystem.t columns)
+      (gate : Gate.t columns)
+      (region : RegionId) (row : Z)
+      (Hin : List.In gate system.(ConstraintSystem.gates))
+      (Hsatisfies : satisfies_gates assignment system) :
+    eval_gate assignment (region, row) gate.
+  Proof.
+    exact (eval_gates_In assignment (region, row) gate _ Hin
+      (Hsatisfies region row)).
+  Qed.
 End Semantics.

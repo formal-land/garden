@@ -42,36 +42,60 @@ Definition q_s3
   let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
   q_s2 ✖️ (q_s2 ➖ Expression.Constant 1).
 
+(* The running-sum slice consumed by one Sinsemilla round: the current word is
+   [z_cur] minus the shifted next running-sum value, masked by the running-step
+   flag [q_run = q_s2 - q_s3]. *)
+Definition generator_table_word
+    (q_sinsemilla2 : Fixed.t)
+    (bits : Advice.t)
+    : Expression.t columns :=
+  let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
+  let q_s3 := q_s3 q_sinsemilla2 in
+  let q_run := q_s2 ➖ q_s3 in
+  let z_cur := Expression.Advice bits Rotation.cur in
+  let z_next := Expression.Advice bits Rotation.next in
+  z_cur ➖ (q_run ✖️ z_next ● (2 ^ sinsemilla_k)).
+
+(* The generator ordinate [y_p] recovered from the running [y_a] and the secant
+   gradient [lambda_1] at the current row. *)
+Definition generator_table_y_p
+    (x_a x_p lambda_1 lambda_2 : Advice.t)
+    : Expression.t columns :=
+  let x_p_expr := Expression.Advice x_p Rotation.cur in
+  let lambda1 := Expression.Advice lambda_1 Rotation.cur in
+  let x_a_expr := Expression.Advice x_a Rotation.cur in
+  (y_a x_a x_p lambda_1 lambda_2 Rotation.cur
+    ● Garden.Halo2.halo2_gadgets.ecc.chip.constants.two_inv)
+    ➖ (lambda1 ✖️ (x_a_expr ➖ x_p_expr)).
+
+Definition generator_table_argument
+    (q_sinsemilla1 : Selector.t)
+    (q_sinsemilla2 : Fixed.t)
+    (x_a x_p bits lambda_1 lambda_2 : Advice.t)
+    : LookupArgument.t columns := {|
+  LookupArgument.pairs :=
+    let q_s1 := Expression.Selector q_sinsemilla1 in
+    let word := generator_table_word q_sinsemilla2 bits in
+    let x_p_expr := Expression.Advice x_p Rotation.cur in
+    let y_p := generator_table_y_p x_a x_p lambda_1 lambda_2 in
+    let not_q_s1 := Expression.Constant 1 ➖ q_s1 in
+    [
+      (q_s1 ✖️ word, Lookup.TableIdx);
+      (q_s1 ✖️ x_p_expr ➕ (not_q_s1 ● sinsemilla_s0_x),
+        Lookup.TableX);
+      (q_s1 ✖️ y_p ➕ (not_q_s1 ● sinsemilla_s0_y),
+        Lookup.TableY)
+    ];
+|}.
+
 Definition configure_generator_table
     (q_sinsemilla1 : Selector.t)
     (q_sinsemilla2 : Fixed.t)
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     : 𝓒 columns unit :=
-  do🞵 𝓒.CreateLookup {|
-    LookupArgument.pairs :=
-      let q_s1 := Expression.Selector q_sinsemilla1 in
-      let q_s2 := Expression.Fixed q_sinsemilla2 Rotation.cur in
-      let q_s3 := q_s3 q_sinsemilla2 in
-      let q_run := q_s2 ➖ q_s3 in
-      let z_cur := Expression.Advice bits Rotation.cur in
-      let z_next := Expression.Advice bits Rotation.next in
-      let word := z_cur ➖ (q_run ✖️ z_next ● (2 ^ sinsemilla_k)) in
-      let x_p_expr := Expression.Advice x_p Rotation.cur in
-      let lambda1 := Expression.Advice lambda_1 Rotation.cur in
-      let x_a_expr := Expression.Advice x_a Rotation.cur in
-      let y_p :=
-        (y_a x_a x_p lambda_1 lambda_2 Rotation.cur
-          ● Garden.Halo2.halo2_gadgets.ecc.chip.constants.two_inv)
-          ➖ (lambda1 ✖️ (x_a_expr ➖ x_p_expr)) in
-      let not_q_s1 := Expression.Constant 1 ➖ q_s1 in
-      [
-        (q_s1 ✖️ word, Lookup.TableIdx);
-        (q_s1 ✖️ x_p_expr ➕ (not_q_s1 ● sinsemilla_s0_x),
-          Lookup.TableX);
-        (q_s1 ✖️ y_p ➕ (not_q_s1 ● sinsemilla_s0_y),
-          Lookup.TableY)
-      ];
-  |} in
+  do🞵 𝓒.CreateLookup
+    (generator_table_argument
+      q_sinsemilla1 q_sinsemilla2 x_a x_p bits lambda_1 lambda_2) in
   return🞵 tt.
 
 Definition initial_y_q_gate
