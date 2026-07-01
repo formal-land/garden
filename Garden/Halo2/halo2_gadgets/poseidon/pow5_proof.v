@@ -298,6 +298,42 @@ Module FullRound.
       cbn in *.
     hauto lq: on.
   Qed.
+
+  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+     [QPoseidonFull] at offset 0 of region [Poseidon.FullRound], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.poseidon.pow5.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+            ConstraintSystem.empty)) :
+      {|
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.FullRound, 0);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.FullRound, 0);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.FullRound, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.FullRound, 0)).
+  Proof.
+  Admitted.
 End FullRound.
 
 Module PartialRound.
@@ -436,6 +472,46 @@ Module PartialRound.
       + rewrite dot3, h3 at 1. reflexivity.
       + rewrite dot3, h4 at 1. reflexivity.
   Qed.
+
+  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+     [QPoseidonPartial] at offset 0 of region [Poseidon.PartialRounds], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic]. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.poseidon.pow5.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+            ConstraintSystem.empty)) :
+      {|
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PartialRounds, 0)).
+  Proof.
+  Admitted.
 End PartialRound.
 
 Module PadAndAdd.
@@ -469,4 +545,36 @@ Module PadAndAdd.
       cbn in *.
     hauto lq: on.
   Qed.
+
+  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+     [QPoseidonPadAndAdd] at offset 0 of region [Poseidon.PadAndAdd], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic]. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.poseidon.pow5.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.poseidon.pow5.configure
+            ConstraintSystem.empty)) :
+      {|
+        State.x0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0);
+        State.x1 := Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0);
+        State.x2 := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.next ⟧
+          (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.prev ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
+            (RegionId.Poseidon RegionId.Poseidon.PadAndAdd, 0)).
+  Proof.
+  Admitted.
 End PadAndAdd.

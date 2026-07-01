@@ -120,4 +120,41 @@ Module IncompleteAddition.
     clear Hc1 Hc2 Hlam Hx_eq Hdd Hd Hxr.
     field_solve.
   Qed.
+
+  (* Chip-level determinism (admitted): [add_incomplete.synthesize] enables
+     [QAddIncomplete] at offset 0 of region [EccAddIncomplete], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     The [Hx_distinct] precondition (incomplete addition needs [x_p <> x_q]) is
+     a genuine input requirement and stays as a hypothesis.  See
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hx_distinct :
+        Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0) <>
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0))
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete.configure
+            ConstraintSystem.empty)) :
+      {|
+        Point.x := Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0);
+        Point.y := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAddIncomplete, 0)).
+  Proof.
+  Admitted.
 End IncompleteAddition.

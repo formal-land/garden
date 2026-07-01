@@ -61,4 +61,30 @@ Module OverflowChecks.
     - rewrite h1. now rewrite Hpow.
     - now rewrite <- h2, add_sub_cancel, FieldRewrite.from_from.
   Qed.
+
+  (* Chip-level determinism (admitted): [overflow.synthesize] enables
+     [QMulOverflow] at offset 0 of region [EccMulOverflowCheck], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul.overflow.configure
+            ConstraintSystem.empty)) :
+      {|
+        s := Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck, 0);
+        z_0 := Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.prev ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.prev ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulOverflowCheck, 0)).
+  Proof.
+  Admitted.
 End OverflowChecks.

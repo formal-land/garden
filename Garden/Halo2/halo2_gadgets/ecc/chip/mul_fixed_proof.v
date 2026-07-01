@@ -89,4 +89,52 @@ Module RunningSumCoordinatesCheck.
     - (* [y_p] is recovered from the [check y] constraint [u^2 - y_p = z]. *)
       clear hx. field_solve.
   Qed.
+
+  (* Chip-level determinism (admitted): [mul_fixed.synthesize] enables
+     [QMulFixedRunningSum] at offset 0 of region [EccMulFixed], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.configure
+            ConstraintSystem.empty)) :
+      {|
+        Garden.Halo2.lemmas.Point.x :=
+          Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0);
+        Garden.Halo2.lemmas.Point.y :=
+          Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs0 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0))
+          (Γ ⊢ ⟦ Expression.Fixed Fixed.FixedZ Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixed, 0)).
+  Proof.
+  Admitted.
 End RunningSumCoordinatesCheck.

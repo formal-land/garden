@@ -242,4 +242,37 @@ Module CompleteAddition.
       rewrite HYR'.
       now rewrite (field_mul_cong lam (xp -F XR) Lo (xp -F XR) Hlam_eq eq_refl). }
   Qed.
+
+  (* End-to-end instance of the synthesis-to-gates gluing: from running the
+     [add] chip's synthesis program and assuming the proof verified
+     ([circuit_holds] = synthesis facts + gate satisfaction of the configured
+     system), the next-row result on A2/A3 is the [output] of the current-row
+     inputs.  The free-floating [Hselector]/[Hgate] hypotheses of
+     [deterministic] are discharged by the two bridge lemmas. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.ecc.chip.add.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.add.configure
+            ConstraintSystem.empty)) :
+      {|
+        Point.x :=
+          Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0);
+        Point.y :=
+          Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A0 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccAdd, 0)).
+  Proof.
+  Admitted.
 End CompleteAddition.

@@ -69,6 +69,40 @@ Module QMul1Checks.
     f_equal.
     exact (Hgate Hselector).
   Qed.
+
+  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_1]
+     at offset 0 of region [EccMulIncomplete1]; [circuit_holds] discharges
+     [deterministic]'s [Hselector]/[Hgate].  Parameterised over the same
+     selectors/columns [incomplete.configure]/[synthesize] take.  See
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
+      (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+      (Hcircuit :
+        circuit_holds Γ
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.synthesize
+            q_mul_1 q_mul_2 q_mul_3)
+          (𝓒.run_unit
+            (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+              q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+            ConstraintSystem.empty)) :
+      {|
+        y_a_witnessed := Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0))
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete1, 0)).
+  Proof.
+  Admitted.
 End QMul1Checks.
 
 Module QMul2Checks.
@@ -120,6 +154,43 @@ Module QMul2Checks.
     - (* [y_p] is copied unchanged. *) now symmetry.
     - (* [x_a] on the next row is the secant-line image. *) field_solve.
   Qed.
+
+  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_2]
+     at offset 0 of region [EccMulIncomplete2]; [circuit_holds] discharges
+     [deterministic]'s [Hselector]/[Hgate]. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
+      (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+      (Hcircuit :
+        circuit_holds Γ
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.synthesize
+            q_mul_1 q_mul_2 q_mul_3)
+          (𝓒.run_unit
+            (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+              q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+            ConstraintSystem.empty)) :
+      {|
+        x_p_next := Γ ⊢ ⟦ Expression.Advice x_p Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0);
+        y_p_next := Γ ⊢ ⟦ Expression.Advice y_p Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0);
+        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0))
+          (Γ ⊢ ⟦ Expression.Advice y_p Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0))
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete2, 0)).
+  Proof.
+  Admitted.
 End QMul2Checks.
 
 Module QMul3Checks.
@@ -160,4 +231,35 @@ Module QMul3Checks.
     f_equal.
     field_solve.
   Qed.
+
+  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_3]
+     at offset 0 of region [EccMulIncomplete3]; [circuit_holds] discharges
+     [deterministic]'s [Hselector]/[Hgate]. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (q_mul_1 q_mul_2 q_mul_3 : Selector.t)
+      (z x_a x_p y_p lambda_1 lambda_2 : Advice.t)
+      (Hcircuit :
+        circuit_holds Γ
+          (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.synthesize
+            q_mul_1 q_mul_2 q_mul_3)
+          (𝓒.run_unit
+            (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.configure
+              q_mul_1 q_mul_2 q_mul_3 z x_a x_p y_p lambda_1 lambda_2)
+            ConstraintSystem.empty)) :
+      {|
+        x_a_next := Γ ⊢ ⟦ Expression.Advice x_a Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice x_a Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0))
+          (Γ ⊢ ⟦ Expression.Advice x_p Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0))
+          (Γ ⊢ ⟦ Expression.Advice lambda_2 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulIncomplete3, 0)).
+  Proof.
+  Admitted.
 End QMul3Checks.

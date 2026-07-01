@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.lemmas.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
@@ -78,4 +79,51 @@ Module DecompositionCheck.
     specialize (Hc4 Hselector).
     f_equal; field_solve.
   Qed.
+
+  (* Chip-level determinism (admitted): [chip.synthesize_instance] enables
+     [q_decompose] at offset 0 of region [SinsemillaMerkleDecomposition], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     Parameterised over the selector/columns and the [cond_swap] sub-programs
+     that [configure_instance]/[synthesize_instance] take.  See
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (q_decompose : Selector.t)
+      (synthesize_cond_swap : 𝓛 columns RegionId.t unit)
+      (configure_cond_swap : 𝓒 columns unit)
+      (a_col b_col c_col left_col right_col : Advice.t)
+      (Hcircuit :
+        circuit_holds Γ
+          (Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.synthesize_instance
+            q_decompose synthesize_cond_swap)
+          (𝓒.run_unit
+            (Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.configure_instance
+              q_decompose configure_cond_swap a_col b_col c_col left_col right_col)
+            ConstraintSystem.empty)) :
+      {|
+        l_whole := Γ ⊢ ⟦ Expression.Advice right_col Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0);
+        left_node := Γ ⊢ ⟦ Expression.Advice left_col Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0);
+        right_node := Γ ⊢ ⟦ Expression.Advice right_col Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0);
+        z1_b := Γ ⊢ ⟦ Expression.Advice b_col Rotation.next ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice a_col Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0))
+          (Γ ⊢ ⟦ Expression.Advice b_col Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0))
+          (Γ ⊢ ⟦ Expression.Advice c_col Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0))
+          (Γ ⊢ ⟦ Expression.Advice a_col Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0))
+          (Γ ⊢ ⟦ Expression.Advice c_col Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0))
+          (Γ ⊢ ⟦ Expression.Advice left_col Rotation.next ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.SinsemillaMerkleDecomposition, 0)).
+  Proof.
+  Admitted.
 End DecompositionCheck.

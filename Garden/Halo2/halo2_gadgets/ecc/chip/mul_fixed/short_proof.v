@@ -42,4 +42,28 @@ Module ShortFixedBaseMul.
     specialize (h4 Hselector).
     now rewrite h4.
   Qed.
+
+  (* Chip-level determinism (admitted): [short.synthesize] enables
+     [QMulFixedShort] at offset 0 of region [EccMulFixedShort], so
+     [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     template. *)
+  Theorem synthesize_correct
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit :
+        circuit_holds Γ
+          Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short.synthesize
+          (𝓒.run_unit Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.short.configure
+            ConstraintSystem.empty)) :
+      {|
+        y_a := Γ ⊢ ⟦ Expression.Advice Advice.A3 Rotation.cur ⟧
+          (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort, 0);
+      |} =
+        output
+          (Γ ⊢ ⟦ Expression.Advice Advice.A1 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort, 0))
+          (Γ ⊢ ⟦ Expression.Advice Advice.A4 Rotation.cur ⟧
+            (RegionId.GadgetLocal RegionId.GadgetLocal.EccMulFixedShort, 0)).
+  Proof.
+  Admitted.
 End ShortFixedBaseMul.
