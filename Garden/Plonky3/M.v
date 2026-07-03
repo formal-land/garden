@@ -24,68 +24,9 @@ Export List.ListNotations.
 Require Import Garden.Field.Field.
 
 
-Module Primes.
-  Definition t_q : Z := 45560315531506369815346746415080538113.
-
-  Definition t_p : Z := 45560315531419706090280762371685220353.
-
-  Definition pallas_p : Z := 2 ^ 254 + t_p.
-
-  Definition pallas_q : Z := 2 ^ 254 + t_q.
-
-  Definition mersenne31 : Z := 2 ^ 31 - 1.
-
-  Definition baby_bear : Z := 2 ^ 31 - 2 ^ 27 + 1.
-
-  Definition koala_bear : Z := 2 ^ 31 - 2 ^ 24 + 1.
-
-  Definition goldilocks : Z := 2 ^ 64 - 2 ^ 32 + 1.
-
-  (* The following six facts are [Znumtheory.prime c] statements for concrete
-     constants, left [Admitted]. They can be discharged with primality
-     certificates (e.g. coqprime). *)
-  Lemma pallas_p_prime : IsPrime pallas_p.
-  Proof. Admitted.
-
-  Lemma pallas_q_prime : IsPrime pallas_q.
-  Proof. Admitted.
-
-  Lemma mersenne31_prime : IsPrime mersenne31.
-  Proof. Admitted.
-
-  Lemma baby_bear_prime : IsPrime baby_bear.
-  Proof. Admitted.
-
-  Lemma koala_bear_prime : IsPrime koala_bear.
-  Proof. Admitted.
-
-  Lemma goldilocks_prime : IsPrime goldilocks.
-  Proof. Admitted.
-
-  Global Instance PallasPIsPrime : Prime pallas_p := {
-    is_prime := pallas_p_prime;
-  }.
-
-  Global Instance PallasQIsPrime : Prime pallas_q := {
-    is_prime := pallas_q_prime;
-  }.
-
-  Global Instance Mersenne31IsPrime : Prime mersenne31 := {
-    is_prime := mersenne31_prime;
-  }.
-
-  Global Instance BabyBearIsPrime : Prime baby_bear := {
-    is_prime := baby_bear_prime;
-  }.
-
-  Global Instance KoalaBearIsPrime : Prime koala_bear := {
-    is_prime := koala_bear_prime;
-  }.
-
-  Global Instance GoldilocksIsPrime : Prime goldilocks := {
-    is_prime := goldilocks_prime;
-  }.
-End Primes.
+(* One shared set of prime constants, primality facts, and [Prime] instances
+   for the whole development: an alias of [Garden.Field.Field.Primes] *)
+Module Primes := Garden.Field.Field.Primes.
 
 Module Default.
   Class C (A : Set) : Set := {
