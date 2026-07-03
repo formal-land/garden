@@ -44,6 +44,21 @@ Section FieldSqrt.
     | _ => UnOp.from 1
     end.
 
+  (* Every [modpow] output is already reduced mod [p]: [modpow_pos] returns a
+     [UnOp.from] leaf or a [*F] product, and the non-positive branch a [UnOp.from]. *)
+  Lemma modpow_pos_reduced (base : Z) (e : positive) :
+    UnOp.from (modpow_pos base e) = modpow_pos base e.
+  Proof.
+    destruct e; cbn [modpow_pos];
+      solve [apply from_mul_reduced | apply from_idem].
+  Qed.
+
+  Lemma modpow_reduced (base e : Z) : UnOp.from (modpow base e) = modpow base e.
+  Proof.
+    unfold modpow. destruct e;
+      solve [apply from_idem | apply modpow_pos_reduced].
+  Qed.
+
   (* [Fpow], [prime_gt1] and the basic field-power laws live in [Field.Lemmas]. *)
 
   Lemma modpow_pos_correct (base : Z) (e : positive) :
@@ -145,6 +160,107 @@ Section FieldSqrt.
     - exact Hm1.
   Qed.
 
+  (* --- [is_square] algebra: the zero branch, squares are residues, and QR
+     multiplicativity, all from the Euler scaffolding above. These feed
+     window-point sign forcing: with [is_square (z - r) = is_square (u * u) = true]
+     and [is_square (window_disc) = is_square ((z - r) *F (r + z)) = false],
+     [is_square_mul_cancel_l] forces [is_square (r + z) = false]. --- *)
+
+  (* Anything reducing to 0 mod p counts as a square (the zero branch). *)
+  Lemma is_square_from_zero (a : Z) : UnOp.from a = 0 -> is_square a = true.
+  Proof.
+    intros Ha. unfold is_square. apply orb_true_iff. left.
+    apply Z.eqb_eq. exact Ha.
+  Qed.
+
+  Lemma is_square_zero : is_square 0 = true.
+  Proof. apply is_square_from_zero. unfold UnOp.from. apply Zmod_0_l. Qed.
+
+  (* Squares are quadratic residues: [u * u] is always a square (Euler's
+     criterion collapses to Fermat on the nonzero branch; the zero branch is
+     handled by [is_square_from_zero]). *)
+  Lemma is_square_sq (u : Z) : is_square (u *F u) = true.
+  Proof.
+    destruct (Z.eq_dec (UnOp.from u) 0) as [Hz | Hnz].
+    - apply is_square_from_zero.
+      assert (Hmul : u *F u = 0)
+        by (rewrite mul_zero_implies_zero; left; exact Hz).
+      rewrite Hmul. unfold UnOp.from. apply Zmod_0_l.
+    - unfold is_square. apply orb_true_iff. right. apply Z.eqb_eq.
+      rewrite modpow_correct by (apply half_nonneg).
+      rewrite Fpow_mul_base by (apply half_nonneg).
+      rewrite Fpow_sqr by (apply half_nonneg).
+      destruct (Z.eq_dec p 2) as [Hp2 | Hpne].
+      + assert (He0 : 2 * ((p - 1) / 2) = 0) by (rewrite Hp2; reflexivity).
+        rewrite He0. apply Fpow_0.
+      + assert (Hp3 : 2 < p) by (pose proof prime_gt1; lia).
+        rewrite odd_pm1 by exact Hp3.
+        exact (fermat_Fpow u Hnz).
+  Qed.
+
+  (* QR multiplicativity: a product of two residues is a residue. *)
+  Lemma is_square_mul (a b : Z) :
+    is_square a = true -> is_square b = true -> is_square (a *F b) = true.
+  Proof.
+    intros Ha Hb.
+    destruct (Z.eq_dec (UnOp.from a) 0) as [Haz | Hanz].
+    - apply is_square_from_zero.
+      assert (Hmul : a *F b = 0)
+        by (rewrite mul_zero_implies_zero; left; exact Haz).
+      rewrite Hmul. unfold UnOp.from. apply Zmod_0_l.
+    - destruct (Z.eq_dec (UnOp.from b) 0) as [Hbz | Hbnz].
+      + apply is_square_from_zero.
+        assert (Hmul : a *F b = 0)
+          by (rewrite mul_zero_implies_zero; right; exact Hbz).
+        rewrite Hmul. unfold UnOp.from. apply Zmod_0_l.
+      + unfold is_square. apply orb_true_iff. right. apply Z.eqb_eq.
+        rewrite modpow_correct by (apply half_nonneg).
+        rewrite Fpow_mul_base by (apply half_nonneg).
+        rewrite (is_square_true_nonzero a Hanz Ha).
+        rewrite (is_square_true_nonzero b Hbnz Hb).
+        rewrite from_one. unfold BinOp.mul. rewrite Z.mul_1_l.
+        pose proof prime_gt1. now rewrite Z.mod_1_l by lia.
+  Qed.
+
+  (* Cancelling a square factor on the left: [a] a residue and [a *F b] a
+     non-residue force [b] a non-residue (square * non-square = non-square).
+     This is the exact form the discriminant step of the sign forcing consumes:
+     [a := z - r] (a square, [= u * u]), [a *F b := window_disc] (the
+     certified non-residue), yielding [is_square (r + z) = false]. *)
+  Lemma is_square_mul_cancel_l (a b : Z) :
+    is_square a = true -> is_square (a *F b) = false -> is_square b = false.
+  Proof.
+    intros Ha Hns.
+    pose proof (is_square_false_spec (a *F b) Hns) as [HABnz HABne].
+    assert (HBnz : UnOp.from b <> 0).
+    { intro Hb. apply HABnz.
+      assert (Hmul : a *F b = 0)
+        by (rewrite mul_zero_implies_zero; right; exact Hb).
+      rewrite Hmul. unfold UnOp.from. apply Zmod_0_l. }
+    assert (HAnz : UnOp.from a <> 0).
+    { intro Haz. apply HABnz.
+      assert (Hmul : a *F b = 0)
+        by (rewrite mul_zero_implies_zero; left; exact Haz).
+      rewrite Hmul. unfold UnOp.from. apply Zmod_0_l. }
+    pose proof (is_square_true_nonzero a HAnz Ha) as HApow.
+    unfold is_square. apply orb_false_iff. split.
+    - apply Z.eqb_neq. exact HBnz.
+    - apply Z.eqb_neq. rewrite modpow_correct by (apply half_nonneg).
+      intro HBpow. apply HABne.
+      rewrite Fpow_mul_base by (apply half_nonneg).
+      rewrite HApow, HBpow, from_one.
+      unfold BinOp.mul. rewrite Z.mul_1_l.
+      pose proof prime_gt1. now rewrite Z.mod_1_l by lia.
+  Qed.
+
+  (* Cancelling a square factor on the right (the commuted form). *)
+  Lemma is_square_mul_cancel_r (a b : Z) :
+    is_square b = true -> is_square (a *F b) = false -> is_square a = false.
+  Proof.
+    intros Hb Hns. apply (is_square_mul_cancel_l b a Hb).
+    rewrite field_mul_comm. exact Hns.
+  Qed.
+
   (* --- Iterated-squaring helpers specific to Tonelli–Shanks (the general
      field-power and [UnOp.from] facts are in [Field.Lemmas]). --- *)
 
@@ -198,6 +314,18 @@ Section FieldSqrt.
           let b2 := b *F b in
           ts_loop fuel' i b2 (t *F b2) (r *F b)
     end.
+
+  (* The Tonelli-Shanks loop returns its running accumulator, updated only via
+     [*F]; so a reduced initial accumulator stays reduced through to the result. *)
+  Lemma ts_loop_reduced :
+    forall (fuel m : nat) (c t r : Z),
+      UnOp.from r = r -> UnOp.from (ts_loop fuel m c t r) = ts_loop fuel m c t r.
+  Proof.
+    induction fuel as [| fuel' IH]; intros m c t r Hr; cbn [ts_loop].
+    - exact Hr.
+    - destruct (UnOp.from t =? 1); [exact Hr |].
+      apply IH. apply from_mul_reduced.
+  Qed.
 
   (* [least_i fuel (t^(2^i0)) i0] is the least index >= i0 (within fuel) at which
      [t^(2^.)] becomes 1; everything strictly below it is not 1. *)
@@ -763,6 +891,16 @@ Section FieldSqrt.
         * exact Hqodd.
         * exact Hs1.
         * exact Hq1.
+  Qed.
+
+  (* [field_sqrt] always returns a value reduced mod [p] (either [0] or the
+     Tonelli-Shanks accumulator, whose initial value [modpow ..] is reduced). *)
+  Lemma field_sqrt_reduced (n : Z) : UnOp.from (field_sqrt n) = field_sqrt n.
+  Proof.
+    unfold field_sqrt. destruct (UnOp.from n =? 0).
+    - unfold UnOp.from. apply Zmod_0_l.
+    - destruct (split_two (S (Z.to_nat (Z.log2 p))) (p - 1)) as [s q].
+      apply ts_loop_reduced. apply modpow_reduced.
   Qed.
 
 End FieldSqrt.
