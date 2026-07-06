@@ -2,6 +2,7 @@ Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
+Require Import Stdlib.micromega.Lia.
 
 Import ListNotations.
 Global Open Scope Z_scope.
@@ -372,6 +373,150 @@ Section Semantics.
         interpret_facts assignment facts
     end.
 
+  Lemma interpret_facts_app
+      (assignment : Assignment.t columns RegionId)
+      (facts1 facts2 : list (Fact.t columns RegionId)) :
+    interpret_facts assignment (facts1 ++ facts2) <->
+      interpret_facts assignment facts1 /\
+      interpret_facts assignment facts2.
+  Proof.
+    induction facts1 as [| fact facts1 IH]; cbn.
+    - tauto.
+    - rewrite IH. tauto.
+  Qed.
+
+  Lemma interpret_facts_app_left
+      (assignment : Assignment.t columns RegionId)
+      (facts1 facts2 : list (Fact.t columns RegionId)) :
+    interpret_facts assignment (facts1 ++ facts2) ->
+    interpret_facts assignment facts1.
+  Proof.
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_facts_app_right
+      (assignment : Assignment.t columns RegionId)
+      (facts1 facts2 : list (Fact.t columns RegionId)) :
+    interpret_facts assignment (facts1 ++ facts2) ->
+    interpret_facts assignment facts2.
+  Proof.
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_facts_In
+      (assignment : Assignment.t columns RegionId)
+      (fact : Fact.t columns RegionId)
+      (facts : list (Fact.t columns RegionId)) :
+    interpret_facts assignment facts ->
+    List.In fact facts ->
+    interpret_fact assignment fact.
+  Proof.
+    induction facts as [| fact' facts IH]; cbn; intros Hfacts Hin.
+    - contradiction.
+    - destruct Hfacts as [Hfact' Hfacts].
+      destruct Hin as [Heq | Hin].
+      + subst fact'. exact Hfact'.
+      + exact (IH Hfacts Hin).
+  Qed.
+
+  Lemma interpret_facts_subset
+      (assignment : Assignment.t columns RegionId)
+      (facts_sub facts : list (Fact.t columns RegionId)) :
+    (forall fact, List.In fact facts_sub -> List.In fact facts) ->
+    interpret_facts assignment facts ->
+    interpret_facts assignment facts_sub.
+  Proof.
+    intros Hsubset Hfacts.
+    induction facts_sub as [| fact facts_sub IH]; cbn.
+    - exact I.
+    - split.
+      + exact (interpret_facts_In assignment fact facts Hfacts
+          (Hsubset fact (or_introl eq_refl))).
+      + apply IH.
+        intros fact' Hin.
+        exact (Hsubset fact' (or_intror Hin)).
+  Qed.
+
+  Lemma interpret_region_facts_bind_left
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (first : Garden.Halo2.Synthesis.𝓡 columns RegionId A)
+      (second : A -> Garden.Halo2.Synthesis.𝓡 columns RegionId B)
+      (region : RegionId) :
+    interpret_facts assignment (region_facts region (𝓡.Bind first second)) ->
+    interpret_facts assignment (region_facts region first).
+  Proof.
+    cbn [region_facts].
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_region_facts_bind_right
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (first : Garden.Halo2.Synthesis.𝓡 columns RegionId A)
+      (second : A -> Garden.Halo2.Synthesis.𝓡 columns RegionId B)
+      (region : RegionId) :
+    interpret_facts assignment (region_facts region (𝓡.Bind first second)) ->
+    interpret_facts assignment
+      (region_facts region (second (region_value first))).
+  Proof.
+    cbn [region_facts].
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_layouter_facts_bind_left
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (first : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      (second : A -> Garden.Halo2.Synthesis.𝓛 columns RegionId B) :
+    interpret_facts assignment (layouter_facts (𝓛.Bind first second)) ->
+    interpret_facts assignment (layouter_facts first).
+  Proof.
+    cbn [layouter_facts].
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_layouter_facts_bind_right
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (first : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      (second : A -> Garden.Halo2.Synthesis.𝓛 columns RegionId B) :
+    interpret_facts assignment (layouter_facts (𝓛.Bind first second)) ->
+    interpret_facts assignment
+      (layouter_facts (second (layouter_value first))).
+  Proof.
+    cbn [layouter_facts].
+    rewrite interpret_facts_app.
+    tauto.
+  Qed.
+
+  Lemma interpret_layouter_facts_in_namespace
+      (assignment : Assignment.t columns RegionId)
+      {A : Set} (name : string)
+      (nested : Garden.Halo2.Synthesis.𝓛 columns RegionId A) :
+    interpret_facts assignment (layouter_facts (𝓛.InNamespace name nested)) ->
+    interpret_facts assignment (layouter_facts nested).
+  Proof.
+    cbn [layouter_facts].
+    tauto.
+  Qed.
+
+  Lemma interpret_layouter_facts_add_region
+      (assignment : Assignment.t columns RegionId)
+      {A : Set} (region : RegionId) (name : string)
+      (program : RegionId -> Garden.Halo2.Synthesis.𝓡 columns RegionId A) :
+    interpret_facts assignment (layouter_facts (𝓛.AddRegion region name program)) ->
+    interpret_facts assignment (region_facts region (program region)).
+  Proof.
+    cbn [layouter_facts].
+    tauto.
+  Qed.
+
   Global Instance SelectorIsEvaluable :
       Evaluation.C (RegionId * Z) columns.(Columns.Selector) Z := {
     Evaluation.eval Γ index selector :=
@@ -488,6 +633,13 @@ Section Semantics.
     interpret_facts assignment (layouter_facts program) /\
     Satisfies assignment (layouter_table_rows program) system.
 
+  Definition gates_only_system
+      (system : ConstraintSystem.t columns)
+      : ConstraintSystem.t columns := {|
+    ConstraintSystem.gates := system.(ConstraintSystem.gates);
+    ConstraintSystem.lookups := [];
+  |}.
+
   (** Bridge 1: a selector enabled by the synthesis program ([= 1]) evaluates
       to a non-zero value, discharging the selector hypothesis of a gate
       lemma. *)
@@ -547,6 +699,28 @@ Section Semantics.
         * exact (IH Hin (proj2 Hgates)).
   Qed.
 
+  Lemma eval_gates_subset
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (gates_sub gates : list (Gate.t columns)) :
+    (forall gate, List.In gate gates_sub -> List.In gate gates) ->
+    eval_gates assignment index gates ->
+    eval_gates assignment index gates_sub.
+  Proof.
+    intros Hsubset Hgates.
+    induction gates_sub as [| gate gates_sub IH]; cbn.
+    - exact I.
+    - destruct gates_sub as [| gate' gates_sub'].
+      + exact (eval_gates_In assignment index gate gates
+          (Hsubset gate (or_introl eq_refl)) Hgates).
+      + split.
+        * exact (eval_gates_In assignment index gate gates
+            (Hsubset gate (or_introl eq_refl)) Hgates).
+        * apply IH.
+          intros gate'' Hin.
+          exact (Hsubset gate'' (or_intror Hin)).
+  Qed.
+
   (** Bridge 3: from gate satisfaction, extract any gate of the constraint
       system at any [(region, row)] — the multi-gate form of
       [satisfies_gates_single]. *)
@@ -561,5 +735,201 @@ Section Semantics.
   Proof.
     exact (eval_gates_In assignment (region, row) gate _ Hin
       (Hsatisfies region row)).
+  Qed.
+
+  Lemma satisfies_gates_subset
+      (assignment : Assignment.t columns RegionId)
+      (system_sub system : ConstraintSystem.t columns) :
+    (forall gate,
+      List.In gate system_sub.(ConstraintSystem.gates) ->
+      List.In gate system.(ConstraintSystem.gates)) ->
+    satisfies_gates assignment system ->
+    satisfies_gates assignment system_sub.
+  Proof.
+    intros Hsubset Hsatisfies region row.
+    exact (eval_gates_subset assignment (region, row)
+      system_sub.(ConstraintSystem.gates)
+      system.(ConstraintSystem.gates)
+      Hsubset
+      (Hsatisfies region row)).
+  Qed.
+
+  Lemma satisfies_lookups_nil
+      (assignment : Assignment.t columns RegionId)
+      (nb_table_rows : Z)
+      (system : ConstraintSystem.t columns) :
+    system.(ConstraintSystem.lookups) = [] ->
+    satisfies_lookups assignment nb_table_rows system.
+  Proof.
+    intros Hlookups region row.
+    unfold satisfies_lookups.
+    rewrite Hlookups.
+    constructor.
+  Qed.
+
+  Lemma eval_lookup_argument_expand_rows
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (nb_table_rows nb_table_rows' : Z)
+      (arg : LookupArgument.t columns) :
+    nb_table_rows <= nb_table_rows' ->
+    eval_lookup_argument assignment index nb_table_rows arg ->
+    eval_lookup_argument assignment index nb_table_rows' arg.
+  Proof.
+    intros Hrows Hlookup.
+    destruct Hlookup as (table_row & Hbound & Hpairs).
+    exists table_row.
+    split.
+    - lia.
+    - exact Hpairs.
+  Qed.
+
+  Lemma eval_lookup_arguments_In
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (nb_table_rows : Z)
+      (arg : LookupArgument.t columns)
+      (args : list (LookupArgument.t columns)) :
+    List.In arg args ->
+    List.Forall
+      (eval_lookup_argument assignment index nb_table_rows) args ->
+    eval_lookup_argument assignment index nb_table_rows arg.
+  Proof.
+    intros Hin Hargs.
+    induction Hargs as [| arg' args Harg _ IH].
+    - destruct Hin.
+    - cbn [List.In] in Hin.
+      destruct Hin as [Heq | Hin].
+      + subst arg'. exact Harg.
+      + exact (IH Hin).
+  Qed.
+
+  Lemma eval_lookup_arguments_subset
+      (assignment : Assignment.t columns RegionId)
+      (index : RegionId * Z)
+      (nb_table_rows nb_table_rows' : Z)
+      (args_sub args : list (LookupArgument.t columns)) :
+    (forall arg, List.In arg args_sub -> List.In arg args) ->
+    nb_table_rows <= nb_table_rows' ->
+    List.Forall
+      (eval_lookup_argument assignment index nb_table_rows) args ->
+    List.Forall
+      (eval_lookup_argument assignment index nb_table_rows') args_sub.
+  Proof.
+    intros Hsubset Hrows Hargs.
+    induction args_sub as [| arg args_sub IH].
+    - constructor.
+    - constructor.
+      + apply (eval_lookup_argument_expand_rows
+          assignment index nb_table_rows nb_table_rows').
+        * exact Hrows.
+        * apply (eval_lookup_arguments_In assignment index
+            nb_table_rows arg args).
+          -- apply Hsubset. left. reflexivity.
+          -- exact Hargs.
+      + apply IH.
+        intros arg' Hin.
+        apply Hsubset. right. exact Hin.
+  Qed.
+
+  Lemma satisfies_lookups_subset
+      (assignment : Assignment.t columns RegionId)
+      (nb_table_rows nb_table_rows' : Z)
+      (system_sub system : ConstraintSystem.t columns) :
+    (forall arg,
+      List.In arg system_sub.(ConstraintSystem.lookups) ->
+      List.In arg system.(ConstraintSystem.lookups)) ->
+    nb_table_rows <= nb_table_rows' ->
+    satisfies_lookups assignment nb_table_rows system ->
+    satisfies_lookups assignment nb_table_rows' system_sub.
+  Proof.
+    intros Hsubset Hrows Hlookups region row.
+    exact (eval_lookup_arguments_subset assignment (region, row)
+      nb_table_rows nb_table_rows'
+      system_sub.(ConstraintSystem.lookups)
+      system.(ConstraintSystem.lookups)
+      Hsubset Hrows
+      (Hlookups region row)).
+  Qed.
+
+  Lemma satisfies_gates_only_system
+      (assignment : Assignment.t columns RegionId)
+      (system : ConstraintSystem.t columns) :
+    satisfies_gates assignment system ->
+    satisfies_gates assignment (gates_only_system system).
+  Proof.
+    exact (fun Hsatisfies => Hsatisfies).
+  Qed.
+
+  Lemma circuit_holds_gates_no_lookups_subset
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (program_sub : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId B)
+      (system_sub system : ConstraintSystem.t columns) :
+    (forall fact,
+      List.In fact (layouter_facts program_sub) ->
+      List.In fact (layouter_facts program)) ->
+    (forall gate,
+      List.In gate system_sub.(ConstraintSystem.gates) ->
+      List.In gate system.(ConstraintSystem.gates)) ->
+    system_sub.(ConstraintSystem.lookups) = [] ->
+    circuit_holds assignment program system ->
+    circuit_holds assignment program_sub system_sub.
+  Proof.
+    intros Hfacts_subset Hgates_subset Hlookups_nil Hholds.
+    destruct Hholds as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    split.
+    - exact (interpret_facts_subset assignment
+        (layouter_facts program_sub)
+        (layouter_facts program)
+        Hfacts_subset
+        Hfacts).
+    - split.
+      + exact (satisfies_gates_subset assignment system_sub system
+          Hgates_subset Hgates).
+      + exact (satisfies_lookups_nil assignment
+          (layouter_table_rows program_sub)
+          system_sub
+          Hlookups_nil).
+  Qed.
+
+  Lemma circuit_holds_subset
+      (assignment : Assignment.t columns RegionId)
+      {A B : Set}
+      (program_sub : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
+      (program : Garden.Halo2.Synthesis.𝓛 columns RegionId B)
+      (system_sub system : ConstraintSystem.t columns) :
+    (forall fact,
+      List.In fact (layouter_facts program_sub) ->
+      List.In fact (layouter_facts program)) ->
+    (forall gate,
+      List.In gate system_sub.(ConstraintSystem.gates) ->
+      List.In gate system.(ConstraintSystem.gates)) ->
+    (forall arg,
+      List.In arg system_sub.(ConstraintSystem.lookups) ->
+      List.In arg system.(ConstraintSystem.lookups)) ->
+    layouter_table_rows program <= layouter_table_rows program_sub ->
+    circuit_holds assignment program system ->
+    circuit_holds assignment program_sub system_sub.
+  Proof.
+    intros Hfacts_subset Hgates_subset Hlookups_subset Hrows Hholds.
+    destruct Hholds as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    split.
+    - exact (interpret_facts_subset assignment
+        (layouter_facts program_sub)
+        (layouter_facts program)
+        Hfacts_subset
+        Hfacts).
+    - split.
+      + exact (satisfies_gates_subset assignment system_sub system
+          Hgates_subset Hgates).
+      + exact (satisfies_lookups_subset assignment
+          (layouter_table_rows program)
+          (layouter_table_rows program_sub)
+          system_sub system
+          Hlookups_subset Hrows Hlookups).
   Qed.
 End Semantics.
