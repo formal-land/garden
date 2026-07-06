@@ -45,12 +45,16 @@ Module Fact.
       (instance : columns.(Columns.Instance_)) (row : Z)
   | LookupTableLoaded
       (column : columns.(Columns.Lookup))
-      (values : list Z) (default_value : Z).
+      (values : list Z) (default_value : Z)
+  | CellIsConstant
+      (cell : Garden.Halo2.Synthesis.Cell.t columns RegionId)
+      (value : Z).
   Arguments SelectorOn {_ _}.
   Arguments FixedIs {_ _}.
   Arguments CellsEqual {_ _}.
   Arguments InstanceIs {_ _}.
   Arguments LookupTableLoaded {_ _}.
+  Arguments CellIsConstant {_ _}.
 End Fact.
 
 Notation "Γ ⊢ ⟦ x ⟧ ρ" := (Evaluation.eval Γ ρ x)
@@ -245,6 +249,7 @@ Section Semantics.
     | Garden.Halo2.Synthesis.𝓡.EnableSelector _ _ _ => tt
     | Garden.Halo2.Synthesis.𝓡.AssignFixed _ _ _ _ => tt
     | Garden.Halo2.Synthesis.𝓡.Copy _ _ => tt
+    | Garden.Halo2.Synthesis.𝓡.ConstrainConstant _ _ => tt
     end.
 
   (** The facts established by a region program, reified as data.  Keeping facts
@@ -267,6 +272,8 @@ Section Semantics.
         [Fact.FixedIs column region offset value]
     | Garden.Halo2.Synthesis.𝓡.Copy left_cell right_cell =>
         [Fact.CellsEqual left_cell right_cell]
+    | Garden.Halo2.Synthesis.𝓡.ConstrainConstant cell value =>
+        [Fact.CellIsConstant cell value]
     end.
 
   Fixpoint layouter_value {A : Set}
@@ -360,6 +367,8 @@ Section Semantics.
         forall row,
           assignment.(Assignment.lookup) column row =
             value_at_row row values default_value
+    | Fact.CellIsConstant cell value =>
+        eval_cell assignment cell = value
     end.
 
   Fixpoint interpret_facts

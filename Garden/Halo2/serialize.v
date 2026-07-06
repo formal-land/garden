@@ -337,6 +337,14 @@ Module V1.
               (Cell.to_raw indices region_start lhs)
               (Cell.to_raw indices region_start rhs)
           ])
+    | Garden.Halo2.Synthesis.𝓡.ConstrainConstant _ _ =>
+        (* The Rust V1 floor planner queues [constrain_constant] requests and
+           materializes them only after synthesis, as a trailing block of
+           constants-column [AssignFixed] + [Copy] events with
+           allocator-chosen rows.  That trailing block is replayed from the
+           generated table ([Garden/Orchard/circuit_synthesis_constants.v]),
+           so the inline op contributes no raw event of its own. *)
+        (tt, [])
     end.
 
   Fixpoint value_at_row (row : nat) (values : list Z) {struct row}
