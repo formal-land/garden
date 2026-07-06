@@ -139,13 +139,26 @@ Definition copy_state_to
   do🞵 𝓡.Copy target.(State.state_1) state.(State.state_1) in
   𝓡.Copy target.(State.state_2) state.(State.state_2).
 
+(** The initial capacity element of the [ConstantLength<2>] domain:
+    [L << 64] with [L = 2]. *)
+Definition initial_capacity_element : Z := 2 ^ 65.
+
 Definition synthesize_initial_state
     : 𝓛 columns RegionId.t State.t :=
   𝓛.InNamespace "Poseidon init" (
     𝓛.AddRegion
       (RegionId.Poseidon RegionId.Poseidon.InitialState)
       "initial state for domain ConstantLength<2>"
-      (fun region => return🞵 (state_at region 0))).
+      (fun region =>
+        let state := state_at region 0 in
+        (* The rate words start at zero and the capacity word at the domain
+           constant ([pow5.rs] [initial_state],
+           [assign_advice_from_constant]). *)
+        do🞵 𝓡.ConstrainConstant state.(State.state_0) 0 in
+        do🞵 𝓡.ConstrainConstant state.(State.state_1) 0 in
+        do🞵
+          𝓡.ConstrainConstant state.(State.state_2) initial_capacity_element in
+        return🞵 state)).
 
 Fixpoint assign_round_constant_entries
     (offset : Z)

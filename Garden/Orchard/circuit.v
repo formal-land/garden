@@ -3,6 +3,7 @@ Require Import Garden.Halo2.Synthesis.
 Require Garden.Halo2.serialize.
 Require Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.
+Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Garden.Halo2.halo2_gadgets.poseidon.pow5.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
@@ -406,6 +407,8 @@ Definition synthesize_merkle_decomposition_instance
     do🞵 𝓡.Copy b1_target b1 in
     let b2_target := Cell.advice region left_col 1 in
     do🞵 𝓡.Copy b2_target b2 in
+    do🞵
+      𝓡.ConstrainConstant (Cell.advice region right_col 1) layer in
     return🞵 tt).
 
 Definition synthesize_merkle_decomposition_1
@@ -471,7 +474,8 @@ Definition synthesize_merkle_hash_layer_1
           "Range check 5 bits"
           Selector.QLookup
           Selector.QBitshift
-          Advice.A9) in
+          Advice.A9
+          Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5) in
     let🞵 b2 :=
       𝓛.InNamespace "b_2" (
         Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
@@ -479,7 +483,8 @@ Definition synthesize_merkle_hash_layer_1
           "Range check 5 bits"
           Selector.QLookup
           Selector.QBitshift
-          Advice.A9) in
+          Advice.A9
+          Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5) in
     let🞵 b :=
       witness_message_piece
         (merkle_region layer RegionId.Merkle.Region.WitnessB)
@@ -509,9 +514,9 @@ Definition synthesize_merkle_hash_layer_1
         pair.(AssignedPair.right)
         b1
         b2
-        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_a)
-        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_b) in
-    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x)).
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.z1_a)
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.z1_b) in
+    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.x)).
 
 Definition synthesize_merkle_hash_layer_2
     (layer : Z)
@@ -530,7 +535,8 @@ Definition synthesize_merkle_hash_layer_2
           "Range check 5 bits"
           Selector.QLookup
           Selector.QBitshift
-          Advice.A9) in
+          Advice.A9
+          Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5) in
     let🞵 b2 :=
       𝓛.InNamespace "b_2" (
         Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.synthesize_short
@@ -538,7 +544,8 @@ Definition synthesize_merkle_hash_layer_2
           "Range check 5 bits"
           Selector.QLookup
           Selector.QBitshift
-          Advice.A9) in
+          Advice.A9
+          Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5) in
     let🞵 b :=
       witness_message_piece
         (merkle_region layer RegionId.Merkle.Region.WitnessB)
@@ -568,9 +575,9 @@ Definition synthesize_merkle_hash_layer_2
         pair.(AssignedPair.right)
         b1
         b2
-        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_a)
-        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z1_b) in
-    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x)).
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.z1_a)
+        hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.z1_b) in
+    return🞵 hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.MerkleHashResult.x)).
 
 Definition synthesize_merkle_layer
     (layer : Z)
@@ -692,6 +699,9 @@ Definition synthesize_short_fixed_base_mul_incomplete_region
     let z_0 := Cell.advice region Advice.A4 0 in
     do🞵 𝓡.Copy z_0 magnitude in
     let last_window := Cell.advice region Advice.A4 21 in
+    (* Strict running-sum decomposition: the tail [z_22] is pinned to zero
+       ([decompose_running_sum.rs] with [strict = true]). *)
+    do🞵 𝓡.ConstrainConstant (Cell.advice region Advice.A4 22) 0 in
     do🞵 enable_mul_fixed_running_sum_rows 0 22%nat in
     do🞵
       assign_fixed_rows_with_selector
@@ -837,6 +847,9 @@ Definition synthesize_base_field_fixed_base_mul_incomplete_region
       let z_43_alpha := Cell.advice region Advice.A4 43 in
       let z_44_alpha := Cell.advice region Advice.A4 44 in
       let z_84_alpha := Cell.advice region Advice.A4 84 in
+      (* Strict running-sum decomposition: the tail [z_85] is pinned to zero
+         ([decompose_running_sum.rs] with [strict = true]). *)
+      do🞵 𝓡.ConstrainConstant (Cell.advice region Advice.A4 85) 0 in
       do🞵 enable_mul_fixed_running_sum_rows 0 85%nat in
       do🞵
         assign_fixed_rows_with_selector

@@ -61,10 +61,15 @@ Definition synthesize_short {columns : Columns.t} {RegionId : Set}
     (name : string)
     (q_lookup q_bitshift : columns.(Columns.Selector))
     (running_sum : columns.(Columns.Advice))
+    (inv_two_pow_s : Z)
     : 𝓛 columns RegionId (Cell.t columns RegionId) :=
   𝓛.AddRegion region name (fun region =>
     let element := Cell.advice region running_sum 0 in
     do🞵 𝓡.EnableSelector q_lookup 0 "" in
     do🞵 𝓡.EnableSelector q_lookup 1 "" in
     do🞵 𝓡.EnableSelector q_bitshift 1 "" in
+    do🞵
+      𝓡.ConstrainConstant
+        (Cell.advice region running_sum 2)
+        inv_two_pow_s in
     return🞵 element).

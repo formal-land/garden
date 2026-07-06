@@ -241,6 +241,30 @@ Module HashResult.
   }.
 End HashResult.
 
+(** Result of the three-piece ([a || b || c]) Merkle CRH hash: its message
+    schedule produces only these cells.  The full [HashResult] belongs to the
+    note-commit hash, whose eight-piece schedule populates every field. *)
+Module MerkleHashResult.
+  Record t : Set := {
+    x : Cell.t columns RegionId.t;
+    y : Cell.t columns RegionId.t;
+    z1_a : Cell.t columns RegionId.t;
+    z1_b : Cell.t columns RegionId.t;
+  }.
+End MerkleHashResult.
+
+(** Result of the four-piece ([a || b || c || d]) CommitIvk hash. *)
+Module CommitIvkHashResult.
+  Record t : Set := {
+    x : Cell.t columns RegionId.t;
+    y : Cell.t columns RegionId.t;
+    z1_a : Cell.t columns RegionId.t;
+    z1_b : Cell.t columns RegionId.t;
+    z13_a : Cell.t columns RegionId.t;
+    z13_c : Cell.t columns RegionId.t;
+  }.
+End CommitIvkHashResult.
+
 Fixpoint enable_selector_rows
     (selector : Selector.t)
     (offset : Z)
@@ -340,10 +364,13 @@ Definition synthesize_hash_to_point_region
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
-    : 𝓡 columns RegionId.t HashResult.t :=
+    : 𝓡 columns RegionId.t MerkleHashResult.t :=
   do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
     𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  (* The initial x_a is pinned to the domain point's x-coordinate
+     ([hash_to_point.rs] [assign_advice_from_constant] of [x_q]). *)
+  do🞵 𝓡.ConstrainConstant (Cell.advice region x_a 0) q_x in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
@@ -390,16 +417,10 @@ Definition synthesize_hash_to_point_region
       true in
   let y := Cell.advice region lambda_1 52 in
   return🞵 {|
-    HashResult.x := x;
-    HashResult.y := y;
-    HashResult.z1_a := z1_a;
-    HashResult.z1_b := z1_b;
-    HashResult.z1_d := z1_b;
-    HashResult.z1_g := z1_b;
-    HashResult.z13_a := z1_a;
-    HashResult.z13_c := z1_b;
-    HashResult.z13_f := z1_b;
-    HashResult.z13_g := z1_b;
+    MerkleHashResult.x := x;
+    MerkleHashResult.y := y;
+    MerkleHashResult.z1_a := z1_a;
+    MerkleHashResult.z1_b := z1_b;
   |}.
 
 Definition synthesize_hash_to_point_commit_ivk_region
@@ -409,10 +430,13 @@ Definition synthesize_hash_to_point_commit_ivk_region
     (x_a x_p bits lambda_1 lambda_2 : Advice.t)
     (q_x q_y : Z)
     (a b c d : Cell.t columns RegionId.t)
-    : 𝓡 columns RegionId.t HashResult.t :=
+    : 𝓡 columns RegionId.t CommitIvkHashResult.t :=
   do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
     𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  (* The initial x_a is pinned to the domain point's x-coordinate
+     ([hash_to_point.rs] [assign_advice_from_constant] of [x_q]). *)
+  do🞵 𝓡.ConstrainConstant (Cell.advice region x_a 0) q_x in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
@@ -476,23 +500,19 @@ Definition synthesize_hash_to_point_commit_ivk_region
       true in
   let y := Cell.advice region lambda_1 51 in
   return🞵 {|
-    HashResult.x := x;
-    HashResult.y := y;
-    HashResult.z1_a := z1_a;
-    HashResult.z1_b := z1_b;
-    HashResult.z1_d := z1_b;
-    HashResult.z1_g := z1_b;
-    HashResult.z13_a := z13_a;
-    HashResult.z13_c := z13_c;
-    HashResult.z13_f := z13_c;
-    HashResult.z13_g := z13_c;
+    CommitIvkHashResult.x := x;
+    CommitIvkHashResult.y := y;
+    CommitIvkHashResult.z1_a := z1_a;
+    CommitIvkHashResult.z1_b := z1_b;
+    CommitIvkHashResult.z13_a := z13_a;
+    CommitIvkHashResult.z13_c := z13_c;
   |}.
 
 Definition synthesize_hash_to_point_1
     (region : RegionId.t)
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
-    : 𝓛 columns RegionId.t HashResult.t :=
+    : 𝓛 columns RegionId.t MerkleHashResult.t :=
   𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_region
       region
@@ -515,7 +535,7 @@ Definition synthesize_hash_to_point_2
     (region : RegionId.t)
     (q_x q_y : Z)
     (a b c : Cell.t columns RegionId.t)
-    : 𝓛 columns RegionId.t HashResult.t :=
+    : 𝓛 columns RegionId.t MerkleHashResult.t :=
   𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_region
       region
@@ -538,7 +558,7 @@ Definition synthesize_hash_to_point_commit_ivk
     (region : RegionId.t)
     (q_x q_y : Z)
     (a b c d : Cell.t columns RegionId.t)
-    : 𝓛 columns RegionId.t HashResult.t :=
+    : 𝓛 columns RegionId.t CommitIvkHashResult.t :=
   𝓛.AddRegion region "hash_to_point" (fun region =>
     synthesize_hash_to_point_commit_ivk_region
       region
@@ -569,6 +589,9 @@ Definition synthesize_hash_to_point_note_commit_region
   do🞵 𝓡.EnableSelector q_sinsemilla4 0 "" in
   do🞵
     𝓡.AssignFixed "fixed y_q" fixed_y_q 0 q_y in
+  (* The initial x_a is pinned to the domain point's x-coordinate
+     ([hash_to_point.rs] [assign_advice_from_constant] of [x_q]). *)
+  do🞵 𝓡.ConstrainConstant (Cell.advice region x_a 0) q_x in
   let🞵 '(x, z1_a) :=
     synthesize_hash_piece
       region
