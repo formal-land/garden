@@ -1,0 +1,78 @@
+(** * ValueCommitV fixed-base window-point computational certificate
+
+    The [vm_compute] half of the ValueCommitV x-coordinate agreement: for
+    every window [w] (0..21) and digit [i] (0..7), the circuit fixed-base
+    table's Lagrange-interpolated x-coordinate equals the x-coordinate of the
+    computed Weierstrass multiple of the ValueCommitV generator [G].
+
+    The window points come from the shared materialised table
+    ([circuit_proof/value_commit_v/table.v]): [x_check_true] compares all
+    22*8 entries against the circuit table by [Z.eqb], reading the multiples
+    from the pasted literal [ValueCommitVFullTable.full_table_reduced], so
+    its [vm_compute] costs seconds — the octupling chain is paid once, in the
+    table leaf's [full_table_reduced_eq].  The per-entry extraction
+    [x_check_entry] (consumed by the ladder file) is stated against the
+    builder-form [ValueCommitVFullTable.full_table] and rewrites through
+    [full_table_reduced_eq]. *)
+
+Require Import Garden.Field.Field.
+Require Import Garden.EllipticCurve.Weierstrass.
+Require Import Garden.EllipticCurve.Pallas.
+Require Import Garden.Halo2.lemmas.
+Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
+Require Import Garden.Halo2.PallasModel.
+Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.circuit_proof.inputs.
+Require Import Garden.Orchard.circuit_proof.fixed_base.main.
+Require Import Garden.Orchard.circuit_proof.table_defs.
+Require Import Garden.Orchard.circuit_proof.cert_defs.
+Require Import Garden.Orchard.circuit_proof.value_commit_v.table.
+Require Import Stdlib.ZArith.ZArith.
+Require Import Stdlib.Lists.List.
+Require Import Stdlib.Bool.Bool.
+Import ListNotations.
+Import OrchardActionInputs.
+
+#[local] Existing Instance Primes.PallasPIsPrime.
+
+Global Open Scope Z_scope.
+
+(** Keep the table constants opaque to unification/conversion in this file
+    ([Opaque] is file-local; [vm_compute] ignores it, and the literal is
+    already a value). *)
+Opaque ValueCommitVFullTable.full_table.
+Opaque ValueCommitVFullTable.full_table_reduced.
+
+Module ValueCommitVFixedWindowCert.
+  (** Alias for the circuit table / default window. *)
+  Definition table : EccSpec.fixed_table :=
+    OrchardSpec.value_commit_v orchard_circuit_params.
+  Definition default : EccSpec.fixed_window :=
+    OrchardActionFixedBase.fixed_window_default.
+
+  (** The whole-table certificate: every window/digit's Lagrange-interpolated
+      x-coordinate equals the multiple's x-coordinate, in the shared checker's
+      raw [forallb] shape ([FixedBaseXCert.check_fn]), reading the multiples
+      from the table leaf's [full_table_reduced] literal. *)
+  Lemma x_check_true :
+    List.forallb
+      (fun w : nat =>
+         List.forallb
+           (FixedBaseXCert.check_fn table default
+              ValueCommitVFullTable.full_table_reduced w)
+           (List.seq 0 8))
+      (List.seq 0 22) = true.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+  (** Per-entry extraction of the x-coordinate agreement. *)
+  Lemma x_check_entry (w i : nat) (Hw : (w < 22)%nat) (Hi : (i < 8)%nat) :
+    Point.x (EccSpec.fixed_window_point (List.nth w table default) (Z.of_nat i) 0)
+    = Point.x (PallasModel.repr
+         (List.nth i (List.nth w ValueCommitVFullTable.full_table [])
+            Pallas.identity)).
+  Proof.
+    exact (FixedBaseXCert.x_check_entry table default
+             ValueCommitVFullTable.full_table ValueCommitVFullTable.full_table_reduced 22
+             ValueCommitVFullTable.full_table_reduced_eq x_check_true w i Hw Hi).
+  Qed.
+End ValueCommitVFixedWindowCert.
