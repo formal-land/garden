@@ -3,6 +3,6 @@ Require Import Garden.Field.Field.
 
 (** Additional primitives for Brevis *)
 
-(** For now, we axiomatize the lookups *)
+(** The lookups are axiomatized *)
 Parameter looking : forall {M : Set}, M -> M.t unit.
 Parameter looked : forall {M : Set}, M -> M.t unit.
