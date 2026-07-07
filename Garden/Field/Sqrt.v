@@ -261,6 +261,36 @@ Section FieldSqrt.
     rewrite field_mul_comm. exact Hns.
   Qed.
 
+  (* Multiplying a non-residue by a nonzero residue yields a non-residue: the
+     converse companion of [is_square_mul_cancel_l].  It lets a finite
+     certificate discharge [is_square X = false] from a pasted witness [r] with
+     [X = a *F (r *F r)] ([a] a fixed proven non-residue) — one multiplication
+     per entry instead of Euler's criterion. *)
+  Lemma is_square_mul_nonres_l (a b : Z) :
+    2 < p -> is_square a = false -> is_square b = true -> UnOp.from b <> 0 ->
+    is_square (a *F b) = false.
+  Proof.
+    intros Hp3 Ha Hb Hbnz.
+    pose proof (is_square_false_spec a Ha) as [Hanz _].
+    pose proof prime_gt1 as Hp1.
+    unfold is_square. apply orb_false_iff. split.
+    - apply Z.eqb_neq. intro Hz.
+      assert (Hz' : a *F b = 0).
+      { unfold UnOp.from in Hz. unfold BinOp.mul in *.
+        rewrite Z.mod_mod in Hz by lia. exact Hz. }
+      apply mul_zero_implies_zero in Hz'. destruct Hz'; contradiction.
+    - apply Z.eqb_neq.
+      rewrite modpow_correct by (apply half_nonneg).
+      rewrite Fpow_mul_base by (apply half_nonneg).
+      rewrite (nonresidue_pow a Hp3 Ha).
+      rewrite (is_square_true_nonzero b Hbnz Hb).
+      rewrite from_one.
+      assert (Hm1 : UnOp.from (-1) = p - 1).
+      { unfold UnOp.from. symmetry. apply Z.mod_unique_pos with (q := -1); lia. }
+      unfold BinOp.mul. rewrite Hm1, Z.mul_1_r, Z.mod_small by lia.
+      lia.
+  Qed.
+
   (* --- Iterated-squaring helpers specific to Tonelli–Shanks (the general
      field-power and [UnOp.from] facts are in [Field.Lemmas]). --- *)
 

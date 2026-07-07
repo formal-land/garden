@@ -199,14 +199,8 @@ Section Curve.
     u mod p = v mod p -> mod_inverse u p = mod_inverse v p.
   Proof.
     intros Huv.
-    pose proof (@prime_range p _) as Hp1.
     unfold mod_inverse.
-    destruct p as [|p'|p'] eqn:Hpe; try lia.
-    rewrite !(fast_pow_correct (Z.pos p') ltac:(lia)).
-    rewrite !Z.mul_1_l.
-    rewrite (Zpower_mod u _ (Z.pos p')) by lia.
-    rewrite (Zpower_mod v _ (Z.pos p')) by lia.
-    rewrite Huv. reflexivity.
+    now rewrite Huv.
   Qed.
 
   Lemma div_cong (n1 d1 n2 d2 : Z) :
@@ -229,11 +223,11 @@ Section Curve.
     destruct (Z.lt_total 2 p) as [Hgt | [Heq | Hlt]].
     - apply mod_inverse_mul; [lia | exact Hy].
     - assert (Hp2 : p = 2) by lia.
-      unfold BinOp.mul, mod_inverse. rewrite Hp2 in *.
-      cbn [Pos.pred Pos.pred_double fast_pow_modulo_positive].
+      unfold BinOp.mul. rewrite Hp2 in *.
       assert (Hm : y mod 2 = 1) by lia.
-      rewrite Z.mul_1_l, Zmult_mod_idemp_l, Z.mul_mod by lia.
-      rewrite Hm. reflexivity.
+      assert (Hinv : mod_inverse y 2 = 1).
+      { unfold mod_inverse. rewrite Hm. reflexivity. }
+      rewrite Hinv, Z.mul_1_l. exact Hm.
     - lia.
   Qed.
 

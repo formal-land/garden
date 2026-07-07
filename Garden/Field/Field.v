@@ -17,6 +17,7 @@ Require Export RecordUpdate.
 From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 Require Export smpl.Smpl.
+Require Garden.Field.Primality.
 
 (* Activate the modulo arithmetic in [lia] *)
 Ltac Zify.zify_post_hook ::= Z.to_euclidean_division_equations.
@@ -60,25 +61,25 @@ Module Primes.
   Definition goldilocks : Z := 2 ^ 64 - 2 ^ 32 + 1.
 
   (* The following six facts are [Znumtheory.prime c] statements for concrete
-     constants, left [Admitted]. They can be discharged with primality
-     certificates (e.g. coqprime). *)
+     constants, discharged by the Coqprime Pocklington certificates of
+     [Garden.Field.Primality] (axiom-free reflexive checks). *)
   Lemma pallas_p_prime : IsPrime pallas_p.
-  Proof. Admitted.
+  Proof. exact Primality.pallas_p_is_prime. Qed.
 
   Lemma pallas_q_prime : IsPrime pallas_q.
-  Proof. Admitted.
+  Proof. exact Primality.pallas_q_is_prime. Qed.
 
   Lemma mersenne31_prime : IsPrime mersenne31.
-  Proof. Admitted.
+  Proof. exact Primality.mersenne31_is_prime. Qed.
 
   Lemma baby_bear_prime : IsPrime baby_bear.
-  Proof. Admitted.
+  Proof. exact Primality.baby_bear_is_prime. Qed.
 
   Lemma koala_bear_prime : IsPrime koala_bear.
-  Proof. Admitted.
+  Proof. exact Primality.koala_bear_is_prime. Qed.
 
   Lemma goldilocks_prime : IsPrime goldilocks.
-  Proof. Admitted.
+  Proof. exact Primality.goldilocks_is_prime. Qed.
 
   Global Instance PallasPIsPrime : Prime pallas_p := {
     is_prime := pallas_p_prime;
@@ -119,10 +120,10 @@ Module InField.
     now rewrite Z.mod_mod by lia.
   Qed.
 End InField.
-(* Square-and-multiply modular exponentiation, used for the field inverse. It is
-   placed here so that [BinOp.div] can be defined as field division. Its
-   correctness ([mod_inverse a p = a ^ (p - 2) mod p] and that it inverts [a]) is
-   proved in [Field.Div], which relies on Fermat's little theorem. *)
+
+(* Square-and-multiply modular exponentiation, the general
+   modular-exponentiation primitive (e.g. behind [is_square]/[modpow] and the
+   quadratic-nonresidue check in [ecc/chip/spec.v]). *)
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
   | xH => (acc * base) mod modulus
@@ -133,9 +134,36 @@ Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) :
     fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
   end.
 
+(* Extended-Euclid modular inverse. [mod_inv_loop] runs the extended Euclidean
+   algorithm on [(r, newr)] carrying the Bezout coefficients [(t, newt)] of the
+   first component: it maintains [r ≡ t * a' (mod p)]. On termination
+   ([newr = 0]) the current [r] is [gcd] of the initial pair, so for a prime [p]
+   and [a' = a mod p <> 0] the returned [t] satisfies [t * a' ≡ 1 (mod p)]. The
+   operands shrink through the recursion, so heavy [vm_compute] ladders avoid
+   full-width modular exponentiation.
+   Correctness ([mod_inverse] inverts a nonzero element) is proved in
+   [Field.Div] via the Bezout loop invariant. *)
+Fixpoint mod_inv_loop (fuel : nat) (t newt r newr : Z) : Z :=
+  match fuel with
+  | O => t
+  | S f =>
+    if newr =? 0 then t
+    else
+      let q := r / newr in
+      mod_inv_loop f newt (t - q * newt) newr (r - q * newr)
+  end.
+
+(* A fuel bound of [O(log p)] steps: the extended Euclidean algorithm on values
+   below [p] terminates in at most [2 * log2 p + O(1)] steps (each pair of steps
+   at least halves the running remainder). *)
+Definition mod_inv_fuel (p : Z) : nat := 2 * Z.to_nat (Z.log2 p) + 4.
+
 Definition mod_inverse (a p : Z) : Z :=
   match p with
-  | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
+  | Zpos _ =>
+    let a' := a mod p in
+    if a' =? 0 then 0
+    else (mod_inv_loop (mod_inv_fuel p) 0 1 p a') mod p
   | _ => 0 (* We will always have 1 <= p *)
   end.
 Module UnOp.
@@ -173,6 +201,7 @@ Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
 Global Instance ZIsMapMod {p} `{Prime p} : MapMod Z := {
   map_mod := UnOp.from;
 }.
+
 Module IsInField.
   Global Instance from_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.from x).
   Proof. typeclasses eauto. Qed.
@@ -322,28 +351,29 @@ Proof.
   assert (c = 0) by nia.
   lia.
 Qed.
+
 Module Test_mod_inverse.
   Definition test1 : Z := mod_inverse 3 7.
   Goal test1 = 5.
   Proof.
-    reflexivity.
+    now vm_compute.
   Qed.
 
   Definition test2 : Z := mod_inverse 2 11. 
   Goal test2 = 6.
   Proof.
-    reflexivity.
+    now vm_compute.
   Qed.
 
   Definition test3 : Z := mod_inverse 5 17.
   Goal test3 = 7.
   Proof.
-    reflexivity.
+    now vm_compute.
   Qed.
 
   Definition test4 : Z := mod_inverse 5 (2 ^ 31 - 1).
   Goal test4 = 858993459.
   Proof.
-    reflexivity.
+    now vm_compute.
   Qed.
 End Test_mod_inverse.
