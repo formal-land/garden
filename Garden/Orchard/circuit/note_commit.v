@@ -141,7 +141,7 @@ Definition assign_complete_add
   let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
-Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
+Definition synth_note_commit_r_mul_incomplete
     (region : RegionId.t)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
   𝓛.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
@@ -159,7 +159,7 @@ Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
       FullFixedResult.mul_b := mul_b;
     |}).
 
-Definition synthesize_full_fixed_base_mul_note_commit_r_last_region
+Definition synth_note_commit_r_mul_last_region
     (region : RegionId.t)
     (result : FullFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
@@ -173,9 +173,9 @@ Definition synthesize_full_fixed_base_mul_note_commit_r
     (which : RegionId.NoteCommit.Which.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   let🞵 result :=
-    synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
+    synth_note_commit_r_mul_incomplete
       (note_commit_region which RegionId.NoteCommit.FixedBaseIncomplete) in
-  synthesize_full_fixed_base_mul_note_commit_r_last_region
+  synth_note_commit_r_mul_last_region
     (note_commit_region which RegionId.NoteCommit.FixedBaseLast)
     result.
 
