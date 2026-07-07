@@ -103,7 +103,7 @@ Module PallasModel.
   (** ** Helper facts feeding the bridge proofs *)
 
   (** The Pallas prime as a literal, so [lia] keeps the euclidean products
-      linear (mirrors [Halo2.lemmas.field_solve]). *)
+      linear (the same device as in [Halo2.lemmas.field_solve]). *)
   Notation pallas_p_lit :=
     28948022309329048855892746252171976963363056481941560715954676764349967630337.
 

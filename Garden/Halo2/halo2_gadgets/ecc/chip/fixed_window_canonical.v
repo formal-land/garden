@@ -32,28 +32,13 @@ Definition fixed_window_point_canonical
   let y := if is_square (r +F EccSpec.fw_z w) then r else 0 -F r in
   {| Point.x := x; Point.y := y |}.
 
-(** Per-window QR forcing (ADMITTED).  A witnessed window point that lies on the
-    curve equals the canonical one.  Planned proof: the two share the interpolated
-    x; the witnessed [y = u² − z] is on-curve, so [y ∈ {±Y}], and [y + z = u²] is a
-    square, so [y] is the unique QR-admitting root — exactly the canonical y.
-    Reduces, per window/digit, to the finite-field fact that only one of [±Y] has
-    [+z] square, plus [field_sqrt_sound]. *)
-Lemma window_point_forced
-    (w : EccSpec.fixed_window) (digit u : Z)
-    (Honcurve :
-      let P := EccSpec.fixed_window_point w digit u in
-      Point.y P *F Point.y P =
-        Point.x P *F Point.x P *F Point.x P +F UnOp.from pallas_b) :
-    EccSpec.fixed_window_point w digit u = fixed_window_point_canonical w digit.
-Proof.
-Admitted.
-
-(** ** [is_square] algebra (part A, local copy)
+(** ** [is_square] algebra (local copies)
 
     The three [is_square] facts the forcing lemmas need, proved from the Euler
     scaffolding of [Field/Sqrt.v] / [Field/Lemmas.v].  A canonical home is
-    [Field/Sqrt.v] (part A of the plan); the copies here keep the witnessed
-    corollary [window_point_forced_of_disc] derivable within Wave 0. *)
+    [Field/Sqrt.v]; the local copies keep the witnessed
+    corollary [window_point_forced_of_disc] derivable from this file's
+    dependencies alone. *)
 
 (** [is_square] depends only on the residue class of its argument. *)
 Lemma mul_cong_r (x a b : Z) :
@@ -177,7 +162,7 @@ Proof. intro Hh. field_solve. Qed.
     quadratic residue ([Hqr]) and the discriminant [window_disc] a non-residue
     ([Hdisc]), [P] is the canonical window point.  [Honcurve] is the exact shape
     the on-curve extraction produces ([point_on_curve], i.e.
-    [circuit_proof_fixed_base.full_width_*_on_curve]); [Hred] records that the
+    [circuit_proof.fixed_base.full_width_*_on_curve]); [Hred] records that the
     witnessed y is reduced mod [p] (both consumers pass a reduced point).
 
     Proof.  x-coords agree definitionally; [add_b_eq_sq] turns [Honcurve] into

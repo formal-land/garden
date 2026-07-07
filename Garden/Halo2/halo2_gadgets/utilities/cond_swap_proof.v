@@ -76,8 +76,8 @@ Module CondSwap.
   (* Chip-level determinism: [cond_swap.synthesize_instance] enables [q_swap]
      at offset 0 of region [RegionId.GadgetLocal.CondSwap], so [circuit_holds]
      against the matching [cond_swap.configure_instance] discharges the
-     [Hselector]/[Hgate] hypotheses of [deterministic]. Template:
-     [Addition.synthesize_correct] (add_chip_proof.v). *)
+     [Hselector]/[Hgate] hypotheses of [deterministic]. The proof follows the
+     same structure as [Addition.synthesize_correct] (add_chip_proof.v). *)
   Theorem synthesize_correct
       (q_swap : Selector.t)
       (a b a_swapped b_swapped swap : Advice.t)

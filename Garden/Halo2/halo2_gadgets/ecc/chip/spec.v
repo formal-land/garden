@@ -18,7 +18,7 @@ Require Import Stdlib.ZArith.Zpow_facts.
 
 Global Open Scope Z_scope.
 
-(** * Elliptic-curve math primitives (Layer A of the crypto-soundness track)
+(** * Elliptic-curve math primitives
 
     Math-level point operations reused as the abstract operations the ECC chips
     are proved to compute.  Complete and incomplete addition are taken verbatim
@@ -33,8 +33,9 @@ Global Open Scope Z_scope.
     [fixed_scalar_mul] instead mirrors the circuit's *internal* fixed-base
     computation: the Orchard fixed bases exist only as windowed Lagrange tables
     (no affine generator), so it folds the per-window [mul_fixed] points over the
-    concrete table directly.  This keeps every constant concrete — see
-    [docs/crypto-soundness.md], "internal soundness". *)
+    concrete table directly.  This keeps every constant concrete (the
+    "internal soundness" reading: the spec tracks the circuit's own
+    computation structure). *)
 
 Module EccSpec.
   (** The affine identity in the chips' [(0, 0)]-sentinel convention (the
@@ -165,7 +166,7 @@ Module EccSpec.
     assert (Hcompute :
         fast_pow_modulo_positive 1 5 p (Z.to_pos e) = p - 1).
     { subst e p.
-      cbv.
+      vm_compute.
       reflexivity. }
     pose proof (fast_pow_correct p ltac:(lia) (Z.to_pos e) 1 5) as Hfast.
     rewrite Hcompute in Hfast.
@@ -216,7 +217,7 @@ Module EccSpec.
     unfold interpolated_x.
     cbn [fixed_interp].
     unfold Garden.Halo2.halo2_gadgets.utilities_proof.pow_nat.
-    field_solve.
+    mod_ring_solve.
   Qed.
 
   Lemma fixed_interp_8_eq_interpolated_x_from
@@ -231,7 +232,7 @@ Module EccSpec.
     unfold interpolated_x.
     cbn [fixed_interp].
     unfold Garden.Halo2.halo2_gadgets.utilities_proof.pow_nat.
-    field_solve.
+    mod_ring_solve.
   Qed.
 
   (** The 3-bit window digit [i] of the scalar [k]. *)
@@ -442,11 +443,7 @@ Module EccSpec.
         ((L *F (UnOp.from 2 *F yp +F L *F (xq -F xp)) -F
           (xq *F xq +F xq *F xp +F xp *F xp)) *F
           (L *F L -F UnOp.from 2 *F xp -F xq))).
-    { show_equality_modulo.
-      change Primes.pallas_p with
-        28948022309329048855892746252171976963363056481941560715954676764349967630337
-        in *;
-      lia. }
+    { mod_ring_solve. }
     rewrite <- from_sub_reduced.
     rewrite Hfactor_mod.
     assert (Hrel :

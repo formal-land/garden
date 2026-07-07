@@ -70,11 +70,11 @@ Module QMul1Checks.
     exact (Hgate Hselector).
   Qed.
 
-  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_1]
+  (* Chip-level determinism: [incomplete.synthesize] enables [q_mul_1]
      at offset 0 of region [EccMulIncomplete1]; [circuit_holds] discharges
      [deterministic]'s [Hselector]/[Hgate].  Parameterised over the same
      selectors/columns [incomplete.configure]/[synthesize] take.  See
-     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)
@@ -175,7 +175,7 @@ Module QMul2Checks.
     - (* [x_a] on the next row is the secant-line image. *) field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_2]
+  (* Chip-level determinism: [incomplete.synthesize] enables [q_mul_2]
      at offset 0 of region [EccMulIncomplete2]; [circuit_holds] discharges
      [deterministic]'s [Hselector]/[Hgate]. *)
   Theorem synthesize_correct
@@ -272,7 +272,7 @@ Module QMul3Checks.
     field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [incomplete.synthesize] enables [q_mul_3]
+  (* Chip-level determinism: [incomplete.synthesize] enables [q_mul_3]
      at offset 0 of region [EccMulIncomplete3]; [circuit_holds] discharges
      [deterministic]'s [Hselector]/[Hgate]. *)
   Theorem synthesize_correct

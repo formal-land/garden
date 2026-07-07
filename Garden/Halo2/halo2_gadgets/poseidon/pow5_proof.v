@@ -299,10 +299,10 @@ Module FullRound.
     hauto lq: on.
   Qed.
 
-  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+  (* Chip-level determinism: [pow5.synthesize] enables
      [QPoseidonFull] at offset 0 of region [Poseidon.FullRound], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
-     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)
@@ -488,7 +488,7 @@ Module PartialRound.
       + rewrite dot3, h4 at 1. reflexivity.
   Qed.
 
-  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+  (* Chip-level determinism: [pow5.synthesize] enables
      [QPoseidonPartial] at offset 0 of region [Poseidon.PartialRounds], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic]. *)
   Theorem synthesize_correct
@@ -576,7 +576,7 @@ Module PadAndAdd.
     hauto lq: on.
   Qed.
 
-  (* Chip-level determinism (admitted): [pow5.synthesize] enables
+  (* Chip-level determinism: [pow5.synthesize] enables
      [QPoseidonPadAndAdd] at offset 0 of region [Poseidon.PadAndAdd], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic]. *)
   Theorem synthesize_correct

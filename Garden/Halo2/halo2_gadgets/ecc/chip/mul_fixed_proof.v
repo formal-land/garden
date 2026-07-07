@@ -90,10 +90,10 @@ Module RunningSumCoordinatesCheck.
       clear hx. field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [mul_fixed.synthesize] enables
+  (* Chip-level determinism: [mul_fixed.synthesize] enables
      [QMulFixedRunningSum] at offset 0 of region [EccMulFixed], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
-     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

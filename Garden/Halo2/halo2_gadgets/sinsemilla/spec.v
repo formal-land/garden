@@ -14,9 +14,9 @@ Import ListNotations.
 
 Global Open Scope Z_scope.
 
-(** * Sinsemilla hash / commitment specification (Layer B)
+(** * Sinsemilla hash / commitment specification
 
-    The core of the crypto-soundness track: fold the per-round Sinsemilla
+    Fold the per-round Sinsemilla
     arithmetic into a hash-to-point, then build the commitment and the Merkle
     root on top of it.
 
@@ -26,8 +26,9 @@ Global Open Scope Z_scope.
     [Acc <- (Acc + S(m)) + Acc], where [S] is the generator looked up in the
     [sinsemilla_s] table.  The chip proves the x-coordinate of this exact step
     per round ([Sinsemilla.deterministic]) and binds [S] to the table word
-    ([GeneratorTable.sound]); composing them along the message is the (admitted)
-    hash-level soundness obligation. *)
+    ([GeneratorTable.sound]); composing them along the message is the
+    hash-level soundness result of [hash_to_point_proof.v] /
+    [hash_to_point_fold_proof.v]. *)
 
 Module SinsemillaSpec.
   Definition sinsemilla_k : Z := 10.

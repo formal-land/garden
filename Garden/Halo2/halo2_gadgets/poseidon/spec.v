@@ -10,7 +10,7 @@ Require Import Garden.Plonky3.M.
 
 Global Open Scope Z_scope.
 
-(** * Poseidon hash specification (Layer A of the crypto-soundness track)
+(** * Poseidon hash specification
 
     This module folds the per-round arithmetic proved deterministic in
     [pow5_proof.v] ([FullRound.output], [PartialRound.output],
@@ -19,12 +19,12 @@ Global Open Scope Z_scope.
 
     The fold mirrors the circuit's [permutation_rows]
     ([p128pow5t3_synthesis.v]): four full rounds (0..3), twenty-eight
-    partial-round *pairs* (rounds 4..59), four full rounds (60..63).  Per the
-    "internal soundness" reading of [docs/crypto-soundness.md] the definition
-    tracks the circuit's own computation structure; the circuit-to-math bridge
+    partial-round *pairs* (rounds 4..59), four full rounds (60..63).  The
+    definition tracks the circuit's own computation structure (the
+    "internal soundness" reading); the circuit-to-math bridge
     (composing [FullRound.deterministic] / [PartialRound.deterministic] /
-    [PadAndAdd.deterministic] along the permute region rows) is the admitted
-    soundness obligation, discharged at the [Orchard/circuit_proof.v] level
+    [PadAndAdd.deterministic] along the permute region rows) is the
+    soundness obligation discharged at the [Orchard/circuit_proof/main.v] level,
     where the Poseidon synthesis region is in scope. *)
 
 Module Poseidon.
