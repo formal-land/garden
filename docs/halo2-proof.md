@@ -12,10 +12,17 @@ The shared proof semantics live in:
 Garden/Halo2/proof.v
 ```
 
-Poseidon proof work currently lives in:
+Poseidon chip proof work lives in:
 
 ```text
 Garden/Halo2/halo2_gadgets/poseidon/pow5_proof.v
+```
+
+The Orchard-level Poseidon hash determinism proof (the nullifier's
+`poseidon_hash2`, built from the chip lemmas) lives in:
+
+```text
+Garden/Orchard/circuit_proof/poseidon.v
 ```
 
 The translated Poseidon configure gates live in:
@@ -33,8 +40,13 @@ Garden/Halo2/Synthesis.v
 The Pallas prime and field operations live in:
 
 ```text
-Garden/Plonky3/M.v
+Garden/Field/Field.v
 ```
+
+That file defines the `Primes` module (prime constants and `Prime` instances),
+the `Prime` class, the `UnOp`/`BinOp` field operations, and the `+F`/`-F`/`*F`
+notations. `Garden/Plonky3/M.v` re-exports the same `Primes` module as an
+alias, so proof files reach it through either import.
 
 Use the Pallas instance locally in proof files:
 
@@ -48,56 +60,74 @@ Require Import Garden.Plonky3.M.
 
 `Garden/Halo2/proof.v` defines the proof-side evaluator.
 
-This evaluator is currently for configured expressions, constraints, gates, and
-constraint systems. The high-level synthesis DSL is now a pair of free-monad
+The evaluator covers configured expressions, constraints, gates, and
+constraint systems. The high-level synthesis DSL is a pair of free-monad
 syntax trees, `𝓡` for region programs and `𝓛` for layouter programs.
-`Garden/Halo2/serialize.v` currently gives the executable raw-JSON
-interpretation; the future Prop semantics should interpret the same syntax.
-The proof semantics do not yet define obligations connecting synthesized
-assignments to gate evaluation.
+`Garden/Halo2/serialize.v` gives the executable raw-JSON interpretation;
+`proof.v` gives the same syntax a relational reading:
+`region_facts`/`layouter_facts` reify the facts established by running
+synthesis (selector enables, fixed assignments, copies, instance and constant
+pinning, lookup-table loads), `interpret_facts` turns those facts into a
+`Prop`, and `satisfies_gates`/`satisfies_lookups`/`Satisfies` state gate and
+lookup satisfaction of the configured constraint system. `circuit_holds`
+packages both halves — the synthesis facts plus `Satisfies` — and is the
+hypothesis of the chip-level theorems. What this relational model captures and
+idealizes is described in `docs/chip-model-caveats.md`.
 
-`Assignment.t columns` gives concrete values for selectors, fixed columns,
-advice columns, and instance columns:
+`Assignment.t columns RegionId` gives concrete values for selectors, fixed
+columns, advice columns, instance columns, and lookup-table columns:
 
 ```coq
-selector : columns.(Columns.Selector) -> Z -> Z;
-fixed : columns.(Columns.Fixed) -> Z -> Z;
-advice : columns.(Columns.Advice) -> Z -> Z;
+selector : columns.(Columns.Selector) -> RegionId -> Z -> Z;
+fixed : columns.(Columns.Fixed) -> RegionId -> Z -> Z;
+advice : columns.(Columns.Advice) -> RegionId -> Z -> Z;
 instance_ : columns.(Columns.Instance_) -> Z -> Z;
+lookup : columns.(Columns.Lookup) -> Z -> Z;
 ```
 
-Lookup table columns are a separate `columns.(Columns.Lookup)` family in the
-configure model. They do not appear in `Expression.t`, so the current gate
-evaluator does not include a lookup-table assignment yet. Add one when proving
-lookup-argument semantics.
+Selector, fixed, and advice values are region-scoped: they are addressed by an
+abstract `RegionId` plus a region-local row offset, never by an absolute row.
+Instance and lookup-table values are global and addressed by an absolute row.
 
-`Evaluation.t columns` packages an assignment, a current row, and the number of
-rows:
+Lookup table columns are a separate `columns.(Columns.Lookup)` family. They do
+not appear in `Expression.t`; they are consumed by `eval_lookup_argument` and
+`satisfies_lookups`, where a lookup argument holds when the tuple of queried
+expressions equals some table row below the `nb_table_rows` bound, and by
+`Fact.LookupTableLoaded`, which pins `Assignment.lookup` to the loaded table
+values.
+
+`Evaluation.C` is a typeclass whose `eval` field takes an assignment, an
+index, and the syntax to evaluate:
 
 ```coq
-Record t {columns : Columns.t} : Set := {
-  assignment : Assignment.t columns;
-  row : Z;
-  nb_rows : Z;
-}.
+Module Evaluation.
+  Class C {columns : Columns.t} {RegionId : Set} {p : Z} `{Prime p}
+      (Index A B : Type) : Type := {
+    eval : Assignment.t columns RegionId -> Index -> A -> B;
+  }.
+End Evaluation.
 ```
 
-Use the notation:
+Instances exist for selectors, expressions, constraints, named constraints,
+constraint lists, gates, and gate lists. Use the notation:
 
 ```coq
-⟦ expression_or_gate ⟧ ρ
+Γ ⊢ ⟦ expression_or_gate ⟧ (region, row)
 ```
 
-Selectors are evaluated at `row mod nb_rows`. Rotated fixed/advice/instance
-queries do not wrap around; they use:
+where `Γ` is the assignment and the index is a `(region, row)` pair.
+
+Selectors are evaluated at the current `(region, row)` with no rotation.
+Rotated fixed/advice/instance queries do not wrap around; they use:
 
 ```coq
-rotated_row row nb_rows rotation =
+rotated_row row rotation =
   row + rotation.(Rotation.offset)
 ```
 
-Proofs that need predecessor or successor rows should carry the corresponding
-row-bound hypotheses explicitly instead of relying on hidden modulo wrapping.
+Rows are plain unbounded integers: there is no `nb_rows`, no modulo wrapping,
+and `satisfies_gates` quantifies over every `(region, row)` pair. See
+`docs/chip-model-caveats.md` for what this idealizes.
 
 Expression evaluation returns `Z` reduced modulo the active prime through
 `UnOp.from`, `+F`, `-F`, and `*F`.
@@ -194,9 +224,10 @@ as `+F`, `-F`, `*F`, and `UnOp.from`.
 For a gate-level deterministic theorem, prefer a statement with:
 
 ```coq
-(ρ : Evaluation.t columns)
-(Hselector : ⟦ selector ⟧ ρ <> 0)
-(Hgate : ⟦ gate ⟧ ρ)
+{RegionId : Set} (Γ : Assignment.t columns RegionId)
+(region : RegionId) (row : Z)
+(Hselector : Γ ⊢ ⟦ selector ⟧ (region, row) <> 0)
+(Hgate : Γ ⊢ ⟦ gate ⟧ (region, row))
 ```
 
 and a conclusion comparing whole state records, not separate coordinate
@@ -204,9 +235,9 @@ equalities:
 
 ```coq
 {|
-  State.x0 := ⟦ next_0 ⟧ ρ;
-  State.x1 := ⟦ next_1 ⟧ ρ;
-  State.x2 := ⟦ next_2 ⟧ ρ;
+  State.x0 := Γ ⊢ ⟦ next_0 ⟧ (region, row);
+  State.x1 := Γ ⊢ ⟦ next_1 ⟧ (region, row);
+  State.x2 := Γ ⊢ ⟦ next_2 ⟧ (region, row);
 |} =
   output current_values round_constants.
 ```
@@ -218,6 +249,15 @@ prove the main `deterministic` theorem directly.
 
 Name theorem hypotheses as they would appear after `intros`, for example
 `Hselector` and `Hgate`.
+
+Each gate-level `deterministic` theorem should have a chip-level
+`synthesize_correct` companion whose hypothesis is `circuit_holds` for the
+chip's `synthesize` program and configured system. Its proof discharges
+`Hselector` with the `enabled_nonzero` bridge (a `Fact.SelectorOn` from the
+synthesis facts gives a nonzero selector) and `Hgate` with
+`satisfies_gates_at` (gate membership in the configured gate list plus
+`satisfies_gates`). The three Poseidon gates in `pow5_proof.v` follow this
+pattern.
 
 ## Poseidon Full Round
 
@@ -240,7 +280,7 @@ state_2_sbox *F UnOp.from (p128pow5t3.mds_coeff row 2)
 This syntactic alignment avoids needing field commutativity just to connect the
 configured gate expression to the proof-level output function.
 
-The proof currently uses:
+The deterministic proof uses:
 
 ```coq
 unfold output, output_coordinate, pow5.
@@ -259,23 +299,27 @@ value_4 *F value
 
 ## Poseidon Partial Round
 
-The partial round proof currently has:
+The partial round proof mirrors the full-round pattern:
 
 ```text
-PartialRound.output : admitted
-PartialRound.deterministic : admitted
-PartialRound.deterministic_from_evaluation : proved
+PartialRound.output : concrete definition
+PartialRound.deterministic : proved
+PartialRound.synthesize_correct : proved
 ```
 
-The proved theorem extracts:
+`PartialRound.output` composes the two half-rounds of the folded gate: each
+half adds its round constants, applies `pow5` to coordinate 0 only
+(`sbox_partial`), and multiplies by the MDS matrix (`mds_mul`).
+
+The `deterministic` proof extracts:
 
 - the intermediate S-box value in advice column `A5`;
 - the equality between the MDS-inverse view of the next row and the computed
   post-round values.
 
-The next cleanup should mirror the full-round pattern: define the concrete
-`PartialRound.output`, then move the proof into `PartialRound.deterministic` and
-remove `deterministic_from_evaluation`.
+It then folds the extracted constraints back into `output` using `dot3` (a
+commutation lemma between the two dot-product orientations), `mds_roundtrip`,
+and the MDS inverse identities below.
 
 ## Poseidon Pad-And-Add
 
@@ -316,17 +360,18 @@ mds_mul
 mds_inv_mul
 ```
 
-The inverse identities are currently admitted:
+The inverse identities are proved:
 
 ```coq
 mds_mul_mds_inv_identity
 mds_inv_mul_mds_identity
 ```
 
-`mds_inv_mul_injective` is proved from those identities. When completing the
-Poseidon proof, these admitted identity lemmas should be replaced by concrete
-proofs that the hard-coded MDS and inverse matrices are inverses modulo the
-Pallas prime.
+Both go through `MatrixInverse.matrix_compose_identity`, which reduces the
+composition to nine per-entry congruences discharged with `now vm_compute`:
+the hard-coded MDS and inverse matrices are inverses modulo the Pallas prime.
+`mds_inv_mul_injective` and `mds_roundtrip` (the `mds_mul (mds_inv_mul s) = s`
+form used on reduced states) are proved from those identities.
 
 ## Reduction and Automation
 
@@ -380,7 +425,7 @@ Time hauto lq: on.                                  about 1.6s
 Time with_strategy opaque [...] hauto lq: on.       about 1.8s
 ```
 
-So the current preference is:
+So the preferred pattern is:
 
 ```coq
 with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
@@ -388,12 +433,39 @@ with_strategy opaque [BinOp.add BinOp.mul BinOp.sub UnOp.from]
 hauto lq: on.
 ```
 
+### `mod_ring_solve` for mod-p ring identities
+
+For goals that are pure mod-p *polynomial identities* over field operations
+(both sides built from `+F`/`-F`/`*F`/`UnOp.from` with possibly nested
+`mod`s), use `mod_ring_solve` (`Garden/Halo2/lemmas.v`) instead of
+`field_solve`:
+
+```coq
+mod_ring_solve.
+```
+
+It unfolds the field ops, strips every inner `mod` at any depth via
+`setoid_rewrite (Zdiv.Zmod_eqm p)` under the `#[export]`-registered `eqm`
+morphism instances, and closes with `f_equal; ring` — milliseconds where
+`field_solve` (which is `lia` over euclidean-division equations with the
+255-bit modulus) takes tens of seconds or diverges. Plain
+`Z.*_mod_idemp_*` rewriting cannot substitute: it only reaches a `mod` that
+is an immediate operand of the enclosing modded node, and greedy rewriting
+strands alternating-depth `mod`s; the `eqm`-setoid route is complete at any
+depth.
+
+Rule of thumb: `mod_ring_solve` for polynomial identities; `field_solve`
+only where genuine linear arithmetic (bounds, cell solving) is needed.
+
 ## Compile Commands
 
 From `garden/Garden`, compile one file with:
 
 ```sh
-opam exec -- coqc -impredicative-set -R . Garden Halo2/halo2_gadgets/poseidon/pow5_proof.v
+opam exec -- coqc -impredicative-set -R . Garden -w -stdlib-vector \
+  Halo2/halo2_gadgets/poseidon/pow5_proof.v
 ```
 
-The project currently uses `-impredicative-set` for these checks.
+These flags match `_CoqProject`; a full build is `make -C Garden`. For the
+`-vos`/`-vok` fast development loop that skips the heavy `vm_compute`
+certificates, see `docs/compile-performance.md`.
