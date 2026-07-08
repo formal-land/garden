@@ -56,7 +56,7 @@ Definition window_disc (w : EccSpec.fixed_window) (digit : Z) : Z :=
     and the per-table certificate files produce it per concrete window/digit. *)
 
 (** [Hdisc] shape — the negative discriminant certificate.  A per-table
-    certificate file ([Orchard/circuit_proof/<base>_disc_cert.v])
+    certificate file ([Orchard/circuit_proof/<base>/disc_cert.v])
     instantiates [w := List.nth k (EccSpec.fixed_table_of_rows <rows>) w0] and
     [digit := d], and discharges this by [vm_compute] for every [(window, digit)]
     across the five fixed-base tables.  A successful certificate also implies
@@ -113,7 +113,7 @@ Qed.
 (** ** Table-wide non-residue certificate scaffolding
 
     The checker definitions and per-entry extraction shared by the per-table
-    certificate files ([Orchard/circuit_proof/<base>_disc_cert.v]).
+    certificate files ([Orchard/circuit_proof/<base>/disc_cert.v]).
     A per-table file supplies its fixed-base table, [nth] default, a
     [root_table] of witness roots (entry [w][d] is a square root of
     [window_disc (List.nth w table default) d] divided by the non-residue
@@ -178,9 +178,9 @@ End WindowDiscNonresTable.
     spend_auth_g instance.  Because this file may not depend on the
     Weierstrass / Pallas theory or the ladder's [window_scalar], the term is
     pinned here only as a comment;
-    [circuit_proof/spend_auth_g_sign_cert.v] states it against
+    [circuit_proof/spend_auth_g/sign_cert.v] states it against
     [SpendAuthGFullTable.full_table]
-    ([circuit_proof/spend_auth_g_table.v]), whose entries are the
+    ([circuit_proof/spend_auth_g/table.v]), whose entries are the
     multiples [Pallas.mul (window_scalar 85 w d) PallasGenerators.spend_auth_g_G]:
 
       is_square
@@ -197,4 +197,4 @@ End WindowDiscNonresTable.
     table leaf shared with the x-coordinate certificate), so the window-sign
     certificate reuses that table rather than recomputing.  The other four
     fixed-base tables have analogous certificates
-    ([circuit_proof/<base>_sign_cert.v]). *)
+    ([circuit_proof/<base>/sign_cert.v]). *)

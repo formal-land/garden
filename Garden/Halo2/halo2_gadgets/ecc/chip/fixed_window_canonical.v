@@ -162,7 +162,7 @@ Proof. intro Hh. field_solve. Qed.
     quadratic residue ([Hqr]) and the discriminant [window_disc] a non-residue
     ([Hdisc]), [P] is the canonical window point.  [Honcurve] is the exact shape
     the on-curve extraction produces ([point_on_curve], i.e.
-    [circuit_proof.fixed_base.full_width_*_on_curve]); [Hred] records that the
+    [circuit_proof.fixed_base.main.full_width_*_on_curve]); [Hred] records that the
     witnessed y is reduced mod [p] (both consumers pass a reduced point).
 
     Proof.  x-coords agree definitionally; [add_b_eq_sq] turns [Honcurve] into
