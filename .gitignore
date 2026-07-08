@@ -4,3 +4,7 @@
 
 # Rocq MCP scratch files
 rocq_mcp_cache_*.v
+
+# Local Claude Code entry points (CLAUDE.md is a symlink to AGENT.md)
+CLAUDE.md
+CLAUDE.local.md
