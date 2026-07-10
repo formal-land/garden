@@ -388,8 +388,10 @@ wall (see the pitfall above).
 exponentiation to extended Euclid, collapsing every inversion-dominated
 `vm_compute`: the table-leaf checks fell from ≈ 23 min each to the band in
 the cost table above, `Orchard/Pallas/Generators.v`'s six `[q]·G` order
-ladders from ≈ 30 min to 87 s, the `order_<base>.v` leaves from ≈ 5 min
-each to their current cost. The first full clean rebuild after the switch:
+ladders from ≈ 30 min to 87 s, the `order_<base>.v` ladder certificates
+from ≈ 5 min each to 16 s (value_commit_v 30 s) — later retired to the
+sub-second instantiations in the cost table above. The first full clean
+rebuild after the switch:
 313 files, ≈ 9 800 s CPU, ≈ 16 min wall — of which the Euler-criterion
 discriminant shards were ≈ 8 100 s CPU (~83% of the build; `modpow`-bound,
 no inversion, so egcd did not help them). The switch also surfaced
@@ -403,10 +405,11 @@ shard). Each family now carries a pasted `nonres_root_table` — per entry a
 root `r` of `disc / pallas_b` — and one checker verifying
 `disc = pallas_b *F (r *F r)` and `r <> 0`: one field multiplication per
 entry (3–7 s per former shard, 238 s CPU total). The exported lemma
-statements stayed byte-identical, so consumers and `Print Assumptions` on the whole-circuit determinism
-theorem were untouched. With the per-entry cost gone,
-the 50-file band sharding cost more in per-file `Require` loading than the
-checks themselves and was retired to one self-contained `disc_cert.v` per
+statements stayed byte-identical, so consumers and `Print Assumptions` on
+the whole-circuit determinism theorem were untouched. With the per-entry
+cost gone, the 50-file band sharding cost more in per-file `Require` loading
+than the checks themselves and was retired to one self-contained
+`disc_cert.v` per
 family (current figure above).
 
 **Critical-path pass (2026-07-06).** With the discriminant block retired,

@@ -1,323 +1,202 @@
-# The Orchard-action soundness theorem: statement, assumptions, and scope
+# The Orchard Action-statement theorem: statement, assumptions, and scope
 
-This document describes what the whole-circuit soundness result for the
-Zcash Orchard action circuit establishes — every satisfying assignment
-produces the protocol-mandated outputs and satisfies the input-side Action
-clauses, with determinism as a corollary: the exact theorem statements, each
-hypothesis and why it is there, what the conclusion means, and what the
-verification effort does and does not ensure given the caveats of the
-circuit/synthesis model. ("Soundness" here is statement-level soundness of
-the constraint system against the specification, not the cryptographic
-soundness of the proving system — see the non-claims below.)
+Orchard is Zcash's shielded payment protocol. Funds live in private
+*notes*; each *action* in a transaction simultaneously spends one note and
+creates one, revealing neither values nor addresses. What an action makes
+public is only: an *anchor* (a Merkle root committing to the set of
+existing notes), the spent note's *nullifier* (preventing double spends),
+a *net value commitment* (hiding the value moved while allowing the
+transaction to balance), a randomized *spend-authorization key* `rk`, the
+new note's *commitment* `cmx`, and two enable flags. A zero-knowledge
+proof certifies that these public values are consistent with some hidden
+witness — that the spent note exists under the anchor, that the spender
+owns it, that the nullifier and commitments are computed correctly. The
+required conditions are the protocol's *Action statement* (§4.18.4 of the
+Zcash protocol specification), and the circuit whose satisfiability the
+proof attests is its deployed Halo 2 implementation.
 
-## The theorems
+This document describes the machine-checked theorem that the circuit
+**soundly enforces the Action statement**: every assignment the circuit
+accepts satisfies it. It gives the exact statements, each hypothesis and
+why it is there, the corollaries — determinism per action, value balance
+per transaction — and the boundaries of the claim. ("Soundness" here is
+statement-level soundness of the constraint system against the
+specification; cryptographic soundness of the proving system is a
+non-claim, listed below.)
 
-The theorems live in
-`Garden/Orchard/circuit_proof/main.v` (module
-`OrchardAction`) and are `Qed`, with an assumption audit recorded below.
+## The theorem
 
-**Functional form — `satisfies_specification`.** For any assignment `Γ` of
-the Orchard action circuit:
+The main theorem lives in `Garden/Orchard/circuit_proof/main.v` (module
+`OrchardAction`):
 
 ```
-Theorem satisfies_specification
+Theorem action_statement
     (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
     (Hmerkle_ok : OrchardActionMerkle.merkle_witness_ok Γ)
-    (Hnote_ok : NoteCommitNewCmx.note_commit_witness_ok Γ) :
-  read_action_outputs Γ =
-    OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
-      (read_action_inputs Γ).
+    (Hnote_ok : NoteCommitNewCmx.note_commit_witness_ok Γ)
+    (Hold_note_ok : OrchardValidActionInputs.old_note_witness_ok Γ)
+    (Hivk_ok : OrchardValidActionInputs.commit_ivk_witness_ok Γ) :
+  (read_action_outputs Γ =
+   OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
+     (read_action_inputs Γ)) /\
+  OrchardValidActionInputs.ValidActionInputs Γ.
 ```
 
-where `read_action_outputs` packages the seven primary public-instance rows
-(`ANCHOR`; `CV_NET`/`RK` as point coordinates; `NF_OLD`; `CMX`). In words:
-**the seven public outputs of any satisfying assignment are the value of the
-protocol-aligned specification function applied to the genuine inputs read
-from that assignment.** The specification
-`OrchardProtocolSpec.orchard_action_spec` (`protocol_spec.v`; its
-`orchard_circuit_params` argument is the slim `OrchardSpec.Params` record of
-the three Sinsemilla domain points) writes each
-§4.18.4 output condition with its fixed-base scalar multiplications as group
-multiples `Pallas.mul k G` of the six real-coordinate Zcash generator points
-(`Orchard/Pallas/Generators.v`): the net value commitment, the old-note
-nullifier (scalar reduced mod `q_P`), `rk = [α]SpendAuthG + ak`, the new-note
-commitment x-coordinate (`cmx`) over the 1086-bit / 109-word note-commit
-message with its two y-parity terms, and the anchor (the computed Merkle root
-when `v_old ≠ 0`, the public anchor row itself on a dummy spend — mirroring
-the circuit's `v_old · (root − anchor) = 0` gate, which deliberately imposes
-no Merkle condition on dummy spends).
+For any assignment `Γ` that the whole Orchard action circuit accepts
+(`Holds Γ`), two things hold.
 
-Internally the seven per-output bridges (`anchor_correct`,
-`cv_net_x_correct`/`cv_net_y_correct`, `nf_old_correct`,
-`rk_x_correct`/`rk_y_correct`, `cmx_correct`) land on `action_spec_of Γ`, the
-circuit-structured output of module `OrchardCircuitSpec`
-(`circuit_proof/internal_spec.v`: the same output conditions with fixed-base
-multiplications as folds over the circuit's Lagrange tables, parameterized by
-its own `OrchardCircuitSpec.Params` record — the six window tables plus the
-protocol `domain` points, instantiated as `orchard_internal_params` in
-`circuit_proof/inputs.v`). The square-root-witness elimination
-`OrchardActionUsFreeNullifierK.action_spec_us_free`
-(`circuit_proof/us_free/nullifier_k.v`) relates that circuit-structured output
-to the witness-free form, and the per-base fold-equals-group-multiple bridge
-`OrchardProtocolEquiv.output_protocol_eq` (`circuit_proof/protocol_equiv.v`,
-backed by `circuit_proof/protocol_mul/`) carries it onto the protocol form —
-both composed inside `satisfies_specification`, which closes by record eta
-(`outputs_eta`).
+**The output half** (available standalone as `satisfies_specification`):
+the seven public output rows — the anchor, the two coordinates of the net
+value commitment, the nullifier, the two coordinates of `rk`, and `cmx` —
+equal the specification functions applied to the genuine inputs read from
+the assignment. Concretely: the nullifier is the specified function of the
+spent note's data; the value commitment commits to exactly
+`v_old − v_new`; `rk` is `[α]·SpendAuthG + ak`; `cmx` commits to the new
+note; and the anchor is the Merkle root computed from the spent note's
+path — except on a *dummy spend* (`v_old = 0`), where the circuit imposes
+no Merkle condition and the anchor is the public row itself, mirroring the
+gate `v_old · (root − anchor) = 0`. Every fixed-base scalar multiplication
+in the specification (`OrchardProtocolSpec`,
+`Garden/Orchard/protocol_spec.v`) is a group multiple `Pallas.mul k G` of
+the real-coordinate Zcash generator points, and each definition carries
+its protocol `§` citation, so the specification is auditable directly
+against the protocol.
 
-**Determinism corollary — `deterministic`.** Two satisfying assignments that
-agree on the genuine inputs (`read_action_inputs Γ1 = read_action_inputs Γ2`,
-plus the witness-honesty conditions for each) agree on all seven public
-output rows. This is the direct consequence of the functional form: each
-side equals the protocol specification of the same inputs.
+**The input half** (`ValidActionInputs`,
+`circuit_proof/valid_action_inputs.v`): the witnessed inputs satisfy the
+Action statement's conditions on the witness itself — the note values are
+64-bit integers, the value-balance identity ties them to the
+magnitude/sign pair that feeds the value commitment, a nonzero spend or
+output requires its enable flag, the spent note's fields open its
+commitment `cm_old`, and the spent note's address belongs to the spender
+(`pk_d = [ivk]·g_d` with `ivk` derived from the spending authority). The
+ownership clause needs the witnessed diversified base to have group order
+`q`; this is proved for every on-curve Pallas point
+(`PallasOrder.pallas_mul_q_on_curve`,
+`Garden/EllipticCurve/PallasOrder.v`, by a Hasse-free counting argument)
+and derived for the witnessed base from circuit satisfaction.
 
-`read_action_inputs` (`circuit_proof/inputs.v`) reads only the *inputs* of an
-action — the witnessed points and field elements (`ak`, `nk`, `ρ_old`,
-`ψ_old`, `cm_old`, `g_d`, `v_old`, `v_new`, …), the three windowed scalars
-(`α`, `rcv`, `rcm_new`) as their 85-window digit decompositions, the
-magnitude/sign pair, the 32-layer Merkle path, and the public anchor row. It
-deliberately excludes the square-root witnesses of the fixed-base ladders:
-those are benign nondeterminism, and the witness-elimination theorem
-(`action_spec_us_free`) proves the outputs do not depend on them.
+**Determinism corollary — `deterministic`.** Two accepted assignments that
+agree on the genuine inputs agree on all seven public output rows: each
+side equals the specification of the same inputs. Once an action's inputs
+are fixed, the circuit admits exactly one value for each public output —
+the instance is non-malleable.
 
-**Composed Action statement — `action_statement`.** The conjunction of
-`satisfies_specification` with the input-side half of §4.18.4
-(`OrchardValidActionInputs.ValidActionInputs`,
-`circuit_proof/valid_action_inputs.v`: input typing, value balance, the two
-enable-flag clauses — covering all nine §4.18.4 primary inputs — and the
-two ownership clauses). Both ownership clauses are `Qed` by delegation —
-old-note commitment integrity to `OldNoteOpen.old_note_commit_integrity`
-(`circuit_proof/old_note/open.v`), diversified address integrity to
-`DiversifiedAddress.diversified_address_integrity`
-(`circuit_proof/ownership/diversified_address.v`) — under the two
-witness-honesty predicates `old_note_witness_ok` / `commit_ivk_witness_ok`
-(Sinsemilla nondegeneracy + short-lookup range facts; the `commit_ivk` one —
-three conjuncts — also carries the variable-base-mul step nondegeneracy
-`VarBaseMul.mul_nondegenerate`). The `g_d_old` base-order fact
-`[q] g_d_old = 𝒪` is *not* a hypothesis: it is a theorem — every reduced
-on-curve Pallas point is annihilated by `pallas_q`
-(`PallasOrder.pallas_mul_q_on_curve`, `Garden/EllipticCurve/PallasOrder.v`,
-instantiating the generic Hasse-free counting argument of
-`GroupOrder.mul_q_annihilates` in `Garden/EllipticCurve/GroupOrder.v`) — and
-`DiversifiedAddress.base_point_order` derives it from `Holds Γ` via
-`base_point_facts`, supplying it at the
-`VarBaseMul.address_integrity_mul_correct` call site. So every hypothesis of
-the ownership clauses is a genuine per-assignment witness-honesty condition;
-no mathematical truth is assumed. The variable-base mul chain under the address
-clause is fully `Qed`: the four segment lemmas of
-`circuit_proof/ownership/var_base_mul.v` (`hi_half_correct`,
-`lo_half_correct`, `complete_bits_correct`, `overflow_scalar_exact`)
-delegate to the leaf files `var_base_incomplete.v`, `var_base_complete.v`
-and `var_base_overflow.v`, so its `Print Assumptions` is the same
-`PrimString.string`/impredicative-`Set` baseline as
-`satisfies_specification` and `deterministic`.
+`read_action_inputs` (`circuit_proof/inputs.v`) defines what "the genuine
+inputs" means, and with it the trust surface of the statement: the
+witnessed points and field elements of the two notes, the three windowed
+scalars, the magnitude/sign pair, the 32-layer Merkle path, and the public
+anchor row. It excludes the square-root witnesses of the fixed-base
+ladders: those are free choices of the prover, and the witness-elimination
+theorem (`action_spec_us_free`) proves the outputs do not depend on them.
 
-## The hypotheses, one by one
+## The hypotheses
 
-**`Hcircuit : Holds Γ`.** `Holds Γ` is notation for `circuit_holds Γ
-synthesize (run configure)`: the assignment satisfies, at every row of every
-region produced by the circuit's own synthesis program, all configured gates,
-the copy (permutation) constraints, the constant bindings emitted by
-`ConstrainConstant`, and the lookup arguments in their `Prop` value model
-(each looked-up tuple equals some row of the loaded table, with the witness
-row bounded — which is what gives lookups their range-check force). This is
-the "the circuit accepted the assignment" premise; everything else is derived
-from it, except the two residual conditions below.
+**`Hcircuit : Holds Γ`.** Notation for `circuit_holds Γ synthesize
+(run configure)`: the assignment satisfies, at every row of every region
+produced by the circuit's own synthesis program, all configured gates, the
+copy constraints, the constant bindings, and the lookup arguments in their
+`Prop` value model. This is the "the circuit accepted the assignment"
+premise.
 
-**`Hmerkle_ok : merkle_witness_ok Γ`** — for each of the 32 Merkle layers:
+**The four witness-honesty conditions.** Each names the same two kinds of
+per-assignment fact about the witnessed cells: canonical (non-wrapped)
+message-piece decompositions, and nondegeneracy of the Sinsemilla and
+variable-base-multiplication incomplete additions along their folds. Both
+hold for every honestly produced witness, but the gates alone do not force
+them in the relational model: the decomposition bounds are enforced in
+real Halo2 by short-lookup rows that constrain values only where the
+`q_running` selector is zero, and the relational selector model leaves
+that selector free at exactly those rows; the incomplete-add gates are, by
+design, unconstraining on their exceptional cases. Without the hypotheses
+the ANCHOR and CMX outputs would be refutable; naming them keeps this
+model gap visible in the statement. They are the exact residue of the
+selector idealization listed under the model caveats.
 
-- *canonical decomposition*: the witnessed 255-bit Sinsemilla message-piece
-  decomposition of the layer's node/sibling data satisfies the strict
-  integer bounds (`< pallas_p`) that make it the canonical representative
-  rather than a wrapped one;
-- *nondegeneracy*: the layer's Sinsemilla hash never hits the incomplete-add
-  exceptional case (equal x-coordinates) along its fold.
+**Input typing.** The range envelope under which the circuit-structured
+and protocol layers coincide (full-width scalars in `[0, 8⁸⁵)`, magnitude
+in `[0, 8²²)`, a genuine sign bit) is enforced by the circuit:
+`protocol_typed_inputs_of_holds` derives it from `Holds Γ` alone. The
+theorem therefore carries exactly `Hcircuit` plus the four witness-honesty
+conditions.
 
-*Motivation.* Both facts are true of every honestly produced witness, but the
-gates alone do not force them in the relational model: the decomposition
-bound is enforced in real Halo2 by a lookup-driven running-sum argument whose
-short-lookup rows constrain `z_cur` only where the `q_running` selector is
-zero, and the relational selector model leaves `q_running` free at exactly
-those rows; the incomplete-add gate is (by design of Sinsemilla) simply
-unconstraining on the exceptional case. Without the hypothesis the ANCHOR
-output is refutable — a malicious prover could witness a wrapped
-decomposition. Surfacing the conditions as named hypotheses keeps the theorem
-honest about this model gap instead of hiding it.
+## Corollary: transaction-level balance
 
-**`Hnote_ok : note_commit_witness_ok Γ`** — the same two conditions for the
-new-note commitment: nondegeneracy of the Sinsemilla fold over the witnessed
-109-word note-commit message, and the short-lookup range facts of the message
-pieces. *Motivation:* identical to the Merkle case; without it the CMX output
-is refutable.
+Because every accepted action provably commits to exactly
+`v_old − v_new`, the per-action facts compose into the protocol's balance
+argument, proved in `Garden/Orchard/bundle/`:
+`OrchardBundle.balanced_or_dlog` shows that a bundle of accepted actions
+with a valid binding-signature opening either conserves value over ℤ or
+exhibits an explicit discrete-log relation between the value-commit
+generators, and `no_inflation` extends this to the shielded pool. See
+`docs/orchard-balance-proof.md`.
 
-Both predicates are per-assignment, decidable-in-principle statements about
-the witnessed cells; they are the exact residue of the two model
-idealizations named below, and they are satisfied by every witness the real
-prover produces. At the bridge level no other side condition is assumed: the
-CV_NET, NF_OLD and RK output bridges are derived from `Holds Γ` alone.
+## Constants provenance
 
-**Input typing — derived from `Holds`, not assumed.** The protocol
-input-typing predicate `ProtocolTypedInputs (read_action_inputs Γ)` — the
-three full-width scalars (`α`, `rcv`, `rcm_new`) in `[0, 8⁸⁵)`, the value
-magnitude in `[0, 8²²)`, and the sign in `{1, −1}` (as field elements) — is
-the range envelope under which the circuit-structured and protocol layers
-coincide (the per-base fold-equals-group-multiple bridges hold on the folds'
-window domains, and the CV_NET sign decode needs a genuine sign bit). It is
-*not* a hypothesis of either theorem: every conjunct is enforced by the
-circuit on a satisfying assignment, and the `Qed` theorem
-`OrchardValidActionInputs.protocol_typed_inputs_of_holds`
-(`circuit_proof/valid_action_inputs.v`, backed by the
-`circuit_proof/typed_inputs/` slices) derives the predicate from `Holds Γ`
-alone — the three full-width scalars from the incomplete-mul running-sum
-window ranges, the magnitude from the 22-window short-mul running sum, and
-the sign from the short-mul sign-square gate. The theorem statements
-therefore carry exactly `Hcircuit` plus the two witness-honesty conditions
-above.
-
-## What the conclusion means
-
-- **Determinism / non-malleability of the instance:** once the inputs of an
-  action are fixed, the circuit admits exactly one value for each public
-  output. In particular the square-root witnesses of the five fixed-base
-  scalar multiplications (SpendAuthG, NullifierK, NoteCommitR, ValueCommitR,
-  ValueCommitV), which *are* free choices of the prover, provably do not
-  influence any output: the per-window quadratic-residue certificates force
-  the witnessed window point to the canonical one.
-- **Against the protocol specification, not just uniqueness:** the theorem
-  is functional (`= orchard_action_spec inputs`), which is strictly stronger
-  than pairwise agreement. It pins the outputs to the independently-auditable
-  `OrchardProtocolSpec` functions — fixed-base multiplications as group
-  multiples of the real-coordinate Zcash generator points — and the root
-  constants are themselves derived in-model from the protocol's own
-  algorithms: the Poseidon parameters from the Grain LFSR + Cauchy MDS
-  construction (`Halo2/halo2_poseidon/{grain,p128pow5t3_provenance}.v`),
-  and the six generators, the three Sinsemilla domain points, and the
-  1024-entry S table from the `GroupHash^P` pipeline — BLAKE2b-512 XMD,
-  simplified SWU onto iso-Pallas, degree-3 isogeny
-  (`Garden/GroupHash/`, `Orchard/Pallas/{generators,q_points}_provenance.v`,
-  `Halo2/halo2_gadgets/sinsemilla/provenance/`), each checker `Qed` with
-  witnessed square roots. The constant-binding sites are validated against
-  a Rust-generated replay table by the standalone gate
-  `circuit_synthesis_constants_check.v`; the vendored reference crates are
-  version-pinned in `docs/halo2-translation.md`. Residual external trust:
-  the Poseidon derivation reaches the reference implementation (the
-  protocol delegates its parameters to `generate_parameters_grain.sage`),
-  and the `GroupHash^P` pipeline constants (iso-curve coefficients, `Z`,
-  `θ`, the isogeny vector) are transcribed from §5.4.9.8 rather than
-  re-derived.
+The specification's root constants — the Poseidon parameters, the six
+fixed-base generators, the Sinsemilla domain points, and the 1024-entry
+S table — are each derived in-model from the protocol's algorithms (the
+Grain LFSR for Poseidon; the BLAKE2b/SSWU/isogeny hash-to-curve pipeline
+for the points, in `Garden/GroupHash/`) and equated with the hard-coded
+literal by a `Qed` checker. The vendored reference crates are
+version-pinned in `docs/halo2-translation.md`, which also records the
+small residue of external trust (the Poseidon reference-implementation
+ceiling and the spec-anchored pipeline coefficients).
 
 ## What this effort does *not* ensure
 
-- **Crypto soundness.** `OrchardSpec.output` mirrors the protocol
-  specification, but no theorem here connects it to cryptographic security
-  properties (collision resistance of Sinsemilla/Poseidon, hiding/binding of
-  the commitments, unforgeability of redemption keys). The statement is
-  "the circuit computes the specified functions of its witnessed inputs",
-  not "the protocol built on it is secure".
-- **Completeness.** The theorems say every satisfying assignment maps to the
-  spec value; they do not exhibit a satisfying assignment for every input
-  (no inhabitation lemma). In particular the two witness-honesty hypotheses
-  are not proved satisfiable-under-`Holds` inside Rocq — their non-vacuity
-  argument is meta-level (honest witnesses satisfy them by construction).
+- **Crypto soundness.** No theorem here connects the specification to
+  cryptographic security properties (collision resistance of
+  Sinsemilla/Poseidon, hiding/binding of the commitments, signature
+  unforgeability). The claim is that the circuit computes the specified
+  functions of its witnessed inputs; the security of the protocol built on
+  those functions is a separate question, and the balance corollary names
+  its two computational boundaries explicitly.
+- **Completeness.** The theorems constrain every accepted assignment; they
+  do not exhibit an accepted assignment for every input. In particular the
+  witness-honesty hypotheses have no in-Rocq satisfiability proof — their
+  non-vacuity argument is meta-level.
 - **Relational–operational consistency.** `Holds` is the *relational*
-  interpreter's satisfaction predicate. The faithful operational lowering of
-  synthesis (`serialize.v`, raw event grid) exists, and the two interpreters
-  agree on everything audited so far, but no theorem yet relates them.
+  interpreter's satisfaction predicate. The faithful operational lowering
+  of synthesis (`serialize.v`, raw event grid) exists, and the two
+  interpreters agree on everything audited so far, but no theorem yet
+  relates them.
 
 ## Model caveats inherited by the theorems
 
-The relational circuit model (`Garden/Halo2/proof.v`) idealizes real Halo2 in
-ways that are documented in `docs/chip-model-caveats.md`; the ones that bear
-on how to read these theorems:
+The relational circuit model (`Garden/Halo2/proof.v`) idealizes real Halo2
+in ways documented in `docs/chip-model-caveats.md`; the ones that bear on
+how to read these theorems:
 
 - **Regions are independent integer address spaces.** The floor planner is
   abstracted away: gates evaluate at abstract `(region, offset)` pairs, so
-  region overlap or a rotation escaping its region cannot be expressed. This
-  matches Halo2's usage discipline but is an axiom of the model, not a
-  proved property of the planner.
-- **The cyclic evaluation domain and blinding rows are dropped.** Gates are
-  quantified over the region's rows in ℤ, not over the wrap-around domain.
-  This makes the model slightly more permissive than reality (never less).
-- **Selector freedom at inactive rows.** Selectors are modeled relationally;
-  where real Halo2 fixes a selector column globally, the model constrains it
-  only at rows the synthesis program touches. The `q_running` freedom behind
-  the two witness-honesty hypotheses is the one place this surfaces in the
-  final statement.
+  region overlap or a rotation escaping its region cannot be expressed.
+  This matches Halo2's usage discipline but is assumed by the model rather
+  than proved of the planner.
+- **The cyclic evaluation domain and blinding rows are dropped.** Gates
+  are quantified over the region's rows in ℤ rather than the wrap-around
+  domain. This makes the model slightly more permissive than reality
+  (never less).
+- **Selector freedom at inactive rows.** Where real Halo2 fixes a selector
+  column globally, the model constrains it only at rows the synthesis
+  program touches. The `q_running` freedom behind the witness-honesty
+  hypotheses is the one place this surfaces in the final statements.
 - **Lookup model.** Lookups assert membership in the loaded table with a
-  bounded witness row — faithful in force, but the table loading and the
-  bound are part of the model rather than derived from an operational
-  execution.
+  bounded witness row; the table loading and the bound are part of the
+  model.
 
 Within those boundaries the per-chip proofs (ECC ladders and complete/
-incomplete addition, Sinsemilla hash and Merkle path, Poseidon permutation,
-running-sum decompositions, note-commit canonicity) are derived from the
-gates without further assumptions.
+incomplete addition, Sinsemilla hash and Merkle path, Poseidon
+permutation, running-sum decompositions, note-commit canonicity) are
+derived from the gates without further assumptions.
 
 ## Assumption audit
 
-`Print Assumptions` on both theorems (`satisfies_specification` and
-`deterministic`, full `.vo` build — and likewise on the supporting
-`protocol_typed_inputs_of_holds`) reports only
-`PrimString.string` (a Rocq primitive-string artifact of the string-keyed
-column maps) plus the use of impredicative `Set` the development is compiled
-with. The Pallas base- and scalar-field primality facts are `Qed` via
-Coqprime Pocklington certificates (`Garden/Field/Primality.v`); no
-domain-specific axiom remains on the path.
-
-The composed `action_statement` (and, through it,
-`OrchardValidActionInputs.valid_action_inputs_of_holds` and
-`diversified_address_integrity`) reports the same baseline: the four
-variable-base-mul segment lemmas of
-`circuit_proof/ownership/var_base_mul.v` — `hi_half_correct`,
-`lo_half_correct`, `complete_bits_correct`, `overflow_scalar_exact` — are
-`Qed` by delegation to `var_base_incomplete.v`, `var_base_complete.v` and
-`var_base_overflow.v`. `old_note_commit_integrity` and the value-clause
-companions `CvNetValue.cv_net_value_balance_sound` /
-`cv_net_commits_net_value_Z` likewise carry only the
-`PrimString.string`/impredicative-`Set` baseline (full-`.vo` `rocq top`
-audit, 2026-07-10).
-
-The Pallas curve-order theorem `PallasOrder.pallas_mul_q_on_curve` behind
-the ownership clause reports **zero axioms** — only the impredicative-`Set`
-theory flag, not even `PrimString.string` (it never touches the string-keyed
-column maps). Full-`.vo` scratch-`coqc` audit, 2026-07-10, after the
-base-order rewire: `pallas_mul_q_on_curve` exactly as above;
-`action_statement`, `satisfies_specification`, `deterministic`,
-`valid_action_inputs_of_holds`, and
-`OrchardValidActionInputs.diversified_address_integrity` each exactly
-`PrimString.string : Set` plus impredicative `Set`. No classical axiom
-appears anywhere on any of these paths.
-
-## The transaction-level balance layer (`Garden/Orchard/bundle/`)
-
-Above the per-action theorems sits the §4.14 composition, the in-model
-form of the balance/no-counterfeiting argument. `OrchardBundle.t`
-(`bundle/spec.v`) is a list of per-action assignments plus the public
-`value_balance`; `bundle_bvk` is the recomputed binding validating key
-(the homomorphic sum of the actions' `cv_net` points minus
-`ValueCommit_0(value_balance)`), and `SignatureKnowledge b bsk` is the
-semantic content of a valid Orchard binding signature —
-`bundle_bvk b = [bsk]·ValueCommitR`. The step from
-"`RedPallas.Validate = 1`" to `SignatureKnowledge` (SUF-CMA plus
-knowledge of the discrete log, §5.4.7.2) stays outside the model as a
-named boundary, like SNARK knowledge soundness.
-
-- `OrchardBundle.balanced_or_dlog` (`bundle/main.v`): under per-action
-  `action_ok` (the `cv_net_commits_net_value_Z` hypothesis package), the
-  §4.14 consensus side conditions (at most `2^16 − 1` actions,
-  `value_balance ∈ {−2^63 .. 2^63 − 1}`), and `SignatureKnowledge`,
-  either `Σ (v_old − v_new) = value_balance` over ℤ, or an explicit
-  discrete-log relation between the two value-commit generators is
-  exhibited (`dlog_relation` with the computable witness
-  `OrchardBindingReduction.extracted_k`).
-- `OrchardBundle.no_inflation` (`bundle/main.v`): the §4.17 corollary
-  over a list of bundles — under the nonnegative-pool consensus rule,
-  either every bundle balances and the total net withdrawal is bounded,
-  or some bundle yields the discrete-log relation.
-
-Pedersen binding is deliberately a *reduction*, not an axiom: the Pallas
-group is cyclic of prime order, so a generator-independence axiom
-(`[a]V + [b]R = 𝒪 → a ≡ b ≡ 0`) would be refutable in-model. A consumer
-invokes DL hardness only to discard the right disjunct. Consequently the
-layer adds no axioms: `Print Assumptions` on both theorems (full-`.vo`
-scratch-`coqc` audit, 2026-07-10) reports exactly `PrimString.string`
-plus impredicative `Set`.
+`Print Assumptions` on every theorem named in this document, run against a
+full `.vo` build, reports exactly `PrimString.string` (a primitive-string
+artifact of the string-keyed column maps) plus the impredicative `Set` the
+development is compiled with; the curve-order theorem and the
+constants-provenance checkers report no axioms at all. The Pallas
+primality facts are `Qed` via Coqprime Pocklington certificates
+(`Garden/Field/Primality.v`). No domain-specific or classical axiom
+appears on any path.
