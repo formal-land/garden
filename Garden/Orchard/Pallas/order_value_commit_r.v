@@ -1,44 +1,43 @@
 (** * Prime-order certificate for the Pallas ValueCommitR fixed base
 
-    The prime-order certificate for the
-    [ValueCommitR] generator: the finite computation
+    Discharges the certificate consumed by
+    [PallasGeneratorsOrder.value_commit_r_order]: the scalar multiple
+    [[pallas_q] G] of the ValueCommitR generator equals the group identity
+    (the point at infinity).
 
-      [[pallas_q] * value_commit_r_G = identity]
+    The fact is an instance of [PallasOrder.pallas_mul_q_on_curve]
+    ([Garden/EllipticCurve/PallasOrder.v]): every reduced on-curve Pallas
+    point is annihilated by [pallas_q], so the certificate follows from the
+    generator's [reduced] / [on_curve] facts ([Generators.v]) with no
+    per-generator ladder computation.
 
-    proved by reducing the binary double-and-add ladder
-    [Weierstrass.mul (p := pallas_p) 0 pallas_q value_commit_r_G] to the proper
-    point at infinity [Weierstrass.Infinity], at the real Zcash ValueCommitR
-    affine coordinates. Because [#E_Pallas(F_p) = pallas_q] is prime, every
-    non-identity on-curve point has order exactly [pallas_q]; the
-    inverse-dominated ladder cost is independent of the coordinates.
-
-    Layering: this file's curve arithmetic depends only on
-    [Garden.EllipticCurve.Pallas]; the ValueCommitR generator point comes from
+    Layering: the order theorem depends only on [Garden.EllipticCurve]; the
+    ValueCommitR generator point itself comes from
     [Garden.Orchard.Pallas.Generators], which is why this file lives under
-    [Garden/Orchard/] rather than [Garden/EllipticCurve/]. The heavy
-    [vm_compute] is isolated here so it recompiles independently.
+    [Garden/Orchard/] rather than [Garden/EllipticCurve/]. *)
 
-    Proof method. The reduction is a closed kernel computation. We close the
-    goal with [vm_cast_no_check (eq_refl identity)], which leaves a single VM
-    cast: the kernel runs the bytecode virtual machine exactly once, at [Qed]
-    time, to check that [mul pallas_q value_commit_r_G] is convertible to
-    [identity]. (Using [vm_compute; reflexivity] instead would run the VM twice
-    — once for the tactic-level goal rewrite, once for the [Qed] re-check — so we
-    avoid it here for the ~5-minute ladder.) *)
-
+Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
+Require Import Garden.EllipticCurve.PallasOrder.
 Require Import Garden.Orchard.Pallas.Generators.
 
 Module PallasOrder_value_commit_r.
+  (** [Weierstrass.mul] stays opaque to conversion here so that checking the
+      instantiated theorem never attempts to evaluate the concrete
+      [pallas_q]-scalar ladder. *)
+  Strategy opaque [Weierstrass.mul].
 
-  (** The prime-order certificate stated exactly as
-      [PallasGeneratorsOrder.value_commit_r_order]
-      ([mul pallas_q value_commit_r_G = identity]). *)
+  (** [[pallas_q] G = O] for the ValueCommitR generator [G], matching the
+      exact form of [PallasGeneratorsOrder.value_commit_r_order]. *)
   Lemma value_commit_r_order :
     Pallas.mul Pallas.pallas_q PallasGenerators.value_commit_r_G =
       Pallas.identity.
   Proof.
-    vm_cast_no_check (eq_refl Pallas.identity).
+    exact (PallasOrder.pallas_mul_q_on_curve
+             PallasGenerators.value_commit_r_G
+             PallasGenerators.value_commit_r_reduced
+             PallasGenerators.value_commit_r_on_curve).
   Qed.
 
+  Strategy transparent [Weierstrass.mul].
 End PallasOrder_value_commit_r.

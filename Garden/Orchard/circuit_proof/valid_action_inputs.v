@@ -411,13 +411,13 @@ Module OrchardValidActionInputs.
       - [VarBaseMul.mul_nondegenerate] — the variable-base mul chip's
         incomplete-addition halves never meet a degenerate case (the
         chip-level analogue of Sinsemilla nondegeneracy, surfaced by the
-        mul composition);
-      - the base-order fact [Pallas.mul pallas_q g_d_old = identity].
-        Unlike the other conjuncts this is not witness honesty but a true
-        statement about every Pallas point (the curve group has prime order
-        [q]); the cardinality fact is outside the formalized Weierstrass
-        interface, so it is carried as a hypothesis on the witnessed base
-        ([circuit_proof/ownership/var_base_mul.v]).
+        mul composition).
+
+      The base-order fact [Pallas.mul pallas_q g_d_old = identity] is not
+      part of the honesty condition: it holds for every reduced on-curve
+      Pallas point ([PallasOrder.pallas_mul_q_on_curve],
+      [EllipticCurve/PallasOrder.v]) and is derived from [Holds] by
+      [DiversifiedAddress.base_point_order].
 
       Proof: delegation to
       [DiversifiedAddress.diversified_address_integrity]
@@ -428,8 +428,7 @@ Module OrchardValidActionInputs.
     SinsemillaHash.nondegenerate
       (OrchardSpec.commit_ivk_q orchard_circuit_params) (commit_ivk_words Γ) /\
     CommitIvkHash.commit_ivk_short_lookup_ok Γ /\
-    VarBaseMul.mul_nondegenerate Γ /\
-    Pallas.mul Pallas.pallas_q (VarBaseMul.base_wpoint Γ) = Pallas.identity.
+    VarBaseMul.mul_nondegenerate Γ.
 
   Theorem diversified_address_integrity
       (Γ : Assignment.t columns RegionId.t)
@@ -444,9 +443,9 @@ Module OrchardValidActionInputs.
           (read_rivk Γ))
         (PallasModel.unrepr (OrchardSpec.in_g_d_old (read_action_inputs Γ)))).
   Proof.
-    destruct Hok as (Hnondeg & Hshort & Hmulnd & Horder).
+    destruct Hok as (Hnondeg & Hshort & Hmulnd).
     exact (DiversifiedAddress.diversified_address_integrity Γ Hcircuit
-      Hnondeg Hshort Hmulnd Horder).
+      Hnondeg Hshort Hmulnd).
   Qed.
 
   (** ** The umbrella predicate: the input-side half of §4.18.4
@@ -493,8 +492,8 @@ Module OrchardValidActionInputs.
   (** [Holds Γ] delivers every input-side condition, under the two
       witness-honesty hypotheses of the ownership clauses (the same
       protocol-sanctioned ⊥-slack as [satisfies_specification]'s
-      [Hmerkle_ok]/[Hnote_ok], plus the mul-chip nondegeneracy and
-      base-order conditions of [commit_ivk_witness_ok]).  The theorem's
+      [Hmerkle_ok]/[Hnote_ok], plus the mul-chip nondegeneracy
+      condition of [commit_ivk_witness_ok]).  The theorem's
       assumptions reduce to the repo-wide baseline ([PrimString.string] and
       impredicative [Set]). *)
   Theorem valid_action_inputs_of_holds

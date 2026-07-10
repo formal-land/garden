@@ -381,8 +381,8 @@ Module OrchardAction.
       input-side conditions.  Hypotheses: [Holds Γ] plus the four
       witness-honesty conditions (Merkle, new-note, old-note, [Commit^ivk] —
       the protocol's own ⊥-slack; [commit_ivk_witness_ok] additionally
-      carries the variable-base-mul nondegeneracy and the [g_d_old]
-      base-order fact, see [circuit_proof/valid_action_inputs.v]).
+      carries the variable-base-mul nondegeneracy, see
+      [circuit_proof/valid_action_inputs.v]).
       The two ownership conditions [Hold_note_ok] and [Hivk_ok] feed only the
       [ValidActionInputs] conjunct, discharged by delegation
       ([circuit_proof/old_note/open.v],

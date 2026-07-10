@@ -90,11 +90,19 @@ old-note commitment integrity to `OldNoteOpen.old_note_commit_integrity`
 `DiversifiedAddress.diversified_address_integrity`
 (`circuit_proof/ownership/diversified_address.v`) — under the two
 witness-honesty predicates `old_note_witness_ok` / `commit_ivk_witness_ok`
-(Sinsemilla nondegeneracy + short-lookup range facts; the `commit_ivk` one
-also carries the variable-base-mul step nondegeneracy
-`VarBaseMul.mul_nondegenerate` and the `g_d_old` base-order fact
-`[q] g_d_old = 𝒪`, a curve-cardinality truth outside the formalized
-Weierstrass interface). The variable-base mul chain under the address
+(Sinsemilla nondegeneracy + short-lookup range facts; the `commit_ivk` one —
+three conjuncts — also carries the variable-base-mul step nondegeneracy
+`VarBaseMul.mul_nondegenerate`). The `g_d_old` base-order fact
+`[q] g_d_old = 𝒪` is *not* a hypothesis: it is a theorem — every reduced
+on-curve Pallas point is annihilated by `pallas_q`
+(`PallasOrder.pallas_mul_q_on_curve`, `Garden/EllipticCurve/PallasOrder.v`,
+instantiating the generic Hasse-free counting argument of
+`GroupOrder.mul_q_annihilates` in `Garden/EllipticCurve/GroupOrder.v`) — and
+`DiversifiedAddress.base_point_order` derives it from `Holds Γ` via
+`base_point_facts`, supplying it at the
+`VarBaseMul.address_integrity_mul_correct` call site. So every hypothesis of
+the ownership clauses is a genuine per-assignment witness-honesty condition;
+no mathematical truth is assumed. The variable-base mul chain under the address
 clause is fully `Qed`: the four segment lemmas of
 `circuit_proof/ownership/var_base_mul.v` (`hi_half_correct`,
 `lo_half_correct`, `complete_bits_correct`, `overflow_scalar_exact`)
@@ -255,3 +263,14 @@ companions `CvNetValue.cv_net_value_balance_sound` /
 `cv_net_commits_net_value_Z` likewise carry only the
 `PrimString.string`/impredicative-`Set` baseline (full-`.vo` `rocq top`
 audit, 2026-07-10).
+
+The Pallas curve-order theorem `PallasOrder.pallas_mul_q_on_curve` behind
+the ownership clause reports **zero axioms** — only the impredicative-`Set`
+theory flag, not even `PrimString.string` (it never touches the string-keyed
+column maps). Full-`.vo` scratch-`coqc` audit, 2026-07-10, after the
+base-order rewire: `pallas_mul_q_on_curve` exactly as above;
+`action_statement`, `satisfies_specification`, `deterministic`,
+`valid_action_inputs_of_holds`, and
+`OrchardValidActionInputs.diversified_address_integrity` each exactly
+`PrimString.string : Set` plus impredicative `Set`. No classical axiom
+appears anywhere on any of these paths.

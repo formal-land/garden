@@ -49,13 +49,14 @@
     - the three [Commit^ivk] short-lookup range facts
       ([CommitIvkHash.commit_ivk_short_lookup_ok]);
     - variable-base incomplete-add nondegeneracy
-      ([VarBaseMul.mul_nondegenerate]) — the mul chip's honesty condition;
-    - the base-order fact [Pallas.mul pallas_q g_d_old = identity].  This
-      one is NOT witness honesty but a true statement about every Pallas
-      point (the curve group has prime order [q]); that cardinality fact is
-      not part of the formalized Weierstrass interface, so it is carried as
-      a hypothesis on the witnessed base until a curve-order certificate
-      exists (see [VarBaseMul]'s header).
+      ([VarBaseMul.mul_nondegenerate]) — the mul chip's honesty condition.
+
+    The base-order fact [Pallas.mul pallas_q g_d_old = identity], a
+    hypothesis of [VarBaseMul.address_integrity_mul_correct], is not a side
+    condition: every reduced on-curve Pallas point is annihilated by
+    [pallas_q] ([PallasOrder.pallas_mul_q_on_curve],
+    [EllipticCurve/PallasOrder.v]), so [base_point_order] derives it from
+    [Holds Γ] via [base_point_facts] and supplies it at the call site.
 
     Proof status: everything in this file is [Qed], as is the whole
     [VarBaseMul] chain it consumes (the four segment lemmas of
@@ -75,6 +76,7 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.window_disc.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.EllipticCurve.Pallas.
+Require Import Garden.EllipticCurve.PallasOrder.
 Require Import Garden.Orchard.Pallas.Generators.
 Require Import Garden.Orchard.Pallas.GeneratorsOrder.
 Require Import Garden.Halo2.PallasModel.
@@ -479,6 +481,18 @@ Module DiversifiedAddress.
     - intro Hid. discriminate Hid.
   Qed.
 
+  (** The witnessed base is annihilated by [pallas_q]: the curve-order
+      theorem [PallasOrder.pallas_mul_q_on_curve] applied to the reduced
+      on-curve point delivered by [base_point_facts]. *)
+  Lemma base_point_order
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit : Holds Γ) :
+    Pallas.mul Pallas.pallas_q (VarBaseMul.base_wpoint Γ) = Pallas.identity.
+  Proof.
+    destruct (base_point_facts Γ Hcircuit) as (HBred & HBoc & _).
+    exact (PallasOrder.pallas_mul_q_on_curve _ HBred HBoc).
+  Qed.
+
   (** ** The [AddressIntegrity.Equality] region: witnessed pk_d = computed *)
 
   Lemma pk_d_old_pinned
@@ -557,10 +571,7 @@ Module DiversifiedAddress.
           (OrchardSpec.commit_ivk_q orchard_circuit_params)
           (CommitIvkHash.commit_ivk_words Γ))
       (Hshort : CommitIvkHash.commit_ivk_short_lookup_ok Γ)
-      (Hmulnd : VarBaseMul.mul_nondegenerate Γ)
-      (Horder :
-        Pallas.mul Pallas.pallas_q (VarBaseMul.base_wpoint Γ) =
-        Pallas.identity) :
+      (Hmulnd : VarBaseMul.mul_nondegenerate Γ) :
     read_pk_d_old Γ =
     PallasModel.repr
       (Pallas.mul
@@ -571,6 +582,7 @@ Module DiversifiedAddress.
         (PallasModel.unrepr (OrchardSpec.in_g_d_old (read_action_inputs Γ)))).
   Proof.
     destruct (base_point_facts Γ Hcircuit) as (HBred & HBoc & HBne).
+    pose proof (base_point_order Γ Hcircuit) as Horder.
     unfold read_pk_d_old.
     rewrite (pk_d_old_pinned Γ Hcircuit).
     rewrite (VarBaseMul.address_integrity_mul_correct Γ Hcircuit
@@ -586,18 +598,17 @@ Module DiversifiedAddress.
       The refinement target for
       [OrchardValidActionInputs.commit_ivk_witness_ok]: the Sinsemilla
       nondegeneracy + short-lookup shape of the other honesty predicates,
-      extended by the two variable-base-mul side conditions surfaced in
-      [VarBaseMul] — the incomplete-add nondegeneracy (genuine witness
-      honesty) and the base-order fact (a curve-cardinality truth carried as
-      a hypothesis until certified; see the header). *)
+      extended by the variable-base-mul incomplete-add nondegeneracy
+      surfaced in [VarBaseMul] (genuine witness honesty; the base-order
+      fact is derived from [Holds] by [base_point_order], see the
+      header). *)
   Definition commit_ivk_witness_ok
       (Γ : Assignment.t columns RegionId.t) : Prop :=
     SinsemillaHash.nondegenerate
       (OrchardSpec.commit_ivk_q orchard_circuit_params)
       (CommitIvkHash.commit_ivk_words Γ) /\
     CommitIvkHash.commit_ivk_short_lookup_ok Γ /\
-    VarBaseMul.mul_nondegenerate Γ /\
-    Pallas.mul Pallas.pallas_q (VarBaseMul.base_wpoint Γ) = Pallas.identity.
+    VarBaseMul.mul_nondegenerate Γ.
 
   Theorem diversified_address_integrity_of_witness_ok
       (Γ : Assignment.t columns RegionId.t)
@@ -612,9 +623,9 @@ Module DiversifiedAddress.
           (read_rivk Γ))
         (PallasModel.unrepr (OrchardSpec.in_g_d_old (read_action_inputs Γ)))).
   Proof.
-    destruct Hok as (Hnondeg & Hshort & Hmulnd & Horder).
+    destruct Hok as (Hnondeg & Hshort & Hmulnd).
     exact (diversified_address_integrity Γ Hcircuit
-      Hnondeg Hshort Hmulnd Horder).
+      Hnondeg Hshort Hmulnd).
   Qed.
 
 End DiversifiedAddress.

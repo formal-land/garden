@@ -300,8 +300,13 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   round proof; `hash_to_point_proof.v` (shared definitions) 3 s;
   `hash_to_point_fold_proof.v` 1.5 s.
 - `circuit_proof/fixed_base/main.v`: 78 s.
-- The `order_<base>.v` ladder-certificate leaves: 16 s each
-  (value_commit_v 30 s), `make -j` parallel.
+- The `order_<base>.v` certificate leaves: < 1 s each — instances of
+  `PallasOrder.pallas_mul_q_on_curve` at the generator's
+  `reduced`/`on_curve` facts (2026-07-10; formerly 16 s ladder
+  certificates each, value_commit_v 30 s). The only remaining `[q]·G`
+  ladder is `Pallas.placeholder_order` (`EllipticCurve/Pallas.v`), the
+  bootstrap certificate the general theorem itself consumes — it cannot
+  be replaced by instantiation without circularity.
 - Discriminant certificates (`circuit_proof/<base>/disc_cert.v`): ≈ 92 s CPU
   total across the five self-contained files (≈ 21 s per 85-window family,
   6 s for the 22-window value_commit_v).

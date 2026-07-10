@@ -48,9 +48,11 @@
       ([witness_non_identity_point_value] / [_on_curve],
       [circuit_proof/fixed_base/main.v]).
     - [Pallas.mul pallas_q B = identity]: the base lies in the (whole-curve)
-      order-[q] group.  The Pallas curve group has prime order [q], but that
-      cardinality fact is not part of the formalized Weierstrass interface,
-      so it enters as an explicit hypothesis on the witnessed base.
+      order-[q] group.  Every reduced on-curve Pallas point satisfies this
+      ([PallasOrder.pallas_mul_q_on_curve], [EllipticCurve/PallasOrder.v]);
+      the consumer derives it from the [QWitnessPointNonId] facts
+      ([DiversifiedAddress.base_point_order]) and supplies it at the call
+      site.
     - [mul_nondegenerate]: the incomplete-addition halves never meet a
       degenerate case (equal x-coordinates, or an identity accumulator).
       The gates force nothing in those cases, so this is genuine witness
