@@ -274,3 +274,38 @@ base-order rewire: `pallas_mul_q_on_curve` exactly as above;
 `OrchardValidActionInputs.diversified_address_integrity` each exactly
 `PrimString.string : Set` plus impredicative `Set`. No classical axiom
 appears anywhere on any of these paths.
+
+## The transaction-level balance layer (`Garden/Orchard/bundle/`)
+
+Above the per-action theorems sits the §4.14 composition, the in-model
+form of the balance/no-counterfeiting argument. `OrchardBundle.t`
+(`bundle/spec.v`) is a list of per-action assignments plus the public
+`value_balance`; `bundle_bvk` is the recomputed binding validating key
+(the homomorphic sum of the actions' `cv_net` points minus
+`ValueCommit_0(value_balance)`), and `SignatureKnowledge b bsk` is the
+semantic content of a valid Orchard binding signature —
+`bundle_bvk b = [bsk]·ValueCommitR`. The step from
+"`RedPallas.Validate = 1`" to `SignatureKnowledge` (SUF-CMA plus
+knowledge of the discrete log, §5.4.7.2) stays outside the model as a
+named boundary, like SNARK knowledge soundness.
+
+- `OrchardBundle.balanced_or_dlog` (`bundle/main.v`): under per-action
+  `action_ok` (the `cv_net_commits_net_value_Z` hypothesis package), the
+  §4.14 consensus side conditions (at most `2^16 − 1` actions,
+  `value_balance ∈ {−2^63 .. 2^63 − 1}`), and `SignatureKnowledge`,
+  either `Σ (v_old − v_new) = value_balance` over ℤ, or an explicit
+  discrete-log relation between the two value-commit generators is
+  exhibited (`dlog_relation` with the computable witness
+  `OrchardBindingReduction.extracted_k`).
+- `OrchardBundle.no_inflation` (`bundle/main.v`): the §4.17 corollary
+  over a list of bundles — under the nonnegative-pool consensus rule,
+  either every bundle balances and the total net withdrawal is bounded,
+  or some bundle yields the discrete-log relation.
+
+Pedersen binding is deliberately a *reduction*, not an axiom: the Pallas
+group is cyclic of prime order, so a generator-independence axiom
+(`[a]V + [b]R = 𝒪 → a ≡ b ≡ 0`) would be refutable in-model. A consumer
+invokes DL hardness only to discard the right disjunct. Consequently the
+layer adds no axioms: `Print Assumptions` on both theorems (full-`.vo`
+scratch-`coqc` audit, 2026-07-10) reports exactly `PrimString.string`
+plus impredicative `Set`.
