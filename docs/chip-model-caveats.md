@@ -71,10 +71,10 @@ interpreter's gate layer only. This document is about that relational model.
    type `Instance_ -> Z -> Z` (`proof.v:14`): instance columns are addressed
    by an absolute row alone, not region-scoped, matching real Halo2 and
    `serialize.v`'s region-less `Cell.instance_raw` lowering
-   (`serialize.v:450`). (They were originally region-indexed — two regions
-   constraining the same instance column and row read different abstract
-   cells — fixed by dropping the region argument at the record field, the
-   `Expression.Instance_` case, and `ConstrainInstance`.) One residual
+   (`serialize.v:450`). (The record field, the `Expression.Instance_` case,
+   and `ConstrainInstance` all address an instance column by absolute row
+   alone, so two regions constraining the same instance column and row read
+   the same abstract cell.) One residual
    idealization remains, shared with advice/fixed: a gate that queries an
    instance column uses the region-local gate row rather than an absolute
    row. This is benign for the audited chips, which reference instance only
@@ -98,8 +98,26 @@ interpreter's gate layer only. This document is about that relational model.
    instance: on an active `q_sinsemilla1` row the three padded slots collapse
    to the bare `word`/`x_p`/`y_p` field values, so the lookup pins the
    witnessed point to the `SINSEMILLA_S` generator for the message word. The
-   range-check chip (`utilities/lookup_range_check.v`) defines
-   `LookupArgument`s that no proof consumes yet.
+   range-check chip's `LookupArgument` is consumed too: `RangeTable`
+   (`utilities/lookup_range_check_proof.v`) proves `configure_lookups_eq`
+   (`lookup_range_check.configure` emits exactly `RangeTable.argument`),
+   `loaded_index_table` (a `LookupTableLoaded` fact with index-sequence
+   values pins the table column to the identity on `[0, n)`), `word_sound`
+   (on a `q_lookup = 1`, `q_running = 1` row the running-sum word
+   `z_cur -F z_next *F 2^k` lies in `[0, nb_table_rows)`) and
+   `short_word_sound` (the `q_running = 0` form, which must carry its
+   selector-off hypothesis explicitly — the fact model records only
+   `SelectorOn` points). The `Lookup.TableIdx` index column it checks
+   against is loaded as the first entry of `load_generator_table`
+   (`sinsemilla/chip.v`), mirroring Rust, where `SinsemillaChip::load`
+   provides the shared table and `LookupRangeCheckConfig::load` is never
+   called by the Orchard circuit. Circuit-level consumers: the variable-base
+   mul overflow decomposition
+   (`Orchard/circuit_proof/ownership/var_base_overflow.v`, via
+   `RangeTable.word_sound` with `GeneratorTable.loaded` at
+   `Lookup.TableIdx`) and the `α_0'` canonicity lookup
+   (`Orchard/circuit_proof/base_field_canonicity.v`,
+   `alpha_lookup_word_range`, same pattern).
 
 3. **No cyclic domain, no usable-row distinction.** Rows are plain integers
    and `rotated_row = row + offset` (`proof.v:58-62`); there is no `nb_rows`
@@ -145,8 +163,8 @@ interpreter's gate layer only. This document is about that relational model.
    proved gate `deterministic`; chips whose `synthesize`/`configure` take an
    abstract sub-program (Merkle's `cond_swap`) project past the opaque prefix
    of the facts/gates lists rather than reducing them. The whole-circuit
-   Orchard action determinism theorems (`OrchardAction.deterministic`,
-   `OrchardAction.deterministic_relational` in
+   Orchard action theorems (`OrchardAction.satisfies_specification`,
+   `OrchardAction.deterministic` in
    `Garden/Orchard/circuit_proof/main.v`) build on this gluing; see
    `docs/orchard-determinism-proof.md` where present. The **completeness**
    direction — an honestly synthesized Γ satisfies `circuit_holds` — remains
@@ -305,10 +323,14 @@ string of the reduced scalar.
   row domain, and the blinding-row distinction; refine `satisfies_gates` to
   quantify over each region's actual extent; and fold in the
   tables-as-fixed-column-prefixes layer of the lookup-table work.
-- **Consume the lookup model beyond the generator table** (item 2): the
-  range-check chip's `LookupArgument`s, and wiring `satisfies_lookups` into a
-  chip-level `circuit_holds` proof the way `satisfies_gates` is wired for
-  `add`.
+- **Selector-off closure for short lookups** (item 2). The range-check
+  chip's `LookupArgument` is now consumed (`RangeTable.word_sound` /
+  `short_word_sound`, used by the var-base-mul overflow and base-field
+  canonicity lookups — see item 2), but the short-lookup form needs an
+  explicit `q_running = 0` hypothesis because the fact model asserts only
+  the `SelectorOn` points. A `SelectorOff`/default-0 selector model (the
+  same well-formedness fact as the completeness gap above) would discharge
+  the named short-lookup witness-honesty conditions.
 
 ## Bottom line
 

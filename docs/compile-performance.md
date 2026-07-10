@@ -285,7 +285,17 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
 
 - Fixed-base table leaves (`circuit_proof/<base>/table.v`): ~79 s ∥ 80 s ∥
   80 s ∥ 20 s in parallel (value_commit_v is the cheap one); the
-  note_commit_r leaf lands in the ~100 s band.
+  note_commit_r leaf lands in the ~100 s band; the commit_ivk_r leaf
+  measured 81 s / 742 MB peak (2026-07-09).
+- The commit_ivk_r certificate leaves (2026-07-09): `disc_cert.v` 19 s,
+  `sign_cert.v` 7.3 s, `x_cert.v` 6.5 s,
+  `protocol_mul/commit_ivk_r.v` 0.8 s — all inside the per-family bands
+  below.
+- The ownership variable-base-mul leaves (2026-07-09):
+  `circuit_proof/ownership/var_base_incomplete.v` ~30 s — dominated by two
+  symbolic-row `field_solve`s (the `q_mul_2`/`q_mul_3` secant conjuncts)
+  plus six gate-membership ltac `In`-proofs; `var_base_mul.v` ~21 s;
+  `var_base_overflow.v` ~10 s; `var_base_complete.v` ~6 s.
 - `sinsemilla/hash_to_point_round_final_proof.v`: 96 s, parallel with the
   round proof; `hash_to_point_proof.v` (shared definitions) 3 s;
   `hash_to_point_fold_proof.v` 1.5 s.
@@ -297,7 +307,7 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   6 s for the 22-window value_commit_v).
 - x-coordinate certificates ≈ 7 s each; window-sign certificates ≈ 9–10 s
   each.
-- `circuit_proof/main.v` 0.9 s; everything else seconds.
+- `circuit_proof/main.v` ~1 s; everything else seconds.
 
 Remaining single-file levers: the `hash_to_point_round_proof` round proof
 and the `sinsemilla_s` table literal, the two largest links in the chain
@@ -342,8 +352,8 @@ shard). Each family now carries a pasted `nonres_root_table` — per entry a
 root `r` of `disc / pallas_b` — and one checker verifying
 `disc = pallas_b *F (r *F r)` and `r <> 0`: one field multiplication per
 entry (3–7 s per former shard, 238 s CPU total). The exported lemma
-statements stayed byte-identical, so consumers and `Print Assumptions
-OrchardAction.deterministic` were untouched. With the per-entry cost gone,
+statements stayed byte-identical, so consumers and `Print Assumptions` on the whole-circuit determinism
+theorem were untouched. With the per-entry cost gone,
 the 50-file band sharding cost more in per-file `Require` loading than the
 checks themselves and was retired to one self-contained `disc_cert.v` per
 family (current figure above).

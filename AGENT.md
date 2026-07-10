@@ -17,7 +17,8 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   planner vs region API, and the parity splice that hid it), and the fix with
   its validation gates.
 - `docs/orchard-determinism-proof.md`: the whole-circuit Orchard-action
-  determinism result — the exact `deterministic`/`deterministic_relational`
+  correctness result — the exact
+  `satisfies_specification`/`deterministic`
   statements, each hypothesis and its motivation (including the two
   witness-honesty side conditions), what the conclusion does and does not
   ensure, the inherited model caveats, and the assumption audit.
