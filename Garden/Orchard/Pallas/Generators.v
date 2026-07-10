@@ -8,7 +8,7 @@
     injectivity of [mul] modulo [pallas_q].
 
     This file, unlike [EllipticCurve/Pallas.v], is Orchard-specific: the six
-    generator names and (for [spend_auth_g_G]) its concrete coordinates are
+    generator names and their concrete coordinates are
     Orchard's fixed-base set, not curve-generic data, so it lives under
     [Garden/Orchard/] rather than [Garden/EllipticCurve/].
 
@@ -25,7 +25,8 @@
     never wait on the six ladder reductions.
 
     Generator coordinates. The six Orchard fixed bases are derived by Zcash
-    hash-to-curve ([group_hash]) and exist in the circuit only as windowed
+    hash-to-curve ([group_hash], Protocol: §5.4.9.8 'Group Hash into Pallas
+    and Vesta') and exist in the circuit only as windowed
     Lagrange tables (no affine generator). All six carry their real Zcash
     affine coordinates: [spend_auth_g_G] was recovered offline from the
     circuit fixed-base table
