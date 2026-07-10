@@ -186,12 +186,24 @@ above.
   is functional (`= orchard_action_spec inputs`), which is strictly stronger
   than pairwise agreement. It pins the outputs to the independently-auditable
   `OrchardProtocolSpec` functions — fixed-base multiplications as group
-  multiples of the real-coordinate Zcash generator points — with the
-  remaining constants (Sinsemilla domain points and tables, Poseidon
-  parameters, the generator coordinates themselves) cross-checked against
-  the vendored Rust `orchard` crate sources by `vm_compute` certificates,
-  and the constant-binding sites validated against a Rust-generated replay
-  table by the standalone gate `circuit_synthesis_constants_check.v`.
+  multiples of the real-coordinate Zcash generator points — and the root
+  constants are themselves derived in-model from the protocol's own
+  algorithms: the Poseidon parameters from the Grain LFSR + Cauchy MDS
+  construction (`Halo2/halo2_poseidon/{grain,p128pow5t3_provenance}.v`),
+  and the six generators, the three Sinsemilla domain points, and the
+  1024-entry S table from the `GroupHash^P` pipeline — BLAKE2b-512 XMD,
+  simplified SWU onto iso-Pallas, degree-3 isogeny
+  (`Garden/GroupHash/`, `Orchard/Pallas/{generators,q_points}_provenance.v`,
+  `Halo2/halo2_gadgets/sinsemilla/provenance/`), each checker `Qed` with
+  witnessed square roots. The constant-binding sites are validated against
+  a Rust-generated replay table by the standalone gate
+  `circuit_synthesis_constants_check.v`; the vendored reference crates are
+  version-pinned in `docs/halo2-translation.md`. Residual external trust:
+  the Poseidon derivation reaches the reference implementation (the
+  protocol delegates its parameters to `generate_parameters_grain.sage`),
+  and the `GroupHash^P` pipeline constants (iso-curve coefficients, `Z`,
+  `θ`, the isogeny vector) are transcribed from §5.4.9.8 rather than
+  re-derived.
 
 ## What this effort does *not* ensure
 

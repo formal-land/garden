@@ -83,6 +83,15 @@ halo2_gadgets/src/poseidon/pow5.rs
 halo2_poseidon/src/p128pow5t3.rs and halo2_poseidon/src/fp.rs
   -> Garden/Halo2/halo2_poseidon/p128pow5t3.v
 
+halo2_poseidon/src/grain.rs, halo2_poseidon/src/mds.rs, and
+halo2_poseidon/src/lib.rs (generate_constants only)
+  -> Garden/Halo2/halo2_poseidon/grain.v
+
+pasta_curves/src/hashtocurve.rs and the Pallas sections of
+pasta_curves/src/curves.rs (vendored as Garden/GroupHash/hashtocurve.rs
+and Garden/GroupHash/curves_pallas_excerpt.rs)
+  -> Garden/GroupHash/{blake2b,xmd,sswu,group_hash}.v
+
 halo2_gadgets/src/sinsemilla/chip.rs
   -> Garden/Halo2/halo2_gadgets/sinsemilla/chip.v
 
@@ -99,6 +108,31 @@ orchard/src/constants/fixed_bases/*.rs
 Rust source snapshots are copied beside the translated Rocq files using the
 same Rust filenames. These `.rs` files are for review and traceability only;
 they are not part of the Rocq build.
+
+Version pins for the vendored `pasta_curves` snapshots
+(`Garden/GroupHash/hashtocurve.rs`, vendored verbatim, and
+`Garden/GroupHash/curves_pallas_excerpt.rs`, the Pallas sections of
+`src/curves.rs` with a provenance header citing the source line ranges):
+crate `pasta_curves` version 0.5.1, git revision
+`fe08536da133280ed2f7e63877d6049a1efc8922` (`git describe`
+`0.5.1-13-gfe08536`, 2026-04-20), with `Cargo.lock` pinning
+`blake2b_simd` 1.0.1.
+
+Generator-side Rust — code that derives constants rather than laying out
+circuit rows, such as the Grain LFSR / Cauchy-MDS pipeline of
+`halo2_poseidon` — is transcribed function-for-function into plain
+executable Rocq instead of the Halo2 DSL: `list bool` for the LFSR bit
+state, plain `Z` residues for field elements, and explicit fuel plus
+`option` results for unbounded Rust loops (self-shrinking iteration,
+rejection sampling). The transcription's output is pinned to the
+hard-coded literals by `vm_compute` checker lemmas in a sibling
+`*_provenance.v` leaf (`p128pow5t3_provenance.v` for the Poseidon
+round constants, MDS, and its inverse;
+`Orchard/Pallas/generators_provenance.v`,
+`Orchard/Pallas/q_points_provenance.v`, and
+`Halo2/halo2_gadgets/sinsemilla/provenance/` for the point families
+derived by the `GroupHash^P` pipeline of `Garden/GroupHash/`, which
+follows the same plain-executable style over `Z` bit-ops).
 
 When Rust submodules need to share translated column bundles without creating
 cycles, put those bundles in a small local `common.v` file under the mirrored

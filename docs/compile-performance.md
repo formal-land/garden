@@ -228,6 +228,25 @@ forced), one-delta lemmas, and per-field reader lemmas, assembled with
 syntactic `rewrite`s so the final `reflexivity` compares literally identical
 terms; the file compiles in ~1 s that way.
 
+### Never `match` on a concrete heavy computation — project through combinators
+
+Elaborating a `match` whose scrutinee is a *constant that unfolds to a big
+computation* sends that computation to the lazy machine at pretyping time,
+before any tactic runs. In `Halo2/halo2_poseidon/p128pow5t3_provenance.v`,
+`Definition derived_round_constants := match derived with Some (rc, _) => rc
+| None => [] end` — where `derived` is the whole Grain/MDS generation
+pipeline applied to concrete parameters — stalled `rocq compile` at 99% CPU
+for >12 minutes (killed), on both the plain and the `-vos` build; even a
+flat `match derived with Some _ => true | None => false end` hangs, while
+the same `match` on a `None`-bodied constant of the identical type is
+instant. Deceptive symptom under `-vos`/`-time`: every sentence logs
+`0. secs` and the stall appears after the last sentence. Fix: never place
+the concrete constant in scrutinee position — route projections through
+combinators whose own `match` is on a bound variable
+(`option_get [] (option_map fst derived)`), leaving the pipeline unreduced
+until a checker's `vm_compute` (which runs it in milliseconds after a ~5 s
+one-time bytecode compilation of the closure).
+
 ### Scope `lia`/`nia` with `clear -` in div/mod-heavy contexts
 
 Micromega cost is a function of the whole context, not the goal: `lia`'s
@@ -313,6 +332,33 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
 - x-coordinate certificates ≈ 7 s each; window-sign certificates ≈ 9–10 s
   each.
 - `circuit_proof/main.v` ~1 s; everything else seconds.
+- The Poseidon constants-provenance pair (2026-07-10):
+  `halo2_poseidon/grain.v` (executable Grain/MDS transcription, no proofs)
+  < 1 s; `halo2_poseidon/p128pow5t3_provenance.v` ~6 s — 5.3 s in the first
+  checker's `vm_compute` (one-time bytecode compilation of the pipeline
+  closure), the remaining four checkers milliseconds each (see the
+  match-scrutinee pitfall above for the elaboration trap this file dodges).
+- The `GroupHash^P` chain (2026-07-10): `GroupHash/blake2b.v` and `xmd.v`
+  < 1 s each (their `vm_compute` reference vectors included), `sswu.v` ~5 s
+  (the transcription-check `vm_compute`s over the iso-Pallas constants),
+  `group_hash.v` < 1 s; the checker leaves
+  `Orchard/Pallas/generators_provenance.v` ~9 s (six points) and
+  `q_points_provenance.v` ~5 s (three points) — one raw-`forallb`
+  `vm_compute` each, recomputing BLAKE2b/XMD and the witnessed SSWU +
+  `iso_map` per point with pasted offline square-root witnesses
+  (`scripts/generate_grouphash_witnesses.py`), never an in-kernel
+  `field_sqrt`.
+- The Sinsemilla S-table provenance shards (2026-07-10):
+  `Halo2/halo2_gadgets/sinsemilla/provenance/shard_{0..7}.v` — ~196 s each
+  (`sinsemilla_s_shard_N_check`, a 128-point raw-`forallb` `vm_compute`
+  over the same witnessed `GroupHash^P` recomputation, ~1.5 s per point;
+  witnesses pasted from `scripts/generate_sinsemilla_witnesses.py`; the
+  companion index lemma's `vm_compute` is negligible). The eight leaves are
+  mutually independent and off every other file's `Require` path (only
+  `provenance/main.v`, < 2 s, consumes them), so they run fully parallel:
+  ~200 s wall on eight cores, never re-paid while iterating elsewhere.
+  Sharding finer was declined — per-leaf memory is small (< 1 GiB) and the
+  cost is pure per-point CPU, so more shards only add `Require` overhead.
 
 Remaining single-file levers: the `hash_to_point_round_proof` round proof
 and the `sinsemilla_s` table literal, the two largest links in the chain
