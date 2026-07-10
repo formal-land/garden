@@ -92,12 +92,16 @@ Module 𝓡.
       (offset : Z)
       (value : Z) : t columns RegionId unit
   | Copy
-      (left right : Cell.t columns RegionId) : t columns RegionId unit.
+      (left right : Cell.t columns RegionId) : t columns RegionId unit
+  | ConstrainConstant
+      (cell : Cell.t columns RegionId)
+      (value : Z) : t columns RegionId unit.
   Arguments Ret {_ _ _}.
   Arguments Bind {_ _ _ _}.
   Arguments EnableSelector {_ _}.
   Arguments AssignFixed {_ _}.
   Arguments Copy {_ _}.
+  Arguments ConstrainConstant {_ _}.
 End 𝓡.
 
 Definition 𝓡 := 𝓡.t.
@@ -107,6 +111,20 @@ Global Instance RegionIsMonad {columns : Columns.t} {RegionId : Set}
   Monad.ret := @𝓡.Ret columns RegionId;
   Monad.bind := @𝓡.Bind columns RegionId;
 |}.
+
+(** Mirror of Rust's [region.assign_advice_from_constant]: create the advice
+    cell and pin it to the constant via the layouter constants mechanism.
+    [value] must be a reduced literal (in [[0, p)]): the Rust layouter writes
+    the canonical representative into the constants column, and the
+    permutation argument forces raw equality with it. *)
+Definition assign_advice_from_constant {columns : Columns.t} {RegionId : Set}
+    (region : RegionId)
+    (column : columns.(Columns.Advice))
+    (offset : Z)
+    (value : Z)
+    : 𝓡 columns RegionId (Cell.t columns RegionId) :=
+  let cell := Cell.advice region column offset in
+  𝓡.Bind (𝓡.ConstrainConstant cell value) (fun _ => 𝓡.Ret cell).
 
 Module 𝓛.
   (** Free syntax tree for layouter-level computations.  These programs

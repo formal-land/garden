@@ -43,10 +43,10 @@ Module ShortFixedBaseMul.
     now rewrite h4.
   Qed.
 
-  (* Chip-level determinism (admitted): [short.synthesize] enables
+  (* Chip-level determinism: [short.synthesize] enables
      [QMulFixedShort] at offset 0 of region [EccMulFixedShort], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
-     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

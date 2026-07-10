@@ -231,7 +231,7 @@ Definition assign_complete_add
   let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
-Definition synthesize_full_fixed_base_mul_incomplete_region
+Definition synth_full_mul_incomplete
     (region : RegionId.t)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
   𝓛.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
@@ -262,7 +262,7 @@ Definition synthesize_full_fixed_base_mul_last_region
 Definition synthesize_full_fixed_base_mul_commit_ivk_r
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   let🞵 result :=
-    synthesize_full_fixed_base_mul_incomplete_region
+    synth_full_mul_incomplete
       (commit_ivk_region RegionId.CommitIvk.FixedBaseIncomplete) in
   synthesize_full_fixed_base_mul_last_region
     (commit_ivk_region RegionId.CommitIvk.FixedBaseLast)
@@ -285,6 +285,7 @@ Definition witness_message_piece
 Definition synthesize_range_check
     (region : RegionId.t)
     (namespace region_name : string)
+    (inv_two_pow_s : Z)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   𝓛.InNamespace namespace (
     𝓛.AddRegion region region_name (fun region =>
@@ -292,6 +293,8 @@ Definition synthesize_range_check
       do🞵 𝓡.EnableSelector Selector.QLookup 0 "" in
       do🞵 𝓡.EnableSelector Selector.QLookup 1 "" in
       do🞵 𝓡.EnableSelector Selector.QBitshift 1 "" in
+      do🞵
+        𝓡.ConstrainConstant (Cell.advice region Advice.A9 2) inv_two_pow_s in
       return🞵 element)).
 
 Fixpoint enable_lookup_running_rows
@@ -327,7 +330,7 @@ Definition assign_cells_used_in_canonicity_gate
     (ak nk : Cell.t columns RegionId.t)
     (a b c d : Cell.t columns RegionId.t)
     (b_0 b_2 d_0 : Cell.t columns RegionId.t)
-    (hash : Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.t)
+    (hash : Garden.Halo2.halo2_gadgets.sinsemilla.chip.CommitIvkHashResult.t)
     (ak_lookup nk_lookup : LookupResult.t)
     : 𝓛 columns RegionId.t unit :=
   𝓛.InNamespace "Assign cells used in canonicity gate" (
@@ -347,7 +350,7 @@ Definition assign_cells_used_in_canonicity_gate
       do🞵
         𝓡.Copy
           z13_a_target
-          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_a) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.CommitIvkHashResult.z13_a) in
       let a_prime_target := Cell.advice region Advice.A7 0 in
       do🞵
         𝓡.Copy a_prime_target ak_lookup.(LookupResult.z_0) in
@@ -366,7 +369,7 @@ Definition assign_cells_used_in_canonicity_gate
       do🞵
         𝓡.Copy
           z13_c_target
-          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.z13_c) in
+          hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.CommitIvkHashResult.z13_c) in
       let b2_c_prime_target := Cell.advice region Advice.A7 1 in
       do🞵
         𝓡.Copy b2_c_prime_target nk_lookup.(LookupResult.z_0) in
@@ -383,12 +386,14 @@ Definition synthesize
     synthesize_range_check
       (commit_ivk_region RegionId.CommitIvk.RangeB0)
       "b_0"
-      "Range check 4 bits" in
+      "Range check 4 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4 in
   let🞵 b_2 :=
     synthesize_range_check
       (commit_ivk_region RegionId.CommitIvk.RangeB2)
       "b_2"
-      "Range check 5 bits" in
+      "Range check 5 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5 in
   let🞵 b :=
     witness_message_piece
       (commit_ivk_region RegionId.CommitIvk.WitnessB)
@@ -398,7 +403,8 @@ Definition synthesize
     synthesize_range_check
       (commit_ivk_region RegionId.CommitIvk.RangeD0)
       "d_0"
-      "Range check 9 bits" in
+      "Range check 9 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_9 in
   let🞵 d :=
     witness_message_piece
       (commit_ivk_region RegionId.CommitIvk.WitnessD)
@@ -422,9 +428,9 @@ Definition synthesize
             d) in
       let m := {|
         AssignedPoint.x :=
-          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.x);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.CommitIvkHashResult.x);
         AssignedPoint.y :=
-          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.HashResult.y);
+          m_hash.(Garden.Halo2.halo2_gadgets.sinsemilla.chip.CommitIvkHashResult.y);
       |} in
       let🞵 ivk :=
         𝓛.InNamespace "M + [r] R" (

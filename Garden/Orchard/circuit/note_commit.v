@@ -141,7 +141,7 @@ Definition assign_complete_add
   let y_r := Cell.advice region Advice.A3 1 in
   return🞵 {| AssignedPoint.x := x_r; AssignedPoint.y := y_r |}.
 
-Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
+Definition synth_note_commit_r_mul_incomplete
     (region : RegionId.t)
     : 𝓛 columns RegionId.t FullFixedResult.t :=
   𝓛.AddRegion region "Full-width fixed-base mul (incomplete addition)" (fun region =>
@@ -159,7 +159,7 @@ Definition synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
       FullFixedResult.mul_b := mul_b;
     |}).
 
-Definition synthesize_full_fixed_base_mul_note_commit_r_last_region
+Definition synth_note_commit_r_mul_last_region
     (region : RegionId.t)
     (result : FullFixedResult.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
@@ -173,9 +173,9 @@ Definition synthesize_full_fixed_base_mul_note_commit_r
     (which : RegionId.NoteCommit.Which.t)
     : 𝓛 columns RegionId.t AssignedPoint.t :=
   let🞵 result :=
-    synthesize_full_fixed_base_mul_note_commit_r_incomplete_region
+    synth_note_commit_r_mul_incomplete
       (note_commit_region which RegionId.NoteCommit.FixedBaseIncomplete) in
-  synthesize_full_fixed_base_mul_note_commit_r_last_region
+  synth_note_commit_r_mul_last_region
     (note_commit_region which RegionId.NoteCommit.FixedBaseLast)
     result.
 
@@ -562,6 +562,7 @@ Definition witness_message_piece
 Definition synthesize_short_range
     (region : RegionId.t)
     (namespace region_name : string)
+    (inv_two_pow_s : Z)
     : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
   𝓛.InNamespace namespace (
     𝓛.AddRegion region region_name (fun region =>
@@ -569,6 +570,8 @@ Definition synthesize_short_range
       do🞵 𝓡.EnableSelector Selector.QLookup 0 "" in
       do🞵 𝓡.EnableSelector Selector.QLookup 1 "" in
       do🞵 𝓡.EnableSelector Selector.QBitshift 1 "" in
+      do🞵
+        𝓡.ConstrainConstant (Cell.advice region Advice.A9 2) inv_two_pow_s in
       return🞵 element)).
 
 Fixpoint enable_lookup_running_rows
@@ -587,6 +590,7 @@ Definition synthesize_running_lookup
     (region : RegionId.t)
     (namespace : string)
     (count : nat)
+    (strict : bool)
     : 𝓛 columns RegionId.t LookupResult.t :=
   𝓛.InNamespace namespace (
     𝓛.AddRegion region "Witness element" (fun region =>
@@ -595,6 +599,12 @@ Definition synthesize_running_lookup
       let z_13 := Cell.advice region Advice.A9 13 in
       do🞵 enable_lookup_running_rows 0 count in
       let z_end := Cell.advice region Advice.A9 (Z.of_nat count) in
+      (* Strict decomposition pins the final running sum to zero
+         ([lookup_range_check.rs] with [strict = true]). *)
+      do🞵
+        (if strict
+         then 𝓡.ConstrainConstant z_end 0
+         else return🞵 tt) in
       return🞵 {|
         LookupResult.z_0 := z_0;
         LookupResult.z_1 := z_1;
@@ -617,7 +627,8 @@ Definition synthesize_y_canonicity
           subject
           RegionId.NoteCommit.YCanonicity.RangeK0)
         "k_0"
-        "Range check 9 bits" in
+        "Range check 9 bits"
+        Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_9 in
     let🞵 k_2 :=
       synthesize_short_range
         (note_commit_y_region
@@ -625,7 +636,8 @@ Definition synthesize_y_canonicity
           subject
           RegionId.NoteCommit.YCanonicity.RangeK2)
         "k_2"
-        "Range check 4 bits" in
+        "Range check 4 bits"
+        Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4 in
     let🞵 j_lookup :=
       synthesize_running_lookup
         (note_commit_y_region
@@ -633,7 +645,8 @@ Definition synthesize_y_canonicity
           subject
           RegionId.NoteCommit.YCanonicity.JLookup)
         "Decompose j = LSB + (2)k_0 + (2^10)k_1"
-        25%nat in
+        25%nat
+        true in
     let🞵 j_prime_lookup :=
       𝓛.InNamespace "j_prime = j + 2^130 - t_P" (
         synthesize_running_lookup
@@ -642,7 +655,8 @@ Definition synthesize_y_canonicity
             subject
             RegionId.NoteCommit.YCanonicity.JPrimeLookup)
           "Decompose low 130 bits of (a + 2^130 - t_P)"
-          13%nat) in
+          13%nat
+          false) in
     𝓛.AddRegion
       (note_commit_y_region which subject RegionId.NoteCommit.YCanonicity.Gate)
       "y canonicity" (fun region =>
@@ -690,12 +704,14 @@ Definition synthesize_instance
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeB0)
       "b_0"
-      "Range check 4 bits" in
+      "Range check 4 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4 in
   let🞵 b_3 :=
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeB3)
       "b_3"
-      "Range check 4 bits" in
+      "Range check 4 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4 in
   let🞵 b :=
     witness_message_piece
       (note_commit_region which RegionId.NoteCommit.WitnessB)
@@ -710,7 +726,8 @@ Definition synthesize_instance
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeD2)
       "d_2"
-      "Range check 8 bits" in
+      "Range check 8 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_8 in
   let🞵 d :=
     witness_message_piece
       (note_commit_region which RegionId.NoteCommit.WitnessD)
@@ -720,12 +737,14 @@ Definition synthesize_instance
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeE0)
       "e_0"
-      "Range check 6 bits" in
+      "Range check 6 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_6 in
   let🞵 e_1 :=
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeE1)
       "e_1"
-      "Range check 4 bits" in
+      "Range check 4 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4 in
   let🞵 e :=
     witness_message_piece
       (note_commit_region which RegionId.NoteCommit.WitnessE)
@@ -740,7 +759,8 @@ Definition synthesize_instance
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeG1)
       "g_1"
-      "Range check 9 bits" in
+      "Range check 9 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_9 in
   let🞵 g :=
     witness_message_piece
       (note_commit_region which RegionId.NoteCommit.WitnessG)
@@ -750,7 +770,8 @@ Definition synthesize_instance
     synthesize_short_range
       (note_commit_region which RegionId.NoteCommit.RangeH0)
       "h_0"
-      "Range check 5 bits" in
+      "Range check 5 bits"
+      Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5 in
   let🞵 h :=
     witness_message_piece
       (note_commit_region which RegionId.NoteCommit.WitnessH)
@@ -810,25 +831,29 @@ Definition synthesize_instance
       synthesize_running_lookup
         (note_commit_region which RegionId.NoteCommit.XGDLookup)
         "Decompose low 130 bits of (a + 2^130 - t_P)"
-        13%nat) in
+        13%nat
+        false) in
   let🞵 x_pkd_lookup :=
     𝓛.InNamespace "x(pk_d) canonicity" (
       synthesize_running_lookup
         (note_commit_region which RegionId.NoteCommit.XPKDLookup)
         "Decompose low 140 bits of (b_3 + 2^4 c + 2^140 - t_P)"
-        14%nat) in
+        14%nat
+        false) in
   let🞵 rho_lookup :=
     𝓛.InNamespace "rho canonicity" (
       synthesize_running_lookup
         (note_commit_region which RegionId.NoteCommit.RhoLookup)
         "Decompose low 140 bits of (e_1 + 2^4 f + 2^140 - t_P)"
-        14%nat) in
+        14%nat
+        false) in
   let🞵 psi_lookup :=
     𝓛.InNamespace "psi canonicity" (
       synthesize_running_lookup
         (note_commit_region which RegionId.NoteCommit.PsiLookup)
         "Decompose low 130 bits of (g_1 + (2^9)g_2 + 2^130 - t_P)"
-        13%nat) in
+        13%nat
+        false) in
   let🞵 b_1 :=
     𝓛.AddRegion
       (note_commit_region which RegionId.NoteCommit.MessagePieceB)

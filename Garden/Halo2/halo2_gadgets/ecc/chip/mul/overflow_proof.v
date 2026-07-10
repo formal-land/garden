@@ -62,10 +62,10 @@ Module OverflowChecks.
     - now rewrite <- h2, add_sub_cancel, FieldRewrite.from_from.
   Qed.
 
-  (* Chip-level determinism (admitted): [overflow.synthesize] enables
+  (* Chip-level determinism: [overflow.synthesize] enables
      [QMulOverflow] at offset 0 of region [EccMulOverflowCheck], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
-     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

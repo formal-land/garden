@@ -59,10 +59,10 @@ Module FullWidthFixedBaseScalarMul.
       clear hx. field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [full_width.synthesize] enables
+  (* Chip-level determinism: [full_width.synthesize] enables
      [QMulFixedFull] at offset 0 of region [EccMulFixedFullWidth], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
-     See [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     See [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

@@ -22,7 +22,8 @@ Garden/Halo2/Synthesis.v
   programs
 
 Garden/Halo2/proof.v
-  proof-facing semantics for expressions, gates, and semantic constraints
+  proof-facing semantics for expressions, gates, and semantic constraints,
+  plus the relational reading of synthesis programs (`circuit_holds`)
 ```
 
 Top-level Orchard translation and generated comparison artifacts:
@@ -245,9 +246,8 @@ This is the current style for the ECC, Poseidon, Sinsemilla, and Merkle
 translations, because the active proof target is Orchard rather than reusable
 generic gadgets.
 
-`meta.enable_equality(...)` is currently omitted from the Rocq semantics. Do not
-add a placeholder event for it unless the shared DSL starts tracking equality
-state.
+`meta.enable_equality(...)` is omitted from the Rocq semantics. Do not add a
+placeholder event for it unless the shared DSL starts tracking equality state.
 
 ## Generated Configure Snapshots
 
@@ -337,14 +337,40 @@ It also defines serializers such as `ColumnRef.to_raw` and `Cell.to_raw`, plus
 an evaluator for `𝓡` and `𝓛`. The serializer is the only place where typed cells
 are converted into raw numeric columns and absolute rows.
 
-Advice assignments are represented in the high-level state so later copies can
-refer to cells, but they intentionally emit no raw JSON event for now. This matches
-the current Rust recorder, which omits advice values from
+Advice witnessing has no dedicated `𝓡` operation: region programs build
+`Cell.advice region column offset` references directly, so later copies and
+constant pinnings can refer to the cell, and no raw JSON event is emitted for
+advice values. This matches the Rust recorder, which omits advice values from
 `Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json`.
 
+`𝓡.ConstrainConstant cell value` models Rust's
+`region.constrain_constant`/`assign_advice_from_constant` (the
+`Synthesis.assign_advice_from_constant` helper mirrors the latter: it builds
+the advice cell, emits the op, and returns the cell). `value` must be a
+reduced literal in `[0, p)`. The op also emits no raw JSON event: the Rust
+recorder instruments the `Assignment` trait, below the V1 floor planner,
+where `constrain_constant` requests have already been desugared into a
+*trailing* block of constants-column `AssignFixed` + `Copy` events with
+allocator-chosen rows — that block is outside what the free-monad program can
+reproduce positionally, so it is replayed verbatim from
+`Garden/Orchard/circuit_synthesis_constants.v` (appended in `circuit.v`'s
+`synthesize_events`). Because that tail is generated *from the
+implementation dump*, the JSON comparison does not check the constants
+mechanism; the check is instead
+`Garden/Orchard/circuit_synthesis_constants_check.v`, a `vm_compute`
+certificate that the program's `ConstrainConstant` ops — resolved through
+`Index.indices` and `region_start_of` — equal the replay table as a multiset
+of (absolute cell, value) pairs. Relationally the op yields
+`Fact.CellIsConstant`, interpreted as pinning the raw cell value
+(`proof.v`). The history of the dropped `constrain_constant` sites and their
+fix is in `docs/constrain-constant-fix.md`.
+
 Large fixed-table data should be produced by structured Rocq model code rather
-than pasted generated Rocq traces. Table and fill-from-row replay are currently
-deferred in the free-monad synthesis model.
+than pasted generated Rocq traces. Lookup tables are loaded with
+`𝓛.InitLookupTables`, which takes a list of `LookupTableColumn.t` entries
+(lookup column, annotation, values, default value); the serializer emits the
+per-row `AssignFixed` events and the trailing `FillFromRow` fills for each
+table column.
 
 `Garden/Halo2/halo2_gadgets/sinsemilla/sinsemilla_s.v` contains the translated
 `SINSEMILLA_S` coordinate table from the Rust `sinsemilla` crate. This is data
@@ -353,7 +379,9 @@ used by the structured table loader, not a raw generated synthesis event dump.
 `Garden/Orchard/circuit_synthesis_constants.v` contains the generated replay
 table for Halo2 V1 floor-planner constant fixed-column bindings. It is generated
 by `scripts/generate_orchard_synthesis_constants.py` from the Rust
-implementation JSON. The data is currently inert for the free-monad model; the
+implementation JSON. The table supplies the trailing constants-column events of
+the serialized stream (JSON parity) and is cross-checked against the model's
+`𝓡.ConstrainConstant` ops by `circuit_synthesis_constants_check.v`; the
 logical Orchard synthesis regions remain hand-written in the Rocq circuit and
 gadget files.
 
@@ -400,9 +428,13 @@ The basic one-step pattern is:
 ```coq
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
-  𝓛.AddRegion (RegionId.GadgetLocal RegionId.GadgetLocal.AddChip) "gate name" (
-    𝓡.EnableSelector Selector.QExample 0 "").
+  𝓛.AddRegion (RegionId.GadgetLocal RegionId.GadgetLocal.AddChip) "gate name"
+    (fun region =>
+      𝓡.EnableSelector Selector.QExample 0 "").
 ```
+
+`𝓛.AddRegion` passes the region id to the region body, so cells built inside
+it carry their owning region.
 
 For multi-step programs:
 
@@ -413,10 +445,10 @@ Definition synthesize
   second_layouter_step.
 
 Definition synthesize_region
+    (region : RegionId.t)
     : 𝓡 columns RegionId.t (Cell.t columns RegionId.t) :=
   let🞵 _ := 𝓡.EnableSelector Selector.QExample 0 "" in
-  let🞵 cell := 𝓡.AssignAdvice "value" Advice.A0 0 0 in
-  return🞵 cell.
+  return🞵 (Cell.advice region Advice.A0 0).
 
 Definition synthesize_pair
     : 𝓛 columns RegionId.t unit :=
@@ -503,9 +535,9 @@ and implementation both emit 19617 events, and
 `opam exec -- make -C Garden orchard-synthesis-json-compare` verifies equality
 of the event list.
 
-The strict comparison uses the generated Rust V1 layout so row mismatches now
+The strict comparison uses the generated Rust V1 layout so row mismatches
 represent actual source-cell dependency mistakes. The NoteCommit message-piece
-and input gates currently thread the concrete message, range-check, Sinsemilla
+and input gates thread the concrete message, range-check, Sinsemilla
 running-sum, and canonicity cells needed for strict parity.
 
 ## Gates
@@ -594,7 +626,7 @@ return🞵 tt
 
 Lookup arguments are stored separately from gates in `ConstraintSystem.t`.
 `LookupArgument.pairs` contains expression/table-column pairs, where the table
-column is represented as a fixed column.
+column is a `columns.(Columns.Lookup)` column.
 
 ## Constraint Names
 
@@ -669,7 +701,7 @@ The detailed proof-facing conventions live in:
 docs/halo2-proof.md
 ```
 
-Use that document for the current patterns around `Evaluation.t`,
-`⟦ x ⟧ ρ`, selector-active determinism theorems, Poseidon output functions,
-`with_strategy opaque [...] cbn`, Hammer replacement tactics, and local proof
-timing with Rocq `Time`.
+Use that document for the current patterns around `Assignment.t`,
+`Γ ⊢ ⟦ x ⟧ (region, row)`, selector-active determinism theorems, Poseidon
+output functions, `with_strategy opaque [...] cbn`, Hammer replacement
+tactics, and local proof timing with Rocq `Time`.

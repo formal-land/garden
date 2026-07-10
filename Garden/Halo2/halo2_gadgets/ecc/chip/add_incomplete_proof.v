@@ -121,12 +121,12 @@ Module IncompleteAddition.
     field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [add_incomplete.synthesize] enables
+  (* Chip-level determinism: [add_incomplete.synthesize] enables
      [QAddIncomplete] at offset 0 of region [EccAddIncomplete], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
      The [Hx_distinct] precondition (incomplete addition needs [x_p <> x_q]) is
-     a genuine input requirement and stays as a hypothesis.  See
-     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     a genuine input requirement and is kept as a hypothesis.  See
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

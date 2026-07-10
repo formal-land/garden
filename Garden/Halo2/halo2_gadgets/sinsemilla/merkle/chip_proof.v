@@ -80,12 +80,12 @@ Module DecompositionCheck.
     f_equal; field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [chip.synthesize_instance] enables
+  (* Chip-level determinism: [chip.synthesize_instance] enables
      [q_decompose] at offset 0 of region [SinsemillaMerkleDecomposition], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
      Parameterised over the selector/columns and the [cond_swap] sub-programs
      that [configure_instance]/[synthesize_instance] take.  See
-     [CompleteAddition.synthesize_correct] (add_proof.v) for the proved
+     [CompleteAddition.synthesize_correct] (add_proof.v) for the
      template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)

@@ -122,6 +122,9 @@ Definition synthesize_variable_base_scalar_mul_region
   let target := Cell.advice region Advice.A3 0 in
   do🞵 𝓡.Copy target base_y in
   let z_2 := Cell.advice region Advice.A9 2 in
+  (* The running sum for the scalar decomposition starts at zero
+     ([mul.rs] [z_init], [assign_advice_from_constant]). *)
+  do🞵 𝓡.ConstrainConstant (Cell.advice region Advice.A9 1) 0 in
   do🞵 𝓡.EnableSelector Selector.QMulIncompleteHi1 1 "" in
   do🞵 enable_selector_rows Selector.QMulIncompleteHi2 2 124%nat in
   do🞵 𝓡.EnableSelector Selector.QMulIncompleteHi3 126 "" in

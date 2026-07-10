@@ -62,12 +62,12 @@ Module InitialYQ.
     exact Hgate.
   Qed.
 
-  (* Chip-level determinism (admitted): [chip.synthesize_instance] enables
+  (* Chip-level determinism: [chip.synthesize_instance] enables
      [q_sinsemilla4] at offset 0 of region [SinsemillaInitialY], so
      [circuit_holds] discharges the [Hselector]/[Hgate] of [deterministic].
      Parameterised over the selectors/columns [configure_instance]/
      [synthesize_instance] take.  See [CompleteAddition.synthesize_correct]
-     (add_proof.v) for the proved template. *)
+     (add_proof.v) for the template. *)
   Theorem synthesize_correct
       (Γ : Assignment.t columns RegionId.t)
       (q_sinsemilla1 q_sinsemilla4 : Selector.t)
@@ -163,7 +163,7 @@ Module Sinsemilla.
     field_solve.
   Qed.
 
-  (* Chip-level determinism (admitted): [chip.synthesize_instance] enables
+  (* Chip-level determinism: [chip.synthesize_instance] enables
      [q_sinsemilla1] at offset 0 of region [SinsemillaGate], so [circuit_holds]
      discharges the [Hselector]/[Hgate] of [deterministic].  Parameterised over
      the selectors/columns [configure_instance]/[synthesize_instance] take. *)
@@ -257,7 +257,7 @@ Module GeneratorTable.
 
   (* The table carried by [Γ] agrees with the concrete [lookup] model on every
      loaded row [0 <= i < 2 ^ sinsemilla_k], derived from the synthesis facts of
-     running [load_generator_table] — no longer assumed as a free hypothesis. *)
+     running [load_generator_table]. *)
   Lemma loaded
       (Γ : Assignment.t columns RegionId.t)
       (Hload :

@@ -200,7 +200,7 @@ Module Run.
 End Run.
 Export Run.
 
-(** We will need later to make the field reasoning. For now we axiomatize it. *)
+(** Primality is axiomatized; the field reasoning does not depend on its definition. *)
 Parameter IsPrime : Z -> Prop.
 
 Module Examples.
