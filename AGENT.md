@@ -16,10 +16,10 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with
   its validation gates.
-- `docs/orchard-determinism-proof.md`: the whole-circuit Orchard-action
-  correctness result — the exact
-  `satisfies_specification`/`deterministic`
-  statements, each hypothesis and its motivation (including the two
+- `docs/orchard-soundness-proof.md`: the whole-circuit Orchard-action
+  soundness result — the exact
+  `satisfies_specification`/`deterministic`/`action_statement`
+  statements, each hypothesis and its motivation (including the
   witness-honesty side conditions), what the conclusion does and does not
   ensure, the inherited model caveats, and the assumption audit.
 - `docs/compile-performance.md`: READ BEFORE touching heavy `vm_compute`

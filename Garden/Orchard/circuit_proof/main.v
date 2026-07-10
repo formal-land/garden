@@ -273,7 +273,7 @@ Module OrchardAction.
       Hypotheses: the circuit accepts Γ ([Hcircuit]) and the two
       witness-honesty side conditions ([Hmerkle_ok], [Hnote_ok] —
       protocol-sanctioned incomplete-add/canonicity slack, see
-      [docs/orchard-determinism-proof.md]).  The protocol input typing
+      [docs/orchard-soundness-proof.md]).  The protocol input typing
       ([OrchardProtocolEquiv.ProtocolTypedInputs]: the input ranges under
       which the circuit-structured and protocol layers coincide) is not
       assumed — every conjunct is circuit-enforced on a satisfying

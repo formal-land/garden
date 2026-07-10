@@ -1,14 +1,18 @@
-# The Orchard-action determinism theorem: statement, assumptions, and scope
+# The Orchard-action soundness theorem: statement, assumptions, and scope
 
-This document describes what the whole-circuit determinism result for the
-Zcash Orchard action circuit establishes: the exact theorem statements, each
+This document describes what the whole-circuit soundness result for the
+Zcash Orchard action circuit establishes — every satisfying assignment
+produces the protocol-mandated outputs and satisfies the input-side Action
+clauses, with determinism as a corollary: the exact theorem statements, each
 hypothesis and why it is there, what the conclusion means, and what the
 verification effort does and does not ensure given the caveats of the
-circuit/synthesis model.
+circuit/synthesis model. ("Soundness" here is statement-level soundness of
+the constraint system against the specification, not the cryptographic
+soundness of the proving system — see the non-claims below.)
 
 ## The theorems
 
-Both theorems live in
+The theorems live in
 `Garden/Orchard/circuit_proof/main.v` (module
 `OrchardAction`) and are `Qed`, with an assumption audit recorded below.
 

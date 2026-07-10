@@ -166,7 +166,7 @@ interpreter's gate layer only. This document is about that relational model.
    Orchard action theorems (`OrchardAction.satisfies_specification`,
    `OrchardAction.deterministic` in
    `Garden/Orchard/circuit_proof/main.v`) build on this gluing; see
-   `docs/orchard-determinism-proof.md` where present. The **completeness**
+   `docs/orchard-soundness-proof.md` where present. The **completeness**
    direction — an honestly synthesized Γ satisfies `circuit_holds` — remains
    open (see [Open gaps](#open-gaps)).
 
@@ -344,7 +344,7 @@ the loaded table with a first end-to-end soundness proof
 (`GeneratorTable.sound`), and the synthesis-to-gates predicate
 (`circuit_holds`) glues the synthesis layer to the gate layer for the
 determinism-bearing gadgets. On top of this model, the whole-circuit Orchard
-action determinism development — see `docs/orchard-determinism-proof.md`
+action determinism development — see `docs/orchard-soundness-proof.md`
 where present — carries two residual named witness-honesty hypotheses
 (`merkle_witness_ok`, `note_commit_witness_ok`): short-lookup range facts
 that the relational selector model leaves free at `q_running = 0` rows, and
