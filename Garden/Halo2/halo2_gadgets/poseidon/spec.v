@@ -33,9 +33,7 @@ Global Open Scope Z_scope.
     partial rounds, used as a sponge with rate 2 / capacity 1 in
     Constant-Input-Length mode.  The MDS matrix and round constants
     ([p128pow5t3.v]) are the Grain-generated parameters of the Poseidon
-    reference implementation, transcribed from the vendored Rust crate;
-    deriving them in-model from the Grain LFSR is the constants-provenance
-    track. *)
+    reference implementation, transcribed from the vendored Rust crate. *)
 
 Module Poseidon.
   Definition rc (round column : nat) : Z :=

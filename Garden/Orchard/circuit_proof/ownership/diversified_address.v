@@ -58,11 +58,10 @@
     [EllipticCurve/PallasOrder.v]), so [base_point_order] derives it from
     [Holds Γ] via [base_point_facts] and supplies it at the call site.
 
-    Proof status: everything in this file is [Qed], as is the whole
-    [VarBaseMul] chain it consumes (the four segment lemmas of
-    [circuit_proof/ownership/var_base_mul.v] delegate to the [Qed] leaf
-    files [var_base_incomplete.v], [var_base_complete.v],
-    [var_base_overflow.v]). *)
+    The [VarBaseMul] chain this file consumes has the four segment lemmas of
+    [circuit_proof/ownership/var_base_mul.v] delegating to the leaf files
+    [var_base_incomplete.v], [var_base_complete.v] and
+    [var_base_overflow.v]. *)
 
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.

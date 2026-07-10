@@ -63,7 +63,7 @@
       is exact ([Pallas.mul α B] for the reduced [α]), leaving any mod-[q]
       reasoning to the consumer.
 
-    Proof status: everything is Qed.  The two incomplete-half lemmas
+    The two incomplete-half lemmas
     ([hi_half_correct], [lo_half_correct]) delegate to
     [circuit_proof/ownership/var_base_incomplete.v], the complete-rounds
     lemma ([complete_bits_correct]) to

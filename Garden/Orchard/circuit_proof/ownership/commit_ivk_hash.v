@@ -1181,8 +1181,8 @@ Module CommitIvkHash.
       [circuit_proof/note_commit/add.v]) at the CommitIvk regions.  The
       ladder-distinctness precondition is an explicit hypothesis throughout:
       its discharge from [Holds] is the per-base certificate chain
-      ([ladder/note_commit_r.v] instantiated at CommitIvkR), which needs the
-      not-yet-generated [circuit_proof/commit_ivk_r/] certificate files. *)
+      ([ladder/note_commit_r.v] instantiated at CommitIvkR), over the
+      [circuit_proof/commit_ivk_r/] certificate files. *)
 
   Import OrchardActionFixedBase.
 
@@ -1661,8 +1661,9 @@ Module CommitIvkHash.
       [fixed_scalar_mul] of the CommitIvkR spec table at the read
       scalar/us — [read_rivk]'s windows and the [A5] square-root witnesses.
       The fold-to-group-multiple switch ([Pallas.mul] via
-      [ProtocolMulCore]) and the discharge of [Hdistinct] from [Holds] both
-      belong to the CommitIvkR certificate task. *)
+      [ProtocolMulCore]) and the discharge of [Hdistinct] from [Holds] are
+      performed in [circuit_proof/ownership/diversified_address.v] over the
+      CommitIvkR certificate set ([circuit_proof/commit_ivk_r/]). *)
   Theorem commit_ivk_point_add_correct
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ)
