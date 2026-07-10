@@ -12,7 +12,7 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   proof patterns, and tactic/performance notes.
 - `docs/chip-model-caveats.md`: what the relational `proof.v` model captures and
   idealizes, and the synthesis-to-gates gluing (`circuit_holds`).
-- `docs/constrain-constant-fix.md`: post-mortem of the constants-mechanism gap
+- `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with
   its validation gates.

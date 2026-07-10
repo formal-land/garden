@@ -99,8 +99,8 @@ copy constraints, the constant bindings, and the lookup arguments in their
 `Prop` value model. This is the "the circuit accepted the assignment"
 premise.
 
-**The four witness-honesty conditions.** Each names the same two kinds of
-per-assignment fact about the witnessed cells: canonical (non-wrapped)
+**The four witness-honesty conditions.** All four assert the same two
+kinds of per-assignment fact about the witnessed cells: canonical (non-wrapped)
 message-piece decompositions, and nondegeneracy of the Sinsemilla and
 variable-base-multiplication incomplete additions along their folds. Both
 hold for every honestly produced witness, but the gates alone do not force
@@ -185,8 +185,8 @@ how to read these theorems:
   bounded witness row; the table loading and the bound are part of the
   model.
 
-Within those boundaries the per-chip proofs (ECC ladders and complete/
-incomplete addition, Sinsemilla hash and Merkle path, Poseidon
+Within those boundaries the per-chip proofs (ECC ladders and
+complete/incomplete addition, Sinsemilla hash and Merkle path, Poseidon
 permutation, running-sum decompositions, note-commit canonicity) are
 derived from the gates without further assumptions.
 
