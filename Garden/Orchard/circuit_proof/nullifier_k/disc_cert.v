@@ -8,7 +8,7 @@
 
     [nk_table] is definitionally
     [EccSpec.fixed_table_of_rows nullifier_k.base_field_fixed_rows] and
-    [OrchardSpec.nullifier_k orchard_circuit_params], and [nk_default] is the
+    [OrchardCircuitSpec.nullifier_k orchard_internal_params], and [nk_default] is the
     empty window [{| EccSpec.fw_coeffs := nil; EccSpec.fw_z := 0 |}], so a
     consumer reading windows out of those references matches this statement
     directly for every in-range index.

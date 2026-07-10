@@ -7,7 +7,7 @@
     [digit := Z.of_nat d].
 
     [sag_table] is definitionally [OrchardActionFixedBase.spend_auth_g_fixed_table]
-    and [OrchardSpec.spend_auth_g orchard_circuit_params], and [sag_default] is
+    and [OrchardCircuitSpec.spend_auth_g orchard_internal_params], and [sag_default] is
     byte-identical to [OrchardActionFixedBase.fixed_window_default], so a consumer
     reading windows out of those references matches this statement directly for
     every in-range index.
@@ -40,7 +40,7 @@ Definition sag_default : EccSpec.fixed_window := {|
 
 (** The concrete SpendAuthG fixed-base window table.  Definitionally equal to
     [OrchardActionFixedBase.spend_auth_g_fixed_table] and to
-    [OrchardSpec.spend_auth_g orchard_circuit_params]. *)
+    [OrchardCircuitSpec.spend_auth_g orchard_internal_params]. *)
 Definition sag_table : EccSpec.fixed_table :=
   EccSpec.fixed_table_of_rows
     Garden.Orchard.constants.fixed_bases.spend_auth_g.full_fixed_rows.

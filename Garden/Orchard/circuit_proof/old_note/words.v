@@ -1,39 +1,45 @@
-(** * The note-commit-new hashed words are the message
+(** * The note-commit-old hashed words are the message
 
-    The 109 grid words hashed by the [Which.New] NoteCommit hash-to-point
-    region ([NoteCommitNewHash.note_commit_new_words]) equal
-    [OrchardSpec.note_commit_message] of the circuit's new-note reads: the
-    witnessed [g_d_new]/[pk_d_new] points, the [v_new] witness cell, the
-    nullifier output cell (the [rho_new] input of
-    [note_commit.synthesize_new]) and the [psi_new] witness cell.
+    The 109 grid words hashed by the [Which.Old] NoteCommit hash-to-point
+    region (Sinsemilla variant 1: running-sum column [A2], word count under
+    [Fixed.QSinsemilla2_1]) equal [OrchardSpec.note_commit_message] of the
+    circuit's old-note reads: the witnessed [g_d_old] point
+    ([WitnessInput.GDOld]), the witnessed [pk_d_old] point, the [VOld],
+    [RhoOld] and [PsiOld] witness cells.
 
-    Route: the region's piece telescopes identify the eight [A7] piece
-    cells with the digit sums of their word runs; the
-    [message_piece_*]/[input_*]/[y_coordinate_checks] gates at the
-    [Which.New] regions force the [note_commit_proof.v] reconstructions;
-    the running lookups ([XGD]/[XPKD]/[Rho]/[Psi], and the [J]/[JPrime]
-    lookups of the two y-canonicity checks) supply the range facts that
-    make each field-level decomposition an exact integer identity — the
-    [+ 2^k - t_P] prime-check legs included, so the 255-bit packings are
-    canonical with no side condition; and
+    The pk_d component: [synthesize_note_commit_old] receives the
+    [AssignedPoint] returned by [synthesize_address_integrity], which is the
+    WITNESSED [pk_d_old] point at
+    [RegionId.AddressIntegrity AddressIntegrity.WitnessPkD] (A0/A1 at row 0 —
+    exactly the cells [OrchardValidActionInputs.read_pk_d_old] reads), NOT
+    the computed [[ivk] g_d_old] output of the variable-base mul.  So what
+    the circuit enforces here is that the old-note message packs the
+    witnessed [pk_d★_old]; the separate [AddressIntegrity.Equality] region
+    (out of scope of this file) pins that witness to the computed point.
+    This matches [OrchardValidActionInputs.old_note_commit_integrity]
+    ([circuit_proof/valid_action_inputs.v]), whose conclusion is stated at
+    [read_pk_d_old].
+
+    Route (the [Which.New] mirror, [circuit_proof/note_commit/words.v]): the
+    region's piece telescopes identify the eight [A6] piece cells with the
+    digit sums of their word runs; the [message_piece_*]/[input_*]/
+    [y_coordinate_checks] gates at the [Which.Old] regions force the
+    [note_commit_proof.v] reconstructions; the running lookups supply the
+    range facts that make each field-level decomposition an exact integer
+    identity — the [+ 2^k - t_P] prime-check legs included; and
     [NoteCommitMessagePieces.hashed_words_of_note_commit_pieces] closes the
     word schedule.
 
-    The one side condition ([note_commit_new_short_lookup_ok]): the
-    eleven short-lookup range cells ([b_0], [b_3], [d_2], [e_0], [e_1],
-    [g_1], [h_0], and the [k_0]/[k_2] of both y-canonicity checks) lie in
-    their bit ranges.  This is a model limitation, not a circuit gap: the
-    halo2 short lookup constrains [z_cur] only where the [q_running]
-    selector is 0, and the relational model pins selectors solely through
-    the synthesis [SelectorOn] facts ([= 1] at enabled points), leaving
-    [QRunning] free at the short-range rows — a dishonest assignment can
-    set it nonzero there and route the lookup through the running-sum
-    branch, so the short bound is underivable from [Holds] alone.  (The
-    running-sum lookups used everywhere else in this file DO pin their
-    rows: their regions enable [QRunning] explicitly.)  This is a
-    selector-plane idealization of the relational model
-    and follows the [merkle_witness_ok] precedent of
-    [circuit_proof/merkle.v]. *)
+    The one side condition ([old_note_short_lookup_ok]): the eleven
+    short-lookup range cells ([b_0], [b_3], [d_2], [e_0], [e_1], [g_1],
+    [h_0], and the [k_0]/[k_2] of both y-canonicity checks) lie in their bit
+    ranges.  This is the same selector-plane idealization of the relational
+    model as [note_commit_new_short_lookup_ok]: the halo2 short lookup
+    constrains [z_cur] only where the [q_running] selector is 0, and the
+    model pins selectors solely through the synthesis [SelectorOn] facts,
+    leaving [QRunning] free at the short-range rows — so the short bound is
+    underivable from [Holds] alone (see the [Which.New] file header and the
+    [merkle_witness_ok] precedent). *)
 
 Require Import Stdlib.Lists.List.
 Require Import Stdlib.micromega.Lia.
@@ -67,7 +73,7 @@ Import ListNotations.
 
 Global Open Scope Z_scope.
 
-Module NoteCommitNewWords.
+Module OldNoteWords.
   Import OrchardActionMerkle.
 
   Local Notation Holds Γ :=
@@ -78,18 +84,15 @@ Module NoteCommitNewWords.
   (** ** Region and cell shorthands *)
 
   Definition ncr (r : RegionId.NoteCommit.t) : RegionId.t :=
-    RegionId.NoteCommit RegionId.NoteCommit.Which.New r.
+    RegionId.NoteCommit RegionId.NoteCommit.Which.Old r.
 
   Definition nyr
       (s : RegionId.NoteCommit.YSubject.t)
       (r : RegionId.NoteCommit.YCanonicity.t) : RegionId.t :=
     ncr (RegionId.NoteCommit.YCanonicity s r).
 
-  (** The hash-to-point region (= [NoteCommitNewHash.new_hash_region]). *)
+  (** The [Which.Old] hash-to-point region. *)
   Definition HR : RegionId.t := ncr RegionId.NoteCommit.HashToPoint.
-
-  Lemma HR_eq : HR = NoteCommitNewHash.new_hash_region.
-  Proof. reflexivity. Qed.
 
   Definition adv (r : RegionId.t) (c : Advice.t) (row : Z)
       : Garden.Halo2.Synthesis.Cell.t columns RegionId.t :=
@@ -100,25 +103,32 @@ Module NoteCommitNewWords.
       (c : Garden.Halo2.Synthesis.Cell.t columns RegionId.t) : Z :=
     UnOp.from (eval_cell Γ c).
 
-  (** The nullifier output cell — the [rho_new] input of the new-note
-      commitment ([synthesize_nullifier]'s value, independent of its
-      arguments). *)
-  Definition new_rho_cell : Garden.Halo2.Synthesis.Cell.t columns RegionId.t :=
-    adv
-      (Garden.Orchard.circuit.nullifier_region
-        RegionId.Nullifier.CompletePointAdd)
-      Advice.A2 1.
+  (** The message-input cells of [synthesize_note_commit_old]: the witnessed
+      [g_d_old] point, the witnessed [pk_d_old] point (the return value of
+      [synthesize_address_integrity]), and the [VOld]/[RhoOld]/[PsiOld]
+      witness cells. *)
 
-  Lemma new_rho_cell_eq
-      (rho psi nk : Garden.Halo2.Synthesis.Cell.t columns RegionId.t)
-      (cm : Garden.Orchard.circuit.AssignedPoint.t) :
-    layouter_value (Garden.Orchard.circuit.synthesize_nullifier rho psi nk cm) =
-      new_rho_cell.
+  (** [synthesize_address_integrity] returns the WITNESSED [pk_d_old] point
+      (the [WitnessPkD] region), independent of its arguments. *)
+  Lemma address_integrity_value_eq
+      (ak nk : Garden.Halo2.Synthesis.Cell.t columns RegionId.t)
+      (g_d_old : Garden.Orchard.circuit.AssignedPoint.t) :
+    layouter_value
+      (Garden.Orchard.circuit.synthesize_address_integrity ak nk g_d_old) =
+    {|
+      Garden.Orchard.circuit.AssignedPoint.x :=
+        adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A0 0;
+      Garden.Orchard.circuit.AssignedPoint.y :=
+        adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A1 0;
+    |}.
   Proof. reflexivity. Qed.
 
-  (** The message word consumed at a hash-region row. *)
+  (** The message word consumed at a hash-region row (variant 1: word count
+      under [QSinsemilla2_1], running-sum column [A2]). *)
   Definition w (Γ : Assignment.t columns RegionId.t) (row : Z) : Z :=
-    SinsemillaHash.word_at Γ Fixed.QSinsemilla2_2 Advice.A7 HR row.
+    SinsemillaHash.word_at Γ Fixed.QSinsemilla2_1 Advice.A2 HR row.
 
   (** Advice at next rotation is advice at the next row. *)
   Lemma advice_next_cur
@@ -142,59 +152,62 @@ Module NoteCommitNewWords.
     apply FieldRewrite.from_from.
   Qed.
 
-  (** ** Fact extraction: down to [note_commit.synthesize_new]
+  (** ** Fact extraction: down to [note_commit.synthesize_old]
 
-      The peel along [synthesize → synthesize_note_commit_new →
-      note_commit.synthesize_new], with the seven message-input cells
-      concrete: the witnessed [g_d]/[pk_d] point cells, the [VNew]
-      witness-input cell, the nullifier output cell and the [psi_new]
-      witness cell. *)
+      The peel along [synthesize → synthesize_note_commit_old →
+      note_commit.synthesize_old] (synthesize bind 8; inside, bind 0 is the
+      ["rcm_old"] namespace nop and bind 1 the commitment computation), with
+      the seven message-input cells concrete: the witnessed [g_d_old] point
+      cells, the witnessed [pk_d_old] point cells and the [VOld]/[RhoOld]/
+      [PsiOld] witness-input cells. *)
 
-  Lemma new_instance_facts
+  Lemma old_instance_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     interpret_facts Γ (layouter_facts
-      (Garden.Orchard.circuit.note_commit.synthesize_new
-        (adv RegionId.NoteCommitNewWitnessGD Advice.A0 0)
-        (adv RegionId.NoteCommitNewWitnessGD Advice.A1 0)
-        (adv RegionId.NoteCommitNewWitnessPkD Advice.A0 0)
-        (adv RegionId.NoteCommitNewWitnessPkD Advice.A1 0)
-        (adv
-          (Garden.Orchard.circuit.witness_input_region
-            RegionId.WitnessInput.VNew)
+      (Garden.Orchard.circuit.note_commit.synthesize_old
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A0 0)
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A1 0)
+        (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
           Advice.A0 0)
-        new_rho_cell
-        (adv RegionId.NoteCommitNewWitnessPsi Advice.A0 0))).
+        (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A1 0)
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.VOld) Advice.A0 0)
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.RhoOld) Advice.A0 0)
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.PsiOld)
+          Advice.A0 0))).
   Proof.
     pose proof (holds_facts Γ Hcircuit) as Hfacts.
     unfold Garden.Orchard.circuit.synthesize in Hfacts.
-    do 9 apply interpret_layouter_facts_bind_right in Hfacts.
+    do 8 apply interpret_layouter_facts_bind_right in Hfacts.
     apply interpret_layouter_facts_bind_left in Hfacts.
-    unfold Garden.Orchard.circuit.synthesize_note_commit_new in Hfacts.
-    do 4 apply interpret_layouter_facts_bind_right in Hfacts.
+    unfold Garden.Orchard.circuit.synthesize_note_commit_old in Hfacts.
+    apply interpret_layouter_facts_bind_right in Hfacts.
     apply interpret_layouter_facts_bind_left in Hfacts.
     apply interpret_layouter_facts_in_namespace in Hfacts.
     exact Hfacts.
   Qed.
 
-  (** ** Per-region facts of the [Which.New] NoteCommit instance
+  (** ** Per-region facts of the [Which.Old] NoteCommit instance
 
-      Each lemma peels [new_instance_facts] down to one region of
+      Each lemma peels [old_instance_facts] down to one region of
       [note_commit.synthesize_instance] (bind [k] reached by [k - 1]
       [bind_right]s), and returns the region's selector and copy facts
-      with the source cells concrete. *)
+      with the source cells concrete.  The witness piece cells live on
+      [A6] ([piece_column] with [use_second_sinsemilla = false]); the
+      hash-region running-sum cells on [A2]. *)
 
   Tactic Notation "peel_instance" hyp(H) integer(k) :=
-    unfold Garden.Orchard.circuit.note_commit.synthesize_new,
+    unfold Garden.Orchard.circuit.note_commit.synthesize_old,
       Garden.Orchard.circuit.note_commit.synthesize_instance in H;
     do k (apply interpret_layouter_facts_bind_right in H);
     apply interpret_layouter_facts_bind_left in H.
 
   Lemma msg_b_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    Γ.(Assignment.selector) Selector.QNoteCommitNewB
+    Γ.(Assignment.selector) Selector.QNoteCommitOldB
       (ncr RegionId.NoteCommit.MessagePieceB) 0 = 1 /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceB) Advice.A6 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceB) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeB0) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceB) Advice.A7 1) =
@@ -204,7 +217,7 @@ Module NoteCommitNewWords.
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceB) Advice.A8 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeB3) Advice.A9 0).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 22.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -214,10 +227,10 @@ Module NoteCommitNewWords.
 
   Lemma msg_d_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    Γ.(Assignment.selector) Selector.QNoteCommitNewD
+    Γ.(Assignment.selector) Selector.QNoteCommitOldD
       (ncr RegionId.NoteCommit.MessagePieceD) 0 = 1 /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceD) Advice.A6 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceD) Advice.A8 0) =
       eval_cell Γ
         (adv (nyr RegionId.NoteCommit.YSubject.PkD
@@ -225,9 +238,9 @@ Module NoteCommitNewWords.
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceD) Advice.A7 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeD2) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceD) Advice.A8 1) =
-      eval_cell Γ (adv HR Advice.A7 52).
+      eval_cell Γ (adv HR Advice.A2 52).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 23.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -237,16 +250,16 @@ Module NoteCommitNewWords.
 
   Lemma msg_e_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    Γ.(Assignment.selector) Selector.QNoteCommitNewE
+    Γ.(Assignment.selector) Selector.QNoteCommitOldE
       (ncr RegionId.NoteCommit.MessagePieceE) 0 = 1 /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceE) Advice.A6 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceE) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeE0) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceE) Advice.A8 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeE1) Advice.A9 0).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 24.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -256,16 +269,16 @@ Module NoteCommitNewWords.
 
   Lemma msg_g_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    Γ.(Assignment.selector) Selector.QNoteCommitNewG
+    Γ.(Assignment.selector) Selector.QNoteCommitOldG
       (ncr RegionId.NoteCommit.MessagePieceG) 0 = 1 /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceG) Advice.A6 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceG) Advice.A6 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeG1) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceG) Advice.A7 1) =
-      eval_cell Γ (adv HR Advice.A7 84).
+      eval_cell Γ (adv HR Advice.A2 84).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 25.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -275,14 +288,14 @@ Module NoteCommitNewWords.
 
   Lemma msg_h_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    Γ.(Assignment.selector) Selector.QNoteCommitNewH
+    Γ.(Assignment.selector) Selector.QNoteCommitOldH
       (ncr RegionId.NoteCommit.MessagePieceH) 0 = 1 /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceH) Advice.A6 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceH) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeH0) Advice.A9 0).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 26.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -293,23 +306,25 @@ Module NoteCommitNewWords.
   Lemma input_gd_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A6 0) =
-      eval_cell Γ (adv RegionId.NoteCommitNewWitnessGD Advice.A0 0) /\
+      eval_cell Γ
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld)
+          Advice.A0 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeB0) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A7 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceB) Advice.A8 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A8 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A8 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.XGDLookup) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A9 0) =
-      eval_cell Γ (adv HR Advice.A7 13) /\
+      eval_cell Γ (adv HR Advice.A2 13) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputGD) Advice.A9 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.XGDLookup) Advice.A9 13) /\
-    Γ.(Assignment.selector) Selector.QNoteCommitNewGd
+    Γ.(Assignment.selector) Selector.QNoteCommitOldGd
       (ncr RegionId.NoteCommit.InputGD) 0 = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 27.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -320,23 +335,25 @@ Module NoteCommitNewWords.
   Lemma input_pkd_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A6 0) =
-      eval_cell Γ (adv RegionId.NoteCommitNewWitnessPkD Advice.A0 0) /\
+      eval_cell Γ
+        (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A0 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeB3) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A7 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceD) Advice.A7 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A8 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A8 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.XPKDLookup) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A9 0) =
-      eval_cell Γ (adv HR Advice.A7 39) /\
+      eval_cell Γ (adv HR Advice.A2 39) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPkD) Advice.A9 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.XPKDLookup) Advice.A9 14) /\
-    Γ.(Assignment.selector) Selector.QNoteCommitNewPkd
+    Γ.(Assignment.selector) Selector.QNoteCommitOldPkd
       (ncr RegionId.NoteCommit.InputPkD) 0 = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 28.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -348,18 +365,18 @@ Module NoteCommitNewWords.
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputValue) Advice.A6 0) =
       eval_cell Γ
-        (adv (Garden.Orchard.circuit.witness_input_region
-          RegionId.WitnessInput.VNew) Advice.A0 0) /\
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.VOld)
+          Advice.A0 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputValue) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeD2) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputValue) Advice.A8 0) =
-      eval_cell Γ (adv HR Advice.A7 52) /\
+      eval_cell Γ (adv HR Advice.A2 52) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputValue) Advice.A9 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeE0) Advice.A9 0) /\
-    Γ.(Assignment.selector) Selector.QNoteCommitNewValue
+    Γ.(Assignment.selector) Selector.QNoteCommitOldValue
       (ncr RegionId.NoteCommit.InputValue) 0 = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 29.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -370,23 +387,25 @@ Module NoteCommitNewWords.
   Lemma input_rho_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A6 0) =
-      eval_cell Γ new_rho_cell /\
+      eval_cell Γ
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)
+          Advice.A0 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A7 0) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeE1) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A7 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceG) Advice.A7 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A8 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A7 0) /\
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A6 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A8 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RhoLookup) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A9 0) =
-      eval_cell Γ (adv HR Advice.A7 71) /\
+      eval_cell Γ (adv HR Advice.A2 71) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputRho) Advice.A9 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RhoLookup) Advice.A9 14) /\
-    Γ.(Assignment.selector) Selector.QNoteCommitNewRho
+    Γ.(Assignment.selector) Selector.QNoteCommitOldRho
       (ncr RegionId.NoteCommit.InputRho) 0 = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 30.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -397,7 +416,9 @@ Module NoteCommitNewWords.
   Lemma input_psi_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A6 0) =
-      eval_cell Γ (adv RegionId.NoteCommitNewWitnessPsi Advice.A0 0) /\
+      eval_cell Γ
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.PsiOld)
+          Advice.A0 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A6 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.RangeH0) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A7 0) =
@@ -405,17 +426,17 @@ Module NoteCommitNewWords.
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A7 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.MessagePieceH) Advice.A8 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A8 0) =
-      eval_cell Γ (adv HR Advice.A7 84) /\
+      eval_cell Γ (adv HR Advice.A2 84) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A8 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.PsiLookup) Advice.A9 0) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A9 0) =
-      eval_cell Γ (adv HR Advice.A7 96) /\
+      eval_cell Γ (adv HR Advice.A2 96) /\
     eval_cell Γ (adv (ncr RegionId.NoteCommit.InputPsi) Advice.A9 1) =
       eval_cell Γ (adv (ncr RegionId.NoteCommit.PsiLookup) Advice.A9 13) /\
-    Γ.(Assignment.selector) Selector.QNoteCommitNewPsi
+    Γ.(Assignment.selector) Selector.QNoteCommitOldPsi
       (ncr RegionId.NoteCommit.InputPsi) 0 = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 31.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -423,11 +444,7 @@ Module NoteCommitNewWords.
     repeat split; assumption.
   Qed.
 
-  (** ** Running-lookup regions: selector schedules and the strict tail
-
-      [note_commit.v]'s local [enable_lookup_running_rows] enables
-      [QLookup]/[QRunning] on each of the region's rows; the [J] lookup
-      additionally pins its final running sum to zero. *)
+  (** ** Running-lookup regions: selector schedules and the strict tail *)
 
   Lemma nc_running_rows_fact
       (region : RegionId.t) (offset : Z) (count i : nat) :
@@ -484,7 +501,7 @@ Module NoteCommitNewWords.
     Γ.(Assignment.selector) Selector.QRunning
       (ncr RegionId.NoteCommit.XGDLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 18.
     apply interpret_layouter_facts_in_namespace in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -502,7 +519,7 @@ Module NoteCommitNewWords.
     Γ.(Assignment.selector) Selector.QRunning
       (ncr RegionId.NoteCommit.XPKDLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 19.
     apply interpret_layouter_facts_in_namespace in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -520,7 +537,7 @@ Module NoteCommitNewWords.
     Γ.(Assignment.selector) Selector.QRunning
       (ncr RegionId.NoteCommit.RhoLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 20.
     apply interpret_layouter_facts_in_namespace in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -538,7 +555,7 @@ Module NoteCommitNewWords.
     Γ.(Assignment.selector) Selector.QRunning
       (ncr RegionId.NoteCommit.PsiLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 21.
     apply interpret_layouter_facts_in_namespace in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -551,7 +568,7 @@ Module NoteCommitNewWords.
   (** ** Y-canonicity sub-regions ([GD] at instance bind 16, [PkD] at 17) *)
 
   Tactic Notation "peel_y" hyp(H) integer(k) integer(j) :=
-    unfold Garden.Orchard.circuit.note_commit.synthesize_new,
+    unfold Garden.Orchard.circuit.note_commit.synthesize_old,
       Garden.Orchard.circuit.note_commit.synthesize_instance in H;
     do k (apply interpret_layouter_facts_bind_right in H);
     apply interpret_layouter_facts_bind_left in H;
@@ -572,7 +589,7 @@ Module NoteCommitNewWords.
       (adv (nyr RegionId.NoteCommit.YSubject.GD
         RegionId.NoteCommit.YCanonicity.JLookup) Advice.A9 25) = 0.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 15 2.
     apply interpret_layouter_facts_bind_left in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -602,7 +619,7 @@ Module NoteCommitNewWords.
       (adv (nyr RegionId.NoteCommit.YSubject.PkD
         RegionId.NoteCommit.YCanonicity.JLookup) Advice.A9 25) = 0.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 16 2.
     apply interpret_layouter_facts_bind_left in H.
     unfold Garden.Orchard.circuit.note_commit.synthesize_running_lookup in H.
@@ -629,7 +646,7 @@ Module NoteCommitNewWords.
       (nyr RegionId.NoteCommit.YSubject.GD
         RegionId.NoteCommit.YCanonicity.JPrimeLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 15 3.
     apply interpret_layouter_facts_bind_left in H.
     apply interpret_layouter_facts_in_namespace in H.
@@ -650,7 +667,7 @@ Module NoteCommitNewWords.
       (nyr RegionId.NoteCommit.YSubject.PkD
         RegionId.NoteCommit.YCanonicity.JPrimeLookup) (Z.of_nat j) = 1.
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 16 3.
     apply interpret_layouter_facts_bind_left in H.
     apply interpret_layouter_facts_in_namespace in H.
@@ -669,9 +686,11 @@ Module NoteCommitNewWords.
       RegionId.NoteCommit.YCanonicity.JLookup in
     let JP := nyr RegionId.NoteCommit.YSubject.GD
       RegionId.NoteCommit.YCanonicity.JPrimeLookup in
-    Γ.(Assignment.selector) Selector.QNoteCommitNewYCanon YG 0 = 1 /\
+    Γ.(Assignment.selector) Selector.QNoteCommitOldYCanon YG 0 = 1 /\
     eval_cell Γ (adv YG Advice.A5 0) =
-      eval_cell Γ (adv RegionId.NoteCommitNewWitnessGD Advice.A1 0) /\
+      eval_cell Γ
+        (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld)
+          Advice.A1 0) /\
     eval_cell Γ (adv YG Advice.A7 0) =
       eval_cell Γ (adv (nyr RegionId.NoteCommit.YSubject.GD
         RegionId.NoteCommit.YCanonicity.RangeK0) Advice.A9 0) /\
@@ -684,7 +703,7 @@ Module NoteCommitNewWords.
     eval_cell Γ (adv YG Advice.A8 1) = eval_cell Γ (adv JP Advice.A9 0) /\
     eval_cell Γ (adv YG Advice.A9 1) = eval_cell Γ (adv JP Advice.A9 13).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 15 4.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -700,9 +719,11 @@ Module NoteCommitNewWords.
       RegionId.NoteCommit.YCanonicity.JLookup in
     let JP := nyr RegionId.NoteCommit.YSubject.PkD
       RegionId.NoteCommit.YCanonicity.JPrimeLookup in
-    Γ.(Assignment.selector) Selector.QNoteCommitNewYCanon YG 0 = 1 /\
+    Γ.(Assignment.selector) Selector.QNoteCommitOldYCanon YG 0 = 1 /\
     eval_cell Γ (adv YG Advice.A5 0) =
-      eval_cell Γ (adv RegionId.NoteCommitNewWitnessPkD Advice.A1 0) /\
+      eval_cell Γ
+        (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A1 0) /\
     eval_cell Γ (adv YG Advice.A7 0) =
       eval_cell Γ (adv (nyr RegionId.NoteCommit.YSubject.PkD
         RegionId.NoteCommit.YCanonicity.RangeK0) Advice.A9 0) /\
@@ -715,7 +736,7 @@ Module NoteCommitNewWords.
     eval_cell Γ (adv YG Advice.A8 1) = eval_cell Γ (adv JP Advice.A9 0) /\
     eval_cell Γ (adv YG Advice.A9 1) = eval_cell Γ (adv JP Advice.A9 13).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_y H 16 4.
     apply interpret_layouter_facts_add_region in H.
     cbn [region_facts interpret_facts interpret_fact List.app] in H.
@@ -723,36 +744,42 @@ Module NoteCommitNewWords.
     repeat split; assumption.
   Qed.
 
-  (** ** The hash-to-point region: facts with concrete piece cells *)
+  (** ** The hash-to-point region: facts with concrete piece cells
 
-  Lemma new_hash_facts
+      Variant 1 ([use_second_sinsemilla = false]): the hash program is
+      [synthesize_hash_to_point_note_commit] — selectors [QSinsemilla1_1]/
+      [QSinsemilla4_1], fixed [QSinsemilla2_1]/[LagrangeCoeffs0], columns
+      [A0]/[A1]/[A2]/[A3]/[A4] — and the witnessed piece cells live on
+      [A6]. *)
+
+  Lemma old_hash_facts
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     interpret_facts Γ (region_facts HR
       (Garden.Halo2.halo2_gadgets.sinsemilla.chip
         .synthesize_hash_to_point_note_commit_region
         HR
-        Selector.QSinsemilla1_2 Selector.QSinsemilla4_2
-        Fixed.QSinsemilla2_2 Fixed.LagrangeCoeffs1
-        Advice.A5 Advice.A6 Advice.A7 Advice.A8 Advice.A9
+        Selector.QSinsemilla1_1 Selector.QSinsemilla4_1
+        Fixed.QSinsemilla2_1 Fixed.LagrangeCoeffs0
+        Advice.A0 Advice.A1 Advice.A2 Advice.A3 Advice.A4
         Garden.Orchard.circuit.note_commit.q_note_commit_m_x
         Garden.Orchard.circuit.note_commit.q_note_commit_m_y
-        (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A7 0)
-        (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A7 0))).
+        (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A6 0)
+        (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A6 0))).
   Proof.
-    pose proof (new_instance_facts Γ Hcircuit) as H.
+    pose proof (old_instance_facts Γ Hcircuit) as H.
     peel_instance H 17.
     apply interpret_layouter_facts_in_namespace in H.
     apply interpret_layouter_facts_bind_right in H.
     apply interpret_layouter_facts_bind_left in H.
     apply interpret_layouter_facts_in_namespace in H.
     unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip
-      .synthesize_hash_to_point_note_commit_2 in H.
+      .synthesize_hash_to_point_note_commit in H.
     apply interpret_layouter_facts_add_region in H.
     exact H.
   Qed.
@@ -768,26 +795,26 @@ Module NoteCommitNewWords.
     cbn [region_facts interpret_facts interpret_fact List.app] in H;
     destruct H as [H _].
 
-  Lemma new_hash_piece_copies
+  Lemma old_hash_piece_copies
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
-    eval_cell Γ (adv HR Advice.A7 0) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 25) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 26) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 51) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 57) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 58) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 83) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A7 0) /\
-    eval_cell Γ (adv HR Advice.A7 108) =
-      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A7 0).
+    eval_cell Γ (adv HR Advice.A2 0) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 25) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 26) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 51) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 57) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 58) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 83) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A6 0) /\
+    eval_cell Γ (adv HR Advice.A2 108) =
+      eval_cell Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A6 0).
   Proof.
-    pose proof (new_hash_facts Γ Hcircuit) as Hbase.
+    pose proof (old_hash_facts Γ Hcircuit) as Hbase.
     unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip
       .synthesize_hash_to_point_note_commit_region in Hbase.
     repeat split.
@@ -804,24 +831,24 @@ Module NoteCommitNewWords.
   (** The whole-region row schedule: [q_sinsemilla1] on all 109 rows,
       [q_s2 = 1] on the running rows, the seven inter-piece zeros and the
       final [2]. *)
-  Lemma new_hash_schedule
+  Lemma old_hash_schedule
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
     (forall j : nat, (j < 109)%nat ->
-      Γ.(Assignment.selector) Selector.QSinsemilla1_2 HR (Z.of_nat j) = 1) /\
+      Γ.(Assignment.selector) Selector.QSinsemilla1_1 HR (Z.of_nat j) = 1) /\
     (forall j : nat, (j < 109)%nat ->
       j <> 24%nat -> j <> 25%nat -> j <> 50%nat -> j <> 56%nat ->
       j <> 57%nat -> j <> 82%nat -> j <> 107%nat -> j <> 108%nat ->
-      Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR (Z.of_nat j) = 1) /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 24 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 25 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 50 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 56 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 57 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 82 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 107 = 0 /\
-    Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR 108 = 2.
+      Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR (Z.of_nat j) = 1) /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 24 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 25 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 50 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 56 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 57 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 82 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 107 = 0 /\
+    Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR 108 = 2.
   Proof.
-    pose proof (new_hash_facts Γ Hcircuit) as Hbase.
+    pose proof (old_hash_facts Γ Hcircuit) as Hbase.
     unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip
       .synthesize_hash_to_point_note_commit_region in Hbase.
     pose proof Hbase as HpA.
@@ -927,19 +954,19 @@ Module NoteCommitNewWords.
 
   (** ** Ten-bit word bounds: hash-region words and running-lookup words *)
 
-  Lemma new_hash_word_bound
+  Lemma old_hash_word_bound
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (j : nat) (Hj : (j < 109)%nat) :
     0 <= w Γ (Z.of_nat j) < 2 ^ 10.
   Proof.
-    destruct (new_hash_schedule Γ Hcircuit) as (Hsel & _).
+    destruct (old_hash_schedule Γ Hcircuit) as (Hsel & _).
     exact (word_at_bound Γ HR (Z.of_nat j)
-      Selector.QSinsemilla1_2 Fixed.QSinsemilla2_2
-      Advice.A5 Advice.A6 Advice.A7 Advice.A8 Advice.A9
+      Selector.QSinsemilla1_1 Fixed.QSinsemilla2_1
+      Advice.A0 Advice.A1 Advice.A2 Advice.A3 Advice.A4
       (generator_table_facts Γ Hcircuit)
-      (SinsemillaHash.enabled_eq_one Γ Selector.QSinsemilla1_2 HR
+      (SinsemillaHash.enabled_eq_one Γ Selector.QSinsemilla1_1 HR
         (Z.of_nat j) (Hsel j Hj))
-      (generator_table_lookup_holds_2 Γ Hcircuit HR (Z.of_nat j))).
+      (generator_table_lookup_holds_1 Γ Hcircuit HR (Z.of_nat j))).
   Qed.
 
   (** The [A9] running-sum reader of a lookup region, and its row word. *)
@@ -1134,24 +1161,24 @@ Module NoteCommitNewWords.
     rewrite List.Forall_map, List.Forall_forall.
     intros j Hj. rewrite List.in_seq in Hj.
     replace (Z.of_nat off + Z.of_nat j) with (Z.of_nat (off + j)%nat) by lia.
-    apply new_hash_word_bound; [exact Hcircuit | lia].
+    apply old_hash_word_bound; [exact Hcircuit | lia].
   Qed.
 
   (** The generic piece telescope at a hash-region offset, fed by the row
-      schedule of [new_hash_schedule]. *)
-  Lemma new_piece_telescope
+      schedule of [old_hash_schedule]. *)
+  Lemma old_piece_telescope
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (off n : nat)
       (Hn : (0 < n)%nat) (Hrange : (off + n <= 109)%nat)
       (Hlen : 10 * Z.of_nat n <= 250)
       (Hsteps : forall j : nat, (S j < n)%nat ->
-        Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR
+        Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR
           (Z.of_nat off + Z.of_nat j) = 1)
       (v : Z) (Hv : v = 0 \/ v = 2)
       (Hlast :
-        Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR
+        Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR
           (Z.of_nat off + Z.of_nat (n - 1)%nat) = v) :
-    Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat off) =
+    Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat off) =
       SinsemillaHash.digit_sum
         (List.map (fun j : nat => w Γ (Z.of_nat off + Z.of_nat j))
           (List.seq 0%nat n)).
@@ -1162,18 +1189,18 @@ Module NoteCommitNewWords.
     - intros j Hj.
       apply word_at_step.
       apply Hsteps. exact Hj.
-    - apply (word_at_last Γ Fixed.QSinsemilla2_2 Advice.A7 HR
+    - apply (word_at_last Γ Fixed.QSinsemilla2_1 Advice.A2 HR
         (Z.of_nat off + Z.of_nat (n - 1)%nat) v Hlast Hv).
     - intros j Hj.
       replace (Z.of_nat off + Z.of_nat j) with (Z.of_nat (off + j)%nat)
         by lia.
-      apply new_hash_word_bound; [exact Hcircuit | lia].
+      apply old_hash_word_bound; [exact Hcircuit | lia].
     - exact Hlen.
   Qed.
 
-  (** ** The eleven [Which.New] NoteCommit gates, at any region and row *)
+  (** ** The eleven [Which.Old] NoteCommit gates, at any region and row *)
 
-  Ltac new_gate_tac :=
+  Ltac old_gate_tac :=
     match goal with
     | Hcircuit : circuit_holds _ _ _ |- _ =>
         apply (satisfies_gates_at _
@@ -1183,106 +1210,107 @@ Module NoteCommitNewWords.
         | exact (holds_gates _ Hcircuit) ]
     end.
 
-  Lemma new_gate_msg_b
+  Lemma old_gate_msg_b
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.message_piece_b_gate
-      Selector.QNoteCommitNewB ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldB ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_msg_d
+  Lemma old_gate_msg_d
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.message_piece_d_gate
-      Selector.QNoteCommitNewD ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldD ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_msg_e
+  Lemma old_gate_msg_e
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.message_piece_e_gate
-      Selector.QNoteCommitNewE ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldE ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_msg_g
+  Lemma old_gate_msg_g
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.message_piece_g_gate
-      Selector.QNoteCommitNewG ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldG ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_msg_h
+  Lemma old_gate_msg_h
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.message_piece_h_gate
-      Selector.QNoteCommitNewH ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldH ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_input_gd
+  Lemma old_gate_input_gd
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.input_g_d_gate
-      Selector.QNoteCommitNewGd ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldGd ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_input_pkd
+  Lemma old_gate_input_pkd
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.input_pk_d_gate
-      Selector.QNoteCommitNewPkd ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldPkd ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_input_value
+  Lemma old_gate_input_value
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.input_value_gate
-      Selector.QNoteCommitNewValue ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldValue ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_input_rho
+  Lemma old_gate_input_rho
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.input_rho_gate
-      Selector.QNoteCommitNewRho ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldRho ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_input_psi
+  Lemma old_gate_input_psi
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.input_psi_gate
-      Selector.QNoteCommitNewPsi ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldPsi ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
-  Lemma new_gate_y_canon
+  Lemma old_gate_y_canon
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (region : RegionId.t) (row : Z) :
     Γ ⊢ ⟦ Garden.Orchard.circuit.note_commit.y_coordinate_checks_gate
-      Selector.QNoteCommitNewYCanon ⟧ (region, row).
-  Proof. new_gate_tac. Qed.
+      Selector.QNoteCommitOldYCanon ⟧ (region, row).
+  Proof. old_gate_tac. Qed.
 
   (** ** Canonical value names
 
       Every quantity of the decomposition, as the reduced value of its home
-      cell.  Pieces live on the witness cells (equal, by the hash-region
-      copies, to the running-sum cells at the piece offsets); the sub-piece
-      bits/chunks live on their range/gate home cells. *)
+      cell.  Pieces live on the [A6] witness cells (equal, by the
+      hash-region copies, to the [A2] running-sum cells at the piece
+      offsets); the sub-piece bits/chunks live on their range/gate home
+      cells. *)
 
   Definition av (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessA) Advice.A6 0).
   Definition bv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessB) Advice.A6 0).
   Definition cv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessC) Advice.A6 0).
   Definition dv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessD) Advice.A6 0).
   Definition ev (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessE) Advice.A6 0).
   Definition fv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessF) Advice.A6 0).
   Definition gv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessG) Advice.A6 0).
   Definition hv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A7 0).
+    val Γ (adv (ncr RegionId.NoteCommit.WitnessH) Advice.A6 0).
 
   Definition b0v (Γ : Assignment.t columns RegionId.t) : Z :=
     val Γ (adv (ncr RegionId.NoteCommit.RangeB0) Advice.A9 0).
@@ -1316,34 +1344,39 @@ Module NoteCommitNewWords.
       RegionId.NoteCommit.YCanonicity.Gate) Advice.A6 0).
 
   Definition z13av (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 13).
+    val Γ (adv HR Advice.A2 13).
   Definition z13cv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 39).
+    val Γ (adv HR Advice.A2 39).
   Definition z1dv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 52).
+    val Γ (adv HR Advice.A2 52).
   Definition z13fv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 71).
+    val Γ (adv HR Advice.A2 71).
   Definition z1gv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 84).
+    val Γ (adv HR Advice.A2 84).
   Definition z13gv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv HR Advice.A7 96).
+    val Γ (adv HR Advice.A2 96).
 
   Definition gdxv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv RegionId.NoteCommitNewWitnessGD Advice.A0 0).
+    val Γ (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld)
+      Advice.A0 0).
   Definition gdyv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv RegionId.NoteCommitNewWitnessGD Advice.A1 0).
+    val Γ (adv (RegionId.WitnessInput RegionId.WitnessInput.GDOld)
+      Advice.A1 0).
   Definition pkdxv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv RegionId.NoteCommitNewWitnessPkD Advice.A0 0).
+    val Γ (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+      Advice.A0 0).
   Definition pkdyv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv RegionId.NoteCommitNewWitnessPkD Advice.A1 0).
-  Definition vnewv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv
-      (Garden.Orchard.circuit.witness_input_region RegionId.WitnessInput.VNew)
+    val Γ (adv (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+      Advice.A1 0).
+  Definition voldv (Γ : Assignment.t columns RegionId.t) : Z :=
+    val Γ (adv (RegionId.WitnessInput RegionId.WitnessInput.VOld)
       Advice.A0 0).
   Definition rhov (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ new_rho_cell.
+    val Γ (adv (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)
+      Advice.A0 0).
   Definition psiv (Γ : Assignment.t columns RegionId.t) : Z :=
-    val Γ (adv RegionId.NoteCommitNewWitnessPsi Advice.A0 0).
+    val Γ (adv (RegionId.WitnessInput RegionId.WitnessInput.PsiOld)
+      Advice.A0 0).
 
   (** Rewriting bridges between expression reads and cell values. *)
 
@@ -1416,7 +1449,7 @@ Module NoteCommitNewWords.
     rewrite List.Forall_map, List.Forall_forall.
     intros j Hj. rewrite List.in_seq in Hj.
     replace (Z.of_nat off + Z.of_nat j) with (Z.of_nat (off + j)%nat) by lia.
-    apply new_hash_word_bound; [exact Hcircuit | lia].
+    apply old_hash_word_bound; [exact Hcircuit | lia].
   Qed.
 
   Lemma Lrun_length
@@ -1443,23 +1476,23 @@ Module NoteCommitNewWords.
     z1gv Γ = SinsemillaHash.digit_sum (Lrun Γ 84 24) /\
     z13gv Γ = SinsemillaHash.digit_sum (Lrun Γ 96 12).
   Proof.
-    destruct (new_hash_schedule Γ Hcircuit)
+    destruct (old_hash_schedule Γ Hcircuit)
       as (Hsel & Hq2one & Hq24 & Hq25 & Hq50 & Hq56 & Hq57 & Hq82 & Hq107
         & Hq108).
-    destruct (new_hash_piece_copies Γ Hcircuit)
+    destruct (old_hash_piece_copies Γ Hcircuit)
       as (HcA & HcB & HcC & HcD & HcE & HcF & HcG & HcH).
     assert (Htel : forall (off n : nat) (vlast : Z),
       (0 < n)%nat -> (off + n <= 109)%nat -> 10 * Z.of_nat n <= 250 ->
       (forall j : nat, (S j < n)%nat ->
-        Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR
+        Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR
           (Z.of_nat off + Z.of_nat j) = 1) ->
       (vlast = 0 \/ vlast = 2) ->
-      Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR
+      Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR
         (Z.of_nat off + Z.of_nat (n - 1)%nat) = vlast ->
-      Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat off) =
+      Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat off) =
         SinsemillaHash.digit_sum (Lrun Γ off n)).
     { intros off n vlast Hn Hrange Hlen Hsteps Hvl Hlast.
-      exact (new_piece_telescope Γ Hcircuit off n Hn Hrange Hlen Hsteps
+      exact (old_piece_telescope Γ Hcircuit off n Hn Hrange Hlen Hsteps
         vlast Hvl Hlast). }
     assert (Hstep_gen : forall (off n : nat),
       (off + n <= 109)%nat ->
@@ -1469,7 +1502,7 @@ Module NoteCommitNewWords.
         (off + i)%nat <> 57%nat /\ (off + i)%nat <> 82%nat /\
         (off + i)%nat <> 107%nat /\ (off + i)%nat <> 108%nat)) ->
       forall j : nat, (S j < S n)%nat ->
-        Γ.(Assignment.fixed) Fixed.QSinsemilla2_2 HR
+        Γ.(Assignment.fixed) Fixed.QSinsemilla2_1 HR
           (Z.of_nat off + Z.of_nat j) = 1).
     { intros off n Hrange Hok j Hj.
       replace (Z.of_nat off + Z.of_nat j) with (Z.of_nat (off + j)%nat)
@@ -1478,7 +1511,7 @@ Module NoteCommitNewWords.
       apply Hq2one; lia. }
     (* Piece a: rows 0..24, boundary 24. *)
     assert (Ta :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 0) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 0) =
         SinsemillaHash.digit_sum (Lrun Γ 0 25)).
     { apply (Htel 0%nat 25%nat 0); try lia.
       - apply (Hstep_gen 0%nat 24%nat); [lia |].
@@ -1487,7 +1520,7 @@ Module NoteCommitNewWords.
         exact Hq24. }
     (* Sub-run of a: rows 13..24. *)
     assert (T13 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 13) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 13) =
         SinsemillaHash.digit_sum (Lrun Γ 13 12)).
     { apply (Htel 13%nat 12%nat 0); try lia.
       - apply (Hstep_gen 13%nat 11%nat); [lia |].
@@ -1496,7 +1529,7 @@ Module NoteCommitNewWords.
         exact Hq24. }
     (* Piece c: rows 26..50, boundary 50. *)
     assert (Tc :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 26) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 26) =
         SinsemillaHash.digit_sum (Lrun Γ 26 25)).
     { apply (Htel 26%nat 25%nat 0); try lia.
       - apply (Hstep_gen 26%nat 24%nat); [lia |].
@@ -1505,7 +1538,7 @@ Module NoteCommitNewWords.
         exact Hq50. }
     (* Sub-run of c: rows 39..50. *)
     assert (T39 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 39) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 39) =
         SinsemillaHash.digit_sum (Lrun Γ 39 12)).
     { apply (Htel 39%nat 12%nat 0); try lia.
       - apply (Hstep_gen 39%nat 11%nat); [lia |].
@@ -1514,7 +1547,7 @@ Module NoteCommitNewWords.
         exact Hq50. }
     (* Piece d: rows 51..56, boundary 56. *)
     assert (Td :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 51) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 51) =
         SinsemillaHash.digit_sum (Lrun Γ 51 6)).
     { apply (Htel 51%nat 6%nat 0); try lia.
       - apply (Hstep_gen 51%nat 5%nat); [lia |].
@@ -1523,7 +1556,7 @@ Module NoteCommitNewWords.
         exact Hq56. }
     (* Sub-run of d: rows 52..56. *)
     assert (T52 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 52) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 52) =
         SinsemillaHash.digit_sum (Lrun Γ 52 5)).
     { apply (Htel 52%nat 5%nat 0); try lia.
       - apply (Hstep_gen 52%nat 4%nat); [lia |].
@@ -1532,7 +1565,7 @@ Module NoteCommitNewWords.
         exact Hq56. }
     (* Piece f: rows 58..82, boundary 82. *)
     assert (Tf :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 58) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 58) =
         SinsemillaHash.digit_sum (Lrun Γ 58 25)).
     { apply (Htel 58%nat 25%nat 0); try lia.
       - apply (Hstep_gen 58%nat 24%nat); [lia |].
@@ -1541,7 +1574,7 @@ Module NoteCommitNewWords.
         exact Hq82. }
     (* Sub-run of f: rows 71..82. *)
     assert (T71 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 71) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 71) =
         SinsemillaHash.digit_sum (Lrun Γ 71 12)).
     { apply (Htel 71%nat 12%nat 0); try lia.
       - apply (Hstep_gen 71%nat 11%nat); [lia |].
@@ -1550,7 +1583,7 @@ Module NoteCommitNewWords.
         exact Hq82. }
     (* Piece g: rows 83..107, boundary 107. *)
     assert (Tg :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 83) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 83) =
         SinsemillaHash.digit_sum (Lrun Γ 83 25)).
     { apply (Htel 83%nat 25%nat 0); try lia.
       - apply (Hstep_gen 83%nat 24%nat); [lia |].
@@ -1559,7 +1592,7 @@ Module NoteCommitNewWords.
         exact Hq107. }
     (* Sub-runs of g: rows 84..107 and 96..107. *)
     assert (T84 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 84) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 84) =
         SinsemillaHash.digit_sum (Lrun Γ 84 24)).
     { apply (Htel 84%nat 24%nat 0); try lia.
       - apply (Hstep_gen 84%nat 23%nat); [lia |].
@@ -1567,7 +1600,7 @@ Module NoteCommitNewWords.
       - replace (Z.of_nat 84 + Z.of_nat (24 - 1)%nat) with 107 by lia.
         exact Hq107. }
     assert (T96 :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, Z.of_nat 96) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, Z.of_nat 96) =
         SinsemillaHash.digit_sum (Lrun Γ 96 12)).
     { apply (Htel 96%nat 12%nat 0); try lia.
       - apply (Hstep_gen 96%nat 11%nat); [lia |].
@@ -1576,17 +1609,17 @@ Module NoteCommitNewWords.
         exact Hq107. }
     (* Single-word pieces b, e, h. *)
     assert (Tb :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, 25) = w Γ 25).
-    { apply (word_at_last Γ Fixed.QSinsemilla2_2 Advice.A7 HR 25 0 Hq25).
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, 25) = w Γ 25).
+    { apply (word_at_last Γ Fixed.QSinsemilla2_1 Advice.A2 HR 25 0 Hq25).
       left. reflexivity. }
     assert (Te :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, 57) = w Γ 57).
-    { apply (word_at_last Γ Fixed.QSinsemilla2_2 Advice.A7 HR 57 0 Hq57).
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, 57) = w Γ 57).
+    { apply (word_at_last Γ Fixed.QSinsemilla2_1 Advice.A2 HR 57 0 Hq57).
       left. reflexivity. }
     assert (Th :
-        Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧ (HR, 108) =
+        Γ ⊢ ⟦ Expression.Advice Advice.A2 Rotation.cur ⟧ (HR, 108) =
           w Γ 108).
-    { apply (word_at_last Γ Fixed.QSinsemilla2_2 Advice.A7 HR 108 2 Hq108).
+    { apply (word_at_last Γ Fixed.QSinsemilla2_1 Advice.A2 HR 108 2 Hq108).
       right. reflexivity. }
     unfold av, bv, cv, dv, ev, fv, gv, hv, z13av, z13cv, z1dv, z13fv, z1gv,
       z13gv, val.
@@ -1671,9 +1704,9 @@ Module NoteCommitNewWords.
   Proof.
     destruct (msg_b_facts Γ Hcircuit) as (Hsel & Hcb & Hcb0 & Hcb2 & Hcb3).
     destruct (NoteCommitMessagePieces.message_piece_b_sound Γ
-      Selector.QNoteCommitNewB (ncr RegionId.NoteCommit.MessagePieceB) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewB _ 0 Hsel)
-      (new_gate_msg_b Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceB) 0))
+      Selector.QNoteCommitOldB (ncr RegionId.NoteCommit.MessagePieceB) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldB _ 0 Hsel)
+      (old_gate_msg_b Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceB) 0))
       as (Hb1bool & Hb2bool & Hdec).
     assert (Eb : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceB, 0) = bv Γ)
@@ -1714,9 +1747,9 @@ Module NoteCommitNewWords.
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Ht52 & _ & _ & _).
     destruct (msg_d_facts Γ Hcircuit) as (Hsel & Hcd & Hcd1 & Hcd2 & Hcz).
     destruct (NoteCommitMessagePieces.message_piece_d_sound Γ
-      Selector.QNoteCommitNewD (ncr RegionId.NoteCommit.MessagePieceD) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewD _ 0 Hsel)
-      (new_gate_msg_d Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceD) 0))
+      Selector.QNoteCommitOldD (ncr RegionId.NoteCommit.MessagePieceD) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldD _ 0 Hsel)
+      (old_gate_msg_d Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceD) 0))
       as (Hd0bool & Hd1bool & Hdec).
     assert (Ed : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceD, 0) = dv Γ)
@@ -1757,9 +1790,9 @@ Module NoteCommitNewWords.
   Proof.
     destruct (msg_e_facts Γ Hcircuit) as (Hsel & Hce & Hce0 & Hce1).
     pose proof (NoteCommitMessagePieces.message_piece_e_sound Γ
-      Selector.QNoteCommitNewE (ncr RegionId.NoteCommit.MessagePieceE) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewE _ 0 Hsel)
-      (new_gate_msg_e Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceE) 0))
+      Selector.QNoteCommitOldE (ncr RegionId.NoteCommit.MessagePieceE) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldE _ 0 Hsel)
+      (old_gate_msg_e Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceE) 0))
       as Hdec.
     assert (Ee : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceE, 0) = ev Γ)
@@ -1787,9 +1820,9 @@ Module NoteCommitNewWords.
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Ht84 & _).
     destruct (msg_g_facts Γ Hcircuit) as (Hsel & Hcg & Hcg1 & Hcg2).
     destruct (NoteCommitMessagePieces.message_piece_g_sound Γ
-      Selector.QNoteCommitNewG (ncr RegionId.NoteCommit.MessagePieceG) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewG _ 0 Hsel)
-      (new_gate_msg_g Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceG) 0))
+      Selector.QNoteCommitOldG (ncr RegionId.NoteCommit.MessagePieceG) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldG _ 0 Hsel)
+      (old_gate_msg_g Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceG) 0))
       as (Hg0bool & Hdec).
     assert (Eg : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceG, 0) = gv Γ)
@@ -1827,9 +1860,9 @@ Module NoteCommitNewWords.
   Proof.
     destruct (msg_h_facts Γ Hcircuit) as (Hsel & Hch & Hch0).
     destruct (NoteCommitMessagePieces.message_piece_h_sound Γ
-      Selector.QNoteCommitNewH (ncr RegionId.NoteCommit.MessagePieceH) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewH _ 0 Hsel)
-      (new_gate_msg_h Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceH) 0))
+      Selector.QNoteCommitOldH (ncr RegionId.NoteCommit.MessagePieceH) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldH _ 0 Hsel)
+      (old_gate_msg_h Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceH) 0))
       as (Hh1bool & Hdec).
     assert (Eh : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceH, 0) = hv Γ)
@@ -1885,15 +1918,15 @@ Module NoteCommitNewWords.
     destruct (input_gd_facts Γ Hcircuit)
       as (Hcx & Hcb0 & Hcb1 & Hca & Hcap & Hcz13 & Hczp & Hsel).
     destruct (NoteCommitMessagePieces.input_g_d_sound Γ
-      Selector.QNoteCommitNewGd (ncr RegionId.NoteCommit.InputGD) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewGd _ 0 Hsel)
-      (new_gate_input_gd Γ Hcircuit (ncr RegionId.NoteCommit.InputGD) 0))
+      Selector.QNoteCommitOldGd (ncr RegionId.NoteCommit.InputGD) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldGd _ 0 Hsel)
+      (old_gate_input_gd Γ Hcircuit (ncr RegionId.NoteCommit.InputGD) 0))
       as (Hdec & Hap & He1 & He2 & He3).
     destruct (msg_b_facts Γ Hcircuit) as (HselB & _ & _ & _ & _).
     destruct (NoteCommitMessagePieces.message_piece_b_sound Γ
-      Selector.QNoteCommitNewB (ncr RegionId.NoteCommit.MessagePieceB) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewB _ 0 HselB)
-      (new_gate_msg_b Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceB) 0))
+      Selector.QNoteCommitOldB (ncr RegionId.NoteCommit.MessagePieceB) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldB _ 0 HselB)
+      (old_gate_msg_b Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceB) 0))
       as (Hb1bool & _ & _).
     assert (EbB : Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceB, 0) = b1v Γ)
@@ -1979,15 +2012,15 @@ Module NoteCommitNewWords.
     destruct (input_pkd_facts Γ Hcircuit)
       as (Hcx & Hcb3 & Hcd0 & Hcc & Hcbcp & Hcz13 & Hczp & Hsel).
     destruct (NoteCommitMessagePieces.input_pk_d_sound Γ
-      Selector.QNoteCommitNewPkd (ncr RegionId.NoteCommit.InputPkD) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewPkd _ 0 Hsel)
-      (new_gate_input_pkd Γ Hcircuit (ncr RegionId.NoteCommit.InputPkD) 0))
+      Selector.QNoteCommitOldPkd (ncr RegionId.NoteCommit.InputPkD) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldPkd _ 0 Hsel)
+      (old_gate_input_pkd Γ Hcircuit (ncr RegionId.NoteCommit.InputPkD) 0))
       as (Hdec & Hap & He1 & He2).
     destruct (msg_d_facts Γ Hcircuit) as (HselD & _ & _ & _ & _).
     destruct (NoteCommitMessagePieces.message_piece_d_sound Γ
-      Selector.QNoteCommitNewD (ncr RegionId.NoteCommit.MessagePieceD) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewD _ 0 HselD)
-      (new_gate_msg_d Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceD) 0))
+      Selector.QNoteCommitOldD (ncr RegionId.NoteCommit.MessagePieceD) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldD _ 0 HselD)
+      (old_gate_msg_d Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceD) 0))
       as (Hd0bool & _ & _).
     assert (EdD : Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceD, 0) = d0v Γ)
@@ -2064,20 +2097,20 @@ Module NoteCommitNewWords.
   Lemma value_int
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (Hd2 : 0 <= d2v Γ < 2 ^ 8) (He0 : 0 <= e0v Γ < 2 ^ 6) :
-    vnewv Γ = d2v Γ + z1dv Γ * 2 ^ 8 + e0v Γ * 2 ^ 58 /\
-    0 <= vnewv Γ < 2 ^ 64.
+    voldv Γ = d2v Γ + z1dv Γ * 2 ^ 8 + e0v Γ * 2 ^ 58 /\
+    0 <= voldv Γ < 2 ^ 64.
   Proof.
     destruct (telescopes Γ Hcircuit)
       as (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Ht52 & _ & _ & _).
     destruct (input_value_facts Γ Hcircuit)
       as (Hcv0 & Hcd2 & Hcz1d & Hce0 & Hsel).
     pose proof (NoteCommitMessagePieces.input_value_sound Γ
-      Selector.QNoteCommitNewValue (ncr RegionId.NoteCommit.InputValue) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewValue _ 0 Hsel)
-      (new_gate_input_value Γ Hcircuit (ncr RegionId.NoteCommit.InputValue) 0))
+      Selector.QNoteCommitOldValue (ncr RegionId.NoteCommit.InputValue) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldValue _ 0 Hsel)
+      (old_gate_input_value Γ Hcircuit (ncr RegionId.NoteCommit.InputValue) 0))
       as Hdec.
     assert (E6 : Γ ⊢ ⟦ Expression.Advice Advice.A6 Rotation.cur ⟧
-        (ncr RegionId.NoteCommit.InputValue, 0) = vnewv Γ)
+        (ncr RegionId.NoteCommit.InputValue, 0) = voldv Γ)
       by (exact (cur_eq Γ _ _ _ _ Hcv0)).
     assert (E7 : Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.InputValue, 0) = d2v Γ)
@@ -2112,15 +2145,15 @@ Module NoteCommitNewWords.
     destruct (input_rho_facts Γ Hcircuit)
       as (Hcr & Hce1 & Hcg0 & Hcf & Hcefp & Hcz13 & Hczp & Hsel).
     destruct (NoteCommitMessagePieces.input_rho_sound Γ
-      Selector.QNoteCommitNewRho (ncr RegionId.NoteCommit.InputRho) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewRho _ 0 Hsel)
-      (new_gate_input_rho Γ Hcircuit (ncr RegionId.NoteCommit.InputRho) 0))
+      Selector.QNoteCommitOldRho (ncr RegionId.NoteCommit.InputRho) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldRho _ 0 Hsel)
+      (old_gate_input_rho Γ Hcircuit (ncr RegionId.NoteCommit.InputRho) 0))
       as (Hdec & Hap & He1 & He2).
     destruct (msg_g_facts Γ Hcircuit) as (HselG & _ & _ & _).
     destruct (NoteCommitMessagePieces.message_piece_g_sound Γ
-      Selector.QNoteCommitNewG (ncr RegionId.NoteCommit.MessagePieceG) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewG _ 0 HselG)
-      (new_gate_msg_g Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceG) 0))
+      Selector.QNoteCommitOldG (ncr RegionId.NoteCommit.MessagePieceG) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldG _ 0 HselG)
+      (old_gate_msg_g Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceG) 0))
       as (Hg0bool & _).
     assert (EgG : Γ ⊢ ⟦ Expression.Advice Advice.A7 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceG, 0) = g0v Γ)
@@ -2205,15 +2238,15 @@ Module NoteCommitNewWords.
     destruct (input_psi_facts Γ Hcircuit)
       as (Hcp & Hch0 & Hcg1 & Hch1 & Hcg2 & Hcggp & Hcz13 & Hczp & Hsel).
     destruct (NoteCommitMessagePieces.input_psi_sound Γ
-      Selector.QNoteCommitNewPsi (ncr RegionId.NoteCommit.InputPsi) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewPsi _ 0 Hsel)
-      (new_gate_input_psi Γ Hcircuit (ncr RegionId.NoteCommit.InputPsi) 0))
+      Selector.QNoteCommitOldPsi (ncr RegionId.NoteCommit.InputPsi) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldPsi _ 0 Hsel)
+      (old_gate_input_psi Γ Hcircuit (ncr RegionId.NoteCommit.InputPsi) 0))
       as (Hdec & Hap & He1 & He2 & He3).
     destruct (msg_h_facts Γ Hcircuit) as (HselH & _ & _).
     destruct (NoteCommitMessagePieces.message_piece_h_sound Γ
-      Selector.QNoteCommitNewH (ncr RegionId.NoteCommit.MessagePieceH) 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewH _ 0 HselH)
-      (new_gate_msg_h Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceH) 0))
+      Selector.QNoteCommitOldH (ncr RegionId.NoteCommit.MessagePieceH) 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldH _ 0 HselH)
+      (old_gate_msg_h Γ Hcircuit (ncr RegionId.NoteCommit.MessagePieceH) 0))
       as (Hh1bool & _).
     assert (EhH : Γ ⊢ ⟦ Expression.Advice Advice.A8 Rotation.cur ⟧
         (ncr RegionId.NoteCommit.MessagePieceH, 0) = h1v Γ)
@@ -2308,9 +2341,9 @@ Module NoteCommitNewWords.
     destruct (y_gate_facts_gd Γ Hcircuit)
       as (Hsel & Hcy & Hck0 & Hck2 & Hcj0 & Hcj1 & Hcj13 & Hcjp0 & Hcjp13).
     destruct (NoteCommitMessagePieces.y_coordinate_checks_sound Γ
-      Selector.QNoteCommitNewYCanon YG 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewYCanon _ 0 Hsel)
-      (new_gate_y_canon Γ Hcircuit YG 0))
+      Selector.QNoteCommitOldYCanon YG 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldYCanon _ 0 Hsel)
+      (old_gate_y_canon Γ Hcircuit YG 0))
       as (Hk3bool & Hj & Hy & Hjp & He1 & He2 & He3).
     assert (E5 : Γ ⊢ ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ (YG, 0) =
         gdyv Γ)
@@ -2422,9 +2455,9 @@ Module NoteCommitNewWords.
     destruct (y_gate_facts_pkd Γ Hcircuit)
       as (Hsel & Hcy & Hck0 & Hck2 & Hcj0 & Hcj1 & Hcj13 & Hcjp0 & Hcjp13).
     destruct (NoteCommitMessagePieces.y_coordinate_checks_sound Γ
-      Selector.QNoteCommitNewYCanon YG 0
-      (enabled_nonzero Γ Selector.QNoteCommitNewYCanon _ 0 Hsel)
-      (new_gate_y_canon Γ Hcircuit YG 0))
+      Selector.QNoteCommitOldYCanon YG 0
+      (enabled_nonzero Γ Selector.QNoteCommitOldYCanon _ 0 Hsel)
+      (old_gate_y_canon Γ Hcircuit YG 0))
       as (Hk3bool & Hj & Hy & Hjp & He1 & He2 & He3).
     assert (E5 : Γ ⊢ ⟦ Expression.Advice Advice.A5 Rotation.cur ⟧ (YG, 0) =
         pkdyv Γ)
@@ -2522,20 +2555,17 @@ Module NoteCommitNewWords.
 
   (** ** The side condition: the eleven short-lookup range cells
 
-      In halo2, each of these cells is bounded by a short 10-bit lookup
-      plus a bitshift row.  The relational model cannot derive these
-      bounds from [Holds]: the short branch of the range-check lookup
-      requires [q_running = 0] on the row, and the model pins selectors
-      only where the synthesis enables them ([SelectorOn] facts, [= 1]),
-      leaving [QRunning] free at the short-range rows (see the file
-      header).  The predicate names exactly the missing bounds. *)
+      The [Which.Old] instance of the selector-plane idealization (see the
+      file header and [note_commit_new_short_lookup_ok]).  The predicate
+      names exactly the missing bounds; the [A9] short-range column is
+      variant-independent ([synthesize_short_range]). *)
 
   Definition short_ok
       (Γ : Assignment.t columns RegionId.t) (r : RegionId.t) (bits : Z)
       : Prop :=
     0 <= val Γ (adv r Advice.A9 0) < 2 ^ bits.
 
-  Definition note_commit_new_short_lookup_ok
+  Definition old_note_short_lookup_ok
       (Γ : Assignment.t columns RegionId.t) : Prop :=
     short_ok Γ (ncr RegionId.NoteCommit.RangeB0) 4 /\
     short_ok Γ (ncr RegionId.NoteCommit.RangeB3) 4 /\
@@ -2555,9 +2585,17 @@ Module NoteCommitNewWords.
 
   (** ** The word-list split and the per-piece [words_le] identification *)
 
-  Lemma new_words_split
+  (** The 109 grid words of the [Which.Old] hash-to-point region — the
+      definition matches [OrchardValidActionInputs.old_note_words]
+      ([circuit_proof/valid_action_inputs.v]) definitionally ([HR] unfolds
+      to [RegionId.NoteCommit Which.Old HashToPoint]).  Kept local so this
+      file stays upstream of [valid_action_inputs.v]. *)
+  Definition old_note_words (Γ : Assignment.t columns RegionId.t) : list Z :=
+    SinsemillaHash.hash_words Γ Fixed.QSinsemilla2_1 Advice.A2 HR 109.
+
+  Lemma old_words_split
       (Γ : Assignment.t columns RegionId.t) :
-    SinsemillaHash.hash_words Γ Fixed.QSinsemilla2_2 Advice.A7 HR 109 =
+    SinsemillaHash.hash_words Γ Fixed.QSinsemilla2_1 Advice.A2 HR 109 =
       Lrun Γ 0 25 ++ Lrun Γ 25 1 ++ Lrun Γ 26 25 ++ Lrun Γ 51 6 ++
       Lrun Γ 57 1 ++ Lrun Γ 58 25 ++ Lrun Γ 83 25 ++ Lrun Γ 108 1.
   Proof. reflexivity. Qed.
@@ -2584,56 +2622,34 @@ Module NoteCommitNewWords.
     lia.
   Qed.
 
-  (** ** The hashed words are the note-commit message
+  (** ** The hashed words are the old-note commitment message
 
-      The 109 grid words of the [Which.New] hash-to-point region equal
-      [OrchardSpec.note_commit_message] at the circuit's new-note reads:
-      the [g_d_new]/[pk_d_new] witness points, the [VNew] witness cell,
-      the nullifier output cell (the very cell [nullifier_cell_correct]
-      equates with [out_nf_old (action_spec_of Γ)]) and the [psi_new]
-      witness cell. *)
-  Theorem note_commit_new_words_correct
+      The 109 grid words of the [Which.Old] hash-to-point region equal
+      [OrchardSpec.note_commit_message] at the circuit's old-note reads:
+      the [GDOld] witness point, the WITNESSED [pk_d_old] point (the
+      [AddressIntegrity.WitnessPkD] cells — [read_pk_d_old]'s cells; see the
+      file header), and the [VOld]/[RhoOld]/[PsiOld] witness cells.  This is
+      the words-canonicity leg of the old-note integrity proof, derived from
+      [Holds] plus the short-lookup side condition
+      ([old_note_short_lookup_ok] — the second conjunct of
+      [OrchardValidActionInputs.old_note_witness_ok]). *)
+  Theorem note_commit_old_words_correct
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ)
-      (Hshort : note_commit_new_short_lookup_ok Γ) :
-    let psi_old :=
-      layouter_value
-        (Garden.Orchard.circuit.assign_free_advice
-          (Garden.Orchard.circuit.witness_input_region
-            RegionId.WitnessInput.PsiOld)
-          "witness psi_old" Advice.A0 0) in
-    let rho_old :=
-      layouter_value
-        (Garden.Orchard.circuit.assign_free_advice
-          (Garden.Orchard.circuit.witness_input_region
-            RegionId.WitnessInput.RhoOld)
-          "witness rho_old" Advice.A0 0) in
-    let cm_old :=
-      layouter_value
-        (Garden.Orchard.circuit.witness_point
-          (Garden.Orchard.circuit.witness_input_region
-            RegionId.WitnessInput.CmOld)
-          "cm_old") in
-    let nk :=
-      layouter_value
-        (Garden.Orchard.circuit.assign_free_advice
-          (Garden.Orchard.circuit.witness_input_region
-            RegionId.WitnessInput.Nk)
-          "witness nk" Advice.A0 0) in
-    NoteCommitNewHash.note_commit_new_words Γ =
+      (Hshort : old_note_short_lookup_ok Γ) :
+    old_note_words Γ =
       OrchardSpec.note_commit_message
-        (OrchardActionInputs.read_point Γ RegionId.NoteCommitNewWitnessGD)
-        (OrchardActionInputs.read_point Γ RegionId.NoteCommitNewWitnessPkD)
+        (OrchardActionInputs.read_point Γ
+          (RegionId.WitnessInput RegionId.WitnessInput.GDOld))
+        (OrchardActionInputs.read_point Γ
+          (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD))
         (OrchardActionInputs.read Γ
-          (RegionId.WitnessInput RegionId.WitnessInput.VNew))
-        (UnOp.from
-          (eval_cell Γ
-            (layouter_value
-              (Garden.Orchard.circuit.synthesize_nullifier
-                rho_old psi_old nk cm_old))))
-        (OrchardActionInputs.read Γ RegionId.NoteCommitNewWitnessPsi).
+          (RegionId.WitnessInput RegionId.WitnessInput.VOld))
+        (OrchardActionInputs.read Γ
+          (RegionId.WitnessInput RegionId.WitnessInput.RhoOld))
+        (OrchardActionInputs.read Γ
+          (RegionId.WitnessInput RegionId.WitnessInput.PsiOld)).
   Proof.
-    cbv zeta.
     destruct Hshort
       as (Hb0 & Hb3 & Hd2 & He0 & He1s & Hg1 & Hh0 & Hk0g & Hk2g & Hk0p
         & Hk2p).
@@ -2664,7 +2680,7 @@ Module NoteCommitNewWords.
       (e0v Γ) (e1v Γ)
       (g0v Γ) (g1v Γ) (z1gv Γ)
       (h0v Γ) (h1v Γ)
-      (gdxv Γ) (pkdxv Γ) (vnewv Γ) (rhov Γ) (psiv Γ)
+      (gdxv Γ) (pkdxv Γ) (voldv Γ) (rhov Γ) (psiv Γ)
       HaR HcR HfR
       Hb0 Hb1c Hb2c Hb3
       Hd0c Hd1c Hd2 Hz1d50
@@ -2699,10 +2715,9 @@ Module NoteCommitNewWords.
     (* Assembly. *)
     transitivity (SinsemillaSpec.words_le 109
       (NoteCommitMessagePieces.note_commit_packed
-        (gdxv Γ) (b2v Γ) (pkdxv Γ) (d1v Γ) (vnewv Γ) (rhov Γ) (psiv Γ))).
-    { unfold NoteCommitNewHash.note_commit_new_words.
-      change NoteCommitNewHash.new_hash_region with HR.
-      rewrite (new_words_split Γ).
+        (gdxv Γ) (b2v Γ) (pkdxv Γ) (d1v Γ) (voldv Γ) (rhov Γ) (psiv Γ))).
+    { unfold old_note_words.
+      rewrite (old_words_split Γ).
       rewrite <- Wa, <- Wb, <- Wc, <- Wd, <- We, <- Wf, <- Wg, <- Wh.
       exact Hwords. }
     unfold OrchardSpec.note_commit_message.
@@ -2710,4 +2725,4 @@ Module NoteCommitNewWords.
     rewrite Hb2par, Hd1par.
     reflexivity.
   Qed.
-End NoteCommitNewWords.
+End OldNoteWords.

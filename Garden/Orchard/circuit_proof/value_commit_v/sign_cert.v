@@ -9,8 +9,8 @@
           (EccSpec.fw_z <window w> +F
             Point.y (PallasModel.repr <multiple w i>))) = true
 
-    where [<window w> = List.nth w (OrchardSpec.value_commit_v
-    orchard_circuit_params)
+    where [<window w> = List.nth w (OrchardCircuitSpec.value_commit_v
+    orchard_internal_params)
     OrchardActionFixedBase.fixed_window_default] and
     the multiple [<multiple w i> = List.nth i (List.nth w
     ValueCommitVFullTable.full_table []) Pallas.identity] is read from the shared
@@ -42,7 +42,8 @@ Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Halo2.lemmas.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.PallasModel.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
 Require Import Garden.Orchard.circuit_proof.table_defs.
@@ -73,7 +74,7 @@ Module ValueCommitVWindowSignCert.
   (** The circuit fixed-base table and its default window (aliases matching the
       x-coordinate certificate). *)
   Definition table : EccSpec.fixed_table :=
-    OrchardSpec.value_commit_v orchard_circuit_params.
+    OrchardCircuitSpec.value_commit_v orchard_internal_params.
   Definition default : EccSpec.fixed_window :=
     OrchardActionFixedBase.fixed_window_default.
 

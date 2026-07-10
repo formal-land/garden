@@ -18,7 +18,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.witness_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Div.
@@ -298,7 +299,7 @@ Module OrchardActionBridges.
     - apply Z.eqb_eq in Hvold_eqb.
       unfold action_spec_of, output_with_witness, read_action_inputs,
         read_action_inputs_with_anchor.
-      cbn [OrchardSpec.out_anchor OrchardSpec.orchard_action_spec
+      cbn [OrchardSpec.out_anchor OrchardCircuitSpec.orchard_action_spec
         OrchardSpec.in_v_old OrchardSpec.in_anchor_public].
       rewrite Hvold_eqb, Z.eqb_refl.
       reflexivity.
@@ -307,7 +308,7 @@ Module OrchardActionBridges.
       { apply Z.eqb_neq. exact Hvold_eqb. }
       unfold action_spec_of, output_with_witness, read_action_inputs,
         read_action_inputs_with_anchor.
-      cbn [OrchardSpec.out_anchor OrchardSpec.orchard_action_spec
+      cbn [OrchardSpec.out_anchor OrchardCircuitSpec.orchard_action_spec
         OrchardSpec.in_v_old OrchardSpec.in_leaf OrchardSpec.in_path
         OrchardSpec.anchor OrchardSpec.merkle_crh_q].
       rewrite Hvold_eqb.
@@ -522,7 +523,7 @@ Module OrchardActionBridges.
               "v_net sign" Advice.A9 0) in
         let v_point :=
           EccSpec.fixed_scalar_mul
-            (OrchardSpec.value_commit_v orchard_circuit_params)
+            (OrchardCircuitSpec.value_commit_v orchard_internal_params)
             (read9 Γ
               (RegionId.ValueCommitment
                 RegionId.ValueCommitment.MagnitudeRangeCheck))
@@ -548,7 +549,7 @@ Module OrchardActionBridges.
             (layouter_value
               Garden.Orchard.circuit.synth_value_commit_r_mul)) =
         EccSpec.fixed_scalar_mul
-          (OrchardSpec.value_commit_r orchard_circuit_params)
+          (OrchardCircuitSpec.value_commit_r orchard_internal_params)
           (read_scalar_from_windows Γ
             (RegionId.ValueCommitment
               RegionId.ValueCommitment.ValueCommitRIncomplete) 85)
@@ -561,11 +562,11 @@ Module OrchardActionBridges.
     rewrite (cv_net_x_complete_add_bridge Γ Hcircuit).
     unfold action_spec_of, output_with_witness, read_action_inputs,
       read_action_inputs_with_anchor, read_action_witness.
-    cbn [OrchardSpec.out_cv_net OrchardSpec.orchard_action_spec
-      OrchardSpec.value_commit OrchardSpec.in_magnitude OrchardSpec.in_sign
-      OrchardSpec.in_rcv OrchardSpec.w_us_v OrchardSpec.w_us_rcv
-      OrchardSpec.value_commit_v OrchardSpec.value_commit_r].
-    unfold OrchardSpec.value_commit.
+    cbn [OrchardSpec.out_cv_net OrchardCircuitSpec.orchard_action_spec
+      OrchardCircuitSpec.value_commit OrchardSpec.in_magnitude OrchardSpec.in_sign
+      OrchardSpec.in_rcv OrchardCircuitSpec.w_us_v OrchardCircuitSpec.w_us_rcv
+      OrchardCircuitSpec.value_commit_v OrchardCircuitSpec.value_commit_r].
+    unfold OrchardCircuitSpec.value_commit.
     rewrite Hvalue, Hblind.
     reflexivity.
   Qed.
@@ -588,7 +589,7 @@ Module OrchardActionBridges.
               "v_net sign" Advice.A9 0) in
         let v_point :=
           EccSpec.fixed_scalar_mul
-            (OrchardSpec.value_commit_v orchard_circuit_params)
+            (OrchardCircuitSpec.value_commit_v orchard_internal_params)
             (read9 Γ
               (RegionId.ValueCommitment
                 RegionId.ValueCommitment.MagnitudeRangeCheck))
@@ -614,7 +615,7 @@ Module OrchardActionBridges.
             (layouter_value
               Garden.Orchard.circuit.synth_value_commit_r_mul)) =
         EccSpec.fixed_scalar_mul
-          (OrchardSpec.value_commit_r orchard_circuit_params)
+          (OrchardCircuitSpec.value_commit_r orchard_internal_params)
           (read_scalar_from_windows Γ
             (RegionId.ValueCommitment
               RegionId.ValueCommitment.ValueCommitRIncomplete) 85)
@@ -627,11 +628,11 @@ Module OrchardActionBridges.
     rewrite (cv_net_y_complete_add_bridge Γ Hcircuit).
     unfold action_spec_of, output_with_witness, read_action_inputs,
       read_action_inputs_with_anchor, read_action_witness.
-    cbn [OrchardSpec.out_cv_net OrchardSpec.orchard_action_spec
-      OrchardSpec.value_commit OrchardSpec.in_magnitude OrchardSpec.in_sign
-      OrchardSpec.in_rcv OrchardSpec.w_us_v OrchardSpec.w_us_rcv
-      OrchardSpec.value_commit_v OrchardSpec.value_commit_r].
-    unfold OrchardSpec.value_commit.
+    cbn [OrchardSpec.out_cv_net OrchardCircuitSpec.orchard_action_spec
+      OrchardCircuitSpec.value_commit OrchardSpec.in_magnitude OrchardSpec.in_sign
+      OrchardSpec.in_rcv OrchardCircuitSpec.w_us_v OrchardCircuitSpec.w_us_rcv
+      OrchardCircuitSpec.value_commit_v OrchardCircuitSpec.value_commit_r].
+    unfold OrchardCircuitSpec.value_commit.
     rewrite Hvalue, Hblind.
     reflexivity.
   Qed.
@@ -781,7 +782,7 @@ Module OrchardActionBridges.
   Definition spend_auth_g_fixed_scalar_mul_value
       (Γ : Assignment.t columns RegionId.t) : Point.t :=
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.SpendAuthority
           RegionId.SpendAuthority.FullFixedIncomplete) 85)
@@ -897,10 +898,10 @@ Module OrchardActionBridges.
     unfold action_spec_of, output_with_witness, read_action_inputs,
       read_action_inputs_with_anchor, read_action_witness, rk_ak_point,
       spend_auth_g_fixed_scalar_mul_value.
-    cbn [OrchardSpec.out_rk OrchardSpec.orchard_action_spec
-      OrchardSpec.in_ak OrchardSpec.in_alpha OrchardSpec.w_us_alpha
-      OrchardSpec.spend_auth_g].
-    unfold OrchardSpec.spend_auth_randomize.
+    cbn [OrchardSpec.out_rk OrchardCircuitSpec.orchard_action_spec
+      OrchardSpec.in_ak OrchardSpec.in_alpha OrchardCircuitSpec.w_us_alpha
+      OrchardCircuitSpec.spend_auth_g].
+    unfold OrchardCircuitSpec.spend_auth_randomize.
     reflexivity.
   Qed.
 
@@ -915,10 +916,10 @@ Module OrchardActionBridges.
     unfold action_spec_of, output_with_witness, read_action_inputs,
       read_action_inputs_with_anchor, read_action_witness, rk_ak_point,
       spend_auth_g_fixed_scalar_mul_value.
-    cbn [OrchardSpec.out_rk OrchardSpec.orchard_action_spec
-      OrchardSpec.in_ak OrchardSpec.in_alpha OrchardSpec.w_us_alpha
-      OrchardSpec.spend_auth_g].
-    unfold OrchardSpec.spend_auth_randomize.
+    cbn [OrchardSpec.out_rk OrchardCircuitSpec.orchard_action_spec
+      OrchardSpec.in_ak OrchardSpec.in_alpha OrchardCircuitSpec.w_us_alpha
+      OrchardCircuitSpec.spend_auth_g].
+    unfold OrchardCircuitSpec.spend_auth_randomize.
     reflexivity.
   Qed.
 
@@ -1548,7 +1549,7 @@ Module OrchardActionBridges.
               (Garden.Orchard.circuit
                 .synth_nullifier_k_mul scalar))) =
         EccSpec.fixed_scalar_mul
-          (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           (Poseidon.poseidon_hash2
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F
@@ -1561,7 +1562,7 @@ Module OrchardActionBridges.
             (read_point Γ
               (RegionId.WitnessInput RegionId.WitnessInput.CmOld))
             (EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                 (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
                 (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F
@@ -1571,7 +1572,7 @@ Module OrchardActionBridges.
         Point.x
           (EccSpec.point_add
             (EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                 (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
                 (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F
@@ -1586,11 +1587,11 @@ Module OrchardActionBridges.
     rewrite (nf_old_complete_add_bridge Γ Hcircuit).
     unfold action_spec_of, output_with_witness, read_action_inputs,
       read_action_inputs_with_anchor, read_action_witness.
-    cbn [OrchardSpec.out_nf_old OrchardSpec.orchard_action_spec
-      OrchardSpec.nullifier OrchardSpec.in_nk OrchardSpec.in_rho_old
-      OrchardSpec.in_psi_old OrchardSpec.in_cm_old OrchardSpec.w_us_k
-      OrchardSpec.nullifier_k].
-    unfold OrchardSpec.nullifier, EccSpec.extract_x.
+    cbn [OrchardSpec.out_nf_old OrchardCircuitSpec.orchard_action_spec
+      OrchardCircuitSpec.nullifier OrchardSpec.in_nk OrchardSpec.in_rho_old
+      OrchardSpec.in_psi_old OrchardSpec.in_cm_old OrchardCircuitSpec.w_us_k
+      OrchardCircuitSpec.nullifier_k].
+    unfold OrchardCircuitSpec.nullifier, EccSpec.extract_x.
     rewrite assigned_point_value_witness_point.
     rewrite Hfixed.
     unfold Garden.Orchard.circuit.witness_input_region.

@@ -49,7 +49,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
 Require Import Garden.Orchard.circuit_proof.ladder.main.
@@ -115,7 +116,7 @@ Module ValueCommitVLadder.
       (Hw : (w < 22)%nat) (Hd : 0 <= d < 8) :
     Point.x
       (EccSpec.fixed_window_point
-        (List.nth w (OrchardSpec.value_commit_v orchard_circuit_params)
+        (List.nth w (OrchardCircuitSpec.value_commit_v orchard_internal_params)
           OrchardActionFixedBase.fixed_window_default) d u) =
     Point.x
       (PallasModel.repr
@@ -124,7 +125,7 @@ Module ValueCommitVLadder.
     refine (fixed_window_point_x_eq_mul_gen PallasGenerators.value_commit_v_G
               PallasGenerators.value_commit_v_on_curve
               PallasGenerators.value_commit_v_reduced 21
-              (OrchardSpec.value_commit_v orchard_circuit_params)
+              (OrchardCircuitSpec.value_commit_v orchard_internal_params)
               _ w d u Hw Hd).
     intros w' i' Hw' Hi'.
     pose proof (ValueCommitVFixedWindowCert.x_check_entry w' i' Hw' Hi') as Hx.
@@ -174,13 +175,13 @@ Module ValueCommitVLadder.
       22
       (fun i => EccSpec.window_digit (OrchardActionInputs.read9 Γ VCV_MAG) i)
       (fun i _ => window_digit_bound (OrchardActionInputs.read9 Γ VCV_MAG) i)
-      (OrchardSpec.value_commit_v orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       _ _ _ _ _ j Hj).
     - (* Hwindow_eq *)
       intros i Hi.
       assert (Hnth : List.nth_error
-          (OrchardSpec.value_commit_v orchard_circuit_params) i
-        = Some (List.nth i (OrchardSpec.value_commit_v orchard_circuit_params)
+          (OrchardCircuitSpec.value_commit_v orchard_internal_params) i
+        = Some (List.nth i (OrchardCircuitSpec.value_commit_v orchard_internal_params)
                   OrchardActionFixedBase.fixed_window_default)).
       { apply List.nth_error_nth'.
         rewrite OrchardActionFixedBase.value_commit_v_table_length. exact Hi. }

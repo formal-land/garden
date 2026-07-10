@@ -17,7 +17,7 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.witness_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Div.
 Require Import Garden.Field.Lemmas.

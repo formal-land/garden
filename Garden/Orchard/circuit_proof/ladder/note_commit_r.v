@@ -58,7 +58,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.constants.fixed_bases.note_commit_r.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
 Require Import Garden.Orchard.circuit_proof.us_free.main.
@@ -125,7 +126,7 @@ Module NoteCommitRLadder.
       (Hw : (w < 85)%nat) (Hd : 0 <= d < 8) :
     Point.x
       (EccSpec.fixed_window_point
-        (List.nth w (OrchardSpec.note_commit_r orchard_circuit_params)
+        (List.nth w (OrchardCircuitSpec.note_commit_r orchard_internal_params)
           OrchardActionFixedBase.fixed_window_default) d u) =
     Point.x
       (PallasModel.repr
@@ -134,7 +135,7 @@ Module NoteCommitRLadder.
     refine (fixed_window_point_x_eq_mul_gen PallasGenerators.note_commit_r_G
               PallasGenerators.note_commit_r_on_curve
               PallasGenerators.note_commit_r_reduced 84
-              (OrchardSpec.note_commit_r orchard_circuit_params)
+              (OrchardCircuitSpec.note_commit_r orchard_internal_params)
               _ w d u Hw Hd).
     intros w' i' Hw' Hi'.
     pose proof (NoteCommitRFixedWindowCert.x_check_entry w' i' Hw' Hi') as Hx.
@@ -189,7 +190,7 @@ Module NoteCommitRLadder.
         (OrchardActionInputs.read_scalar_from_windows Γ NCR 85) i)
       (fun i _ => window_digit_bound
         (OrchardActionInputs.read_scalar_from_windows Γ NCR 85) i)
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       _ _ _ _ _ j Hj).
     - (* Hwindow_eq *)
       intros i Hi.

@@ -14,7 +14,7 @@ Require Import Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip_proof.
 Require Import Garden.Halo2.halo2_gadgets.utilities.cond_swap_proof.
 Require Import Garden.Halo2.halo2_gadgets.utilities_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Lemmas.
 Require Import Garden.Plonky3.M.
