@@ -39,7 +39,11 @@ Global Open Scope Z_scope.
 
 Module EccSpec.
   (** The affine identity in the chips' [(0, 0)]-sentinel convention (the
-      representation [CompleteAddition.output] treats as the neutral element). *)
+      representation [CompleteAddition.output] treats as the neutral element).
+      The sentinel is unambiguous because [x = 0] is not the x-coordinate of
+      any Pallas point ([pallas_b_quadratic_nonresidue] below); it matches
+      the protocol's coordinate-extractor convention [x(𝒪_P) = y(𝒪_P) = 0]
+      (§5.4.9.7 of the Zcash protocol specification). *)
   Definition identity : Point.t := {| Point.x := 0; Point.y := 0 |}.
 
   (** Complete (total) point addition — covers all exceptional cases. *)
@@ -48,13 +52,22 @@ Module EccSpec.
       P.(Point.x) P.(Point.y) Q.(Point.x) Q.(Point.y).
 
   (** Incomplete point addition — the Sinsemilla/fixed-base inner operation,
-      valid only when the x-coordinates differ. *)
+      valid only when the x-coordinates differ.  This is the total-function
+      transcription of the protocol's partial [⊕] (§5.4.1.9): on the
+      exceptional cases where [⊕] returns [⊥] (equal x-coordinates, identity
+      operands) it computes an unconstrained chord-formula value instead —
+      the honest-branch side conditions of the consuming proofs exclude
+      exactly those cases. *)
   Definition point_add_incomplete (P Q : Point.t) : Point.t :=
     IncompleteAddition.output
       P.(Point.x) P.(Point.y) Q.(Point.x) Q.(Point.y).
 
   (** [Extract_P]: the x-coordinate of a curve point, used to project [RK],
-      [NF_OLD] and [CMX] to their field-element instance values. *)
+      [NF_OLD] and [CMX] to their field-element instance values.
+      Protocol: §5.4.9.7 'Coordinate Extractor for Pallas',
+      [Extract_P(P) = x(P) mod q_P] with [x(𝒪_P) = 0] — coordinates here are
+      already reduced field elements, and the [(0, 0)] sentinel realizes the
+      identity case. *)
   Definition extract_x (P : Point.t) : Z := P.(Point.x).
 
   (** Canonical scalar multiplication [k]·P by iterated complete addition.
@@ -254,7 +267,11 @@ Module EccSpec.
   (** [k]·G as the windowed running sum the circuit computes: complete-add the
       per-window points across [tbl], with the per-window square-root witnesses
       [us] read from the assignment.  No affine generator appears — [tbl] is a
-      concrete circuit constant. *)
+      concrete circuit constant.  The protocol-aligned counterpart is the
+      group multiple [Pallas.mul k G] of the affine generator
+      ([Orchard/protocol_spec.v]); the equivalence statements over the
+      concrete Orchard tables are in
+      [Orchard/circuit_proof/protocol_equiv.v]. *)
   Definition fixed_scalar_mul (tbl : fixed_table) (k : Z) (us : list Z) : Point.t :=
     fixed_scalar_mul_aux tbl k us 0%nat identity.
 

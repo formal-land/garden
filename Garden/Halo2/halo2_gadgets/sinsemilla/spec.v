@@ -28,7 +28,19 @@ Global Open Scope Z_scope.
     per round ([Sinsemilla.deterministic]) and binds [S] to the table word
     ([GeneratorTable.sound]); composing them along the message is the
     hash-level soundness result of [hash_to_point_proof.v] /
-    [hash_to_point_fold_proof.v]. *)
+    [hash_to_point_fold_proof.v].
+
+    Protocol reference: §5.4.1.9 'Sinsemilla Hash Function' of the Zcash
+    protocol specification defines
+    [SinsemillaHashToPoint] as exactly this fold ([k = 10]; per word
+    [Acc ← (Acc ⊕ 𝒮(m_i)) ⊕ Acc] with incomplete addition [⊕]), so the
+    circuit-structured and protocol functions coincide on the honest
+    (non-⊥) branch; the exceptional [⊥] cases of [⊕] (equal x-coordinates,
+    identity operands) are where the protocol's functions return [⊥] while
+    these total transcriptions compute the chip's unconstrained value.  The
+    domain and per-word generators are [𝒬(D)]/[𝒮(j)] group hashes
+    (§5.4.9.8); here they are the circuit's concrete constants — [Q] a
+    parameter, [S] the [sinsemilla_s] lookup table. *)
 
 Module SinsemillaSpec.
   Definition sinsemilla_k : Z := 10.
@@ -59,7 +71,12 @@ Module SinsemillaSpec.
 
   (** Sinsemilla commitment: blind the hash-to-point with [r]·[R], where [R] is
       the commitment-randomness base.  ([SinsemillaCommit] = hash-to-point in
-      the commitment domain plus the [Pedersen]-style blinding term.) *)
+      the commitment domain plus the [Pedersen]-style blinding term.)
+
+      Protocol: §5.4.8.4 'Sinsemilla commitments',
+      [SinsemillaCommit_r(D, M) = SinsemillaHashToPoint(D || "-M", M)
+      + [r] GroupHash^P(D || "-r", "")]; [Q] and [R] are the two group-hash
+      points, supplied here as concrete parameters. *)
   Definition sinsemilla_commit
       (Q : Point.t) (words : list Z) (r : Z) (R : Point.t) : Point.t :=
     EccSpec.point_add
@@ -67,7 +84,10 @@ Module SinsemillaSpec.
       (EccSpec.scalar_mul r R).
 
   (** Short Sinsemilla commitment ([SinsemillaCommit] then [Extract_x]) — the
-      shape used by [NoteCommit]/[CommitIvk] to produce a field element. *)
+      shape used by [NoteCommit]/[CommitIvk] to produce a field element.
+
+      Protocol: §5.4.8.4, [SinsemillaShortCommit_r(D, M) =
+      Extract⊥_P(SinsemillaCommit_r(D, M))]. *)
   Definition sinsemilla_short_commit
       (Q : Point.t) (words : list Z) (r : Z) (R : Point.t) : Z :=
     EccSpec.extract_x (sinsemilla_commit Q words r R).
@@ -81,11 +101,23 @@ Module SinsemillaSpec.
     end.
 
   (** Merkle layer message: the 10-bit layer index [l] followed by the two
-      255-bit child hashes, packed into 52 ten-bit words (520 bits). *)
+      255-bit child hashes, packed into 52 ten-bit words (520 bits).
+
+      Protocol: §5.4.1.3 'Merkle Tree Hash Function', the [MerkleCRH^Orchard]
+      message [l⋆ || left⋆ || right⋆] with
+      [l⋆ = I2LEBSP_10(MerkleDepth^Orchard − 1 − layer)] and 255-bit child
+      encodings; the [layer] argument here is that already-flipped 10-bit
+      prefix (0 at the layer above the leaves, 31 at the root), matching the
+      leaf-upward fold of [merkle_root]. *)
   Definition merkle_message (layer left right : Z) : list Z :=
     words_le 52 (layer + left * 2 ^ sinsemilla_k + right * 2 ^ (sinsemilla_k + 255)).
 
-  (** Orchard [MerkleCRH]: Sinsemilla-hash the layer-tagged child pair. *)
+  (** Orchard [MerkleCRH]: Sinsemilla-hash the layer-tagged child pair.
+
+      Protocol: §5.4.1.3, [MerkleCRH^Orchard(layer, left, right) =
+      SinsemillaHash("z.cash:Orchard-MerkleCRH", l⋆ || left⋆ || right⋆)],
+      the [hash = ⊥ ↦ 0] escape hatch of that definition being the
+      incomplete-addition slack the Action statement's notes sanction. *)
   Definition merkle_crh
       (Q : Point.t) (layer left right : Z) : Z :=
     sinsemilla_hash Q (merkle_message layer left right).
@@ -99,7 +131,11 @@ Module SinsemillaSpec.
     else merkle_crh Q layer node sibling.
 
   (** Merkle root: fold [merkle_layer] up the authentication path from the leaf.
-      Orchard uses a 32-layer tree, so [path] has length 32. *)
+      Orchard uses a 32-layer tree, so [path] has length 32.
+
+      Protocol: §4.9 'Merkle Path Validity' — verifying a Merkle path from a
+      leaf to the root [rt = M⁰₀], the per-layer swap bit being the node's
+      position parity at that layer. *)
   Definition merkle_root
       (Q : Point.t) (leaf : Z) (path : list (Z * Z * bool)) : Z :=
     Stdlib.Lists.List.fold_left
