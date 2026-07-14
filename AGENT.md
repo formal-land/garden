@@ -12,6 +12,13 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   proof patterns, and tactic/performance notes.
 - `docs/chip-model-caveats.md`: what the relational `proof.v` model captures and
   idealizes, and the synthesis-to-gates gluing (`circuit_holds`).
+- `docs/operational-soundness.md`: the relational ↔ operational bridge — the
+  `serialize.v` event replay (`RawGrid`/`apply_events`/`realize`), the ideal
+  `mock_prover_accepts` checker, `operational_sound`/`operational_complete`,
+  the placement-generic replay-success conditions (`realize/disjoint.v`),
+  the whole-circuit Orchard instantiation with its `vm_compute` certificates
+  (`circuit_operational.v`), and the assurance upgrade this delivers for the
+  Action-statement surface.
 - `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with

@@ -279,16 +279,16 @@ Module GeneratorTable.
     destruct Hload as (Hidx & Hx & Hy & _).
     cbn [interpret_fact] in Hidx, Hx, Hy.
     destruct col; cbn [lookup].
-    - rewrite Hidx. unfold value_at_row,
+    - rewrite Hidx by lia. unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite nth_map_seq by exact Hk.
       apply Z2Nat.id; lia.
-    - rewrite Hx. unfold value_at_row,
+    - rewrite Hx by lia. unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite List.map_map.
       rewrite nth_map_seq by exact Hk.
       now rewrite Z2Nat.id by lia.
-    - rewrite Hy. unfold value_at_row,
+    - rewrite Hy by lia. unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite List.map_map.
       rewrite nth_map_seq by exact Hk.

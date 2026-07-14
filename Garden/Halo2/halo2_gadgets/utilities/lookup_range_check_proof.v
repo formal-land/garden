@@ -93,7 +93,7 @@ Module RangeTable.
       Γ.(Assignment.lookup) table_idx i = i.
     Proof.
       cbn [interpret_fact] in Hfact.
-      rewrite Hfact.
+      rewrite Hfact by lia.
       unfold value_at_row.
       rewrite nth_map_seq by (apply Z2Nat.inj_lt; lia).
       apply Z2Nat.id; lia.

@@ -302,6 +302,16 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
 (18 s) → `hash_to_point_round_proof` (105 s) → `circuit_proof/merkle.v`
 (25 s) — with the fixed-base chain ~60 s shorter. Heavy leaves:
 
+- `Orchard/circuit_operational.v` (2026-07-14): 17.8 s / 1.66 GB peak —
+  dominated by `orchard_replay_ok`, a single `vm_cast_no_check` VM run of
+  `replay_is_ok` on the 19,617-event Orchard stream (12.3 s; the conflict
+  check is quadratic in the 15,047 write events); the other three
+  `vm_compute` certificates (`constants_materialized` coverage,
+  `instance_free`, `flattening_ok`) are < 0.5 s each, and
+  `orchard_operational_sound` pays ≈ 4.5 s of delta conversion at
+  `exact`+Qed. The block conditions of `Halo2/realize/disjoint.v` are the
+  placement-generic alternative if the whole-stream replay certificate
+  ever becomes too heavy.
 - Fixed-base table leaves (`circuit_proof/<base>/table.v`): ~79 s ∥ 80 s ∥
   80 s ∥ 20 s in parallel (value_commit_v is the cheap one); the
   note_commit_r leaf lands in the ~100 s band; the commit_ivk_r leaf

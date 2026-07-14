@@ -364,7 +364,11 @@ Section Semantics.
         eval_cell assignment cell =
           assignment.(Assignment.instance_) instance row
     | Fact.LookupTableLoaded column values default_value =>
+        (* Only non-negative rows are pinned: the serializer writes table
+           rows from [0] and fills past the end, so no replay of its events
+           determines a negative row. *)
         forall row,
+          0 <= row ->
           assignment.(Assignment.lookup) column row =
             value_at_row row values default_value
     | Fact.CellIsConstant cell value =>

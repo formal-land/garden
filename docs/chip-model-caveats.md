@@ -190,8 +190,9 @@ Both are derived from the program:
   mirrors `serialize.v`'s fill (the `row`-th entry of `values`, else
   `default_value`); `Fact.LookupTableLoaded column values default_value`
   (`proof.v:45`) is emitted by `layouter_facts` for each entry (`proof.v:306`)
-  and interpreted as `forall row, Γ.(Assignment.lookup) column row =
-  value_at_row row values default_value` (`proof.v:358`); a
+  and interpreted as `forall row, 0 <= row -> Γ.(Assignment.lookup) column row
+  = value_at_row row values default_value` — exactly the rows a replay of the
+  serializer's events (which write rows `>= 0` only) can establish; a
   `layouter_table_rows` fixpoint (`proof.v:319`) returns the loaded row
   count, so `circuit_holds` computes `nb_table_rows` from the program
   (`proof.v:489`) — a program with no table (e.g. `add`) gets `0`.
@@ -206,15 +207,8 @@ Both are derived from the program:
   `2 ^ sinsemilla_k`. Only the Pallas primality certificate remains as an
   axiom.
 
-Two known refinements remain:
+One known refinement remains:
 
-- `interpret_fact` on `Fact.LookupTableLoaded` quantifies over **all** rows,
-  and `value_at_row` truncates through `Z.to_nat`, so negative rows are
-  pinned to the first table entry — stronger than any replay of the
-  serializer's events (which write rows `>= 0` only) can deliver. The
-  interpretation should be weakened to `0 <= row`; `GeneratorTable.loaded`
-  only instantiates rows in `[0, 2 ^ sinsemilla_k)`, so nothing downstream
-  changes.
 - Faithfully, a lookup table is not a separate `Assignment.lookup` address
   space: it is ordinary fixed columns occupying `[0, nb_table_rows) ⊆
   [0, nb_rows)`, with the `default_value` padding coinciding with the
@@ -303,14 +297,50 @@ an unreduced ℤ-sum the digit ambiguity above genuinely refutes the
 circuit↔spec equality, because the circuit witnesses the canonical digit
 string of the reduced scalar.
 
+## The operational bridge
+
+The relational ↔ operational consistency gap is closed — see
+`docs/operational-soundness.md` for the full account. The generic bridge
+(`Halo2/realize/main.v` + `realize/value.v`/`realize/constraints.v`/
+`realize/facts.v`/`realize/sound.v`) replays the `serialize.v` event stream
+into a flat grid (`apply_events`, failing on any conflicting rewrite) and
+proves `operational_sound`: replay success plus acceptance by the ideal
+checker `mock_prover_accepts` (gates and lookups of the indexed, flattened
+system at every absolute row; `Raw.Event.Copy` permutation obligations read
+off the events) yields `circuit_holds` of the realized assignment, under the
+decidable system hypotheses `instance_free` (no `Expression.Instance_` in
+gates/lookups) and `flattening_ok` (no `Constraint.Range _ 0`);
+`operational_complete` is the converse given an inhabitant of `RegionId`.
+The floor planner's trailing constants block enters `operational_sound` as
+an explicit extra event input with the `constants_materialized`
+correspondence (vacuous for `ConstrainConstant`-free chips,
+`operational_sound_no_tail`). The layout idealizations are thereby a
+per-placement computation (replay success, by `vm_compute` — see the
+add-chip instance in `Halo2/realize/smoke.v`) rather than trusted
+hypotheses. Both instantiation layers are proved:
+
+- `Halo2/realize/disjoint.v` — placement-generic sufficient conditions:
+  `replay_is_ok` equals the decidable `conflict_free` verdict at every
+  initial grid (`replay_is_ok_conflict_free`), and
+  `layouter_replay_succeeds` / `layouter_with_tail_replay_succeeds` derive
+  replay success from per-block single-assignment (`block_ok`,
+  placement-independent) plus pairwise block compatibility
+  (`blocks_compatible_all`: disjoint region row intervals under
+  `region_start`; column-disjoint table and constants blocks) — per-region
+  reasoning plus interval disjointness in place of one whole-stream
+  quadratic replay.
+- `Orchard/circuit_operational.v` — the whole-circuit Orchard
+  instantiation: `orchard_operational_sound` discharges every decidable
+  premise of `operational_sound` by `vm_compute` certificates on the
+  19,617-event stream (replay success on symbolic witness planes,
+  `instance_free`/`flattening_ok`, and the `constants_materialized`
+  coverage of the concrete constants tail), so the `Holds` hypothesis of
+  the Orchard action surface follows from mock acceptance of the
+  serialized circuit alone; `orchard_action_statement_operational`
+  composes with `action_statement`.
+
 ## Open gaps
 
-- **Relational ↔ operational consistency.** No theorem connects the
-  relational facts of `proof.v` to the operational `serialize.v` events that
-  mirror real Rust Halo2 (`region_start` resolution, absolute rows, lookup
-  table fills, the constants trailing block). Until such a bridge exists, the
-  relational layout idealizations (independent per-region address spaces,
-  region-local instance rows in gates) are trusted, not proved.
 - **Completeness of `circuit_holds`.** The gluing (item 4) is used in the
   soundness direction only: assume a successful proof and derive functional
   correctness. The dual — that an honestly synthesized Γ *satisfies*
@@ -349,5 +379,10 @@ where present — carries two residual named witness-honesty hypotheses
 (`merkle_witness_ok`, `note_commit_witness_ok`): short-lookup range facts
 that the relational selector model leaves free at `q_running = 0` rows, and
 Sinsemilla incomplete-add nondegeneracy. The faithful operational counterpart
-exists in `serialize.v` but is not proven consistent with the relational
-model; the open gaps above are the exact trust boundary.
+in `serialize.v` is connected to the relational model by the generic
+event-replay bridge (`operational_sound`/`operational_complete`,
+`Halo2/realize/sound.v`), instantiated on the whole Orchard action circuit
+with its concrete placement and constants tail
+(`Orchard/circuit_operational.v`), so the action surface's `Holds`
+hypothesis follows from mock-prover acceptance of the serialized circuit;
+the remaining open gaps above are the exact trust boundary.
