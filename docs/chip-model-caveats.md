@@ -167,8 +167,12 @@ interpreter's gate layer only. This document is about that relational model.
    `OrchardAction.deterministic` in
    `Garden/Orchard/circuit_proof/main.v`) build on this gluing; see
    `docs/orchard-soundness-proof.md` where present. The **completeness**
-   direction — an honestly synthesized Γ satisfies `circuit_holds` — remains
-   open (see [Open gaps](#open-gaps)).
+   direction — an honestly synthesized Γ satisfies `circuit_holds` — is now
+   supplied generically by `Complete.circuit_holds_intro` (`Halo2/complete.v`)
+   and instantiated for the add chip and, constructively, for the whole Orchard
+   circuit; see [`circuit-completeness.md`](circuit-completeness.md) for the
+   theorem surface and [Open gaps](#open-gaps) for what is proved and what
+   remains.
 
 ## Tying lookups to the loaded table (`InitLookupTables`)
 
@@ -341,14 +345,37 @@ hypotheses. Both instantiation layers are proved:
 
 ## Open gaps
 
-- **Completeness of `circuit_holds`.** The gluing (item 4) is used in the
-  soundness direction only: assume a successful proof and derive functional
-  correctness. The dual — that an honestly synthesized Γ *satisfies*
-  `circuit_holds` — needs a well-formedness fact the model does not track:
-  selectors are 0 except where the synthesis program enables them. The
-  synthesis facts assert only the `= 1` points, so `satisfies_gates` (which
-  quantifies over all `(region, row)`) cannot yet be discharged from a
-  synthesized Γ.
+- **Completeness of `circuit_holds`.** The gluing (item 4) was originally used
+  in the soundness direction only. The dual — an honestly synthesized Γ
+  *satisfies* `circuit_holds` — is now addressed (full account in
+  [`circuit-completeness.md`](circuit-completeness.md)). The well-formedness
+  fact the model did not track — selectors are 0 except where the synthesis
+  program enables them — is now supplied as the selector plane of the
+  `honest_planes` predicate (the enabled-point indicator), which makes
+  `satisfies_gates` (quantified over all `(region, row)`) vacuous off the
+  enabled points. On that basis:
+  - `Complete.circuit_holds_intro` (`Halo2/complete.v`, `Qed`, clean audit)
+    reduces `circuit_holds` to finite per-enabled-point gate/lookup/witness
+    obligations plus three `vm_compute` Boolean checkers.
+  - `CompleteAdditionCompleteness.completeness` (`ecc/chip/add_complete.v`,
+    `Qed`, clean audit) is the add-chip instance.
+  - `OrchardCompletenessInstance.orchard_completeness_instance`
+    (`Orchard/circuit_completeness/instance_cert.v`) is the constructive
+    whole-circuit C1 instance (`Holds (honest_assignment test_input)` plus
+    read-back for one concrete valid input). It is `Qed`, but its audit is
+    **not yet clean**: it rests on 5 `Admitted` leaf certificates — 17 of the
+    4,858 enabled gate points (`instance_shards_blocked.shard_37..40_ok`: the
+    variable-base ladder interior and the `NoteCommit`/`Commit^ivk`
+    decomposition + canonicity subregions) and 84 of the 2,964 witness facts
+    (`instance_witness.witness_facts_ok`), all reading the deliberately-stubbed
+    C2-scale sub-generator cells. 4,841 enabled points and 2,880 witness facts
+    are machine-verified.
+
+  Remaining: complete those stubbed cells so the 5 leaves close (C1
+  axiom-free), then the universally quantified theorem
+  `completeness_statement honest_assignment` (stated as
+  `OrchardHonestAssignment.orchard_completeness_statement`, `Prop` only) — the
+  C2 campaign.
 - **Cyclic-domain refinement** (item 3): restore `nb_rows`, the `Z / 2^k Z`
   row domain, and the blinding-row distinction; refine `satisfies_gates` to
   quantify over each region's actual extent; and fold in the
@@ -358,9 +385,15 @@ hypotheses. Both instantiation layers are proved:
   `short_word_sound`, used by the var-base-mul overflow and base-field
   canonicity lookups — see item 2), but the short-lookup form needs an
   explicit `q_running = 0` hypothesis because the fact model asserts only
-  the `SelectorOn` points. A `SelectorOff`/default-0 selector model (the
-  same well-formedness fact as the completeness gap above) would discharge
-  the named short-lookup witness-honesty conditions.
+  the `SelectorOn` points. The default-0 selector model — the same
+  well-formedness fact as the completeness gap above — now exists in the
+  completeness direction as the `honest_planes` selector plane (the
+  enabled-point indicator, 0 off the enabled points), consumed by
+  `Complete.circuit_holds_intro`. It is not yet propagated back into the
+  soundness lemmas: the short-lookup form still carries its `q_running = 0`
+  hypothesis explicitly, and folding the default-0 model into the soundness
+  side (so the named short-lookup witness-honesty conditions discharge
+  automatically) remains open.
 
 ## Bottom line
 

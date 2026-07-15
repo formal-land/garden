@@ -247,6 +247,69 @@ combinators whose own `match` is on a bound variable
 until a checker's `vm_compute` (which runs it in milliseconds after a ~5 s
 one-time bytecode compilation of the closure).
 
+### Never reference a deep spec-constant chain inside a `Fixpoint` body
+
+A `Fixpoint` whose body mentions a constant that unfolds into a deep
+definition chain (observed with `SinsemillaSpec.merkle_layer`, which reaches
+the whole hash/generator/table chain) stalls compilation for *minutes* in
+end-of-file processing — under `-vos` and `-time`, every sentence logs
+`0. secs` and the stall appears after the last sentence, the same deceptive
+symptom as the match-scrutinee pitfall.  Measured on
+`circuit_completeness/instance_defs.v` (2026-07-15): a 32-iteration Merkle
+fixpoint referencing `merkle_layer` directly cost ≈ 8 min of end-of-file
+CPU; the identical logic as a *higher-order* fixpoint over abstract
+`step`/`check` function parameters, instantiated by a plain `Definition`
+(`chain_nondeg_go` / `merkle_nondeg_b`), compiles in ≈ 1 s.  Plain
+(non-recursive) definitions referencing the same constants are unaffected.
+When a recursive checker needs a heavy spec function, abstract it as a
+function parameter and instantiate outside the fixpoint.
+
+### Per-cell witness generators must not recompute region prefixes per read
+
+`vm_compute` shares no work between two applications of the same function:
+an `Assignment.t` whose advice plane recomputes region-level derivations at
+every cell read makes whole-circuit `vm_compute` certificates infeasible.
+Measured on the completeness instance
+(`Orchard/circuit_completeness/instance_cert.v`, 2026-07-14), with the raw
+VM cost constants — one 255-bit modular multiplication ≈ 7 ms (Z is the
+binary inductive, so a multiply is ~65 k constructor operations), one
+incomplete point addition (one egcd inversion + a few multiplies) ≈ 48 ms,
+one `field_sqrt` (Tonelli–Shanks, modpow-bound) ≈ 9–14 s, one `Pallas.mul`
+at a 255-bit scalar ≈ 20 s — the per-read costs of the current
+`circuit_completeness/advice_*` sub-generators are: any Merkle hash-region
+cell ≈ 10 s (the leaf recomputes `cm_old`, a 109-word Sinsemilla hash) plus
+≈ 5 s per layer index (the running node re-folds all previous layers); any
+`A5` cell of a fixed-base leg ≈ 1 161 s (a `List.nth` into
+`canonical_us_for` forces all 85 `field_sqrt`s); any variable-base-mul
+accumulator cell ≈ 20 s (one full `Pallas.mul`); the Orchard-checks
+`A4`/`A5` cells ≈ 161 s each (`anchor_root`, the 32-layer Merkle fold).
+Summed over the 4 858 enabled selector points × their gate reads this is
+days of VM time.
+
+The implemented architecture
+(`Orchard/circuit_completeness/tables.v`, 2026-07-15): every region-level
+derivation is hoisted into one record (`OrchardCompletenessTables.t`) built
+by `tables_of w` — the per-layer Sinsemilla accumulator rows built linearly
+(two field inversions per round, mirroring `IncompleteAddition.output`'s
+reduced chord formulas so the values are bit-identical to the spec fold),
+the six fixed-base legs, the Poseidon schedule, and the scalar multiples —
+and `honest_assignment` binds `tables_of w` in a `let` outside the per-cell
+lambdas.  Since global constants are evaluated once per `vm_compute` run
+and closure environments are built strictly, one run forces the record once
+(≈ 3–4 min for the whole circuit at the test input) and every cell read is
+a list lookup; the whole 4 858-point truth table evaluates in ≈ 9.5 min.
+The `field_sqrt` wall disappeared without pasted literals: the fixed-base
+square-root witnesses are read from the window-sign certificates' pasted
+`root_table`s (`circuit_proof/<base>/sign_cert.v`, one root per
+(window, digit) with `root² = fw_z + y`) instead of `canonical_us_for` —
+`y = u² − z` is identical for either root, so every consumer value is
+unchanged.  Two residual rules: the VM is call-by-value, so never pass a
+heavy derivation as a plain argument to a per-cell helper in the *builders*
+themselves; and work is still never shared across `vm_compute` runs (each
+certificate `Qed` re-pays the record build), so keep the number of
+heavy-certificate `Qed`s per file small — within one file's compilation the
+VM shares evaluated globals across successive `vm_compute` sentences.
+
 ### Scope `lia`/`nia` with `clear -` in div/mod-heavy contexts
 
 Micromega cost is a function of the whole context, not the goal: `lia`'s
@@ -312,6 +375,40 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   `exact`+Qed. The block conditions of `Halo2/realize/disjoint.v` are the
   placement-generic alternative if the whole-stream replay certificate
   ever becomes too heavy.
+- The completeness-instance certificate leaves (2026-07-15, over the
+  hoisted `tables.v` record — every run pays the ≈ 3–4 min record build
+  once, then per-cell lookups; the ten leaves are mutually independent and
+  compile fully parallel, ≈ 30 min wall on a free machine):
+  `instance_shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
+  layer families, one `vm_compute`) 8:03 / 1.0 GB;
+  `instance_shards_misc.v` (witness-input, Poseidon, gadget-local,
+  Orchard-checks + the value-commitment, nullifier and spend-authority
+  families, two `vm_compute`s sharing the record build) 6:25;
+  `instance_read.v` (`read_action_inputs_ok`; the specification side
+  recomputes `anchor_root` and the commitment values) 14:57 / 0.8 GB;
+  `instance_domain.v` (`valid_b` plus the linear Merkle/Sinsemilla
+  nondegeneracy clauses) 7:45; the four variable-base nondegeneracy ranges
+  (`instance_mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index —
+  the cost falls with the index, so the ranges are sized against it)
+  ≈ 30 / 23 / 19 / 14 min; `instance_defs.v` / `tables.v` /
+  `honest_assignment.v` (definitions only) ≈ 1 s each.  The four
+  generator-blocked shard certificates (`instance_shards_blocked.v`:
+  variable-base ladder boundary rows and the `NoteCommit`/`Commit^ivk`
+  decomposition and canonicity subregions — 17 of the 4 858 enabled points)
+  and the witness-fact certificate (`instance_witness.v`, 84 of the 2 964
+  facts) are Admitted pending the sub-generator completion; the exact
+  failing points are listed in the files.
+- `Orchard/circuit_completeness/certificates.v`: ≈ 8.7 s total — three
+  `vm_cast_no_check` certificates over `layouter_facts circuit.synthesize`
+  (14,773 facts, built by the VM in ≈ 0.07 s). The
+  `no_conflicting_writes` certificate dominates at ≈ 7.9 s: a first-match
+  scan quadratic in the 6,948 fixed writes. The `selector_guarded`
+  (configured system only) and `lookup_defaults_ok` (three lookup
+  arguments against table row 0) certificates and the
+  `layouter_table_rows = 1024` fact are each < 0.05 s. Single-process
+  `vm_compute` stays under 1 GB, so no `native_compute` or region-family
+  sharding is needed; shard `no_conflicting_writes` by top-level
+  `RegionId` constructor if the fixed-write count grows.
 - Fixed-base table leaves (`circuit_proof/<base>/table.v`): ~79 s ∥ 80 s ∥
   80 s ∥ 20 s in parallel (value_commit_v is the cheap one); the
   note_commit_r leaf lands in the ~100 s band; the commit_ivk_r leaf
