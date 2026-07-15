@@ -19,6 +19,14 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   the whole-circuit Orchard instantiation with its `vm_compute` certificates
   (`circuit_operational.v`), and the assurance upgrade this delivers for the
   Action-statement surface.
+- `docs/circuit-completeness.md`: the completeness direction of `circuit_holds`
+  (honest witnesses are accepted) — the generic gluing intro lemma
+  `Complete.circuit_holds_intro`, the add-chip completeness theorem, the
+  Orchard witness generator (`decidable_eq.v`, `circuit_completeness/`), and the
+  constructive whole-circuit C1 instance `orchard_completeness_instance` (`Qed`,
+  resting on 5 tracked `Admitted` leaf certificates for the stubbed C2-scale
+  sub-generator cells), plus the stated universal C2 target and the assumption
+  audit.
 - `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with
