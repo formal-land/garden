@@ -8,6 +8,7 @@ Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_completeness.witness_input.
+Require Import Garden.Orchard.circuit_completeness.tables_nc.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.ZArith.ZArith.
@@ -32,8 +33,12 @@ Global Open Scope Z_scope.
 
     The values are read off [witness_input.v]'s derived spec functions
     ([merkle_layer_words] / [note_commit_*_words] / [commit_ivk_words] and the
-    accumulator fold [sinsemilla_acc]); nothing cryptographic is recomputed
-    here.  Cells no gate/copy/lookup of these regions reads default to 0.
+    accumulator fold [sinsemilla_acc]); the [NoteCommit] / [Commit^ivk]
+    decomposition, canonicity, range-check and lookup subregions read the
+    bit-slice cell layer of [tables_nc.v] at the notes' honest opening values
+    (the new note's [ρ] is the old note's nullifier).  Nothing cryptographic
+    is recomputed here.  Cells no gate/copy/lookup of these regions reads
+    default to 0.
 
     The per-gate satisfaction proofs (that these cells satisfy the Sinsemilla
     and decomposition gates) are the C2 follow-up and are not attempted here;
@@ -301,11 +306,12 @@ Module OrchardAdviceMerkleSinsemilla.
   (** ** The dispatcher
 
       The advice plane for the covered regions; 0 elsewhere (those regions are
-      owned by sibling sub-generators).  Within the Merkle and note/commitment
-      subtrees, only the hash, decomposition, witness-piece and range regions
-      carry values; the [NoteCommit] message-piece and canonicity subregions —
-      whose field-decomposition layout lives in the [note_commit] soundness
-      files — are left at 0 for the assembly follow-up. *)
+      owned by sibling sub-generators).  Within the note/commitment subtrees,
+      the hash regions carry the incomplete-addition ladder, and every
+      message-piece, input-decomposition, y-canonicity, range-check and
+      canonicity-lookup subregion reads the [tables_nc.v] cell layer; the
+      fixed-base blinding legs and the final complete additions are the ECC
+      sub-generator's regions and read 0 here. *)
   Definition advice
       (w : HonestInput) (col : Advice.t) (region : RegionId.t) (row : Z) : Z :=
     match region with
@@ -343,7 +349,20 @@ Module OrchardAdviceMerkleSinsemilla.
                   (split_pieces note_commit_lens (note_commit_new_words w))
                   true col row
             end
-        | _ => 0
+        | RegionId.NoteCommit.FixedBaseIncomplete
+        | RegionId.NoteCommit.FixedBaseLast
+        | RegionId.NoteCommit.CompletePointAdd => 0
+        | _ =>
+            match which with
+            | RegionId.NoteCommit.Which.Old =>
+                OrchardNoteCommitCells.nc_advice
+                  (hi_g_d_old w) (hi_pk_d_old w) (hi_v_old w)
+                  (hi_rho_old w) (hi_psi_old w) false nregion col row
+            | RegionId.NoteCommit.Which.New =>
+                OrchardNoteCommitCells.nc_advice
+                  (hi_g_d_new w) (hi_pk_d_new w) (hi_v_new w)
+                  (rho_new w) (hi_psi_new w) true nregion col row
+            end
         end
     | RegionId.CommitIvk cregion =>
         match cregion with
@@ -351,7 +370,12 @@ Module OrchardAdviceMerkleSinsemilla.
             hash_region_advice commit_ivk_Q
               (split_pieces commit_ivk_lens (commit_ivk_words w))
               false col row
-        | _ => 0
+        | RegionId.CommitIvk.FixedBaseIncomplete
+        | RegionId.CommitIvk.FixedBaseLast
+        | RegionId.CommitIvk.CompletePointAdd => 0
+        | _ =>
+            OrchardNoteCommitCells.civk_advice
+              (EccSpec.extract_x (hi_ak w)) (hi_nk w) cregion col row
         end
     | _ => 0
     end.

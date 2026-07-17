@@ -57,6 +57,8 @@ Require Import Garden.Orchard.circuit_completeness.advice_witness_io.
 Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
 Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
 Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.tables_nc.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.ZArith.ZArith.
@@ -331,7 +333,7 @@ Module OrchardCompletenessTables.
       [vm_compute] run: the note-commitment/[Commit^ivk] hash regions, the
       old-note commitment and the anchor chain, the six fixed-base legs and
       their derived sums, the Poseidon schedule, the nullifier chain and the
-      variable-base scalar data, plus the public-instance values. *)
+      variable-base ladder record, plus the public-instance values. *)
   Record t : Set := {
     (* Old note commitment and the Merkle chain. *)
     t_nc_old_hash : hash_data;
@@ -355,6 +357,7 @@ Module OrchardCompletenessTables.
     t_civkr_pt : Point.t;
     t_ivk : Z;
     t_vb_result : Point.t;
+    t_vb : OrchardVarBaseTables.t;
     (* Fixed-base legs and their derived points. *)
     t_sa_leg : leg_data;
     t_sa_comm : Point.t;
@@ -364,7 +367,9 @@ Module OrchardCompletenessTables.
     t_vcv_leg : leg_data;
     t_vcv_mul : Point.t;
     t_nco_leg : leg_data;
+    t_nco_pt : Point.t;
     t_ncn_leg : leg_data;
+    t_ncn_pt : Point.t;
     (* Public-instance values. *)
     t_anchor_row : Z;
     t_cv_spec : Point.t;
@@ -428,6 +433,7 @@ Module OrchardCompletenessTables.
     let vb_res :=
       PallasModel.repr
         (Pallas.mul ivk_v (PallasModel.unrepr (hi_g_d_old w))) in
+    let vb := OrchardVarBaseTables.vb_columns ivk_v (hi_g_d_old w) in
     (* The five remaining fixed-base legs and the derived leg sums. *)
     let sa_leg :=
       leg_of OrchardAdviceEccMuls.tbl_spend_auth
@@ -448,9 +454,13 @@ Module OrchardCompletenessTables.
     let nco_leg :=
       leg_of OrchardAdviceEccMuls.tbl_note_commit_r
         NoteCommitRWindowSignCert.root_table (hi_rcm_old w) in
+    let nco_pt :=
+      EccSpec.point_add (leg_pt nco_leg 84%nat) (leg_acc nco_leg 83%nat) in
     let ncn_leg :=
       leg_of OrchardAdviceEccMuls.tbl_note_commit_r
         NoteCommitRWindowSignCert.root_table (hi_rcm_new w) in
+    let ncn_pt :=
+      EccSpec.point_add (leg_pt ncn_leg 84%nat) (leg_acc ncn_leg 83%nat) in
     (* The public-instance values. *)
     let anchor_row :=
       if hi_v_old w =? 0 then hi_anchor_public w else anchor in
@@ -479,6 +489,7 @@ Module OrchardCompletenessTables.
       t_civkr_pt := civkr_pt;
       t_ivk := ivk_v;
       t_vb_result := vb_res;
+      t_vb := vb;
       t_sa_leg := sa_leg;
       t_sa_comm := sa_comm;
       t_rk_pt := rk_pt;
@@ -487,7 +498,9 @@ Module OrchardCompletenessTables.
       t_vcv_leg := vcv_leg;
       t_vcv_mul := vcv_mul;
       t_nco_leg := nco_leg;
+      t_nco_pt := nco_pt;
       t_ncn_leg := ncn_leg;
+      t_ncn_pt := ncn_pt;
       t_anchor_row := anchor_row;
       t_cv_spec := cv;
       t_rk_spec := rk_spec;
@@ -770,29 +783,6 @@ Module OrchardCompletenessTables.
     Point.y := vcv_y_var_t w tb;
   |}.
 
-  Definition vb_advice_t (w : HonestInput) (tb : t)
-      (column : Advice.t) (offset : Z) : Z :=
-    if offset =? 0 then
-      match column with
-      | A0 => Point.x (hi_g_d_old w)
-      | A1 => Point.y (hi_g_d_old w)
-      | A2 => Point.x (hi_g_d_old w)
-      | A3 => Point.y (hi_g_d_old w)
-      | _ => 0
-      end
-    else if offset =? 136 then
-      match column with
-      | A0 => Point.x (hi_g_d_old w)
-      | A1 => Point.y (hi_g_d_old w)
-      | A2 => Point.x (t_vb_result tb)
-      | A3 => Point.y (t_vb_result tb)
-      | _ => 0
-      end
-    else 0.
-
-  Definition vb_s_t (tb : t) : Z :=
-    t_ivk tb + ((t_ivk tb + Primes.t_q) / 2 ^ 254) * 2 ^ 130.
-
   Definition advice_ecc_t (w : HonestInput) (tb : t)
       (column : Advice.t) (region : RegionId.t) (offset : Z) : Z :=
     match region with
@@ -837,40 +827,12 @@ Module OrchardCompletenessTables.
     | RegionId.ValueCommitment RegionId.ValueCommitment.CompletePointAdd =>
         OrchardAdviceEccMuls.cadd_advice (vcv_point_t w tb) (t_vcr_pt tb)
           column offset
-    | RegionId.AddressIntegrity
-        (RegionId.AddressIntegrity.Mul
-          RegionId.AddressIntegrity.Mul.VariableBase) =>
-        vb_advice_t w tb column offset
-    | RegionId.AddressIntegrity
-        (RegionId.AddressIntegrity.Mul
-          RegionId.AddressIntegrity.Mul.OverflowS) =>
-        if offset =? 0 then
-          match column with A6 => vb_s_t tb | _ => 0 end
-        else 0
-    | RegionId.AddressIntegrity
-        (RegionId.AddressIntegrity.Mul
-          RegionId.AddressIntegrity.Mul.OverflowLookup) =>
-        match column with
-        | A9 =>
-            if (0 <=? offset) && (offset <=? 13)
-            then vb_s_t tb / 2 ^ (10 * offset) else 0
-        | _ => 0
-        end
-    | RegionId.AddressIntegrity
-        (RegionId.AddressIntegrity.Mul
-          RegionId.AddressIntegrity.Mul.OverflowCheck) =>
-        if offset =? 1 then
-          match column with
-          | A7 => t_ivk tb
-          | A8 => vb_s_t tb
-          | _ => 0
-          end
-        else if offset =? 2 then
-          match column with
-          | A7 => vb_s_t tb / 2 ^ 130
-          | _ => 0
-          end
-        else 0
+    (* The variable-base multiplication block ([[ivk] g_d_old]): the 137-row
+       double-and-add ladder and the three overflow-check regions, read off
+       the hoisted ladder record ([OrchardVarBaseTables]). *)
+    | RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul sub) =>
+        OrchardVarBaseTables.mul_advice_of (t_ivk tb) (hi_g_d_old w)
+          (t_vb tb) sub column offset
     | RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD =>
         if offset =? 0 then
           match column with
@@ -892,9 +854,11 @@ Module OrchardCompletenessTables.
 
       The total dispatcher: the same region routing as
       [OrchardHonestAssignment.advice_plane], every family reading its
-      hoisted data.  The [NoteCommit]/[Commit^ivk] decomposition and
-      canonicity subregions and the variable-base ladder interior are the
-      untouched sub-generator gaps (0, as in the [advice_*] files). *)
+      hoisted data.  The [NoteCommit]/[Commit^ivk] decomposition,
+      canonicity, range-check and lookup subregions read the [tables_nc.v]
+      bit-slice layer directly (per-read cost a few integer divisions); the
+      variable-base multiplication block reads the hoisted ladder record of
+      [tables_vb.v]. *)
   Definition advice_t (w : HonestInput) (tb : t)
       (column : Advice.t) (region : RegionId.t) (row : Z) : Z :=
     match region with
@@ -919,39 +883,14 @@ Module OrchardCompletenessTables.
     | RegionId.CommitIvk RegionId.CommitIvk.CompletePointAdd =>
         OrchardAdviceEccMuls.cadd_advice
           (hd_out (t_civk_hash tb)) (t_civkr_pt tb) column row
-    (* The witnessed message pieces (copied into the hash region's [bits]
-       heads): [a]/[b]/[c]/[d] start at bits rows 0/25/26/50 of the 51-word
-       [Commit^ivk] message. *)
-    | RegionId.CommitIvk RegionId.CommitIvk.WitnessA =>
-        if (row =? 0) && OrchardAdviceMerkleSinsemilla.advice_eqb column A6
-        then List.nth 0 (hd_bits (t_civk_hash tb)) 0 else 0
-    | RegionId.CommitIvk RegionId.CommitIvk.WitnessB =>
-        if (row =? 0) && OrchardAdviceMerkleSinsemilla.advice_eqb column A6
-        then List.nth 25 (hd_bits (t_civk_hash tb)) 0 else 0
-    | RegionId.CommitIvk RegionId.CommitIvk.WitnessC =>
-        if (row =? 0) && OrchardAdviceMerkleSinsemilla.advice_eqb column A6
-        then List.nth 26 (hd_bits (t_civk_hash tb)) 0 else 0
-    | RegionId.CommitIvk RegionId.CommitIvk.WitnessD =>
-        if (row =? 0) && OrchardAdviceMerkleSinsemilla.advice_eqb column A6
-        then List.nth 50 (hd_bits (t_civk_hash tb)) 0 else 0
-    (* The pinned bitshift constants of the piece range checks; the checked
-       values stay with the decomposition/canonicity sub-generator. *)
-    | RegionId.CommitIvk RegionId.CommitIvk.RangeB0 =>
-        match column, row with
-        | A9, 2 => Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_4
-        | _, _ => 0
-        end
-    | RegionId.CommitIvk RegionId.CommitIvk.RangeB2 =>
-        match column, row with
-        | A9, 2 => Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_5
-        | _, _ => 0
-        end
-    | RegionId.CommitIvk RegionId.CommitIvk.RangeD0 =>
-        match column, row with
-        | A9, 2 => Garden.Halo2.halo2_gadgets.ecc.chip.constants.inv_two_pow_9
-        | _, _ => 0
-        end
-    | RegionId.CommitIvk _ => 0
+    (* The witnessed message pieces, the sub-piece range checks, the
+       canonicity lookup running sums and the canonicity-gate rows: the
+       [tables_nc.v] bit-slice cell layer over the packed [Commit^ivk]
+       message [ak_x + nk·2^255] (every read costs a few integer
+       divisions, so no hoisting is needed). *)
+    | RegionId.CommitIvk cregion =>
+        OrchardNoteCommitCells.civk_advice
+          (EccSpec.extract_x (hi_ak w)) (hi_nk w) cregion column row
     | RegionId.NoteCommit RegionId.NoteCommit.Which.Old
         RegionId.NoteCommit.HashToPoint =>
         hash_region_advice_t (t_nc_old_hash tb) false column row
@@ -960,7 +899,39 @@ Module OrchardCompletenessTables.
         hash_region_advice_t (t_nc_new_hash tb) true column row
     | RegionId.NoteCommit _ RegionId.NoteCommit.FixedBaseIncomplete =>
         advice_ecc_t w tb column region row
-    | RegionId.NoteCommit _ _ => 0
+    (* The fixed-base blinding legs' final complete additions and the
+       commitment sums (the [assign_complete_add] witness rows over the
+       hoisted leg boundaries and hash outputs). *)
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.Old
+        RegionId.NoteCommit.FixedBaseLast =>
+        OrchardAdviceEccMuls.cadd_advice
+          (leg_pt (t_nco_leg tb) 84%nat) (leg_acc (t_nco_leg tb) 83%nat)
+          column row
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.New
+        RegionId.NoteCommit.FixedBaseLast =>
+        OrchardAdviceEccMuls.cadd_advice
+          (leg_pt (t_ncn_leg tb) 84%nat) (leg_acc (t_ncn_leg tb) 83%nat)
+          column row
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.Old
+        RegionId.NoteCommit.CompletePointAdd =>
+        OrchardAdviceEccMuls.cadd_advice
+          (hd_out (t_nc_old_hash tb)) (t_nco_pt tb) column row
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.New
+        RegionId.NoteCommit.CompletePointAdd =>
+        OrchardAdviceEccMuls.cadd_advice
+          (hd_out (t_nc_new_hash tb)) (t_ncn_pt tb) column row
+    (* The message-piece, input-decomposition, y-canonicity, range-check
+       and canonicity-lookup subregions: the [tables_nc.v] bit-slice cell
+       layer over the packed §5.4.8.4 note message ([ρ_new] is the old
+       note's nullifier, read from the hoisted chain). *)
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.Old nregion =>
+        OrchardNoteCommitCells.nc_advice
+          (hi_g_d_old w) (hi_pk_d_old w) (hi_v_old w)
+          (hi_rho_old w) (hi_psi_old w) false nregion column row
+    | RegionId.NoteCommit RegionId.NoteCommit.Which.New nregion =>
+        OrchardNoteCommitCells.nc_advice
+          (hi_g_d_new w) (hi_pk_d_new w) (hi_v_new w)
+          (t_nf_spec tb) (hi_psi_new w) true nregion column row
     | RegionId.NoteCommitOldEquality => 0
     | RegionId.NoteCommitNewWitnessGD =>
         if row =? 0 then

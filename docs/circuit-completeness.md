@@ -114,9 +114,14 @@ assumption audit exactly `PrimString.string` + impredicative `Set`.
 - `Garden/Orchard/circuit_completeness/tables.v` — the hoisted per-family
   derivation record (`tables_of w`) that keeps the whole-circuit `vm_compute`
   certificates feasible (see [`compile-performance.md`](compile-performance.md),
-  "Per-cell witness generators…").
+  "Per-cell witness generators…"), together with its two cell layers:
+  `tables_vb.v` (the variable-base double-and-add ladder and overflow block,
+  built by one linear fold — two field inversions per bit, never a per-cell
+  `Pallas.mul`) and `tables_nc.v` (the `NoteCommit`/`Commit^ivk`
+  decomposition, y-canonicity, range-check and lookup cells as pure
+  div/mod bit slices of the packed §5.4.8.4 messages).
 
-### The constructive C1 instance (statement `Qed`, audit not yet clean)
+### The constructive C1 instance (`Qed`, clean audit)
 
 `OrchardCompletenessInstance.orchard_completeness_instance`
 (`Garden/Orchard/circuit_completeness/instance_cert.v`):
@@ -138,24 +143,10 @@ a sharded `check_point` truth table over the 4,858 enabled gate points and
 certificates in `instance_domain.v` + `instance_mul_{a..d}.v`; read-back in
 `instance_read.v`).
 
-**The theorem is `Qed`, but its assumption audit is not yet clean.** It rests
-on 5 `Admitted` leaf certificates, which `Print Assumptions` reports alongside
-`PrimString.string` + impredicative `Set`:
-
-- `instance_shards_blocked.shard_37_ok` … `shard_40_ok` — 17 of the 4,858
-  enabled gate points: the variable-base-mul ladder interior rows
-  (`AddressIntegrity`, families 37) and the `NoteCommit` / `Commit^ivk`
-  decomposition + canonicity subregions (families 38/39/40). The exact failing
-  points are listed in the file.
-- `instance_witness.witness_facts_ok` — 84 of the 2,964 copy/constant witness
-  facts, the copies between those same stubbed decomposition/canonicity cells
-  and their generated sources.
-
-All are the same root cause: the C2-scale sub-generator cells (var-base
-double-and-add interior, NoteCommit/CommitIvk decomposition + canonicity) are
-deliberately left at 0 in the current generator. **4,841 enabled points and
-2,880 witness facts are machine-verified by `vm_compute`.** No statement was
-weakened; completing these is generator work, not a test-vector or layout bug.
+**All 4,858 enabled points and all 2,964 witness facts are machine-verified
+by `vm_compute`.** The full-`.vo` `Print Assumptions` audit of
+`orchard_completeness_instance` reports exactly `PrimString.string` +
+impredicative `Set`.
 
 ### The universally quantified target (stated only)
 
@@ -183,19 +174,12 @@ Proved and clean (`PrimString.string` + impredicative `Set`):
 - `CompleteAdditionCompleteness.completeness` — the add-chip instance.
 - The Orchard supporting infrastructure: `decidable_eq.v`, the three
   `certificates.v` checkers, the `honest_assignment` generator with
-  `honest_planes_ok`.
-
-Delivered but not yet axiom-free:
-
-- `orchard_completeness_instance` — `Qed`, but resting on the 5 `Admitted`
-  leaf certificates above (17 enabled points + 84 witness facts of the stubbed
-  C2-scale sub-generator cells).
+  `honest_planes_ok`, and the cell layers `tables.v` / `tables_vb.v` /
+  `tables_nc.v`.
+- `orchard_completeness_instance` — the whole-circuit C1 instance.
 
 Remaining:
 
-1. Complete the stubbed sub-generator cells (var-base ladder interior,
-   NoteCommit/CommitIvk decomposition + canonicity) so the 5 `Admitted` leaves
-   close and the C1 instance becomes axiom-free.
-2. The universally quantified theorem
+1. The universally quantified theorem
    `completeness_statement honest_assignment` — the per-gate forward lemmas,
    per-region-family generator↔gate lemmas, and assembly (the C2 campaign).

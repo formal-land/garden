@@ -56,10 +56,18 @@ Global Open Scope Z_scope.
       exceptional-case witnesses on [A5]-[A8], and [point_add] output on
       [A2]/[A3] at row 1 — the witness formulas of the [add] chip's
       completeness proof;
-    - variable-base ladder ([mul.synthesize_variable_base_scalar_mul_region]):
-      the base-point copies and the [[ivk] g_d_old] result cell; the deep
-      double-and-add interior rows are the per-gate C2 obligation and default
-      to [0]. *)
+    - variable-base ladder ([mul.synthesize_variable_base_scalar_mul_region],
+      bridged by [circuit_proof/ownership/var_base_mul.v]): row 0 doubles the
+      base by complete addition; rows 2..126 and 2..127 carry the hi and lo
+      incomplete double-and-add halves (bits 254..130 and 129..4 of
+      [ivk + t_q]) on the [z]/[x_a]/[λ₁]/[λ₂] column quadruples
+      [A9]/[A3]/[A4]/[A5] and [A6]/[A7]/[A8]/[A2]; rows 129..134 the three
+      complete rounds (bits 3..1, one [QEccAdd] pair per bit with the
+      [QMulDecomposeVar] running sums); row 135 the LSB round, its output
+      [[ivk] g_d_old] on [A2]/[A3] of row 136; the overflow block carries
+      the reduced [s = ivk + k_254·2^130], its 13-word running-sum
+      decomposition, and the [z_0]/[z_130]/[k_254] copies of the ladder's
+      [A9] running sums. *)
 
 Module OrchardAdviceEccMuls.
   Import OrchardWitnessInput.
@@ -286,44 +294,207 @@ Module OrchardAdviceEccMuls.
   Definition vb_result (w : HonestInput) : Point.t :=
     PallasModel.repr (Pallas.mul (ivk w) (mul_base w)).
 
-  (** The variable-base region's cleanly-determined cells: the base-point
-      copies at the first double-and-add row, the zero-initialised running
-      sum, and the [[ivk] g_d_old] result at [A2]/[A3] of the final row.  The
-      interior double-and-add rows (the incomplete hi/lo ladders, the complete
-      final rounds, and the [A9] scalar running sums) are the per-gate C2
-      obligation and default to [0]. *)
+  (** The incomplete double-and-add step at bit [i] (accumulator boundary
+      [i + 1]): the intermediate sum [mid = acc ⊞ (2k_i − 1)B] and the two
+      chord gradients the [q_mul_{1,2,3}] gates read
+      ([ecc/chip/mul/incomplete.v]; soundness bridge
+      [circuit_proof/ownership/var_base_incomplete.v]).  The accumulator's
+      [y] is not stored per row — the gates recover it as
+      [((λ₁ + λ₂)(x_a − x_r)) / 2]. *)
+  Definition vb_step_mid (w : HonestInput) (i : nat) : Point.t :=
+    EccSpec.point_add_incomplete (mul_acc w (S i)) (mul_step_point w i).
+
+  Definition vb_step_l1 (w : HonestInput) (i : nat) : Z :=
+    let acc := mul_acc w (S i) in
+    let q := mul_step_point w i in
+    BinOp.div (Point.y acc -F Point.y q) (Point.x acc -F Point.x q).
+
+  Definition vb_step_l2 (w : HonestInput) (i : nat) : Z :=
+    let acc := mul_acc w (S i) in
+    let m := vb_step_mid w i in
+    BinOp.div (Point.y acc -F Point.y m) (Point.x acc -F Point.x m).
+
+  (** The complete-round chain (bits 3..1, [ecc/chip/mul/complete.v];
+      soundness bridge [circuit_proof/ownership/var_base_complete.v]): per
+      bit the signed base is complete-added into the accumulator and the
+      accumulator complete-added onto the sum.  On the nondegenerate domain
+      each [vb_acc_bit i] equals [mul_acc w i]. *)
+  Definition vb_cacc4 (w : HonestInput) : Point.t := mul_acc w 4.
+  Definition vb_mid_bit3 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (mul_step_point w 3) (vb_cacc4 w).
+  Definition vb_acc_bit3 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (vb_cacc4 w) (vb_mid_bit3 w).
+  Definition vb_mid_bit2 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (mul_step_point w 2) (vb_acc_bit3 w).
+  Definition vb_acc_bit2 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (vb_acc_bit3 w) (vb_mid_bit2 w).
+  Definition vb_mid_bit1 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (mul_step_point w 1) (vb_acc_bit2 w).
+  Definition vb_acc_bit1 (w : HonestInput) : Point.t :=
+    EccSpec.point_add (vb_acc_bit2 w) (vb_mid_bit1 w).
+
+  (** The LSB round's point ([lsb_check_gate]): the [(0, 0)] identity
+      sentinel on bit [1], [−B] on bit [0]. *)
+  Definition vb_lsb_point (w : HonestInput) : Point.t :=
+    if scalar_bit (mul_scalar w) 0 =? 1
+    then {| Point.x := 0; Point.y := 0 |}
+    else point_neg (vb_base w).
+
+  (** The complete-addition operand pair [(p, q)] of a [QEccAdd] row of the
+      region: the base doubling at row 0, per complete round the
+      [signed-base + acc] then [acc + mid] pairs, and the LSB addition at
+      row 135. *)
+  Definition vb_cadd_ops (w : HonestInput) (offset : Z)
+      : Point.t * Point.t :=
+    if offset =? 129 then (mul_step_point w 3, vb_cacc4 w)
+    else if offset =? 130 then (vb_cacc4 w, vb_mid_bit3 w)
+    else if offset =? 131 then (mul_step_point w 2, vb_acc_bit3 w)
+    else if offset =? 132 then (vb_acc_bit3 w, vb_mid_bit2 w)
+    else if offset =? 133 then (mul_step_point w 1, vb_acc_bit2 w)
+    else if offset =? 134 then (vb_acc_bit2 w, vb_mid_bit1 w)
+    else if offset =? 135 then (vb_lsb_point w, vb_acc_bit1 w)
+    else (vb_base w, vb_base w).
+
+  (** The full 137-row variable-base region.  Row [r] of the hi half
+      (rows 2..126) processes bit [256 − r] of [ivk + t_q] from accumulator
+      boundary [257 − r] on columns [A9]/[A3]/[A4]/[A5]
+      ([z]/[x_a]/[λ₁]/[λ₂]); row [r] of the lo half (rows 2..127) processes
+      bit [131 − r] from boundary [132 − r] on [A6]/[A7]/[A8]/[A2]; both
+      halves read the base on [A0]/[A1].  The boundary cells carry the
+      witnessed [y_a] values ([A4@1], [A4@127], [A8@1], [A8@128]) and the
+      final accumulator coordinates ([A2]/[A3]@1, [A3]/[A7]@127/128).  Rows
+      129..135 host the complete rounds and the LSB round: the [QEccAdd]
+      operand/output chain on [A0]..[A3] with the [assign_complete_add]
+      witnesses on [A4]..[A8], and on [A9] the resumed running sums
+      interleaved with the base-[y] pins the [QMulDecomposeVar] gate reads.
+      Every cell equals the corresponding hoisted-table value
+      ([tables_vb.v]) on the nondegenerate domain. *)
   Definition vb_advice (w : HonestInput) (column : Advice.t) (offset : Z) : Z :=
-    if offset =? 0 then
-      match column with
-      | A0 => Point.x (vb_base w)
-      | A1 => Point.y (vb_base w)
-      | A2 => Point.x (vb_base w)
-      | A3 => Point.y (vb_base w)
-      | _ => 0
-      end
-    else if offset =? 1 then
-      match column with A9 => 0 | _ => 0 end
-    else if offset =? 136 then
-      match column with
-      | A0 => Point.x (vb_base w)
-      | A1 => Point.y (vb_base w)
-      | A2 => Point.x (vb_result w)
-      | A3 => Point.y (vb_result w)
-      | _ => 0
-      end
-    else 0.
+    let k := mul_scalar w in
+    match column with
+    | A0 =>
+        if (offset =? 0) || ((2 <=? offset) && (offset <=? 127))
+           || (offset =? 129) || (offset =? 131) || (offset =? 133)
+           || (offset =? 136)
+        then Point.x (vb_base w)
+        else if offset =? 130 then Point.x (vb_cacc4 w)
+        else if offset =? 132 then Point.x (vb_acc_bit3 w)
+        else if offset =? 134 then Point.x (vb_acc_bit2 w)
+        else if offset =? 135 then Point.x (vb_lsb_point w)
+        else 0
+    | A1 =>
+        if (offset =? 0) || ((2 <=? offset) && (offset <=? 127))
+           || (offset =? 136)
+        then Point.y (vb_base w)
+        else if offset =? 129 then Point.y (mul_step_point w 3)
+        else if offset =? 131 then Point.y (mul_step_point w 2)
+        else if offset =? 133 then Point.y (mul_step_point w 1)
+        else if offset =? 130 then Point.y (vb_cacc4 w)
+        else if offset =? 132 then Point.y (vb_acc_bit3 w)
+        else if offset =? 134 then Point.y (vb_acc_bit2 w)
+        else if offset =? 135 then Point.y (vb_lsb_point w)
+        else 0
+    | A2 =>
+        if offset =? 0 then Point.x (vb_base w)
+        else if offset =? 1 then Point.x (mul_acc w 255)
+        else if (2 <=? offset) && (offset <=? 127)
+        then vb_step_l2 w (Z.to_nat (131 - offset))
+        else if offset =? 129 then Point.x (vb_cacc4 w)
+        else if offset =? 130 then Point.x (vb_mid_bit3 w)
+        else if offset =? 131 then Point.x (vb_acc_bit3 w)
+        else if offset =? 132 then Point.x (vb_mid_bit2 w)
+        else if offset =? 133 then Point.x (vb_acc_bit2 w)
+        else if offset =? 134 then Point.x (vb_mid_bit1 w)
+        else if offset =? 135 then Point.x (vb_acc_bit1 w)
+        else if offset =? 136 then Point.x (vb_result w)
+        else 0
+    | A3 =>
+        if offset =? 0 then Point.y (vb_base w)
+        else if offset =? 1 then Point.y (mul_acc w 255)
+        else if (2 <=? offset) && (offset <=? 126)
+        then Point.x (mul_acc w (Z.to_nat (257 - offset)))
+        else if offset =? 127 then Point.x (mul_acc w 130)
+        else if offset =? 129 then Point.y (vb_cacc4 w)
+        else if offset =? 130 then Point.y (vb_mid_bit3 w)
+        else if offset =? 131 then Point.y (vb_acc_bit3 w)
+        else if offset =? 132 then Point.y (vb_mid_bit2 w)
+        else if offset =? 133 then Point.y (vb_acc_bit2 w)
+        else if offset =? 134 then Point.y (vb_mid_bit1 w)
+        else if offset =? 135 then Point.y (vb_acc_bit1 w)
+        else if offset =? 136 then Point.y (vb_result w)
+        else 0
+    | A4 =>
+        if offset =? 1 then Point.y (mul_acc w 255)
+        else if (2 <=? offset) && (offset <=? 126)
+        then vb_step_l1 w (Z.to_nat (256 - offset))
+        else if offset =? 127 then Point.y (mul_acc w 130)
+        else if (offset =? 0) || ((129 <=? offset) && (offset <=? 135)) then
+          let '(pp, qq) := vb_cadd_ops w offset in
+          lambda_w (Point.x pp) (Point.y pp) (Point.x qq) (Point.y qq)
+        else 0
+    | A5 =>
+        if (2 <=? offset) && (offset <=? 126)
+        then vb_step_l2 w (Z.to_nat (256 - offset))
+        else if (offset =? 0) || ((129 <=? offset) && (offset <=? 135)) then
+          let '(pp, qq) := vb_cadd_ops w offset in
+          alpha_w (Point.x pp) (Point.x qq)
+        else 0
+    | A6 =>
+        if (1 <=? offset) && (offset <=? 127)
+        then bit_running_sum k (Z.to_nat (131 - offset))
+        else if (offset =? 0) || ((129 <=? offset) && (offset <=? 135)) then
+          let '(pp, _) := vb_cadd_ops w offset in
+          beta_w (Point.x pp)
+        else 0
+    | A7 =>
+        if (2 <=? offset) && (offset <=? 127)
+        then Point.x (mul_acc w (Z.to_nat (132 - offset)))
+        else if offset =? 128 then Point.x (vb_cacc4 w)
+        else if (offset =? 0) || ((129 <=? offset) && (offset <=? 135)) then
+          let '(_, qq) := vb_cadd_ops w offset in
+          gamma_w (Point.x qq)
+        else 0
+    | A8 =>
+        if offset =? 1 then Point.y (mul_acc w 130)
+        else if (2 <=? offset) && (offset <=? 127)
+        then vb_step_l1 w (Z.to_nat (131 - offset))
+        else if offset =? 128 then Point.y (vb_cacc4 w)
+        else if (offset =? 0) || ((129 <=? offset) && (offset <=? 135)) then
+          let '(pp, qq) := vb_cadd_ops w offset in
+          delta_w (Point.x pp) (Point.y pp) (Point.x qq) (Point.y qq)
+        else 0
+    | A9 =>
+        if (1 <=? offset) && (offset <=? 126)
+        then bit_running_sum k (Z.to_nat (256 - offset))
+        else if offset =? 129 then bit_running_sum k 4
+        else if offset =? 131 then bit_running_sum k 3
+        else if offset =? 133 then bit_running_sum k 2
+        else if offset =? 135 then bit_running_sum k 1
+        else if offset =? 136 then k
+        else if (offset =? 130) || (offset =? 132) || (offset =? 134)
+        then Point.y (vb_base w)
+        else 0
+    end.
 
   (** ** The overflow check
 
-      [s = alpha + k_254 . 2^130] recovers the top scalar bit; the lookup
-      region decomposes its low 130 bits into thirteen 10-bit running sums;
-      the check region copies the three var-base running sums and [alpha]/[s].
-      The cross-region [z] copies ([z_2], [z_126], [z_136]) mirror the
-      variable-base [A9] running sums (defaulted above) and so default to [0]
-      here for copy consistency; the [alpha]/[s]/[z_13] cells carry their
-      determined values. *)
+      [s = alpha + k_254 . 2^130] recovers the top scalar bit
+      ([ecc/chip/mul/overflow.v]; soundness bridge
+      [circuit_proof/ownership/var_base_overflow.v]).  [s] is reduced to its
+      field representative: the lookup region decomposes the reduced value
+      into thirteen 10-bit running sums, so on [k_254 = 1] — where
+      [alpha + 2^130 ≥ p] — the tail [z_13 = s / 2^130] is [0], as the
+      [s_minus_lo_130_check] constraint requires.  The check region copies
+      the three var-base [A9] running sums ([z_136 = ivk + t_q],
+      [z_126 = z_130], [z_2 = k_254]) and [alpha]/[s]/[z_13], and witnesses
+      the [η] inverse of [z_130] for the canonicity constraint. *)
   Definition vb_k254 (w : HonestInput) : Z := mul_scalar w / 2 ^ 254.
-  Definition vb_s (w : HonestInput) : Z := ivk w + vb_k254 w * 2 ^ 130.
+  Definition vb_s (w : HonestInput) : Z :=
+    (ivk w + vb_k254 w * 2 ^ 130) mod Primes.pallas_p.
+  Definition vb_z130 (w : HonestInput) : Z := mul_scalar w / 2 ^ 130.
+  Definition vb_eta (w : HonestInput) : Z :=
+    if vb_z130 w =? 0 then 0
+    else mod_inverse (vb_z130 w) Primes.pallas_p.
 
   Definition overflow_s_advice (w : HonestInput) (column : Advice.t) (offset : Z) : Z :=
     if (offset =? 0) then match column with A6 => vb_s w | _ => 0 end else 0.
@@ -339,19 +510,20 @@ Module OrchardAdviceEccMuls.
       (w : HonestInput) (column : Advice.t) (offset : Z) : Z :=
     if offset =? 0 then
       match column with
-      | A6 => 0            (* z_136 copy: mirrors the defaulted var-base A9 *)
-      | A7 => 0            (* z_2 copy *)
+      | A6 => mul_scalar w    (* z_136 copy: the full 255-bit running sum *)
+      | A7 => vb_k254 w       (* z_2 copy: the top scalar bit *)
       | _ => 0
       end
     else if offset =? 1 then
       match column with
-      | A6 => 0            (* z_126 copy *)
-      | A7 => ivk w        (* alpha copy *)
-      | A8 => vb_s w       (* s copy *)
+      | A6 => vb_z130 w       (* z_126 copy *)
+      | A7 => ivk w           (* alpha copy *)
+      | A8 => vb_s w          (* s copy *)
       | _ => 0
       end
     else if offset =? 2 then
       match column with
+      | A6 => vb_eta w           (* eta: the inverse witness of z_130 *)
       | A7 => vb_s w / 2 ^ 130   (* z_13 copy: low-130-bit running-sum tail *)
       | _ => 0
       end

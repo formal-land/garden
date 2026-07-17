@@ -1,24 +1,20 @@
-(** * Generator-blocked shard certificates of the completeness instance
+(** * Ladder / decomposition / canonicity shard certificates of the
+    completeness instance
 
-    The four region families whose advice sub-generators are incomplete, so
-    their [check_point] certificates compute [false] on the stubbed cells
-    and are Admitted pending the sub-generator completion (the C2 assembly
-    step).  The failing points are exactly the stubbed-cell rows — every
-    other enabled point of these families passes:
+    The four region families whose advice cells come from the dedicated
+    table layers — one [vm_compute] certificate per family:
 
-    - family 37 ([AddressIntegrity]): the variable-base ladder's boundary
-      rows and the overflow z-copies — [(QEccAdd, Mul.VariableBase, 0)],
-      [(QMulLsb, Mul.VariableBase, 135)], [(QEccAdd, Mul.VariableBase, 135)]
-      and [(QMulOverflow, Mul.OverflowCheck, 1)]; the double-and-add
-      interior rows and running sums are left at [0] by [vb_advice_t];
-    - family 38 ([Commit^ivk]): [(QCommitIvk, CanonicityGate, 0)] — the
-      canonicity-gate row awaits the [b_0]/[b_1]/[b_2]/[d_0]/[d_1]
-      decomposition and the [Ak]/[Nk] lookup running sums;
-    - families 39/40 (old/new [NoteCommit]): per note, the two y-canonicity
-      gate rows [(QNoteCommit*YCanon, YCanonicity _ Gate, 0)] and the four
-      input-decomposition rows [(QNoteCommit*Gd, InputGD, 0)],
-      [(QNoteCommit*Pkd, InputPkD, 0)], [(QNoteCommit*Rho, InputRho, 0)],
-      [(QNoteCommit*Psi, InputPsi, 0)]. *)
+    - family 37 ([AddressIntegrity]): the 137-row variable-base
+      double-and-add ladder and its three overflow-check regions, read off
+      the hoisted ladder record ([tables_vb.v]);
+    - family 38 ([Commit^ivk]): the message-piece, range-check,
+      canonicity-lookup and canonicity-gate subregions, read off the
+      bit-slice cell layer ([tables_nc.v]) over the packed message
+      [ak_x + nk·2^255];
+    - families 39/40 (old/new [NoteCommit]): the hash, blinding-leg,
+      message-piece, input-decomposition, y-canonicity, range-check and
+      canonicity-lookup subregions, read off the same bit-slice layer over
+      the packed §5.4.8.4 note message. *)
 
 Require Import Garden.Orchard.circuit_completeness.instance_defs.
 Require Import Stdlib.ZArith.ZArith.
@@ -31,24 +27,24 @@ Global Open Scope Z_scope.
 Module OrchardCompletenessInstanceShardsBlocked.
   Import OrchardCompletenessInstanceDefs.
 
-  (** [AddressIntegrity]: the variable-base ladder boundary rows. *)
+  (** [AddressIntegrity]: the variable-base ladder and overflow block. *)
   Lemma shard_37_ok :
     List.forallb check_point (shard_in [37]) = true.
-  Admitted.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-  (** [Commit^ivk]: the canonicity-gate row. *)
+  (** [Commit^ivk]: the decomposition and canonicity subregions. *)
   Lemma shard_38_ok :
     List.forallb check_point (shard_in [38]) = true.
-  Admitted.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-  (** Old [NoteCommit]: the y-canonicity and input-decomposition rows. *)
+  (** Old [NoteCommit]: the hash, decomposition and canonicity subregions. *)
   Lemma shard_39_ok :
     List.forallb check_point (shard_in [39]) = true.
-  Admitted.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-  (** New [NoteCommit]: the y-canonicity and input-decomposition rows. *)
+  (** New [NoteCommit]: the hash, decomposition and canonicity subregions. *)
   Lemma shard_40_ok :
     List.forallb check_point (shard_in [40]) = true.
-  Admitted.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
 End OrchardCompletenessInstanceShardsBlocked.
