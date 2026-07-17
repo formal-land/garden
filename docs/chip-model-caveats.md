@@ -117,7 +117,17 @@ interpreter's gate layer only. This document is about that relational model.
    `RangeTable.word_sound` with `GeneratorTable.loaded` at
    `Lookup.TableIdx`) and the `α_0'` canonicity lookup
    (`Orchard/circuit_proof/base_field_canonicity.v`,
-   `alpha_lookup_word_range`, same pattern).
+   `alpha_lookup_word_range`, same pattern). The polynomial layer closes
+   this `Prop` model's loop from above: `lookup_sound` / `lookup_complete`
+   (`Halo2/plonkish/lookup_poly.v`) prove the set-membership reading of
+   `eval_lookup_argument` equivalent, for all θ, β, γ, to the five lookup
+   grand-product rules the deployed verifier checks on the cyclic domain,
+   with the tables-as-fixed-prefix coherence discharged as a `vm_compute`
+   certificate on the pinned instance
+   (`Orchard/circuit_compiled_algebraic.v`) — so the idealized membership
+   semantics is no longer a modeling choice but a proved consequence of
+   the polynomial identities (see `docs/operational-soundness.md`, "The
+   polynomial-identity layer").
 
 3. **No cyclic domain, no usable-row distinction.** Rows are plain integers
    and `rotated_row = row + offset` (`proof.v:58-62`); there is no `nb_rows`
@@ -360,26 +370,36 @@ hypotheses. Both instantiation layers are proved:
   - `CompleteAdditionCompleteness.completeness` (`ecc/chip/add_complete.v`,
     `Qed`, clean audit) is the add-chip instance.
   - `OrchardCompletenessInstance.orchard_completeness_instance`
-    (`Orchard/circuit_completeness/instance_cert.v`) is the constructive
-    whole-circuit C1 instance (`Holds (honest_assignment test_input)` plus
-    read-back for one concrete valid input). It is `Qed`, but its audit is
-    **not yet clean**: it rests on 5 `Admitted` leaf certificates — 17 of the
-    4,858 enabled gate points (`instance_shards_blocked.shard_37..40_ok`: the
-    variable-base ladder interior and the `NoteCommit`/`Commit^ivk`
-    decomposition + canonicity subregions) and 84 of the 2,964 witness facts
-    (`instance_witness.witness_facts_ok`), all reading the deliberately-stubbed
-    C2-scale sub-generator cells. 4,841 enabled points and 2,880 witness facts
-    are machine-verified.
+    (`Orchard/circuit_completeness/instance_cert.v`, `Qed`, clean audit) is
+    the constructive whole-circuit C1 instance
+    (`Holds (honest_assignment test_input)` plus read-back for one concrete
+    valid input): all 4,858 enabled gate points and all 2,964 witness facts
+    are machine-verified by `vm_compute`.
 
-  Remaining: complete those stubbed cells so the 5 leaves close (C1
-  axiom-free), then the universally quantified theorem
+  Remaining: the universally quantified theorem
   `completeness_statement honest_assignment` (stated as
   `OrchardHonestAssignment.orchard_completeness_statement`, `Prop` only) — the
   C2 campaign.
-- **Cyclic-domain refinement** (item 3): restore `nb_rows`, the `Z / 2^k Z`
-  row domain, and the blinding-row distinction; refine `satisfies_gates` to
-  quantify over each region's actual extent; and fold in the
-  tables-as-fixed-column-prefixes layer of the lookup-table work.
+- **Cyclic-domain refinement** (item 3) — *partially discharged at the
+  compiled level.* The finite domain now exists one layer below the relational
+  model: `Halo2/plonkish/main.v`'s `Domain` carries `n = 2^k` rows,
+  `usable_rows = n - (blinding_factors + 1)`, and the `l_0`/`l_last`/`l_blind`
+  row predicates, and `compile_correct` / `plonkish_of_mock_prover`
+  (`Halo2/plonkish/`) connect it upward: compiled-gate satisfaction on the
+  cyclic domain ↔ selector-gated satisfaction on usable rows, and
+  `mock_prover_accepts` ↔ compiled-plonkish satisfaction restricted to
+  `[0, n)`, with the blinding-row vacuity and the finite-domain layout as
+  computable side conditions (`finite_domain_ok_b`), instantiated on the
+  concrete Orchard domain (k = 11, n = 2048) in `Orchard/circuit_compiled.v`.
+  What remains: the relational `proof.v` model *itself* still uses plain
+  integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap, no
+  `nb_rows`), and `satisfies_gates` still quantifies over all `(region, row)`
+  rather than each region's actual extent; folding the finite domain back into
+  the relational reading — and the tables-as-fixed-column-prefixes coherence
+  of the lookup-table work (the refinement noted at the end of [Tying lookups
+  to the loaded table](#tying-lookups-to-the-loaded-table-initlookuptables)) —
+  is still open. See `docs/operational-soundness.md` (the compiled plonkish
+  layer) and `docs-local/circuit-compilation-plan.md`.
 - **Selector-off closure for short lookups** (item 2). The range-check
   chip's `LookupArgument` is now consumed (`RangeTable.word_sound` /
   `short_word_sound`, used by the var-base-mul overflow and base-field
