@@ -933,6 +933,65 @@ predates the completeness-instance layer entirely. Heavy leaves:
   `exact`+Qed. The block conditions of `Halo2/realize/disjoint.v` are the
   placement-generic alternative if the whole-stream replay certificate
   ever becomes too heavy.
+- `Orchard/circuit_compiled.v` (2026-07-17): ≈ 92 s / 3.3 GB peak — the
+  per-assignment indicator certificate dominates: checking every selector
+  assignment's expression against its activation vector on all 2048 domain
+  rows through `combination_view` costs ≈ 78 s in one scan, so it is sharded
+  into four 14-assignment `forallb` windows (25 / 13 / 20 / 21 s,
+  reassembled by `forallb_chunk4`); the σ-construction certificate
+  (`orchard_sigma_some`, union-find closure of the 2 964 copies over
+  15 × 2048 cells) is 3.3 s, the first certificate pays the ≈ 3.5 s
+  `compiled` global build (shared by every later `vm_compute` sentence in
+  the file), `orchard_compiled_eq` is 1.5 s, and everything else —
+  `finite_domain_ok_b` included — is < 0.2 s.
+- `Orchard/circuit_compiled_check.v` (2026-07-17): ≈ 4.7 s — the twelve
+  pinned-vk parity certificates against `circuit_description_fixed`, each a
+  `vm_cast_no_check` of an `eq_refl` comparing a projection of
+  `OrchardCompiledCheck.compiled` (the compiled Orchard system) with the
+  pinned literal; the first sentence pays the one-time `compiled` global
+  build shared by the rest. `circuit_compiled_pinned.v` (the pinned literal
+  data) is ≈ 1.1 s; the six
+  `Halo2/plonkish/{main,compile,mock,sigma,orbit,smoke}.v` proof-layer files
+  are each < 1 s (generic theorems, no concrete-instance `vm_compute`).
+- `Orchard/circuit_compiled_algebraic.v`: ≈ 21 s / 1.3 GB — the L1
+  side-condition certificates: the σ-mapping scans and boundary fixed
+  points, the `delta` order/small-power checks (one 222-bit `fast_pow`),
+  the lookup replacement-exactness scan over the domain rows, and the
+  event-stream value/fill scans, each a `vm_cast_no_check`; the first
+  certificate pays the shared `compiled`/σ global builds.  The
+  `coset_lbl_inj` proof keeps every `lia` scoped with `clear -` — the
+  unscoped form cost ≈ 4.5 min across six calls (18–76 s each) in the
+  hypothesis context carrying the `Fpow`-heavy coset equations.
+- The `transcript_repr` T1 leaves: `Orchard/vk_pinned_parity.v` ≈ 6.5 s —
+  the byte-parity certificate (`vm_cast_no_check` of a primitive-string
+  equality between the printed pretty rendering and the 1.3 MB imported
+  dump) plus the compact-length certificate; the first pays the shared
+  `compiled` + printer global builds (the printer itself is ≈ 2 s after
+  the `rev_append` fix — see the `List.rev` pitfall above).
+  `vk_pinned_bytes.v` (the 20 sharded PrimString dump literals),
+  `vk_pinned_data.v`, and `vk_pinned_print.v` are ≈ 1 s each.
+- `Orchard/vk_transcript_repr.v` (T2, the Fiat–Shamir binding scalar):
+  ≈ 33 s — the input-length and block-count certificates pay the one-time
+  VM build of the 285,142-byte hash input and its 2,228-block split
+  (≈ 9 s + 5 s, shared by the later sentences of the file); the four
+  state-threading shard certificates (557-block BLAKE2b ranges between
+  pinned 8-word chain values) are ≈ 2.5 s each; the final-block digest
+  and `mod pallas_p` certificate is sub-second; the generic
+  `compress_blocks_chunk` lemma pays one ≈ 8 s `lia` in its base case.
+  See the "unification/`fold`/`lia` vs heavy constants" pitfall above —
+  the naive proof of the same theorem costs > 20 min across three
+  divergent sentences.
+- The R4 counting/boundary leaves (2026-07-20):
+  `Halo2/plonkish/counting.v` ≈ 11 s / 1.26 GB — no concrete-instance
+  `vm_compute` (the per-family counting theorems, bad-set cardinality
+  bounds, and constructive case corollaries are all generic over an
+  arbitrary repetition-free challenge list, at impredicative `Set` only);
+  the cost is proof-checking the `roots_le_pdeg`-based root-count and
+  matching arguments plus the plonkish dependency load. `boundary.v`
+  ≈ 0.6 s (the two composed single-challenge corollaries and the named
+  `IPABinding`/`MultiopenReduction`/`FiatShamirChallengeGood` `Definition`s
+  — no certificate). Neither is on any other file's `Require` path (both
+  are R4 endpoints), so they are never re-paid while iterating elsewhere.
 - The completeness-instance certificate leaves (remeasured 2026-07-17, over
   the hoisted `tables.v` record — which now also carries the variable-base
   ladder record of `tables_vb.v`, one linear double-and-add fold with two
@@ -1050,6 +1109,50 @@ predates the completeness-instance layer entirely. Heavy leaves:
   ~200 s wall on eight cores, never re-paid while iterating elsewhere.
   Sharding finer was declined — per-leaf memory is small (< 1 GiB) and the
   cost is pure per-point CPU, so more shards only add `Require` overhead.
+
+- The vk-commitment MSM layer (2026-07-24; machinery + the fixed-column-0
+  calibration certificate):
+  `EllipticCurve/GroupOrderTight.v` ≈ 8 s (the three-coset order theorem
+  and the ladder-distribution point algebra, all symbolic);
+  `EllipticCurve/VestaOrder.v` ≈ 115 s — dominated by the
+  [pallas_p]-fold `placeholder_order` ladder (`vm_cast_no_check`, ~100 s)
+  plus the Euler-criterion cube certificate (~1.3 s);
+  `Orchard/vk_msm.v` ≈ 14 s (95 `Qed`, no concrete-instance heavy
+  `vm_compute`; the largest sentence is `fft_spec`'s `Qed` at ~19 s under
+  a cold elaborator, ~7 s warm);
+  `Orchard/vk_msm_data_fixed0.v` ≈ 19 s (2 × 2048 pasted literals + two
+  checkpoint points);
+  `Orchard/vk_msm_calibrate.v` ≈ 110 s — the replayed-column certificate
+  (≈ 17 s: the 19,617-event replay + 2048 installed-plane reads), the
+  inverse-NTT coefficient certificate (≈ 82 s: 11-level radix-2 FFT,
+  ~22.5 k modular multiplications), the sub-second range/length/
+  blind-and-compare certificates, and the term-style assembly theorem;
+  `Orchard/vk_msm_calibrate_{a,b}.v`: MEASURED_SHARD — one half-range
+  1024-base Pippenger `vm_compute` each (32 windows of 8 bits,
+  255 filter-buckets, suffix-sum aggregation; ≈ 49 k affine point
+  operations at ≈ 57 ms each), mutually independent, ≈ 0.7 GB peak.
+  The 44-commitment fan-out runs two such leaves per commitment fully
+  parallel; under route (b) every column is a dense 2048-scalar MSM, so
+  the per-commitment cost is uniform.
+
+- The Vesta SRS provenance shards (2026-07-23):
+  `Orchard/vk_srs_cert_{0..15}.v` — ≈ 295 s CPU each
+  (`vk_srs_shard_N_check`, a 128-point raw-`forallb` `vm_compute` over the
+  witnessed `GroupHashVesta` recomputation — BLAKE2b XMD, witnessed SSWU
+  onto iso-Vesta, iso-curve addition, `iso_map` — ≈ 2.3 s per point under
+  16-way parallel load; witnesses pasted from
+  `scripts/generate_vk_srs_witnesses.py`, never an in-kernel `field_sqrt`).
+  The sixteen leaves are mutually independent and only
+  `Orchard/vk_srs_cert.v` (≈ 70 s: the 2049-point on-curve/reducedness scan,
+  the single-point `w` certificate, the index scan, and list-plumbing
+  assembly — all `Qed`) consumes them: ≈ 5.2 min wall for all 16 on 32
+  cores, never re-paid while iterating elsewhere.  Supporting leaves:
+  `GroupHash/sswu_vesta.v` ≈ 14 s (two Euler-criterion nonsquare checks, the
+  λ-provenance `modpow`, and the pinned SSWU test vectors),
+  `GroupHash/group_hash_vesta.v` ≈ 8 s (the pinned Vesta `hash_to_curve`
+  reference vector), the sixteen `Orchard/vk_srs_data_*.v` literal files
+  ≈ 2.5 s each (see the literal-table sharding pitfall above),
+  `EllipticCurve/Vesta.v` and `Orchard/vk_srs_entry.v` < 1 s.
 
 Remaining single-file levers: the `hash_to_point_round_proof` round proof
 and the `sinsemilla_s` table literal, the two largest links in the chain

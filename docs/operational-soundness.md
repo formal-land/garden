@@ -164,24 +164,85 @@ the tree-wide baseline (`PrimString.string` and impredicative `Set`); no
 axiom, no `Admitted`, and the pre-existing Orchard action surface is
 untouched.
 
+## The compiled plonkish layer (reaching L2)
+
+`mock_prover_accepts` is the raw event-grid checker (L3). Below it sits the
+compiled circuit the deployed keygen actually produces: the selector columns
+packed into *combination* fixed columns, the copy list closed into an explicit
+permutation σ, and the finite cyclic domain `Z / 2^k Z` with its
+usable/blinding rows. That layer is now modeled in Rocq and connected upward to
+this bridge:
+
+- `Halo2/plonkish/main.v` — `Domain` (n = 2^k rows, `usable_rows`,
+  `l_0`/`l_last`/`l_blind`), `CompiledSystem` (numeric columns, selectors
+  gone), `Compile.compile` (the `compress_selectors` packing with the
+  indicator polynomial), and `Sigma.sigma_of_copies` (union-find cycle
+  closure).
+- `Halo2/plonkish/compile.v` — `compile_correct` / `compile_correct_domain`:
+  compiled-gate satisfaction on the cyclic domain ↔ selector-gated gate
+  satisfaction on usable rows, allocation-independent, under the
+  indicator-value distinctness and blinding-row vacuity side conditions.
+- `Halo2/plonkish/sigma.v` (with the generic finite-orbit theory
+  `Halo2/plonkish/orbit.v`) — `sigma_correct`: the grid is invariant under
+  `sigma_of_copies copies` ↔ every copy holds as value equality. Both
+  directions `Qed`; the forward orbit lemma `sigma_copies_connected` is closed
+  (no `Admitted`).
+- `Halo2/plonkish/mock.v` — `plonkish_of_mock_prover`: `mock_prover_accepts`
+  ↔ compiled-plonkish satisfaction restricted to `[0, n)`, under the decidable
+  `finite_domain_ok_b` layout checks.
+
+The whole-circuit composition is `Orchard/circuit_compiled.v`: from compiled
+algebraic acceptance of `OrchardCompiledCheck.compiled` (the compiled Orchard
+system) together with grid invariance under the σ built from the Orchard
+copies, `orchard_compiled_sound` derives `mock_prover_accepts` of the replayed
+grid, which `orchard_operational_sound` (this bridge) turns into
+`circuit_holds`; `orchard_compiled_operational_sound` and
+`orchard_compiled_action_statement` then compose down to the § 4.18.4 surface.
+Every computable side condition is a `vm_compute` certificate on the concrete
+instance (k = 11, n = 2048): the four-way-sharded indicator certificate, the
+σ-construction certificate over the 2 964 copies on 15 × 2048 cells, and
+`finite_domain_ok_b`. The replay-plane links (`compile_correct`'s selector- and
+fixed-plane hypotheses) are discharged by structural replay lemmas over
+`orchard_events`, not by symbolic-grid `vm_compute`.
+
+The compiled system is anchored to the deployed verifying key by parity:
+`Orchard/circuit_compiled_check.v` proves twelve `vm_cast_no_check`
+certificates that `Compile.compile` applied to the model's `ConstraintSystem.t`
+makes byte-identical choices to the deployed keygen — gate polynomials and
+counts, the 56-selector → combination-column assignment, query tables,
+permutation columns, constants column — against `circuit_description_fixed`, the
+in-tree Debug dump of `vk.pinned()`. Assumption audit on every new theorem:
+exactly `PrimString.string` + impredicative `Set` (the two `sigma.v`/`orbit.v`
+orbit theorems are cleaner still — impredicative `Set` only).
+
+This closes the L3 ↔ L2 arrow of the refinement ladder in
+`docs-local/circuit-compilation-plan.md`; the remaining external residue
+(polynomial identities, commitments, Fiat–Shamir — L1/L0) is what the
+paragraphs below record.
+
 ## What this does not claim
 
-The bridge deliberately stops at the ideal checker; the remaining distance
-to a deployed prover is recorded, not hidden:
+The bridge and the compiled layer stop at algebraic acceptance; the remaining
+distance to a deployed prover is recorded, not hidden:
 
-- `mock_prover_accepts` quantifies over **all** integer rows, not the
-  `2^k` cyclic row domain of the real prover, and blinding rows are not
-  modeled (the cyclic-domain refinement gap of
-  `docs/chip-model-caveats.md`).
+- `mock_prover_accepts` quantifies over **all** integer rows; the finite
+  `2^k` cyclic domain and its usable/blinding rows are now modeled one level
+  down (`Halo2/plonkish/main.v`'s `Domain`), and `plonkish_of_mock_prover`
+  restricts acceptance to `[0, n)` with the layout checks. What remains is
+  that the relational `proof.v` model itself still uses plain integer rows —
+  the cyclic-domain refinement of `docs/chip-model-caveats.md` is discharged
+  at the compiled level but not folded back into the relational reading.
 - Both directions are now instantiated on Orchard, but they say different
   things: soundness says acceptance implies the theorems, completeness says
   the honest witness is accepted. Completeness is a non-vacuity result — it
   does not constrain what else the checker accepts. See
   [`orchard-completeness-proof.md`](orchard-completeness-proof.md).
-- No cryptography is verified here: connecting mock acceptance to real
-  proof verification — selector compression, the permutation argument's
-  grand products, polynomial commitments, Fiat–Shamir — is the verified
-  circuit-compilation track, for which this bridge is the bottom anchor.
+- The compiled layer proves the *algebraic* content of compilation — selector
+  compression, the permutation construction, the cyclic-domain/blinding
+  discipline — pinned to the deployed vk by the parity certificates. What
+  stays external is the polynomial-identity layer above it: the vanishing /
+  permutation / lookup grand products in the all-challenge reading (L1),
+  polynomial commitments, IPA binding, and Fiat–Shamir (L0).
 - The four witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged.
 
@@ -197,3 +258,10 @@ to a deployed prover is recorded, not hidden:
 | `Halo2/realize/disjoint.v` | `replay_is_ok_conflict_free`, `layouter_replay_succeeds` |
 | `Orchard/circuit_operational.v` | `orchard_replay_ok`, `orchard_operational_sound`, `orchard_action_statement_operational` |
 | `Orchard/circuit_completeness/operational/` | the completeness mirror: `orchard_grid_identification`, `orchard_operational_complete` (see `orchard-completeness-proof.md`) |
+| `Halo2/plonkish/main.v` | `Domain`, `CompiledSystem`, `Compile.compile`, `Sigma.sigma_of_copies` |
+| `Halo2/plonkish/compile.v` | `compile_correct`, `compile_correct_domain` |
+| `Halo2/plonkish/orbit.v` | `FiniteOrbit` (generic finite-orbit / two-orbit merge theory) |
+| `Halo2/plonkish/sigma.v` | `sigma_correct`, `sigma_copies_connected` |
+| `Halo2/plonkish/mock.v` | `plonkish_of_mock_prover` |
+| `Orchard/circuit_compiled_pinned.v` / `circuit_compiled_check.v` | pinned-vk data + 12 parity certificates |
+| `Orchard/circuit_compiled.v` | `orchard_compiled_sound`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
