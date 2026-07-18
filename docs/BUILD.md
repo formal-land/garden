@@ -4,6 +4,10 @@ This document provides an introduction to how to build the `garden` project for 
 
 Before starting, make sure you have `Rust` and `opam` installed.
 
+The Orchard verification visualization is a separate frontend and requires
+[Node.js 22](https://nodejs.org/) and npm. It does not require the Rocq toolchain
+unless you are also changing or checking the proofs.
+
 ## Setting Up Dependency Submodules
 
 Fetch the necessary codes from submodule repositories:
@@ -110,6 +114,52 @@ cd Garden
 make snapshot
 cd ..
 ```
+
+## Orchard Verification Visualization
+
+The source for the Orchard Verification Journey and Atlas lives in
+`web/orchard-verification`. Its production bundle is committed in
+`docs/orchard-verification` so the experience can be served as static files
+without Node.js or a runtime network connection.
+
+Install the pinned dependencies and start the development server from the
+repository root:
+
+```sh
+cd web/orchard-verification
+npm ci
+npm run dev
+```
+
+Open the URL printed by Vite for the Journey. Add `/proof-map.html` for the
+Atlas.
+
+Before committing a change, run the type checks and component tests, rebuild
+the committed bundle, and run the browser tests:
+
+```sh
+npm run check
+npm run build
+npx playwright install chromium
+npm run test:e2e
+git diff --exit-code -- ../../docs/orchard-verification
+```
+
+The final command is expected to succeed after the regenerated bundle has been
+staged or committed. In CI, Playwright installs Chromium together with its
+system dependencies.
+
+To inspect only the committed production files, serve them from the repository
+root:
+
+```sh
+python3 -m http.server 4173 --directory docs/orchard-verification
+```
+
+Then open `http://localhost:4173/` for the Journey or
+`http://localhost:4173/proof-map.html` for the Atlas. Do not open the HTML files
+directly with a `file:` URL; an HTTP server matches the way their relative
+assets are deployed.
 
 ## If Using VsRocq
 

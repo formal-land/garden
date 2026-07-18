@@ -31,6 +31,23 @@ We handle circuits at the implementation level in:
 - [LLZK](https://github.com/Veridise/llzk-lib)
 - [Circom](https://github.com/iden3/circom)
 
+## Orchard formal verification
+
+Garden also contains the formal verification of the Orchard Action circuit,
+from the captured Halo 2 configuration and synthesis through the gadget,
+Action-statement, transaction-balance, and operational-soundness proofs.
+Explore the work through two complementary views:
+
+- [Orchard Verification Journey](docs/orchard-verification/index.html), an
+  animated, guided account of how the proof developed;
+- [Orchard Verification Atlas](docs/orchard-verification/proof-map.html), an
+  interactive map of the proof dependencies, evidence, assumptions, and
+  remaining boundaries.
+
+The pages are self-contained and committed with the documentation. See
+[BUILD.md](docs/BUILD.md#orchard-verification-visualization) for local viewing,
+development, and verification commands.
+
 ## Keccak in Plonky3
 
 Our biggest example is the formal verification of the implementation of Keccak in Plonky3. You can find:

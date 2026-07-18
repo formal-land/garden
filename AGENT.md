@@ -38,6 +38,13 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   (checker-lemma shape, leaf closures, table literals, memory limits), the
   `-vos`/`-vok` fast dev loop, and the current cost map of the certificate
   leaves.
+- `docs/orchard-verification/index.html`: the generated Orchard Verification
+  Journey, a guided animated account of the verification effort.
+- `docs/orchard-verification/proof-map.html`: the generated Orchard
+  Verification Atlas, an engineer-facing map of proofs, evidence, assumptions,
+  and remaining boundaries. Its React/TypeScript source and shared evidence
+  model live in `web/orchard-verification/`; build and validation commands are
+  documented in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.
@@ -54,6 +61,10 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 - Update `docs/halo2-proof.md` whenever proof statements, semantics, tactics,
   or Poseidon proof status changes.
 - Update this map whenever a documentation file is added, renamed, or removed.
+- Treat `docs/orchard-verification/` as generated output: edit the source or
+  evidence model under `web/orchard-verification/`, run its checks and build,
+  and commit the refreshed bundle alongside any source change. Do not hand-edit
+  the generated pages.
 
 ## Proof iteration workflow
 

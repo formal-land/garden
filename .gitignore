@@ -9,3 +9,11 @@ rocq_mcp_cache_*.v
 CLAUDE.md
 CLAUDE.local.md
 .claude/
+
+# Orchard verification visualization build/test caches
+web/orchard-verification/node_modules/
+web/orchard-verification/.vite/
+web/orchard-verification/coverage/
+web/orchard-verification/playwright-report/
+web/orchard-verification/test-results/
+web/orchard-verification/blob-report/
