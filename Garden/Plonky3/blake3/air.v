@@ -257,11 +257,11 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
           .chain(initial_row_3.iter())
           .for_each(|elem| elem.iter().for_each(|&bool| builder.assert_bool(bool)));
   *)
-  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) local.(Blake3Cols.inputs) in
+  let* _ := M.for_each local.(Blake3Cols.inputs) (fun input => M.for_each input M.assert_bool) in
   let chaining_values_0 := Array.get local.(Blake3Cols.chaining_values) 0 in
-  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) chaining_values_0 in
+  let* _ := M.for_each chaining_values_0 (fun input => M.for_each input M.assert_bool) in
   let chaining_values_1 := Array.get local.(Blake3Cols.chaining_values) 1 in
-  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) chaining_values_1 in
+  let* _ := M.for_each chaining_values_1 (fun input => M.for_each input M.assert_bool) in
 
   (*
   local.chaining_values[0]
@@ -462,9 +462,9 @@ Definition eval {p} `{Prime p} (local : Blake3Cols.t Z) : M.t unit :=
   *)
   (* final_round_helpers *)
   let* _ := 
-    M.for_each (M.for_each (fun x => M.assert_bool x)) local.(Blake3Cols.final_round_helpers) in
+    M.for_each local.(Blake3Cols.final_round_helpers) (fun bits => M.for_each bits M.assert_bool) in
   (* outputs[0] *)
-  let* _ := M.for_each (M.for_each (fun x => M.assert_bool x)) (Array.get local.(Blake3Cols.outputs) 0) in    
+  let* _ := M.for_each (Array.get local.(Blake3Cols.outputs) 0) (fun bits => M.for_each bits M.assert_bool) in    
   
   (*
     // Finally we check the xor by xor'ing the output with final_round_helpers, packing the bits

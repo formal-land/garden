@@ -257,6 +257,7 @@ Module M.
   Inductive t (A : Set) : Set :=
   | Pure (value : A) : t A
   | AssertZero (x : Z) (value : A) : t A
+  | AssertEitherZero (x1 x2 : Z) (value : A) : t A
   (** This constructor does nothing, but helps to delimit what is inside the current the current
       function and what is being called, to better compose reasoning. *)
   | Call (e : t A) : t A
@@ -266,6 +267,7 @@ Module M.
   .
   Arguments Pure {_}.
   Arguments AssertZero {_}.
+  Arguments AssertEitherZero {_}.
   Arguments Call {_}.
   Arguments Let {_ _}.
   Arguments When {_}.
@@ -275,6 +277,7 @@ Module M.
     match e with
     | M.Pure value => M.Pure (f value)
     | M.AssertZero x value => M.AssertZero x (f value)
+    | M.AssertEitherZero x1 x2 value => M.AssertEitherZero x1 x2 (f value)
     | M.Call e => M.Call (map f e)
     | M.Let e k => M.Let e (fun x => map f (k x))
     | M.When condition e => M.When condition (map f e)
@@ -285,6 +288,7 @@ Module M.
     match e with
     | M.Pure value => (value, [])
     | M.AssertZero expr value => (value, [Trace.Event.AssertZero expr])
+    | M.AssertEitherZero x1 x2 value => (value, [Trace.Event.AssertZero (x1 *F x2)])
     | M.Call e => to_trace e
     | M.Let e k =>
       let '(value_e, trace_e) := to_trace e in
@@ -303,6 +307,10 @@ Notation "'let*' x ':=' e 'in' k" :=
   (M.Let e (fun x => k))
   (at level 200, x pattern, e at level 200, k at level 200).
 
+Notation "'do*' e 'in' k" :=
+  (M.Let e (fun (_ : unit) => k))
+  (at level 200, e at level 200, k at level 200).
+
 Notation "'msg*' message 'in' k" :=
   (M.Message message k)
   (at level 200, message at level 200, k at level 200).
@@ -313,6 +321,9 @@ Definition pure {A : Set} (x : A) : M.t A :=
 (* fn assert_zero<I: Into<Self::Expr>>(&mut self, x: I) *)
 Definition assert_zero (x : Z) : M.t unit :=
   M.AssertZero x tt.
+
+Definition assert_either_zero (x1 x2 : Z) : M.t unit :=
+  M.AssertEitherZero x1 x2 tt.
 
 Definition assert_bool {p} `{Prime p} (x : Z) : M.t unit :=
   M.AssertZero (BinOp.mul (BinOp.sub 1 x) x) tt.
@@ -332,7 +343,7 @@ Definition assert_zeros {N : Z} (array : Array.t Z N) : M.t unit :=
   for_in_zero_to_n N (fun i => assert_zero (array.(Array.get) i)).
 
 (* helper: acting on all elements in an array *)
-Definition for_each {A : Set} {N : Z} (f : A -> M.t unit) (x : Array.t A N) : M.t unit :=
+Definition for_each {A : Set} {N : Z} (x : Array.t A N) (f : A -> M.t unit) : M.t unit :=
   for_in_zero_to_n N (fun i => f (Array.get x i)).
 
 (* helper: acting on all elements in an array, but returning a sum *)
@@ -492,6 +503,11 @@ Proof.
   rewrite mul_zero_implies_zero.
   tauto.
 Qed.
+
+Lemma from_small {p} `{Prime p} (x : Z) :
+  -p < x < p ->
+  x mod p = x.
+Admitted.
 
 (** This lemma is often useful when the value we are comparing to zero is small and known. *)
 Lemma is_zero_small {p} `{Prime p} (x : Z) :
@@ -810,6 +826,8 @@ Module Run.
     {{ M.Pure value 🔽 value, True }}
   | AssertZero (x : Z) (value : A) :
     {{ M.AssertZero x value 🔽 value, x = 0 }}
+  | AssertEitherZero (x1 x2 : Z) (value : A) :
+    {{ M.AssertEitherZero x1 x2 value 🔽 value, x1 = 0 \/ x2 = 0 }}
   | Call (e : M.t A) (value : A) (P : Prop) :
     {{ e 🔽 value, P }} ->
     {{ M.Call e 🔽 value, P }}
@@ -965,6 +983,7 @@ Module Run.
     (eapply Run.ForInZeroToN) ||
     (apply Run.Pure) ||
     (apply Run.AssertZero) ||
+    (apply Run.AssertEitherZero) ||
     (apply Run.Call) ||
     (eapply Run.Let) ||
     (apply Run.When) ||
