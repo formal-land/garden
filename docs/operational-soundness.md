@@ -269,6 +269,71 @@ impredicative `Set` (several endpoints cleaner — impredicative `Set`
 only). This closes the L2 ↔ L1 arrow; what remains external is recorded
 below.
 
+## The random-challenge counting layer and the byte-level anchor (R4)
+
+The L1 theorems above quantify the challenges (y, β, γ, θ) universally,
+while the deployed transcript samples *one* tuple. R4 closes that gap
+from both ends: it names the residual gap as an in-model finite-cardinality
+statement, and it anchors the pinned circuit description to the deployed
+verifier at the byte level.
+
+- `Halo2/plonkish/counting.v` — the Schwartz–Zippel counting lemmas. For
+  each argument family the all-challenge equivalence is recast as: a
+  counting theorem over an arbitrary repetition-free challenge list (built
+  on `Poly.roots_le_pdeg`, a nonzero polynomial having strictly fewer
+  distinct roots than its degree), an explicit *bad set* (accepts-and-
+  property-fails) with a `card_at_most` bound (vanishing ≤ #gates − 1 per
+  domain point; permutation the nested-pair reading over the `2·|all_cells|`
+  budget; lookup ≤ u·m at the θ level plus the 2u-per-side (β, γ) grid
+  bound), and a constructive case corollary via the finite-grid
+  decidability procedures (`gates_vanish_dec`, `perm_usable_invariant_dec`,
+  `lookup_membership_dec`) — no classical axioms.
+- `Halo2/plonkish/boundary.v` — the composed single-challenge corollary
+  `algebraic_sound_at_challenge`: acceptance at one tuple *outside* the
+  three bad sets yields the exact R2 satisfaction triple `algebraic_sound`
+  gives from the all-challenge reading; `algebraic_accepts_at_cases` is the
+  disjunctive form carrying each bad set with its cardinality bound. The
+  genuinely external boundary is named here in the `SignatureKnowledge`
+  style, never as axioms: `IPABinding` (one commitment opens to at most one
+  polynomial), `MultiopenReduction` (an accepted opening pins the column
+  polynomials), and `FiatShamirChallengeGood` (a transcript-derived
+  challenge avoids a density-bounded bad set) — `Definition`s over an
+  abstract commitment space, to be instantiated by a future L0.
+
+The byte-level anchor upgrades the pinned-vk trust from offline
+transcription to certified bytes (`Orchard/vk_pinned_*.v`,
+`Orchard/vk_transcript_repr.v`):
+
+- **T1 (dump parity)** — `vk_pinned_dump_parity`: a verified Debug printer
+  over the model's compiled Orchard system (real `Expression` trees,
+  queries, lookups, constants, permutation columns) plus fresh pinned
+  literals (moduli strings, `extended_k`, the 44 commitment coordinate
+  pairs, `minimum_degree`) emits the pretty rendering, proved
+  primitive-string-equal to all 1,285,701 bytes of the in-tree
+  `circuit_description_fixed` (the Debug dump of `vk.pinned()`). This
+  retires the offline-transcription trust of `circuit_compiled_pinned.v` —
+  the fingerprint literals stay as the checkers' interface, now backed by
+  certified bytes.
+- **T2 (Fiat–Shamir scalar)** — `transcript_repr_spec`: the same printer's
+  alternate (compact `{:?}`) flag yields `s`; `transcript_repr` is
+  `le64(len s) ∥ s` hashed with BLAKE2b-512 personalized
+  `"Halo2-Verify-Key"`, the 64-byte digest read little-endian mod
+  `pallas_p` — the exact `plonk.rs` `from_parts` pipeline, delivering the
+  binding scalar a future L0 composition consumes. The ≈ 2 228-block fold
+  is sharded per the `compile-performance.md` discipline; a personalized
+  BLAKE2b reference vector guards the parameter-block wiring.
+
+The vk-commitment MSM (computing the 44 pinned commitments from the
+compiled polynomials) stays deferred — T1 pins their coordinate literals
+and certifies them as bytes; the MSM certificate would additionally prove
+they are the commitments *of the compiled polynomials*.
+
+Assumption audit: the counting lemmas are at impredicative `Set` only (no
+`PrimString`); the boundary corollaries, T1, and T2 add exactly the
+`PrimString`/`PrimInt63` primitive family; no classical axioms anywhere,
+and `orchard_algebraic_action_statement` / `OrchardAction.action_statement`
+re-audit unchanged at their baselines.
+
 ## What this does not claim
 
 The bridge and the compiled layer stop at algebraic acceptance; the remaining
@@ -290,10 +355,18 @@ distance to a deployed prover is recorded, not hidden:
   system — selector compression, the permutation construction, the
   cyclic-domain/blinding discipline, and the vanishing / permutation /
   lookup identities in the all-challenge reading (L1) — pinned to the
-  deployed vk by the parity certificates. What stays external is the
-  challenge instantiation (the deployed transcript samples one challenge
-  tuple where the L1 theorems quantify them all), polynomial commitments
-  with IPA binding, and Fiat–Shamir (L0).
+  deployed vk by the parity certificates, now byte-anchored (T1 retires
+  the offline-transcription trust of the pinned description; T2 delivers
+  the Fiat–Shamir binding scalar). The external residue has shrunk to
+  exactly the R4 named set: (i) *challenge instantiation* — the deployed
+  transcript's sampled tuple avoids the three bad sets, now an in-model
+  finite-cardinality statement (`counting.v`) consumed through
+  `FiatShamirChallengeGood`, not an opaque gap; (ii) `IPABinding`
+  (polynomial-commitment binding); and (iii) Fiat–Shamir / the multiopen
+  reduction (`MultiopenReduction`) — the L0 layer. Each is a named
+  `SignatureKnowledge`-style hypothesis, never an axiom. The vk-commitment
+  MSM (the compiled polynomials' commitments equal the pinned points) is
+  the one remaining byte-level stretch, still deferred.
 - The four witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged.
 
@@ -323,3 +396,8 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/plonkish/lookup_poly.v` | `lookup_sound`, `lookup_complete` |
 | `Halo2/plonkish/algebraic.v` | `algebraic_accepts`, `algebraic_sound` |
 | `Orchard/circuit_compiled_algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_action_statement` |
+| `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
+| `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |
+| `Orchard/vk_pinned_print.v` / `vk_pinned_data.v` / `vk_pinned_bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
+| `Orchard/vk_pinned_parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_fixed`, all 1,285,701 bytes) |
+| `Orchard/vk_transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |
