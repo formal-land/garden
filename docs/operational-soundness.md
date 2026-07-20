@@ -216,9 +216,58 @@ exactly `PrimString.string` + impredicative `Set` (the two `sigma.v`/`orbit.v`
 orbit theorems are cleaner still — impredicative `Set` only).
 
 This closes the L3 ↔ L2 arrow of the refinement ladder in
-`docs-local/circuit-compilation-plan.md`; the remaining external residue
-(polynomial identities, commitments, Fiat–Shamir — L1/L0) is what the
-paragraphs below record.
+`docs-local/circuit-compilation-plan.md`; the polynomial-identity layer
+below it is the next section.
+
+## The polynomial-identity layer (reaching L1)
+
+Compiled acceptance is still a row-by-row grid statement. The deployed
+verifier instead checks *polynomial identities* over the cyclic domain: the
+vanishing quotient for the gate plane, and the permutation and lookup grand
+products. That layer is proved in the all-challenge reading — every
+equivalence quantifies the challenges (y, β, γ, θ) universally, so no
+probabilistic reasoning enters the statements; the random-challenge gap is
+isolated as the counting lemmas of the R4 package (pending):
+
+- `Halo2/plonkish/poly.v` / `poly_domain.v` / `poly_smoke.v` — the
+  univariate polynomial library over the `Field/Field.v` mod-p arithmetic:
+  monic division (`pdivmod_spec` / `pdivmod_unique`), the root bound
+  (`roots_le_pdeg`), Lagrange interpolation (`lagrange_eval` /
+  `interpolant_unique`), and the pinned Orchard domain — the vk's ω with
+  `vm_compute` order-`2^11` certificates, the repetition-free `H = ⟨ω⟩`,
+  and `X^2048 − 1 = ∏_{j<2048}(X − ω^j)`.
+- `Halo2/plonkish/vanishing.v` — `vanishing_sound`: `(∀ y, ∃ h,
+  Σ_i y^i·E_i = h·(X^n − 1)) ↔ ∀ i, ∀ j < n, E_i(ω^j) = 0`.
+- `Halo2/plonkish/permutation_poly.v` — `permutation_sound` /
+  `permutation_complete`: the four product rules (`l_0` boot, the main
+  `Z(ωX)` rule, chunk chaining, `q_last` boolean) holding on `H` for all
+  β, γ ↔ grid σ-invariance on usable rows, by telescoping the running
+  products and the multiset argument over the integral domain.
+- `Halo2/plonkish/lookup_poly.v` — `lookup_sound` / `lookup_complete`: the
+  five lookup rules for all θ, β, γ ↔ every usable-row input tuple appears
+  among the table rows — the set-membership reading `eval_lookup_argument`
+  uses, closing the lookup `Prop`-model loop of
+  `docs/chip-model-caveats.md`.
+- `Halo2/plonkish/lookup_compile.v` — the value-preserving
+  lookup-substitution seam: acceptance's lookup conjunct restated over
+  `CompiledSystem.lookups` (`plonkish_accepts_compiled_iff`).
+- `Halo2/plonkish/algebraic.v` — `algebraic_accepts` (the three argument
+  families over a `CompiledSystem`, all challenges quantified, stated over
+  column polynomials agreeing with the grid on `H`) and `algebraic_sound`:
+  algebraic acceptance implies compiled-plonkish satisfaction.
+- `Orchard/circuit_compiled_algebraic.v` — the pinned composition:
+  `orchard_algebraic_sound` → `orchard_algebraic_mock_accepts` →
+  `orchard_algebraic_operational_sound` →
+  `orchard_algebraic_action_statement` — algebraic acceptance of the
+  pinned compiled system ends at the § 4.18.4 Action surface, with the new
+  computable side conditions (the σ-mapping scans, the δ-coset labels,
+  lookup replacement exactness, tables-as-prefix coherence) discharged as
+  `vm_compute` certificates on the concrete instance.
+
+Assumption audit on every new theorem: exactly `PrimString.string` +
+impredicative `Set` (several endpoints cleaner — impredicative `Set`
+only). This closes the L2 ↔ L1 arrow; what remains external is recorded
+below.
 
 ## What this does not claim
 
@@ -237,12 +286,14 @@ distance to a deployed prover is recorded, not hidden:
   the honest witness is accepted. Completeness is a non-vacuity result — it
   does not constrain what else the checker accepts. See
   [`orchard-completeness-proof.md`](orchard-completeness-proof.md).
-- The compiled layer proves the *algebraic* content of compilation — selector
-  compression, the permutation construction, the cyclic-domain/blinding
-  discipline — pinned to the deployed vk by the parity certificates. What
-  stays external is the polynomial-identity layer above it: the vanishing /
-  permutation / lookup grand products in the all-challenge reading (L1),
-  polynomial commitments, IPA binding, and Fiat–Shamir (L0).
+- The compiled and polynomial layers prove the *algebraic* content of the
+  system — selector compression, the permutation construction, the
+  cyclic-domain/blinding discipline, and the vanishing / permutation /
+  lookup identities in the all-challenge reading (L1) — pinned to the
+  deployed vk by the parity certificates. What stays external is the
+  challenge instantiation (the deployed transcript samples one challenge
+  tuple where the L1 theorems quantify them all), polynomial commitments
+  with IPA binding, and Fiat–Shamir (L0).
 - The four witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged.
 
@@ -265,3 +316,10 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/plonkish/mock.v` | `plonkish_of_mock_prover` |
 | `Orchard/circuit_compiled_pinned.v` / `circuit_compiled_check.v` | pinned-vk data + 12 parity certificates |
 | `Orchard/circuit_compiled.v` | `orchard_compiled_sound`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
+| `Halo2/plonkish/poly.v` / `poly_domain.v` | univariate polynomial library; the pinned ω, `H`, `X^n − 1` factorization |
+| `Halo2/plonkish/lookup_compile.v` | `lookup_compile_correct`, `plonkish_accepts_compiled_iff` |
+| `Halo2/plonkish/vanishing.v` | `vanishing_sound` |
+| `Halo2/plonkish/permutation_poly.v` | `permutation_sound`, `permutation_complete` |
+| `Halo2/plonkish/lookup_poly.v` | `lookup_sound`, `lookup_complete` |
+| `Halo2/plonkish/algebraic.v` | `algebraic_accepts`, `algebraic_sound` |
+| `Orchard/circuit_compiled_algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_action_statement` |
