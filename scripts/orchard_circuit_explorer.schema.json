@@ -1,0 +1,292 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://formal-land.github.io/garden/schema/orchard-circuit-highlevel.v1.json",
+  "title": "Garden Orchard circuit explorer data",
+  "description": "Deterministic, source-enriched configure and synthesis structure for the Orchard Action circuit.",
+  "type": "object",
+  "required": ["schema", "metadata", "configure", "synthesis", "flow", "sources", "diagnostics"],
+  "properties": {
+    "schema": { "const": "garden.orchard.circuit-highlevel.v1" },
+    "metadata": {
+      "type": "object",
+      "required": ["generator", "manifestSha256", "input", "circuit", "placement", "repositoryRefs", "symbols", "representations"],
+      "properties": {
+        "generator": {
+          "type": "object",
+          "required": ["name", "version"],
+          "properties": {
+            "name": { "type": "string" },
+            "version": { "type": "string" }
+          }
+        },
+        "manifestSha256": { "$ref": "#/$defs/sha256" },
+        "input": {
+          "type": "object",
+          "required": ["schema", "path", "sha256"],
+          "properties": {
+            "schema": { "enum": ["garden.orchard.circuit-structure.raw.v1", "orchard.action_circuit.highlevel.v1"] },
+            "path": { "$ref": "#/$defs/relativePath" },
+            "sha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "circuit": { "type": "object" },
+        "floorPlanner": { "type": "string" },
+        "placement": { "type": "string", "minLength": 1 },
+        "repositoryRefs": {
+          "type": "object",
+          "required": ["garden", "halo2", "orchard"],
+          "additionalProperties": { "$ref": "#/$defs/gitRevision" }
+        },
+        "symbols": { "type": "object" },
+        "representations": { "type": "object" }
+      }
+    },
+    "configure": {
+      "type": "object",
+      "required": ["summary", "entrypointSource", "operations", "gates", "lookups"],
+      "properties": {
+        "summary": { "type": "object" },
+        "entrypointSource": { "$ref": "#/$defs/sourceResolution" },
+        "operations": { "type": "array", "items": { "$ref": "#/$defs/idObject" } },
+        "gates": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["index", "name", "constraints", "selectorIds", "regionIds", "componentIds", "source"],
+                "properties": {
+                  "index": { "type": "integer", "minimum": 0 },
+                  "name": { "type": "string" },
+                  "constraints": { "type": "array", "items": { "$ref": "#/$defs/idObject" } },
+                  "selectorIds": { "$ref": "#/$defs/idArray" },
+                  "regionIds": { "$ref": "#/$defs/idArray" },
+                  "componentIds": { "$ref": "#/$defs/idArray" },
+                  "componentId": { "type": ["string", "null"] },
+                  "source": { "$ref": "#/$defs/sourceResolution" }
+                }
+              }
+            ]
+          }
+        },
+        "lookups": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["index", "selectorIds", "tableIds", "regionIds", "componentIds"],
+                "properties": {
+                  "selectorIds": { "$ref": "#/$defs/idArray" },
+                  "tableIds": { "$ref": "#/$defs/idArray" },
+                  "regionIds": { "$ref": "#/$defs/idArray" },
+                  "componentIds": { "$ref": "#/$defs/idArray" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "synthesis": {
+      "type": "object",
+      "required": ["summary", "tree", "namespaces", "regions", "operations", "regionGroups", "instanceRows"],
+      "properties": {
+        "summary": { "type": "object" },
+        "tree": { "type": "array", "items": { "$ref": "#/$defs/treeNode" } },
+        "namespaces": { "type": "array", "items": { "$ref": "#/$defs/idObject" } },
+        "regions": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["occurrence", "name", "namespace", "componentId", "metrics", "source", "selectorIds", "gateIds", "lookupIds"],
+                "properties": {
+                  "occurrence": { "type": "integer", "minimum": 0 },
+                  "name": { "type": "string" },
+                  "namespace": { "type": "array", "items": { "type": "string" } },
+                  "componentId": { "type": ["string", "null"] },
+                  "metrics": { "$ref": "#/$defs/metrics" },
+                  "source": { "$ref": "#/$defs/sourceResolution" },
+                  "selectorIds": { "$ref": "#/$defs/idArray" },
+                  "gateIds": { "$ref": "#/$defs/idArray" },
+                  "lookupIds": { "$ref": "#/$defs/idArray" }
+                }
+              }
+            ]
+          }
+        },
+        "operations": { "type": "array", "items": { "$ref": "#/$defs/idObject" } },
+        "regionGroups": { "type": "array", "items": { "$ref": "#/$defs/idObject" } },
+        "instanceRows": {
+          "type": "array",
+          "minItems": 9,
+          "maxItems": 9,
+          "items": { "$ref": "#/$defs/idObject" }
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "required": ["bounds", "nodes", "edges"],
+      "properties": {
+        "bounds": { "type": "object" },
+        "nodes": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["kind", "title", "position", "regionIds", "selectorIds", "gateIds", "lookupIds", "tableIds", "instanceRowIds", "metrics"],
+                "properties": {
+                  "regionIds": { "$ref": "#/$defs/idArray" },
+                  "selectorIds": { "$ref": "#/$defs/idArray" },
+                  "gateIds": { "$ref": "#/$defs/idArray" },
+                  "lookupIds": { "$ref": "#/$defs/idArray" },
+                  "tableIds": { "$ref": "#/$defs/idArray" },
+                  "instanceRowIds": { "$ref": "#/$defs/idArray" },
+                  "metrics": { "type": "object" }
+                }
+              }
+            ]
+          }
+        },
+        "edges": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["from", "to", "label"],
+                "properties": {
+                  "from": { "type": "string", "pattern": "^component:" },
+                  "to": { "type": "string", "pattern": "^component:" },
+                  "label": { "type": "string" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "sources": {
+      "type": "object",
+      "required": ["confidenceLevels", "repositories", "files", "records", "summary"],
+      "properties": {
+        "records": {
+          "type": "array",
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/idObject" },
+              {
+                "type": "object",
+                "required": ["repository", "revision", "path", "language", "siteKind", "verification", "url"],
+                "properties": {
+                  "revision": { "$ref": "#/$defs/gitRevision" },
+                  "path": { "$ref": "#/$defs/relativePath" },
+                  "language": { "enum": ["rocq", "rust"] }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "diagnostics": {
+      "type": "object",
+      "required": ["errors", "warnings", "summary"],
+      "properties": {
+        "errors": { "type": "array" },
+        "warnings": { "type": "array" },
+        "summary": { "type": "object" }
+      }
+    }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "gitRevision": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "relativePath": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$"
+    },
+    "idObject": {
+      "type": "object",
+      "required": ["id"],
+      "properties": { "id": { "type": "string", "minLength": 1 } }
+    },
+    "idArray": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "sourceResolution": {
+      "type": "object",
+      "required": ["confidence", "primarySourceId", "candidates"],
+      "properties": {
+        "confidence": { "enum": ["exact", "mapped", "ambiguous", "unresolved"] },
+        "primarySourceId": { "type": ["string", "null"] },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sourceId", "confidence", "reason"],
+            "properties": {
+              "sourceId": { "type": "string" },
+              "confidence": { "enum": ["exact", "mapped"] },
+              "reason": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "required": ["operationCount", "operationCounts", "rowRange"],
+      "properties": {
+        "operationCount": { "type": "integer", "minimum": 0 },
+        "operationCounts": { "type": "object", "additionalProperties": { "type": "integer", "minimum": 0 } },
+        "rowRange": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["min", "max"],
+              "properties": { "min": { "type": "integer" }, "max": { "type": "integer" } }
+            }
+          ]
+        }
+      }
+    },
+    "treeNode": {
+      "type": "object",
+      "required": ["id", "kind"],
+      "oneOf": [
+        {
+          "properties": {
+            "kind": { "const": "namespace" },
+            "children": { "type": "array", "items": { "$ref": "#/$defs/treeNode" } }
+          },
+          "required": ["name", "occurrence", "children"]
+        },
+        {
+          "properties": {
+            "kind": { "const": "region" },
+            "operationIds": { "$ref": "#/$defs/idArray" }
+          },
+          "required": ["name", "occurrence", "operationIds", "source", "componentId"]
+        },
+        {
+          "properties": {
+            "kind": { "enum": ["constrain_instance", "init_lookup_tables", "query_instance"] }
+          }
+        }
+      ]
+    }
+  }
+}

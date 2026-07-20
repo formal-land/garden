@@ -117,7 +117,7 @@ cd ..
 
 ## Orchard Verification Visualization
 
-The source for the Orchard Verification Journey and Atlas lives in
+The source for the Orchard Verification Journey, Atlas, and Circuit Explorer lives in
 `web/orchard-verification`. Its production bundle is committed in
 `docs/orchard-verification` so the experience can be served as static files
 without Node.js or a runtime network connection.
@@ -132,7 +132,21 @@ npm run dev
 ```
 
 Open the URL printed by Vite for the Journey. Add `/proof-map.html` for the
-Atlas.
+Atlas or `/circuit.html` for the generated high-level Rocq circuit explorer.
+
+The Circuit Explorer loads its versioned JSON from `public/data`. When the
+Rocq circuit, free-monad evaluator, source mapping, or functional-flow manifest
+changes, regenerate and verify that artifact from `Garden/`:
+
+```sh
+cd Garden
+make orchard-circuit-visualization-json
+make orchard-circuit-visualization-check
+cd ..
+```
+
+The generation step requires the Rocq/OCaml environment described above. It
+does not modify or build the sibling Halo2 and Orchard repositories.
 
 Before committing a change, run the type checks and component tests, rebuild
 the committed bundle, and run the browser tests:
@@ -156,10 +170,11 @@ root:
 python3 -m http.server 4173 --directory docs/orchard-verification
 ```
 
-Then open `http://localhost:4173/` for the Journey or
-`http://localhost:4173/proof-map.html` for the Atlas. Do not open the HTML files
-directly with a `file:` URL; an HTTP server matches the way their relative
-assets are deployed.
+Then open `http://localhost:4173/` for the Journey,
+`http://localhost:4173/proof-map.html` for the Atlas, or
+`http://localhost:4173/circuit.html` for the Circuit Explorer. Do not open the
+HTML files directly with a `file:` URL; an HTTP server matches the way their
+relative assets and circuit JSON are deployed.
 
 ## If Using VsRocq
 

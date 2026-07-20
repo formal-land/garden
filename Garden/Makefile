@@ -1,6 +1,7 @@
 .PHONY: all clean clean-util distclean default
 .PHONY: orchard-json-from-model orchard-configure-json-from-model orchard-configure-json-compare
 .PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare orchard-synthesis-json-compare-normalized
+.PHONY: orchard-structure-json-from-model orchard-circuit-visualization-json orchard-circuit-visualization-check
 
 VFILES := $(shell find -L . -name "*.v" | grep -v -f blacklist.txt | sort)
 
@@ -27,6 +28,9 @@ ORCHARD_CONFIGURE_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_configure_generated
 ORCHARD_CONFIGURE_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_configure_generated_from_implementation.json
 ORCHARD_SYNTHESIS_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_synthesis_generated_from_model.json
 ORCHARD_SYNTHESIS_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_synthesis_generated_from_implementation.json
+ORCHARD_STRUCTURE_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_structure_generated_from_model.json
+ORCHARD_CIRCUIT_VISUALIZATION_JSON := ../web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
+ORCHARD_CIRCUIT_VISUALIZATION_GENERATOR := ../scripts/generate_orchard_circuit_explorer.py
 ORCHARD_SYNTHESIS_EXTRACT := Orchard/circuit_synthesis_json_extract.v
 ORCHARD_SYNTHESIS_EXTRACTED_ML := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.ml
 ORCHARD_SYNTHESIS_EXTRACTED_MLI := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.mli
@@ -65,6 +69,21 @@ orchard-json-from-model: $(ORCHARD_SYNTHESIS_EXE)
 orchard-configure-json-from-model: orchard-json-from-model
 
 orchard-synthesis-json-from-model: orchard-json-from-model
+
+orchard-structure-json-from-model: $(ORCHARD_SYNTHESIS_EXE)
+	mkdir -p $(ORCHARD_SNAPSHOTS)
+	$(ORCHARD_SYNTHESIS_EXE) --structure $(ORCHARD_STRUCTURE_MODEL_JSON)
+
+orchard-circuit-visualization-json: orchard-structure-json-from-model
+	python3 $(ORCHARD_CIRCUIT_VISUALIZATION_GENERATOR) \
+	  --input $(ORCHARD_STRUCTURE_MODEL_JSON) \
+	  --output $(ORCHARD_CIRCUIT_VISUALIZATION_JSON)
+
+orchard-circuit-visualization-check: orchard-structure-json-from-model
+	python3 $(ORCHARD_CIRCUIT_VISUALIZATION_GENERATOR) \
+	  --input $(ORCHARD_STRUCTURE_MODEL_JSON) \
+	  --output $(ORCHARD_CIRCUIT_VISUALIZATION_JSON) \
+	  --check
 
 orchard-configure-json-compare: orchard-configure-json-from-model
 	python3 ../scripts/compare_orchard_configure_json.py \

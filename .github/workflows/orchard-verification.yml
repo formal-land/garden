@@ -6,6 +6,12 @@ on:
     paths:
       - "web/orchard-verification/**"
       - "docs/orchard-verification/**"
+      - "Garden/Halo2/high_level_trace*.v"
+      - "Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json"
+      - "scripts/generate_orchard_circuit_explorer.py"
+      - "scripts/orchard_circuit_explorer.schema.json"
+      - "scripts/orchard_circuit_explorer_manifest.v1.json"
+      - "scripts/tests/test_generate_orchard_circuit_explorer.py"
       - "docs/BUILD.md"
       - "README.md"
       - "AGENT.md"
@@ -15,6 +21,12 @@ on:
     paths:
       - "web/orchard-verification/**"
       - "docs/orchard-verification/**"
+      - "Garden/Halo2/high_level_trace*.v"
+      - "Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json"
+      - "scripts/generate_orchard_circuit_explorer.py"
+      - "scripts/orchard_circuit_explorer.schema.json"
+      - "scripts/orchard_circuit_explorer_manifest.v1.json"
+      - "scripts/tests/test_generate_orchard_circuit_explorer.py"
       - "docs/BUILD.md"
       - "README.md"
       - "AGENT.md"
@@ -43,6 +55,12 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Validate generated circuit data
+        working-directory: .
+        run: |
+          python3 -m unittest scripts.tests.test_generate_orchard_circuit_explorer
+          python3 scripts/generate_orchard_circuit_explorer.py --validate web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
 
       - name: Type-check and run component tests
         run: npm run check

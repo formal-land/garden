@@ -42,9 +42,12 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   Journey, a guided animated account of the verification effort.
 - `docs/orchard-verification/proof-map.html`: the generated Orchard
   Verification Atlas, an engineer-facing map of proofs, evidence, assumptions,
-  and remaining boundaries. Its React/TypeScript source and shared evidence
-  model live in `web/orchard-verification/`; build and validation commands are
-  documented in `docs/BUILD.md`.
+  and remaining boundaries.
+- `docs/orchard-verification/circuit.html`: the generated Orchard Circuit
+  Explorer, a layered view of the high-level Rocq configure, namespace, region,
+  gate, and source structure. Its React/TypeScript source, generated data, and
+  the other visualization sources live in `web/orchard-verification/`; build
+  and validation commands are documented in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.

@@ -17,3 +17,7 @@ web/orchard-verification/coverage/
 web/orchard-verification/playwright-report/
 web/orchard-verification/test-results/
 web/orchard-verification/blob-report/
+
+# Python generator/test caches
+__pycache__/
+*.py[cod]

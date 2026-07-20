@@ -3,9 +3,10 @@ import gardenLogo from "../../../garden.svg?url";
 import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
 import { ProofMap } from "./components/ProofMap";
+import { CircuitExplorer } from "./components/CircuitExplorer";
 
 type Theme = "light" | "dark";
-type View = "journey" | "atlas";
+type View = "journey" | "atlas" | "circuit";
 
 function initialTheme(): Theme {
   const saved = window.localStorage.getItem("garden-orchard-theme");
@@ -33,6 +34,9 @@ function SiteHeader({ view, theme, onThemeChange }: {
         </a>
         <a href="./proof-map.html" aria-current={view === "atlas" ? "page" : undefined}>
           Atlas
+        </a>
+        <a href="./circuit.html" aria-current={view === "circuit" ? "page" : undefined}>
+          Circuit
         </a>
       </nav>
       <button
@@ -91,7 +95,11 @@ function SiteFooter() {
 
 export function App() {
   const view = useMemo<View>(
-    () => document.documentElement.dataset.view === "atlas" ? "atlas" : "journey",
+    () => {
+      if (document.documentElement.dataset.view === "atlas") return "atlas";
+      if (document.documentElement.dataset.view === "circuit") return "circuit";
+      return "journey";
+    },
     [],
   );
   const [theme, setTheme] = useState<Theme>(initialTheme);
@@ -112,7 +120,13 @@ export function App() {
         theme={theme}
         onThemeChange={() => setTheme((current) => current === "light" ? "dark" : "light")}
       />
-      {view === "journey" ? <JourneyView data={orchardVerificationData} /> : <AtlasView />}
+      {view === "journey" ? (
+        <JourneyView data={orchardVerificationData} />
+      ) : view === "atlas" ? (
+        <AtlasView />
+      ) : (
+        <CircuitExplorer />
+      )}
       <SiteFooter />
     </div>
   );

@@ -241,6 +241,80 @@ let json_lookup (lookup : M.LookupArgument.t) =
   Printf.sprintf "{\"pairs\":%s}"
     (json_list ~indent:0 json_lookup_pair lookup)
 
+(* The structural trace keeps Garden's semantic constraint constructors,
+   unlike the configure parity artifact above, which intentionally lowers
+   every constraint to one polynomial expression. *)
+let rec json_semantic_constraint = function
+  | M.Constraint.Select (selector, constraint_) ->
+      Printf.sprintf
+        "{\"tag\":\"Select\",\"selector\":%s,\"constraint\":%s}"
+        (json_index selector)
+        (json_semantic_constraint constraint_)
+  | M.Constraint.Equal (left, right) ->
+      Printf.sprintf "{\"tag\":\"Equal\",\"left\":%s,\"right\":%s}"
+        (json_expression left)
+        (json_expression right)
+  | M.Constraint.Boolean expression ->
+      Printf.sprintf "{\"tag\":\"Boolean\",\"expression\":%s}"
+        (json_expression expression)
+  | M.Constraint.Range (expression, range) ->
+      Printf.sprintf
+        "{\"tag\":\"Range\",\"expression\":%s,\"range\":%d}"
+        (json_expression expression)
+        (int_of_nat range)
+  | M.Constraint.Either (left, right) ->
+      Printf.sprintf "{\"tag\":\"Either\",\"left\":%s,\"right\":%s}"
+        (json_semantic_constraint left)
+        (json_semantic_constraint right)
+  | M.Constraint.EqualZeroToPrecise expression ->
+      Printf.sprintf
+        "{\"tag\":\"EqualZeroToPrecise\",\"expression\":%s}"
+        (json_expression expression)
+
+let json_trace_named_constraint (name, constraint_) =
+  Printf.sprintf "{\"name\":%s,\"constraint\":%s}"
+    (json_option_pstring name)
+    (json_semantic_constraint constraint_)
+
+let json_trace_gate (gate : M.Gate.t) =
+  Printf.sprintf
+    "{\"name\":%s,\"constraint_count\":%d,\"constraints\":%s}"
+    (json_pstring gate.name)
+    (List.length gate.constraints)
+    (json_list ~indent:0 json_trace_named_constraint gate.constraints)
+
+let lowercase_column_kind = function
+  | M.Raw.ColumnKind.Advice -> "advice"
+  | M.Raw.ColumnKind.Fixed -> "fixed"
+  | M.Raw.ColumnKind.Instance_ -> "instance"
+
+let json_option_z = function
+  | None -> "null"
+  | Some value -> json_z value
+
+let trace_cell_id (cell : M.HighLevelTrace.Cell.t) =
+  let kind = lowercase_column_kind cell.column.kind in
+  let column = string_of_z cell.column.index in
+  match cell.column.kind, cell.region_index with
+  | M.Raw.ColumnKind.Instance_, _ ->
+      Printf.sprintf "cell:%s:%s:row:%s"
+        kind column (string_of_z cell.offset)
+  | _, Some region ->
+      Printf.sprintf "cell:%s:%s:region:%s:offset:%s"
+        kind column (string_of_z region) (string_of_z cell.offset)
+  | _, None ->
+      Printf.sprintf "cell:%s:%s:offset:%s"
+        kind column (string_of_z cell.offset)
+
+let json_trace_cell (cell : M.HighLevelTrace.Cell.t) =
+  Printf.sprintf
+    "{\"id\":%s,\"column\":%s,\"region_index\":%s,\"offset\":%s,\"absolute_row\":%s}"
+    (json_string (trace_cell_id cell))
+    (json_column_ref cell.column)
+    (json_option_z cell.region_index)
+    (json_z cell.offset)
+    (json_z cell.absolute_row)
+
 let json_event = function
   | M.Raw.Event.EnterRegion name ->
       Printf.sprintf "{\"tag\":\"EnterRegion\",\"name\":%s}" (json_pstring name)
@@ -274,6 +348,224 @@ let json_event = function
         (json_z from_row)
         (json_z value)
 
+type configure_trace_stats = {
+  mutable configure_gate_count : int;
+  mutable configure_lookup_count : int;
+  mutable configure_constraint_count : int;
+}
+
+let json_configure_trace_operation stats operation_index = function
+  | M.HighLevelTrace.ConfigureOp.CreateGate gate ->
+      let gate_index = stats.configure_gate_count in
+      stats.configure_gate_count <- gate_index + 1;
+      stats.configure_constraint_count <-
+        stats.configure_constraint_count + List.length gate.constraints;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"create_gate\",\"gate_id\":%s,\"gate_index\":%d,\"gate\":%s}"
+        (json_string (Printf.sprintf "configure-op:%d" operation_index))
+        (json_string (Printf.sprintf "gate:%d" gate_index))
+        gate_index
+        (json_trace_gate gate)
+  | M.HighLevelTrace.ConfigureOp.CreateLookup lookup ->
+      let lookup_index = stats.configure_lookup_count in
+      stats.configure_lookup_count <- lookup_index + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"create_lookup\",\"lookup_id\":%s,\"lookup_index\":%d,\"lookup\":%s}"
+        (json_string (Printf.sprintf "configure-op:%d" operation_index))
+        (json_string (Printf.sprintf "lookup-argument:%d" lookup_index))
+        lookup_index
+        (json_lookup lookup)
+
+type layout_trace_stats = {
+  mutable layout_node_count : int;
+  mutable layout_namespace_count : int;
+  mutable layout_region_count : int;
+  mutable layout_constrain_instance_count : int;
+  mutable layout_lookup_table_count : int;
+  mutable layout_lookup_column_count : int;
+  mutable layout_region_operation_count : int;
+  mutable layout_selector_enable_count : int;
+  mutable layout_fixed_assignment_count : int;
+  mutable layout_copy_count : int;
+  mutable layout_constant_count : int;
+}
+
+let json_region_operation stats region_index operation_index = function
+  | M.HighLevelTrace.RegionOp.EnableSelector
+      (selector, offset, absolute_row, annotation) ->
+      stats.layout_region_operation_count <-
+        stats.layout_region_operation_count + 1;
+      stats.layout_selector_enable_count <-
+        stats.layout_selector_enable_count + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"enable_selector\",\"selector_id\":%s,\"selector\":%s,\"offset\":%s,\"absolute_row\":%s,\"annotation\":%s}"
+        (json_string
+          (Printf.sprintf "region:%s/op:%d"
+            (string_of_z region_index) operation_index))
+        (json_string (Printf.sprintf "selector:%s" (string_of_z selector)))
+        (json_z selector)
+        (json_z offset)
+        (json_z absolute_row)
+        (json_pstring annotation)
+  | M.HighLevelTrace.RegionOp.AssignFixed (cell, annotation, value) ->
+      stats.layout_region_operation_count <-
+        stats.layout_region_operation_count + 1;
+      stats.layout_fixed_assignment_count <-
+        stats.layout_fixed_assignment_count + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"assign_fixed\",\"cell\":%s,\"annotation\":%s,\"value\":%s}"
+        (json_string
+          (Printf.sprintf "region:%s/op:%d"
+            (string_of_z region_index) operation_index))
+        (json_trace_cell cell)
+        (json_pstring annotation)
+        (json_z value)
+  | M.HighLevelTrace.RegionOp.Copy (lhs, rhs) ->
+      stats.layout_region_operation_count <-
+        stats.layout_region_operation_count + 1;
+      stats.layout_copy_count <- stats.layout_copy_count + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"copy\",\"lhs\":%s,\"rhs\":%s}"
+        (json_string
+          (Printf.sprintf "region:%s/op:%d"
+            (string_of_z region_index) operation_index))
+        (json_trace_cell lhs)
+        (json_trace_cell rhs)
+  | M.HighLevelTrace.RegionOp.ConstrainConstant (cell, value) ->
+      stats.layout_region_operation_count <-
+        stats.layout_region_operation_count + 1;
+      stats.layout_constant_count <- stats.layout_constant_count + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"constrain_constant\",\"cell\":%s,\"value\":%s}"
+        (json_string
+          (Printf.sprintf "region:%s/op:%d"
+            (string_of_z region_index) operation_index))
+        (json_trace_cell cell)
+        (json_z value)
+
+let json_lookup_table_entry (entry : M.HighLevelTrace.LookupTableEntry.t) =
+  Printf.sprintf
+    "{\"id\":%s,\"column\":%s,\"annotation\":%s,\"value_count\":%d,\"default_value\":%s}"
+    (json_string (Printf.sprintf "lookup-column:%s" (string_of_z entry.column)))
+    (json_z entry.column)
+    (json_pstring entry.annotation)
+    (int_of_nat entry.value_count)
+    (json_z entry.default_value)
+
+let rec json_layout_node stats = function
+  | M.HighLevelTrace.LayoutNode.Namespace (name, children) ->
+      let namespace_index = stats.layout_namespace_count in
+      stats.layout_node_count <- stats.layout_node_count + 1;
+      stats.layout_namespace_count <- namespace_index + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"namespace\",\"name\":%s,\"children\":%s}"
+        (json_string (Printf.sprintf "namespace:%d" namespace_index))
+        (json_pstring name)
+        (json_list ~indent:0 (json_layout_node stats) children)
+  | M.HighLevelTrace.LayoutNode.Region
+      (region_index, start_row, name, operations) ->
+      stats.layout_node_count <- stats.layout_node_count + 1;
+      stats.layout_region_count <- stats.layout_region_count + 1;
+      let operations =
+        List.mapi (json_region_operation stats region_index) operations
+      in
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"region\",\"region_index\":%s,\"start_row\":%s,\"name\":%s,\"operations\":%s}"
+        (json_string (Printf.sprintf "region:%s" (string_of_z region_index)))
+        (json_z region_index)
+        (json_z start_row)
+        (json_pstring name)
+        (json_list ~indent:0 (fun operation -> operation) operations)
+  | M.HighLevelTrace.LayoutNode.ConstrainInstance
+      (source_cell, instance_column, row) ->
+      let layout_operation_index = stats.layout_constrain_instance_count in
+      stats.layout_node_count <- stats.layout_node_count + 1;
+      stats.layout_constrain_instance_count <- layout_operation_index + 1;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"constrain_instance\",\"source\":%s,\"instance_cell_id\":%s,\"instance_column\":%s,\"row\":%s}"
+        (json_string (Printf.sprintf "layout-op:%d" layout_operation_index))
+        (json_trace_cell source_cell)
+        (json_string
+          (Printf.sprintf "cell:instance:%s:row:%s"
+            (string_of_z instance_column) (string_of_z row)))
+        (json_z instance_column)
+        (json_z row)
+  | M.HighLevelTrace.LayoutNode.InitLookupTables (name, entries) ->
+      let lookup_table_index = stats.layout_lookup_table_count in
+      stats.layout_node_count <- stats.layout_node_count + 1;
+      stats.layout_lookup_table_count <- lookup_table_index + 1;
+      stats.layout_lookup_column_count <-
+        stats.layout_lookup_column_count + List.length entries;
+      Printf.sprintf
+        "{\"id\":%s,\"kind\":\"init_lookup_tables\",\"name\":%s,\"entries\":%s}"
+        (json_string (Printf.sprintf "lookup-tables:%d" lookup_table_index))
+        (json_pstring name)
+        (json_list ~indent:0 json_lookup_table_entry entries)
+
+let write_structure_json path =
+  let configure_stats = {
+    configure_gate_count = 0;
+    configure_lookup_count = 0;
+    configure_constraint_count = 0;
+  } in
+  let configure_operations =
+    List.mapi
+      (json_configure_trace_operation configure_stats)
+      M.model_configure_trace
+  in
+  let layout_stats = {
+    layout_node_count = 0;
+    layout_namespace_count = 0;
+    layout_region_count = 0;
+    layout_constrain_instance_count = 0;
+    layout_lookup_table_count = 0;
+    layout_lookup_column_count = 0;
+    layout_region_operation_count = 0;
+    layout_selector_enable_count = 0;
+    layout_fixed_assignment_count = 0;
+    layout_copy_count = 0;
+    layout_constant_count = 0;
+  } in
+  let layout_nodes =
+    List.map (json_layout_node layout_stats) M.model_layout_trace
+  in
+  let channel = open_out path in
+  Fun.protect
+    ~finally:(fun () -> close_out channel)
+    (fun () ->
+      Printf.fprintf channel "{\n";
+      Printf.fprintf channel
+        "  \"schema\": \"garden.orchard.circuit-structure.raw.v1\",\n";
+      Printf.fprintf channel "  \"configure\": {\n";
+      Printf.fprintf channel "    \"operations\": %s,\n"
+        (json_list ~indent:4 (fun operation -> operation) configure_operations);
+      Printf.fprintf channel
+        "    \"summary\": {\"operation_count\":%d,\"gate_count\":%d,\"lookup_count\":%d,\"constraint_count\":%d}\n"
+        (List.length configure_operations)
+        configure_stats.configure_gate_count
+        configure_stats.configure_lookup_count
+        configure_stats.configure_constraint_count;
+      Printf.fprintf channel "  },\n";
+      Printf.fprintf channel "  \"synthesis\": {\n";
+      Printf.fprintf channel "    \"nodes\": %s,\n"
+        (json_list ~indent:4 (fun node -> node) layout_nodes);
+      Printf.fprintf channel
+        "    \"summary\": {\"root_node_count\":%d,\"node_count\":%d,\"namespace_count\":%d,\"region_count\":%d,\"constrain_instance_count\":%d,\"lookup_table_init_count\":%d,\"lookup_column_count\":%d,\"region_operation_count\":%d,\"selector_enable_count\":%d,\"fixed_assignment_count\":%d,\"copy_count\":%d,\"constant_count\":%d}\n"
+        (List.length layout_nodes)
+        layout_stats.layout_node_count
+        layout_stats.layout_namespace_count
+        layout_stats.layout_region_count
+        layout_stats.layout_constrain_instance_count
+        layout_stats.layout_lookup_table_count
+        layout_stats.layout_lookup_column_count
+        layout_stats.layout_region_operation_count
+        layout_stats.layout_selector_enable_count
+        layout_stats.layout_fixed_assignment_count
+        layout_stats.layout_copy_count
+        layout_stats.layout_constant_count;
+      Printf.fprintf channel "  }\n";
+      Printf.fprintf channel "}\n")
+
 let write_synthesis_json path =
   let channel = open_out path in
   Fun.protect
@@ -306,9 +598,13 @@ let write_configure_json path =
 
 let () =
   match Array.to_list Sys.argv with
+  | [_; "--structure"; structure_output] ->
+      write_structure_json structure_output
   | [_; configure_output; synthesis_output] ->
       write_configure_json configure_output;
       write_synthesis_json synthesis_output
   | _ ->
-      prerr_endline "usage: orchard_synthesis_json CONFIGURE.json SYNTHESIS.json";
+      prerr_endline
+        "usage: orchard_synthesis_json CONFIGURE.json SYNTHESIS.json\n\
+         \       orchard_synthesis_json --structure STRUCTURE.json";
       exit 2

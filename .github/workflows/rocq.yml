@@ -49,6 +49,7 @@ jobs:
             cd Garden
             make
             make snapshot
+            make orchard-circuit-visualization-check
             cd ..
           endGroup
           startGroup "Check that the diff is empty (excluding submodules)"

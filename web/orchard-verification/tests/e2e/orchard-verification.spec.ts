@@ -134,3 +134,62 @@ test.describe("Orchard verification atlas", () => {
     assertRuntimeClean();
   });
 });
+
+test.describe("Orchard circuit explorer", () => {
+  test("lazy-loads the snapshot and drills from flow to exact region operations", async ({ page }) => {
+    const assertRuntimeClean = observeRuntime(page);
+    const dataResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/data/orchard-circuit-highlevel.v1.json")
+    );
+    await page.goto("/circuit.html");
+    await expect(page.getByRole("heading", { name: "Orchard Circuit Explorer" })).toBeVisible();
+    await expect((await dataResponse).ok()).toBe(true);
+    await expect(page.getByRole("searchbox", { name: "Search circuit structure" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Circuit", exact: true })).toHaveAttribute("aria-current", "page");
+
+    const merkleNode = (page.viewportSize()?.width ?? 1280) <= 760
+      ? page.locator(".circuit-mobile-flow button").filter({ hasText: "Merkle path" })
+      : page.locator(".circuit-flow-node").filter({ hasText: "Merkle" });
+    await merkleNode.click();
+    await expect(page).toHaveURL(/#level=component&item=component%3Amerkle-path/);
+    const canvas = page.locator(".circuit-canvas");
+    await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeVisible();
+    await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeFocused();
+    await expect(page.getByRole("complementary", { name: "Circuit item details" }))
+      .toContainText("Source mapping confidence");
+
+    await page.getByRole("button", { name: "Show exact concrete regions" }).click();
+    const occurrence = canvas.locator(".circuit-card--region-occurrence").first();
+    await expect(occurrence).toBeVisible();
+    await occurrence.click();
+    await expect(canvas.locator(".circuit-operation-list button").first()).toBeVisible();
+    await expect(page).toHaveURL(/#level=detail&item=region%3A\d+&mode=exact/);
+
+    await page.goBack();
+    await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeFocused();
+    await expect(page).toHaveURL(/#level=component&item=component%3Amerkle-path&mode=exact/);
+
+    const search = page.getByRole("searchbox", { name: "Search circuit structure" });
+    await search.fill("Orchard circuit checks");
+    await expect(search).toBeFocused();
+    await expect(page.locator("#circuit-search-results")).toContainText("Orchard circuit checks");
+    await expectNoHorizontalPageOverflow(page);
+    assertRuntimeClean();
+  });
+
+  test("supports exact gate deep links and an accessible responsive layout", async ({ page }) => {
+    const assertRuntimeClean = observeRuntime(page);
+    await page.goto("/circuit.html#level=detail&item=gate%3A0&mode=exact");
+
+    const canvas = page.locator(".circuit-canvas");
+    await expect(canvas.getByRole("heading", { name: "Orchard circuit checks" })).toBeVisible();
+    await expect(canvas.locator(".circuit-constraint-list button").first()).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Circuit item details" }))
+      .toContainText("Exact");
+    await expect(page.getByText("Browse the circuit as an outline")).toBeVisible();
+
+    await expectNoHorizontalPageOverflow(page);
+    await expectNoAxeViolations(page);
+    assertRuntimeClean();
+  });
+});
