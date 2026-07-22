@@ -1935,6 +1935,21 @@ input[type="range"] {
   padding: 3rem 0 3.5rem;
 }
 
+.circuit-intro .circuit-metrics--strip {
+  border-left: 1px solid var(--line);
+}
+
+.circuit-flow-focus > * {
+  min-width: 0;
+}
+
+.circuit-flow-focus span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+  white-space: normal;
+}
+
 .circuit-intro {
   display: block;
   margin-bottom: 1rem;

@@ -120,12 +120,22 @@ describe("journey application", () => {
     expect(screen.getByRole("heading", { name: "Orchard Verification Journey", level: 1 })).toBeVisible();
     expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
     expect(document.querySelector(".theme-toggle")).not.toBeInTheDocument();
+    expect(screen.getByText("Repository versions · Known limitations")).toBeVisible();
+    expect(screen.queryByText(/Methodology/)).not.toBeInTheDocument();
+
+    const snapshotSummary = screen.getByText("Snapshot").closest("summary")!;
+    const snapshotDetails = snapshotSummary.closest("details")!;
+    fireEvent.click(snapshotSummary);
+    expect(snapshotDetails).toHaveAttribute("open");
+    fireEvent.pointerDown(document.body);
+    expect(snapshotDetails).not.toHaveAttribute("open");
 
     cleanup();
     document.documentElement.dataset.view = "atlas";
     render(<App />);
     expect(screen.getByRole("heading", { name: "Orchard Verification Atlas", level: 1 })).toBeVisible();
     expect(screen.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
+    expect(screen.queryByRole("link", { name: /Open guided journey/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
   });
 });

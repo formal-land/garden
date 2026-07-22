@@ -187,15 +187,23 @@ describe("circuit explorer interactions", () => {
     expect(loader).toHaveBeenCalledOnce();
     expect(screen.getByRole("heading", { name: "Choose a circuit item", level: 2 })).toBeVisible();
     expect(screen.getByRole("heading", { name: "Explore the circuit by component", level: 2 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Where the main shared gadgets live", level: 2 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Poseidon", level: 3 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Elliptic-curve gadgets", level: 3 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Sinsemilla and Merkle", level: 3 })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Range checks", level: 3 })).toBeVisible();
+    expect(screen.queryByText("Interactive guide")).not.toBeInTheDocument();
+    expect(screen.queryByText("Generated Rocq snapshot")).not.toBeInTheDocument();
     expect(screen.queryByRole("complementary", { name: "Circuit item details" })).not.toBeInTheDocument();
     expect(container.querySelector(".circuit-workspace")).toHaveClass("circuit-workspace--flow");
 
-    const focusDescription = container.querySelector<HTMLElement>(".circuit-flow-focus")!;
+    expect(container.querySelector(".circuit-flow-focus")).not.toBeInTheDocument();
     const witnessEdge = container.querySelector<SVGGElement>('[data-edge-id="edge:witness-merkle"]')!;
     const rootEdge = container.querySelector<SVGGElement>('[data-edge-id="edge:merkle-check"]')!;
     const anchorEdge = container.querySelector<SVGGElement>('[data-edge-id="edge:check-anchor"]')!;
 
     fireEvent.mouseEnter(merkleFlowNode);
+    let focusDescription = container.querySelector<HTMLElement>(".circuit-flow-focus")!;
     expect(focusDescription).toHaveAttribute("data-flow-item", "component:merkle-path");
     expect(focusDescription).toHaveTextContent("Reconstructs the note-commitment root.");
     expect(witnessEdge).toHaveClass("is-emphasized");
@@ -203,22 +211,29 @@ describe("circuit explorer interactions", () => {
     expect(anchorEdge).toHaveClass("is-muted");
 
     fireEvent.mouseLeave(merkleFlowNode);
+    expect(container.querySelector(".circuit-flow-focus")).not.toBeInTheDocument();
     fireEvent.focus(merkleFlowNode);
+    focusDescription = container.querySelector<HTMLElement>(".circuit-flow-focus")!;
     expect(focusDescription).toHaveAttribute("data-flow-item", "component:merkle-path");
     expect(rootEdge).toHaveClass("is-emphasized");
     fireEvent.blur(merkleFlowNode);
+    expect(container.querySelector(".circuit-flow-focus")).not.toBeInTheDocument();
 
     fireEvent.mouseEnter(rootEdge);
+    focusDescription = container.querySelector<HTMLElement>(".circuit-flow-focus")!;
     expect(focusDescription).toHaveAttribute("data-flow-item", "edge:merkle-check");
     expect(focusDescription).toHaveTextContent("Sends the reconstructed root to the Action checks.");
     expect(rootEdge).toHaveClass("is-emphasized", "is-label-hovered");
     fireEvent.mouseLeave(rootEdge);
+    expect(container.querySelector(".circuit-flow-focus")).not.toBeInTheDocument();
 
     const rootLabel = rootEdge.querySelector("text")!;
     fireEvent.focus(rootLabel);
+    focusDescription = container.querySelector<HTMLElement>(".circuit-flow-focus")!;
     expect(focusDescription).toHaveAttribute("data-flow-item", "edge:merkle-check");
     expect(focusDescription).toHaveTextContent("Circuit wire");
     fireEvent.blur(rootLabel);
+    expect(container.querySelector(".circuit-flow-focus")).not.toBeInTheDocument();
   });
 
   it("drills into grouped regions with inline operations and restores focus", async () => {

@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import gardenLogo from "../../../garden.svg?url";
 import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
@@ -19,9 +19,39 @@ function formatSnapshotDate(value: string): string {
 function EvidenceContext() {
   const snapshot = orchardVerificationData.snapshot;
   const refs = snapshot.repositoryRefs;
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    const closeWhenPointerMovesOutside = (event: PointerEvent) => {
+      const details = detailsRef.current;
+      if (
+        details?.open &&
+        event.target instanceof Node &&
+        !details.contains(event.target)
+      ) {
+        details.open = false;
+      }
+    };
+
+    const closeOnEscape = (event: KeyboardEvent) => {
+      const details = detailsRef.current;
+      if (event.key !== "Escape" || !details?.open) return;
+
+      details.open = false;
+      details.querySelector("summary")?.focus();
+    };
+
+    document.addEventListener("pointerdown", closeWhenPointerMovesOutside);
+    document.addEventListener("keydown", closeOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", closeWhenPointerMovesOutside);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, []);
 
   return (
-    <details className="evidence-context" id="evidence-context">
+    <details ref={detailsRef} className="evidence-context" id="evidence-context">
       <summary>
         <span>Snapshot</span>
         <time dateTime={snapshot.asOf}>{formatSnapshotDate(snapshot.asOf)}</time>
@@ -89,9 +119,6 @@ function AtlasView() {
             remaining trust assumptions explicit.
           </p>
         </div>
-        <a className="text-link" href="./">
-          Open guided journey <span aria-hidden="true">→</span>
-        </a>
       </section>
       <ProofMap data={orchardVerificationData} />
     </main>
@@ -110,7 +137,7 @@ function SiteFooter() {
         </time>
       </p>
       <details className="site-footer__context">
-        <summary>Methodology · Repository versions · Known limitations</summary>
+        <summary>Repository versions · Known limitations</summary>
         <div className="site-footer__context-panel">
           <div>
             <strong>{snapshot.title}</strong>

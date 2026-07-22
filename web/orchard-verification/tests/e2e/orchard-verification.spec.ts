@@ -93,6 +93,13 @@ test.describe("Orchard verification journey", () => {
 
     await expect(page.getByRole("navigation", { name: "Visualization views" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Journey controls" })).toBeVisible();
+    if ((page.viewportSize()?.width ?? 1280) > 980) {
+      const snapshotContext = page.locator(".evidence-context");
+      await snapshotContext.locator("summary").click();
+      await expect(snapshotContext).toHaveAttribute("open", "");
+      await page.mouse.click(10, 10);
+      await expect(snapshotContext).not.toHaveAttribute("open", "");
+    }
     await expect(page.getByRole("article").getByText("Established in this stage")).toBeVisible();
     await expect(page.getByRole("article").getByText("Not yet established")).toBeVisible();
     await expect(page.locator(".stage-story .evidence-chip").filter({ hasText: gardenEvidence.label }))
@@ -234,6 +241,9 @@ test.describe("Orchard circuit explorer", () => {
 
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
     await expect(page.locator(".circuit-interpretation-note")).toContainText("Interpretation layer");
+    const metricBorder = await page.locator(".circuit-intro .circuit-metrics--strip")
+      .evaluate((element) => getComputedStyle(element).borderLeftWidth);
+    expect(metricBorder).not.toBe("0px");
     const merkleNode = mobile
       ? page.locator(".circuit-mobile-flow button").filter({ hasText: "Merkle path" })
       : page.locator(".circuit-flow-node").filter({ hasText: "Merkle" });
@@ -241,6 +251,11 @@ test.describe("Orchard circuit explorer", () => {
     await merkleNode.focus();
     await expect(flowFocus).toHaveAttribute("data-flow-item", "component:merkle-path");
     await expect(flowFocus).toContainText("Merkle");
+    const hoverCopyStyle = await flowFocus.locator("span").evaluate((element) => ({
+      overflowWrap: getComputedStyle(element).overflowWrap,
+      whiteSpace: getComputedStyle(element).whiteSpace,
+    }));
+    expect(hoverCopyStyle).toEqual({ overflowWrap: "anywhere", whiteSpace: "normal" });
     if (!mobile) {
       await merkleNode.hover();
       await expect(page.locator(".circuit-flow-edge.is-emphasized")).toHaveCount(2);

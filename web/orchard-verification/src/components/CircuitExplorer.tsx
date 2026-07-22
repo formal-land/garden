@@ -998,7 +998,6 @@ function FlowCanvas({
                     textAnchor="middle"
                     tabIndex={0}
                     aria-label={`${edge.label}. ${summary}`}
-                    aria-describedby="circuit-flow-focus-description"
                     onFocus={() => setHoveredEdgeId(edge.id)}
                     onBlur={() => setHoveredEdgeId(null)}
                   >
@@ -1034,7 +1033,6 @@ function FlowCanvas({
               style={style}
               aria-current={selectedId === item.node.id ? "true" : undefined}
               aria-label={`${item.node.title}. ${item.node.summary}`}
-              aria-describedby="circuit-flow-focus-description"
               onClick={() => onSelect(item.node)}
               onMouseEnter={() => setHoveredNodeId(item.node.id)}
               onMouseLeave={() => setHoveredNodeId(null)}
@@ -1048,18 +1046,18 @@ function FlowCanvas({
           );
         })}
       </div>
-      <div
-        className={classNames("circuit-flow-focus", focusedDescription && "is-active")}
-        id="circuit-flow-focus-description"
-        data-flow-item={focusedDescription?.id}
-      >
-        <p>{focusedDescription?.kind === "wire" ? "Circuit wire" : focusedDescription ? "Circuit item" : "Interactive guide"}</p>
-        <h3>{focusedDescription?.title ?? "Follow an item through the circuit"}</h3>
-        <span>
-          {focusedDescription?.summary ??
-            "Hover or focus a circuit item or wire name to see its role. Select an item to inspect its regions, gates, and source."}
-        </span>
-      </div>
+      {focusedDescription ? (
+        <div
+          className="circuit-flow-focus is-active"
+          id="circuit-flow-focus-description"
+          data-flow-item={focusedDescription.id}
+          role="status"
+        >
+          <p>{focusedDescription.kind === "wire" ? "Circuit wire" : "Circuit item"}</p>
+          <h3>{focusedDescription.title}</h3>
+          <span>{focusedDescription.summary}</span>
+        </div>
+      ) : null}
       <ol className="circuit-mobile-flow" aria-label="High-level Orchard circuit flow">
         {data.flow.nodes.map((node) => (
           <li key={node.id}>
@@ -1889,14 +1887,26 @@ function EmbeddedGadgets({
     {
       id: "poseidon",
       title: "Poseidon",
-      matcher: "/poseidon/",
+      matchers: ["/poseidon/"],
       detail: "Poseidon is nested in nullifier derivation: its full-round, partial-round, and pad-and-add gates implement the hash before the ECC-based nullifier step.",
     },
     {
       id: "ecc",
       title: "Elliptic-curve gadgets",
-      matcher: "/ecc/",
+      matchers: ["/ecc/"],
       detail: "ECC point checks, additions, and variable- and fixed-base multiplication are shared across commitments, authority randomization, address integrity, nullifier derivation, and note construction.",
+    },
+    {
+      id: "sinsemilla",
+      title: "Sinsemilla and Merkle",
+      matchers: ["/sinsemilla/", "/merkle/"],
+      detail: "Sinsemilla hashing and its Merkle-path helpers support note-commitment and commitment-tree checks, including the short-commit and conditional-swap work nested inside those components.",
+    },
+    {
+      id: "range-check",
+      title: "Range checks",
+      matchers: ["range_check", "range-check"],
+      detail: "Lookup-based range checks constrain compact values and decomposed limbs throughout the circuit, including the short range-check paths reused by higher-level Orchard components.",
     },
   ] as const;
 
@@ -1905,14 +1915,16 @@ function EmbeddedGadgets({
       <CircuitSectionHeading
         eyebrow="Shared gadgets"
         id="circuit-helper-title"
-        title="Where Poseidon and ECC live"
-        description="They are not missing. This flow is grouped by Orchard function, while reusable Poseidon, ECC, Sinsemilla, and range-check gadgets are nested inside the components that call them."
+        title="Where the main shared gadgets live"
+        description="The flow is grouped by Orchard function. Reusable Poseidon, elliptic-curve, Sinsemilla, Merkle, and range-check gadgets appear here under the components that invoke them."
       />
       <div className="circuit-helper-grid">
         {families.map((family) => {
           const gates = data.configure.gates.filter((gate) =>
             gate.sourceIds.some((sourceId) =>
-              sourcesById.get(sourceId)?.path.toLocaleLowerCase().includes(family.matcher)
+              family.matchers.some((matcher) =>
+                sourcesById.get(sourceId)?.path.toLocaleLowerCase().includes(matcher)
+              )
             )
           );
           const componentIds = [...new Set(gates.flatMap((gate) =>
@@ -1944,36 +1956,6 @@ function EmbeddedGadgets({
           );
         })}
       </div>
-    </section>
-  );
-}
-
-function CircuitSnapshot({ data }: { data: CircuitExplorerData }) {
-  return (
-    <section className="circuit-snapshot-note" aria-labelledby="circuit-snapshot-title">
-      <div className="circuit-snapshot-note__intro">
-        <p className="eyebrow">Generated Rocq snapshot</p>
-        <h2 id="circuit-snapshot-title">{data.metadata.title}</h2>
-        <p>{data.metadata.description}</p>
-      </div>
-      <dl className="circuit-snapshot-facts">
-        {data.metadata.version ? <div><dt>Version</dt><dd><code>{data.metadata.version}</code></dd></div> : null}
-        {data.metadata.field ? <div><dt>Field</dt><dd><code>{data.metadata.field}</code></dd></div> : null}
-        {data.metadata.k !== undefined ? <div><dt>k</dt><dd>{data.metadata.k}</dd></div> : null}
-        {data.metadata.floorPlanner ? <div><dt>Floor planner</dt><dd>{data.metadata.floorPlanner}</dd></div> : null}
-        {data.metadata.witnessValues ? <div><dt>Witness values</dt><dd>{titleCase(data.metadata.witnessValues)}</dd></div> : null}
-      </dl>
-      {data.metadata.placement ? <p className="circuit-snapshot-note__placement">{data.metadata.placement}</p> : null}
-      {Object.keys(data.metadata.repositoryRefs).length ? (
-        <div className="circuit-snapshot-note__revisions">
-          <h3>Pinned sources</h3>
-          <dl>
-            {Object.entries(data.metadata.repositoryRefs).map(([repository, revision]) => (
-              <div key={repository}><dt>{titleCase(repository)}</dt><dd><code>{revision.slice(0, 12)}</code></dd></div>
-            ))}
-          </dl>
-        </div>
-      ) : null}
     </section>
   );
 }
@@ -2454,7 +2436,6 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
         <>
           <CircuitOutline data={data} entries={entries} onSelect={selectEntry} />
           <EmbeddedGadgets data={data} entries={entries} onSelect={selectEntry} />
-          <CircuitSnapshot data={data} />
         </>
       ) : null}
     </main>
