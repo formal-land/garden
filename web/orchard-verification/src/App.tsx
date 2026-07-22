@@ -1,24 +1,14 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import gardenLogo from "../../../garden.svg?url";
+import footerGarden from "./assets/garden-footer.webp";
 import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
 import { ProofMap } from "./components/ProofMap";
 import { CircuitExplorer } from "./components/CircuitExplorer";
 
-type Theme = "light" | "dark";
 type View = "journey" | "atlas" | "circuit";
 
-function initialTheme(): Theme {
-  const saved = window.localStorage.getItem("garden-orchard-theme");
-  if (saved === "light" || saved === "dark") return saved;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-}
-
-function SiteHeader({ view, theme, onThemeChange }: {
-  view: View;
-  theme: Theme;
-  onThemeChange: () => void;
-}) {
+function SiteHeader({ view }: { view: View }) {
   return (
     <header className="site-header">
       <a className="garden-brand" href="./" aria-label="Garden Orchard verification journey">
@@ -39,15 +29,6 @@ function SiteHeader({ view, theme, onThemeChange }: {
           Circuit
         </a>
       </nav>
-      <button
-        type="button"
-        className="theme-toggle"
-        onClick={onThemeChange}
-        aria-label={`Use ${theme === "light" ? "dark" : "light"} theme`}
-        title={`Use ${theme === "light" ? "dark" : "light"} theme`}
-      >
-        <span aria-hidden="true">{theme === "light" ? "☾" : "☀"}</span>
-      </button>
     </header>
   );
 }
@@ -89,6 +70,9 @@ function SiteFooter() {
         <div><dt>Orchard</dt><dd><code>{refs.orchard.slice(0, 8)}</code></dd></div>
       </dl>
       <p className="site-footer__caveat">{orchardVerificationData.snapshot.caveat}</p>
+      <div className="site-footer__art" aria-hidden="true">
+        <img src={footerGarden} alt="" width="1600" height="533" loading="lazy" />
+      </div>
     </footer>
   );
 }
@@ -102,24 +86,9 @@ export function App() {
     },
     [],
   );
-  const [theme, setTheme] = useState<Theme>(initialTheme);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    window.localStorage.setItem("garden-orchard-theme", theme);
-    document.querySelector('meta[name="theme-color"]')?.setAttribute(
-      "content",
-      theme === "light" ? "#f7f4e8" : "#0d1d15",
-    );
-  }, [theme]);
-
   return (
     <div className="site-shell">
-      <SiteHeader
-        view={view}
-        theme={theme}
-        onThemeChange={() => setTheme((current) => current === "light" ? "dark" : "light")}
-      />
+      <SiteHeader view={view} />
       {view === "journey" ? (
         <JourneyView data={orchardVerificationData} />
       ) : view === "atlas" ? (

@@ -6,6 +6,7 @@ import {
   useState,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
+  type ReactNode,
 } from "react";
 
 import {
@@ -17,8 +18,8 @@ import type {
   CircuitConstraint,
   CircuitExplorerData,
   CircuitExplorerLevel,
-  CircuitExplorerMode,
   CircuitExplorerRoute,
+  CircuitFlowEdge,
   CircuitFlowNode,
   CircuitGate,
   CircuitItemKind,
@@ -34,6 +35,7 @@ import type {
 } from "../circuit/model";
 
 const EXACT_PAGE_SIZE = 60;
+const RELATIONSHIP_PREVIEW_SIZE = 12;
 
 type DataLoader = () => Promise<CircuitExplorerData>;
 type EntryOrigin = "flow" | "component" | "detail";
@@ -62,6 +64,13 @@ interface LaidOutNode {
   readonly y: number;
 }
 
+interface FlowFocus {
+  readonly id: string;
+  readonly kind: "node" | "wire";
+  readonly title: string;
+  readonly summary: string;
+}
+
 function classNames(
   ...values: ReadonlyArray<string | false | null | undefined>
 ): string {
@@ -75,16 +84,30 @@ function titleCase(value: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+const PROOF_NODE_TITLES: Readonly<Record<string, string>> = {
+  "gadgets-ecc": "ECC gadget proofs",
+  "gadgets-poseidon-range": "Poseidon and range-check proofs",
+  "gadgets-sinsemilla-merkle": "Sinsemilla and Merkle proofs",
+  "capture-synthesis-model": "Rocq synthesis model",
+  "action-valid-inputs": "Action input validity",
+  "action-seven-outputs": "Action public outputs",
+  "action-theorem": "Action circuit theorem",
+};
+
+function proofNodeTitle(id: string): string {
+  return PROOF_NODE_TITLES[id] ?? titleCase(id);
+}
+
 function defaultRoute(): CircuitExplorerRoute {
-  return { level: "flow", itemId: null, mode: "aggregate", query: "" };
+  return { level: "flow", itemId: null, query: "", focusId: null };
 }
 
 function routeHash(route: CircuitExplorerRoute): string {
   const parameters = new URLSearchParams();
   if (route.level !== "flow") parameters.set("level", route.level);
   if (route.itemId) parameters.set("item", route.itemId);
-  if (route.mode === "exact") parameters.set("mode", "exact");
   if (route.query) parameters.set("q", route.query);
+  if (route.focusId) parameters.set("focus", route.focusId);
   const value = parameters.toString();
   return value ? `#${value}` : "";
 }
@@ -114,6 +137,28 @@ function entryForFlowNode(
 
 function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
   const componentIds = new Set(data.synthesis.components.map(({ id }) => id));
+  const sourcesById = new Map(data.sources.map((source) => [source.id, source]));
+  const detailProofNodes = (
+    sourceIds: readonly string[],
+    candidates: readonly CircuitSourceResolutionCandidate[] = [],
+  ): string[] => {
+    const paths = [...sourceIds, ...candidates.map(({ sourceId }) => sourceId)]
+      .flatMap((id) => {
+        const source = sourcesById.get(id);
+        return source ? [source.path.toLocaleLowerCase()] : [];
+      });
+    const proofNodeIds = new Set<string>(["capture-synthesis-model"]);
+    if (paths.some((path) => path.includes("/poseidon/") || path.includes("range_check"))) {
+      proofNodeIds.add("gadgets-poseidon-range");
+    }
+    if (paths.some((path) => path.includes("/ecc/"))) {
+      proofNodeIds.add("gadgets-ecc");
+    }
+    if (paths.some((path) => path.includes("sinsemilla") || path.includes("merkle"))) {
+      proofNodeIds.add("gadgets-sinsemilla-merkle");
+    }
+    return [...proofNodeIds];
+  };
   const occurrencesById = new Map(
     data.synthesis.occurrences.map((occurrence) => [occurrence.id, occurrence]),
   );
@@ -159,7 +204,7 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceIds: region.sourceIds,
       sourceConfidence: region.sourceConfidence,
       sourceCandidates: region.sourceCandidates,
-      proofNodeIds: [],
+      proofNodeIds: detailProofNodes(region.sourceIds, region.sourceCandidates),
       metrics: region.metrics,
       namespacePath: region.namespacePath,
       searchText: [region.id, region.title, region.semanticId, region.summary, ...region.namespacePath, ...region.searchTerms]
@@ -180,7 +225,7 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceIds: occurrence.sourceIds,
       sourceConfidence: occurrence.sourceConfidence,
       sourceCandidates: occurrence.sourceCandidates,
-      proofNodeIds: [],
+      proofNodeIds: detailProofNodes(occurrence.sourceIds, occurrence.sourceCandidates),
       metrics: occurrence.metrics,
       namespacePath: occurrence.namespacePath,
       searchText: [occurrence.id, occurrence.title, occurrence.semanticId, ...occurrence.namespacePath, ...occurrence.searchTerms]
@@ -201,7 +246,7 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceIds: gate.sourceIds,
       sourceConfidence: gate.sourceConfidence,
       sourceCandidates: gate.sourceCandidates,
-      proofNodeIds: [],
+      proofNodeIds: detailProofNodes(gate.sourceIds, gate.sourceCandidates),
       metrics: gate.metrics,
       namespacePath: [],
       searchText: [gate.id, gate.title, gate.summary, gate.selector, ...gate.regionIds, ...gate.searchTerms]
@@ -222,7 +267,7 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceIds: lookup.sourceIds,
       sourceConfidence: lookup.sourceConfidence,
       sourceCandidates: lookup.sourceCandidates,
-      proofNodeIds: [],
+      proofNodeIds: detailProofNodes(lookup.sourceIds, lookup.sourceCandidates),
       metrics: lookup.metrics,
       namespacePath: [],
       searchText: [
@@ -258,7 +303,14 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceCandidates: constraint.sourceCandidates.length
         ? constraint.sourceCandidates
         : gate?.sourceCandidates ?? [],
-      proofNodeIds: [],
+      proofNodeIds: gate
+        ? detailProofNodes(
+            constraint.sourceIds.length ? constraint.sourceIds : gate.sourceIds,
+            constraint.sourceCandidates.length
+              ? constraint.sourceCandidates
+              : gate.sourceCandidates,
+          )
+        : detailProofNodes(constraint.sourceIds, constraint.sourceCandidates),
       metrics: [],
       namespacePath: [],
       searchText: [
@@ -287,7 +339,12 @@ function buildEntries(data: CircuitExplorerData): ExplorerEntry[] {
       sourceCandidates: operation.sourceCandidates.length
         ? operation.sourceCandidates
         : occurrence?.sourceCandidates ?? [],
-      proofNodeIds: [],
+      proofNodeIds: detailProofNodes(
+        operation.sourceIds.length ? operation.sourceIds : occurrence?.sourceIds ?? [],
+        operation.sourceCandidates.length
+          ? operation.sourceCandidates
+          : occurrence?.sourceCandidates ?? [],
+      ),
       metrics: [],
       namespacePath: occurrence?.namespacePath ?? [],
       searchText: [
@@ -331,42 +388,99 @@ function findSelectedEntry(
   return entries.find((entry) => entry.origin === "detail" && entry.id === route.itemId) ?? null;
 }
 
+function presentationEntryFor(
+  data: CircuitExplorerData,
+  entries: readonly ExplorerEntry[],
+  entry: ExplorerEntry,
+): ExplorerEntry {
+  if (entry.kind === "constraint") {
+    const constraint = entry.item as CircuitConstraint;
+    return entries.find((candidate) =>
+      candidate.kind === "gate" && candidate.id === constraint.gateId
+    ) ?? entry;
+  }
+  if (entry.kind === "operation") {
+    const operation = entry.item as CircuitRegionOperation;
+    const occurrenceId = operation.occurrenceId ?? operation.regionId;
+    const occurrence = occurrenceId
+      ? entries.find((candidate) =>
+          candidate.kind === "region-occurrence" && candidate.id === occurrenceId
+        )
+      : undefined;
+    if (occurrence) return occurrence;
+    const componentId = operation.componentId ?? data.synthesis.occurrences.find(
+      (candidate) => candidate.id === occurrenceId,
+    )?.componentId;
+    return entries.find((candidate) =>
+      candidate.origin === "component" && candidate.id === componentId
+    ) ?? entry;
+  }
+  return entry;
+}
+
 function parseRoute(
   data: CircuitExplorerData,
   entries: readonly ExplorerEntry[],
-): { route: CircuitExplorerRoute; notice?: string } {
+): { route: CircuitExplorerRoute; notice?: string; replace?: boolean } {
   const parameters = new URLSearchParams(window.location.hash.slice(1));
   const requestedLevel = parameters.get("level");
   const level: CircuitExplorerLevel =
     requestedLevel === "component" || requestedLevel === "detail"
       ? requestedLevel
       : "flow";
-  const mode: CircuitExplorerMode = parameters.get("mode") === "exact" ? "exact" : "aggregate";
   const query = parameters.get("q") ?? "";
   const requestedItem = parameters.get("item");
+  const requestedFocus = parameters.get("focus");
   const candidate: CircuitExplorerRoute = {
     level,
     itemId: requestedItem,
-    mode,
     query,
+    focusId: requestedFocus,
   };
 
-  if (!requestedItem && level === "flow") return { route: candidate };
+  if (!requestedItem && level === "flow") {
+    return { route: candidate, replace: parameters.has("mode") };
+  }
   const found = findSelectedEntry(entries, candidate);
-  if (found) return { route: candidate };
+  if (found) {
+    const presented = presentationEntryFor(data, entries, found);
+    if (presented !== found) {
+      const targetLevel = presented.origin === "component" ? "component" : "detail";
+      return {
+        route: {
+          level: targetLevel,
+          itemId: presented.id,
+          query,
+          focusId: found.kind === "operation" || found.kind === "constraint" ? found.id : null,
+        },
+        notice: entryRedirectNotice(found, presented),
+        replace: true,
+      };
+    }
+    return { route: candidate, replace: parameters.has("mode") };
+  }
 
   if (level === "component" && !requestedItem && data.synthesis.components[0]) {
     return {
       route: { ...candidate, itemId: data.synthesis.components[0].id },
       notice: "The component link was incomplete, so the first circuit component is shown.",
+      replace: true,
     };
   }
   return {
-    route: { ...defaultRoute(), mode, query },
+    route: { ...defaultRoute(), query },
     notice: requestedItem
       ? `The linked circuit item “${requestedItem}” is not present in this evidence snapshot.`
       : "The linked circuit view was incomplete, so the circuit overview is shown.",
+    replace: true,
   };
+}
+
+function entryRedirectNotice(from: ExplorerEntry, to: ExplorerEntry): string {
+  if (from.kind === "constraint") {
+    return `The constraint “${from.title}” is shown directly inside its gate, “${to.title}”.`;
+  }
+  return `The operation “${from.title}” is shown directly inside “${to.title}”.`;
 }
 
 function layoutFlowNodes(
@@ -401,20 +515,16 @@ function layoutFlowNodes(
   });
 }
 
-function upstreamNodeIds(data: CircuitExplorerData, selectedId: string | null): Set<string> {
-  if (!selectedId) return new Set();
-  const result = new Set([selectedId]);
-  let changed = true;
-  while (changed) {
-    changed = false;
-    for (const edge of data.flow.edges) {
-      if (result.has(edge.to) && !result.has(edge.from)) {
-        result.add(edge.from);
-        changed = true;
-      }
-    }
-  }
-  return result;
+function flowEdgeSummary(
+  edge: CircuitFlowEdge,
+  nodes: ReadonlyMap<string, CircuitFlowNode>,
+): string {
+  if (edge.summary) return edge.summary;
+  const from = nodes.get(edge.from)?.title ?? edge.from;
+  const to = nodes.get(edge.to)?.title ?? edge.to;
+  return edge.label
+    ? `Carries ${edge.label} from ${from} to ${to}.`
+    : `Connects ${from} to ${to}.`;
 }
 
 function metricsWithFallback(entry: ExplorerEntry): CircuitMetric[] {
@@ -477,12 +587,15 @@ function RelationshipLinks({
   kind?: CircuitItemKind;
   onSelect: (entry: ExplorerEntry) => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
+  useEffect(() => setExpanded(false), [ids]);
   if (!ids.length) return null;
+  const visibleIds = expanded ? ids : ids.slice(0, RELATIONSHIP_PREVIEW_SIZE);
   return (
-    <details className="circuit-relationship-links">
-      <summary>{ids.length} linked {label}</summary>
+    <section className="circuit-relationship-links">
+      <h3>{ids.length} linked {label}</h3>
       <ul>
-        {ids.map((id) => {
+        {visibleIds.map((id) => {
           const target = entries.find((candidate) =>
             candidate.id === id && candidate.origin === origin && (!kind || candidate.kind === kind)
           );
@@ -497,7 +610,16 @@ function RelationshipLinks({
           );
         })}
       </ul>
-    </details>
+      {!expanded && ids.length > visibleIds.length ? (
+        <button
+          className="circuit-relationship-links__more"
+          type="button"
+          onClick={() => setExpanded(true)}
+        >
+          Show all {ids.length} linked {label}
+        </button>
+      ) : null}
+    </section>
   );
 }
 
@@ -542,10 +664,56 @@ function FlowCanvas({
     () => new Map(laidOut.map((item) => [item.node.id, item])),
     [laidOut],
   );
-  const highlighted = useMemo(
-    () => upstreamNodeIds(data, selectedId),
-    [data, selectedId],
+  const nodesById = useMemo(
+    () => new Map(data.flow.nodes.map((node) => [node.id, node])),
+    [data.flow.nodes],
   );
+  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+  const [hoveredEdgeId, setHoveredEdgeId] = useState<string | null>(null);
+  const activeNodeId = hoveredNodeId ?? selectedId;
+  const connectedNodeIds = useMemo(() => {
+    const result = new Set<string>();
+    if (activeNodeId) {
+      result.add(activeNodeId);
+      for (const edge of data.flow.edges) {
+        if (edge.from === activeNodeId) result.add(edge.to);
+        if (edge.to === activeNodeId) result.add(edge.from);
+      }
+    }
+    if (hoveredEdgeId) {
+      const edge = data.flow.edges.find(({ id }) => id === hoveredEdgeId);
+      if (edge) {
+        result.add(edge.from);
+        result.add(edge.to);
+      }
+    }
+    return result;
+  }, [activeNodeId, data.flow.edges, hoveredEdgeId]);
+  const focusedDescription = useMemo<FlowFocus | null>(() => {
+    if (hoveredEdgeId) {
+      const edge = data.flow.edges.find(({ id }) => id === hoveredEdgeId);
+      if (edge) {
+        return {
+          id: edge.id,
+          kind: "wire",
+          title: edge.label ?? "Circuit connection",
+          summary: flowEdgeSummary(edge, nodesById),
+        };
+      }
+    }
+    if (activeNodeId) {
+      const node = nodesById.get(activeNodeId);
+      if (node) {
+        return {
+          id: node.id,
+          kind: "node",
+          title: node.title,
+          summary: node.summary,
+        };
+      }
+    }
+    return null;
+  }, [activeNodeId, data.flow.edges, hoveredEdgeId, nodesById]);
   const buttonRefs = useRef(new Map<string, HTMLButtonElement>());
 
   const moveFocus = (event: ReactKeyboardEvent<HTMLButtonElement>, current: LaidOutNode) => {
@@ -581,31 +749,86 @@ function FlowCanvas({
         <svg
           className="circuit-flow-canvas__edges"
           viewBox={`0 0 ${width} ${height}`}
-          aria-hidden="true"
+          role="group"
+          aria-label="Circuit wires"
           preserveAspectRatio="none"
         >
           <defs>
-            <marker id="circuit-flow-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-              <path d="M 0 0 L 10 5 L 0 10 z" />
-            </marker>
+            {(["data", "constraint", "public"] as const).map((kind) => (
+              <marker
+                id={`circuit-flow-arrow-${kind}`}
+                className={`circuit-flow-arrow--${kind}`}
+                key={kind}
+                viewBox="0 0 10 10"
+                refX="9"
+                refY="5"
+                markerWidth="6"
+                markerHeight="6"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" />
+              </marker>
+            ))}
           </defs>
+          <g className="circuit-flow-hit-layer" aria-hidden="true">
+            {data.flow.edges.map((edge) => {
+              const from = byId.get(edge.from);
+              const to = byId.get(edge.to);
+              if (!from || !to) return null;
+              const bend = Math.max(45, Math.abs(to.x - from.x) * 0.42);
+              const path = `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
+              return (
+                <path
+                  key={edge.id}
+                  className="circuit-flow-edge__hit"
+                  d={path}
+                  onMouseEnter={() => setHoveredEdgeId(edge.id)}
+                  onMouseLeave={() => setHoveredEdgeId(null)}
+                />
+              );
+            })}
+          </g>
           {data.flow.edges.map((edge) => {
             const from = byId.get(edge.from);
             const to = byId.get(edge.to);
             if (!from || !to) return null;
-            const active = !selectedId || (highlighted.has(edge.from) && highlighted.has(edge.to));
             const bend = Math.max(45, Math.abs(to.x - from.x) * 0.42);
+            const path = `M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`;
+            const incident = Boolean(activeNodeId) &&
+              (edge.from === activeNodeId || edge.to === activeNodeId);
+            const emphasized = hoveredEdgeId === edge.id || incident;
+            const muted = Boolean(activeNodeId || hoveredEdgeId) && !emphasized;
+            const summary = flowEdgeSummary(edge, nodesById);
             return (
               <g
                 key={edge.id}
-                className={`circuit-flow-edge circuit-flow-edge--${edge.kind} ${active ? "is-active" : "is-muted"}`}
+                className={classNames(
+                  "circuit-flow-edge",
+                  `circuit-flow-edge--${edge.kind}`,
+                  emphasized && "is-emphasized",
+                  hoveredEdgeId === edge.id && "is-label-hovered",
+                  muted && "is-muted",
+                )}
+                data-edge-id={edge.id}
+                onMouseEnter={() => setHoveredEdgeId(edge.id)}
+                onMouseLeave={() => setHoveredEdgeId(null)}
               >
+                <title>{summary}</title>
                 <path
-                  d={`M ${from.x} ${from.y} C ${from.x + bend} ${from.y}, ${to.x - bend} ${to.y}, ${to.x} ${to.y}`}
-                  markerEnd="url(#circuit-flow-arrow)"
+                  d={path}
+                  markerEnd={`url(#circuit-flow-arrow-${edge.kind})`}
                 />
                 {edge.label ? (
-                  <text x={(from.x + to.x) / 2} y={(from.y + to.y) / 2 - 7} textAnchor="middle">
+                  <text
+                    x={(from.x + to.x) / 2}
+                    y={(from.y + to.y) / 2 - 7}
+                    textAnchor="middle"
+                    tabIndex={0}
+                    aria-label={`${edge.label}. ${summary}`}
+                    aria-describedby="circuit-flow-focus-description"
+                    onFocus={() => setHoveredEdgeId(edge.id)}
+                    onBlur={() => setHoveredEdgeId(null)}
+                  >
                     {edge.label}
                   </text>
                 ) : null}
@@ -614,7 +837,8 @@ function FlowCanvas({
           })}
         </svg>
         {laidOut.map((item) => {
-          const muted = selectedId && !highlighted.has(item.node.id);
+          const muted = Boolean(activeNodeId || hoveredEdgeId) && !connectedNodeIds.has(item.node.id);
+          const connected = connectedNodeIds.has(item.node.id) && item.node.id !== activeNodeId;
           const style = {
             "--circuit-node-x": `${(item.x / width) * 100}%`,
             "--circuit-node-y": `${(item.y / height) * 100}%`,
@@ -631,12 +855,18 @@ function FlowCanvas({
                 "circuit-flow-node",
                 `circuit-flow-node--${item.node.kind}`,
                 selectedId === item.node.id && "is-selected",
+                connected && "is-connected",
                 muted && "is-muted",
               )}
               style={style}
-              aria-pressed={selectedId === item.node.id}
+              aria-current={selectedId === item.node.id ? "true" : undefined}
               aria-label={`${item.node.title}. ${item.node.summary}`}
+              aria-describedby="circuit-flow-focus-description"
               onClick={() => onSelect(item.node)}
+              onMouseEnter={() => setHoveredNodeId(item.node.id)}
+              onMouseLeave={() => setHoveredNodeId(null)}
+              onFocus={() => setHoveredNodeId(item.node.id)}
+              onBlur={() => setHoveredNodeId(null)}
               onKeyDown={(event) => moveFocus(event, item)}
             >
               <span>{titleCase(item.node.kind)}</span>
@@ -645,10 +875,29 @@ function FlowCanvas({
           );
         })}
       </div>
+      <div
+        className={classNames("circuit-flow-focus", focusedDescription && "is-active")}
+        id="circuit-flow-focus-description"
+        data-flow-item={focusedDescription?.id}
+      >
+        <p>{focusedDescription?.kind === "wire" ? "Circuit wire" : focusedDescription ? "Circuit item" : "Interactive guide"}</p>
+        <h3>{focusedDescription?.title ?? "Follow an item through the circuit"}</h3>
+        <span>
+          {focusedDescription?.summary ??
+            "Hover or focus a circuit item or wire name to see its role. Select an item to inspect its regions, gates, and source."}
+        </span>
+      </div>
       <ol className="circuit-mobile-flow" aria-label="High-level Orchard circuit flow">
         {data.flow.nodes.map((node) => (
           <li key={node.id}>
-            <button type="button" onClick={() => onSelect(node)} aria-pressed={selectedId === node.id}>
+            <button
+              type="button"
+              className={`circuit-mobile-flow__node--${node.kind}`}
+              onClick={() => onSelect(node)}
+              onFocus={() => setHoveredNodeId(node.id)}
+              onBlur={() => setHoveredNodeId(null)}
+              aria-current={selectedId === node.id ? "true" : undefined}
+            >
               <span>{titleCase(node.kind)}</span>
               <strong>{node.title}</strong>
               <small>{node.summary}</small>
@@ -656,15 +905,33 @@ function FlowCanvas({
           </li>
         ))}
       </ol>
+      <section className="circuit-mobile-wires" aria-labelledby="circuit-mobile-wires-title">
+        <h3 id="circuit-mobile-wires-title">Circuit wires</h3>
+        <p>Connections are listed explicitly on small screens, where hover is unavailable.</p>
+        <ul>
+          {data.flow.edges.map((edge) => {
+            const from = nodesById.get(edge.from);
+            const to = nodesById.get(edge.to);
+            return (
+              <li className={`circuit-mobile-wire--${edge.kind}`} key={edge.id}>
+                <span>{titleCase(edge.kind)} wire</span>
+                <strong>{edge.label || `${from?.shortTitle ?? edge.from} to ${to?.shortTitle ?? edge.to}`}</strong>
+                <small>{from?.shortTitle ?? edge.from} → {to?.shortTitle ?? edge.to}</small>
+                <p>{flowEdgeSummary(edge, nodesById)}</p>
+              </li>
+            );
+          })}
+        </ul>
+      </section>
     </>
   );
 }
 
-function OperationDetail({ operation }: { operation: CircuitRegionOperation }) {
+function OperationRecord({ operation }: { operation: CircuitRegionOperation }) {
   return (
-    <article className="circuit-operation-detail">
+    <article className="circuit-operation-record" data-operation-id={operation.id} tabIndex={-1}>
       <p className="circuit-card__kind">{titleCase(operation.kind)}</p>
-      <h2>{operation.title}</h2>
+      <h4>{operation.title}</h4>
       {operation.annotation ? <p>{operation.annotation}</p> : null}
       <dl className="circuit-operation-facts">
         {operation.selectorId ? <><dt>Selector ID</dt><dd><code>{operation.selectorId}</code></dd></> : null}
@@ -675,23 +942,17 @@ function OperationDetail({ operation }: { operation: CircuitRegionOperation }) {
         {operation.regionId ? <><dt>Region</dt><dd><code>{operation.regionId}</code></dd></> : null}
       </dl>
       {operation.cells.length ? (
-        <div className="circuit-cell-table-wrap">
-          <table className="circuit-cell-table">
-            <caption>Cells referenced by this operation</caption>
-            <thead><tr><th>Cell</th><th>Kind</th><th>Column</th><th>Offset</th><th>Absolute row</th></tr></thead>
-            <tbody>
-              {operation.cells.map((cell) => (
-                <tr key={cell.id}>
-                  <th scope="row"><code>{cell.id}</code></th>
-                  <td>{titleCase(cell.kind)}</td>
-                  <td>{cell.column ?? "—"}</td>
-                  <td>{cell.relativeOffset ?? "—"}</td>
-                  <td>{cell.absoluteRow ?? "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <ul className="circuit-operation-cells" aria-label="Referenced cells">
+          {operation.cells.map((cell) => (
+            <li key={cell.id}>
+              <code>{cell.label}</code>
+              <span>{titleCase(cell.kind)}</span>
+              {cell.column ? <span>column {cell.column}</span> : null}
+              {cell.relativeOffset !== undefined ? <span>offset {cell.relativeOffset}</span> : null}
+              {cell.absoluteRow !== undefined ? <span>row {cell.absoluteRow}</span> : null}
+            </li>
+          ))}
+        </ul>
       ) : operation.lookupEntries.length ? null : <p>No cell operands are recorded for this operation.</p>}
       {operation.lookupEntries.length ? (
         <div className="circuit-cell-table-wrap">
@@ -719,20 +980,169 @@ function OperationDetail({ operation }: { operation: CircuitRegionOperation }) {
   );
 }
 
+function ConstraintRecord({ constraint }: { constraint: CircuitConstraint }) {
+  return (
+    <article className="circuit-constraint-record" data-constraint-id={constraint.id}>
+      <p className="circuit-card__kind">Polynomial constraint</p>
+      <h3>{constraint.title}</h3>
+      <pre><code>{constraint.expression}</code></pre>
+      <dl>
+        <div>
+          <dt>Columns</dt>
+          <dd>{constraint.columns.length ? constraint.columns.join(", ") : "Derived from the expression"}</dd>
+        </div>
+        <div>
+          <dt>Rotations</dt>
+          <dd>{constraint.rotations.length ? constraint.rotations.join(", ") : "0 / not annotated"}</dd>
+        </div>
+      </dl>
+    </article>
+  );
+}
+
+function RegionOperationList({
+  occurrences,
+  operations,
+  visibleLimit,
+  focusId,
+  onShowMore,
+}: {
+  occurrences: readonly CircuitRegionOccurrence[];
+  operations: readonly CircuitRegionOperation[];
+  visibleLimit: number;
+  focusId: string | null;
+  onShowMore: () => void;
+}) {
+  const operationsByOccurrence = new Map<string, CircuitRegionOperation[]>();
+  for (const operation of operations) {
+    const occurrenceId = operation.occurrenceId ?? operation.regionId;
+    if (!occurrenceId) continue;
+    const current = operationsByOccurrence.get(occurrenceId) ?? [];
+    current.push(operation);
+    operationsByOccurrence.set(occurrenceId, current);
+  }
+  const focusedOccurrence = focusId
+    ? occurrences.find((occurrence) =>
+        operationsByOccurrence.get(occurrence.id)?.some((operation) => operation.id === focusId)
+      )
+    : undefined;
+  const [chosenOccurrenceId, setChosenOccurrenceId] = useState(occurrences[0]?.id ?? "");
+  const [dismissedFocusId, setDismissedFocusId] = useState<string | null>(null);
+  const activeOccurrence = (focusId !== dismissedFocusId ? focusedOccurrence : undefined) ??
+    occurrences.find((occurrence) => occurrence.id === chosenOccurrenceId) ??
+    occurrences[0];
+
+  useEffect(() => {
+    const nextId = (focusId !== dismissedFocusId ? focusedOccurrence?.id : undefined) ?? (
+      occurrences.some((occurrence) => occurrence.id === chosenOccurrenceId)
+        ? chosenOccurrenceId
+        : occurrences[0]?.id ?? ""
+    );
+    if (nextId !== chosenOccurrenceId) setChosenOccurrenceId(nextId);
+  }, [chosenOccurrenceId, dismissedFocusId, focusId, focusedOccurrence?.id, occurrences]);
+
+  const orderedOperations = activeOccurrence
+    ? operationsByOccurrence.get(activeOccurrence.id) ?? []
+    : [];
+  const focusIndex = focusId
+    ? orderedOperations.findIndex((operation) => operation.id === focusId)
+    : -1;
+  const effectiveLimit = Math.max(visibleLimit, focusIndex + 1);
+  const visibleOperations = orderedOperations.slice(0, effectiveLimit);
+  const total = occurrences.reduce(
+    (count, occurrence) => count + (operationsByOccurrence.get(occurrence.id)?.length ?? 0),
+    0,
+  );
+  const emptyOccurrenceCount = occurrences.filter(
+    (occurrence) => !(operationsByOccurrence.get(occurrence.id)?.length),
+  ).length;
+
+  return (
+    <section className="circuit-region-operations" aria-labelledby="region-operations-title">
+      <div className="circuit-layer-heading">
+        <div>
+          <p className="circuit-card__kind">Free-monad synthesis trace</p>
+          <h3 id="region-operations-title">Region operations</h3>
+          <p>
+            These operators are shown directly in evaluator order. Selectors, rows,
+            values, and referenced cells come from the extracted Rocq trace.
+          </p>
+        </div>
+        <p>{total} operator{total === 1 ? "" : "s"} across {occurrences.length} exact occurrence{occurrences.length === 1 ? "" : "s"}</p>
+      </div>
+      {occurrences.length > 1 && total ? (
+        <div className="circuit-occurrence-picker">
+          <label htmlFor="circuit-occurrence-select">Exact occurrence shown</label>
+          <select
+            id="circuit-occurrence-select"
+            aria-describedby="circuit-occurrence-help"
+            value={activeOccurrence?.id ?? ""}
+            onChange={(event) => {
+              setChosenOccurrenceId(event.currentTarget.value);
+              setDismissedFocusId(focusId);
+            }}
+          >
+            {occurrences.map((occurrence) => {
+              const count = operationsByOccurrence.get(occurrence.id)?.length ?? 0;
+              return (
+                <option key={occurrence.id} value={occurrence.id}>
+                  #{occurrence.index} · {occurrence.title} · {count} operator{count === 1 ? "" : "s"}
+                </option>
+              );
+            })}
+          </select>
+          <small id="circuit-occurrence-help">Repeated regions share one definition; choose an exact evaluator occurrence to inspect its ordered operators.</small>
+        </div>
+      ) : null}
+      <div className="circuit-occurrence-list">
+        {activeOccurrence && orderedOperations.length ? (
+          <section className="circuit-occurrence" key={activeOccurrence.id}>
+            <header>
+              <div>
+                <p className="circuit-card__kind">Exact region {activeOccurrence.index}</p>
+                <h3>{activeOccurrence.title}</h3>
+              </div>
+              <span>{visibleOperations.length} of {orderedOperations.length} operator{orderedOperations.length === 1 ? "" : "s"} shown</span>
+            </header>
+            {activeOccurrence.namespacePath.length ? (
+              <p className="circuit-namespace-path">{activeOccurrence.namespacePath.join(" / ")}</p>
+            ) : null}
+            <div className="circuit-operation-list">
+              {visibleOperations.map((operation) => (
+                <OperationRecord key={operation.id} operation={operation} />
+              ))}
+            </div>
+          </section>
+        ) : null}
+      </div>
+      {emptyOccurrenceCount ? (
+        <p className="circuit-empty-note">
+          {emptyOccurrenceCount} exact occurrence{emptyOccurrenceCount === 1 ? "" : "s"} emitted no operators in the extracted trace.
+        </p>
+      ) : null}
+      {visibleOperations.length < orderedOperations.length ? (
+        <button className="circuit-show-more" type="button" onClick={onShowMore}>
+          Show all {orderedOperations.length - visibleOperations.length} remaining operations
+        </button>
+      ) : null}
+    </section>
+  );
+}
+
 function DetailCanvas({
   data,
   entries,
   entry,
-  mode,
   visibleLimit,
+  focusId,
   onSelect,
   onShowMore,
 }: {
   data: CircuitExplorerData;
   entries: readonly ExplorerEntry[];
   entry: ExplorerEntry | null;
-  mode: CircuitExplorerMode;
   visibleLimit: number;
+  focusId: string | null;
   onSelect: (entry: ExplorerEntry) => void;
   onShowMore: () => void;
 }) {
@@ -740,14 +1150,10 @@ function DetailCanvas({
     return (
       <div className="circuit-empty-layer">
         <p className="eyebrow">Region and gate detail</p>
-        <h2>Choose a synthesis region or configured gate</h2>
+        <h2>Choose a synthesis region or gate</h2>
         <p>Drill through a component to inspect its exact operations, constraints, cells, and source provenance.</p>
       </div>
     );
-  }
-
-  if (entry.item && "kind" in entry.item && "cells" in entry.item) {
-    return <OperationDetail operation={entry.item as CircuitRegionOperation} />;
   }
 
   if (entry.kind === "region") {
@@ -755,38 +1161,32 @@ function DetailCanvas({
     const occurrences = data.synthesis.occurrences.filter((occurrence) =>
       occurrence.groupId === region.id || region.occurrenceIds.includes(occurrence.id)
     );
-    if (mode === "aggregate") {
-      return (
-        <article className="circuit-detail-summary">
-          <p className="circuit-card__kind">Aggregated region</p>
-          <h2>{region.title}</h2>
-          <p>{region.summary}</p>
-          {region.semanticId ? <code>{region.semanticId}</code> : null}
-          <MetricGrid metrics={metricsWithFallback(entry)} />
-          <p>Switch to <strong>Exact</strong> to inspect the {region.count} concrete occurrence{region.count === 1 ? "" : "s"} and their operations.</p>
-        </article>
-      );
-    }
-    const visible = occurrences.slice(0, visibleLimit);
+    const operations = data.synthesis.operations.filter((operation) =>
+      occurrences.some((occurrence) =>
+        operation.occurrenceId === occurrence.id ||
+        operation.regionId === occurrence.id ||
+        occurrence.operationIds.includes(operation.id)
+      )
+    );
     return (
       <div>
         <div className="circuit-layer-heading">
-          <div><p className="circuit-card__kind">Exact occurrences</p><h2>{region.title}</h2></div>
-          <p>{visible.length} of {occurrences.length} shown</p>
+          <div>
+            <p className="circuit-card__kind">Synthesis region</p>
+            <h2>{region.title}</h2>
+            <p>{region.summary}</p>
+          </div>
+          <p>{occurrences.length} exact occurrence{occurrences.length === 1 ? "" : "s"}</p>
         </div>
-        <div className="circuit-card-grid">
-          {visible.map((occurrence) => {
-            const occurrenceEntry = entries.find((candidate) =>
-              candidate.origin === "detail" && candidate.id === occurrence.id
-            );
-            return occurrenceEntry ? <EntryCard key={occurrence.id} entry={occurrenceEntry} onSelect={onSelect} /> : null;
-          })}
-        </div>
-        {visible.length < occurrences.length ? (
-          <button className="circuit-show-more" type="button" onClick={onShowMore}>
-            Show {Math.min(EXACT_PAGE_SIZE, occurrences.length - visible.length)} more occurrences
-          </button>
-        ) : null}
+        {region.semanticId ? <code>{region.semanticId}</code> : null}
+        <MetricGrid metrics={metricsWithFallback(entry)} />
+        <RegionOperationList
+          occurrences={occurrences}
+          operations={operations}
+          visibleLimit={visibleLimit}
+          focusId={focusId}
+          onShowMore={onShowMore}
+        />
       </div>
     );
   }
@@ -806,28 +1206,13 @@ function DetailCanvas({
         </div>
         {occurrence.namespacePath.length ? <p className="circuit-namespace-path">{occurrence.namespacePath.join(" / ")}</p> : null}
         <MetricGrid metrics={metricsWithFallback(entry)} />
-        <div className="circuit-operation-list">
-          {operations.length ? operations.slice(0, visibleLimit).map((operation) => {
-            const operationEntry = entries.find((candidate) => candidate.item === operation);
-            return (
-              <button type="button" key={operation.id} onClick={() => operationEntry && onSelect(operationEntry)}>
-                <span>{titleCase(operation.kind)}</span>
-                <strong>{operation.title}</strong>
-                <small>
-                  {operation.annotation ?? operation.selectorName ?? operation.selectorId ?? operation.value ??
-                    (operation.lookupEntries.length
-                      ? `${operation.lookupEntries.length} lookup table columns`
-                      : operation.absoluteRow !== undefined
-                        ? `absolute row ${operation.absoluteRow}`
-                        : "")}
-                </small>
-              </button>
-            );
-          }) : <p className="circuit-empty-note">No region operations were emitted for this occurrence.</p>}
-        </div>
-        {operations.length > visibleLimit ? (
-          <button className="circuit-show-more" type="button" onClick={onShowMore}>Show more operations</button>
-        ) : null}
+        <RegionOperationList
+          occurrences={[occurrence]}
+          operations={operations}
+          visibleLimit={visibleLimit}
+          focusId={focusId}
+          onShowMore={onShowMore}
+        />
       </div>
     );
   }
@@ -837,56 +1222,29 @@ function DetailCanvas({
     const constraints = data.configure.constraints.filter((constraint) =>
       constraint.gateId === gate.id || gate.constraintIds.includes(constraint.id)
     );
-    if (mode === "aggregate") {
-      return (
-        <article className="circuit-detail-summary">
-          <p className="circuit-card__kind">Configured gate</p>
-          <h2>{gate.title}</h2>
-          <p>{gate.summary}</p>
-          {gate.selector ? <p>Enabled by <code>{gate.selector}</code></p> : null}
-          <MetricGrid metrics={metricsWithFallback(entry)} />
-          <RelationshipLinks label="components" ids={gate.componentIds} entries={entries} origin="component" onSelect={onSelect} />
-          <RelationshipLinks label="synthesis regions" ids={gate.regionIds} entries={entries} origin="detail" kind="region-occurrence" onSelect={onSelect} />
-          <p>Switch to <strong>Exact</strong> to expand every named polynomial constraint.</p>
-        </article>
-      );
-    }
     return (
       <div>
         <div className="circuit-layer-heading">
-          <div><p className="circuit-card__kind">Exact constraints</p><h2>{gate.title}</h2></div>
+          <div>
+            <p className="circuit-card__kind">Gate</p>
+            <h2>{gate.title}</h2>
+            <p>{gate.summary}</p>
+            {gate.selector ? <p>Enabled by <code>{gate.selector}</code></p> : null}
+          </div>
           <p>{constraints.length} constraint{constraints.length === 1 ? "" : "s"}</p>
         </div>
+        <MetricGrid metrics={metricsWithFallback(entry)} />
+        <div className="circuit-direct-explanation">
+          In Halo2, every gate is declared during circuit configuration. The extracted configure free monad defines the following polynomial constraints for this gate.
+        </div>
         <div className="circuit-constraint-list">
-          {constraints.map((constraint) => {
-            const constraintEntry = entries.find((candidate) => candidate.item === constraint);
-            return (
-              <button type="button" key={constraint.id} onClick={() => constraintEntry && onSelect(constraintEntry)}>
-                <strong>{constraint.title}</strong>
-                <code>{constraint.expression}</code>
-              </button>
-            );
-          })}
+          {constraints.map((constraint) => (
+            <ConstraintRecord key={constraint.id} constraint={constraint} />
+          ))}
         </div>
         <RelationshipLinks label="components" ids={gate.componentIds} entries={entries} origin="component" onSelect={onSelect} />
         <RelationshipLinks label="synthesis regions" ids={gate.regionIds} entries={entries} origin="detail" kind="region-occurrence" onSelect={onSelect} />
       </div>
-    );
-  }
-
-  if (entry.kind === "constraint") {
-    const constraint = entry.item as CircuitConstraint;
-    return (
-      <article className="circuit-constraint-detail">
-        <p className="circuit-card__kind">Polynomial constraint</p>
-        <h2>{constraint.title}</h2>
-        <pre><code>{constraint.expression}</code></pre>
-        <dl>
-          <div><dt>Gate</dt><dd><code>{constraint.gateId}</code></dd></div>
-          <div><dt>Columns</dt><dd>{constraint.columns.length ? constraint.columns.join(", ") : "Derived from the expression AST"}</dd></div>
-          <div><dt>Rotations</dt><dd>{constraint.rotations.length ? constraint.rotations.join(", ") : "0 / not annotated"}</dd></div>
-        </dl>
-      </article>
     );
   }
 
@@ -1003,8 +1361,8 @@ function CircuitInspector({
                     <code>{source.path}{source.symbol ? ` :: ${source.symbol}` : ""}{source.line ? `:${source.line}` : ""}</code>
                   )}
                   {source.candidates.length ? (
-                    <details>
-                      <summary>{source.candidates.length} source candidate{source.candidates.length === 1 ? "" : "s"}</summary>
+                    <div className="circuit-source-candidates">
+                      <h4>{source.candidates.length} source candidate{source.candidates.length === 1 ? "" : "s"}</h4>
                       <ul>
                         {source.candidates.map((candidate, index) => (
                           <li key={`${candidate.path}:${candidate.symbol}:${index}`}>
@@ -1014,7 +1372,7 @@ function CircuitInspector({
                           </li>
                         ))}
                       </ul>
-                    </details>
+                    </div>
                   ) : null}
                 </li>
               ))}
@@ -1023,10 +1381,10 @@ function CircuitInspector({
             <p>No primary source anchor is assigned to this item. Candidate mappings remain explicit below.</p>
           )}
           {entry.sourceCandidates.length ? (
-            <details>
-              <summary>
+            <div className="circuit-source-candidates">
+              <h4>
                 {entry.sourceCandidates.length} mapping candidate{entry.sourceCandidates.length === 1 ? "" : "s"}
-              </summary>
+              </h4>
               <ul>
                 {entry.sourceCandidates.map((candidate, index) => {
                   const source = sourcesById.get(candidate.sourceId);
@@ -1049,7 +1407,7 @@ function CircuitInspector({
                   );
                 })}
               </ul>
-            </details>
+            </div>
           ) : null}
         </section>
 
@@ -1060,7 +1418,7 @@ function CircuitInspector({
               {entry.proofNodeIds.map((nodeId) => (
                 <li key={nodeId}>
                   <a href={`./proof-map.html#node=${encodeURIComponent(nodeId)}`}>
-                    Open {nodeId} in the Atlas <span aria-hidden="true">→</span>
+                    Open {proofNodeTitle(nodeId)} in the Atlas <span aria-hidden="true">→</span>
                   </a>
                 </li>
               ))}
@@ -1082,6 +1440,194 @@ function CircuitInspector({
         ) : null}
       </div>
     </aside>
+  );
+}
+
+function CircuitSectionHeading({
+  eyebrow,
+  id,
+  title,
+  description,
+  children,
+}: {
+  eyebrow: string;
+  id?: string;
+  title: string;
+  description: string;
+  children?: ReactNode;
+}) {
+  return (
+    <header className="circuit-section-heading">
+      <div>
+        <p className="eyebrow">{eyebrow}</p>
+        <h2 id={id}>{title}</h2>
+        <p>{description}</p>
+      </div>
+      {children}
+    </header>
+  );
+}
+
+function CircuitOutline({
+  data,
+  entries,
+  onSelect,
+}: {
+  data: CircuitExplorerData;
+  entries: readonly ExplorerEntry[];
+  onSelect: (entry: ExplorerEntry) => void;
+}) {
+  return (
+    <section className="circuit-outline-alternative" aria-labelledby="circuit-outline-title">
+      <CircuitSectionHeading
+        eyebrow="Component index"
+        id="circuit-outline-title"
+        title="Explore the circuit by component"
+        description="Each card is a functional part of the Orchard Action circuit. Within each card, the list contains aggregated synthesis-region names; the occurrence count tells you how many exact regions the Rocq evaluator emitted."
+      />
+      <div>
+        {data.synthesis.components.map((component) => {
+          const componentEntry = entries.find((entry) =>
+            entry.origin === "component" && entry.id === component.id
+          );
+          const regions = data.synthesis.regions.filter((region) =>
+            region.componentId === component.id || component.regionIds.includes(region.id)
+          );
+          return (
+            <section key={component.id}>
+              <p className="circuit-card__kind">Functional component</p>
+              <h3>{component.title}</h3>
+              <p>{component.summary}</p>
+              {componentEntry ? (
+                <button type="button" onClick={() => onSelect(componentEntry)}>
+                  Explore {component.shortTitle}
+                </button>
+              ) : null}
+              <p className="circuit-outline-alternative__list-label">
+                Synthesis region groups ({regions.length})
+              </p>
+              {regions.length ? (
+                <ul>
+                  {regions.map((region) => (
+                    <li key={region.id}>
+                      <button type="button" onClick={() => {
+                        const entry = entries.find((candidate) => candidate.item === region);
+                        if (entry) onSelect(entry);
+                      }}>
+                        {region.title} · {region.count} occurrence{region.count === 1 ? "" : "s"}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : <p>No named synthesis regions are assigned to this component.</p>}
+            </section>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function EmbeddedGadgets({
+  data,
+  entries,
+  onSelect,
+}: {
+  data: CircuitExplorerData;
+  entries: readonly ExplorerEntry[];
+  onSelect: (entry: ExplorerEntry) => void;
+}) {
+  const sourcesById = new Map(data.sources.map((source) => [source.id, source]));
+  const families = [
+    {
+      id: "poseidon",
+      title: "Poseidon",
+      matcher: "/poseidon/",
+      detail: "Poseidon is nested in nullifier derivation: its full-round, partial-round, and pad-and-add gates implement the hash before the ECC-based nullifier step.",
+    },
+    {
+      id: "ecc",
+      title: "Elliptic-curve gadgets",
+      matcher: "/ecc/",
+      detail: "ECC point checks, additions, and variable- and fixed-base multiplication are shared across commitments, authority randomization, address integrity, nullifier derivation, and note construction.",
+    },
+  ] as const;
+
+  return (
+    <section className="circuit-helper-section" aria-labelledby="circuit-helper-title">
+      <CircuitSectionHeading
+        eyebrow="Shared gadgets"
+        id="circuit-helper-title"
+        title="Where Poseidon and ECC live"
+        description="They are not missing. This flow is grouped by Orchard function, while reusable Poseidon, ECC, Sinsemilla, and range-check gadgets are nested inside the components that call them."
+      />
+      <div className="circuit-helper-grid">
+        {families.map((family) => {
+          const gates = data.configure.gates.filter((gate) =>
+            gate.sourceIds.some((sourceId) =>
+              sourcesById.get(sourceId)?.path.toLocaleLowerCase().includes(family.matcher)
+            )
+          );
+          const componentIds = [...new Set(gates.flatMap((gate) =>
+            [gate.componentId, ...gate.componentIds].filter((id): id is string => Boolean(id))
+          ))];
+          const components = componentIds.flatMap((id) => {
+            const component = data.synthesis.components.find((candidate) => candidate.id === id);
+            const entry = entries.find((candidate) =>
+              candidate.origin === "component" && candidate.id === id
+            );
+            return component && entry ? [{ component, entry }] : [];
+          });
+          return (
+            <article key={family.id} className={`circuit-helper-card circuit-helper-card--${family.id}`}>
+              <p className="circuit-card__kind">Integrated helper family</p>
+              <h3>{family.title}</h3>
+              <p>{family.detail}</p>
+              <p className="circuit-helper-card__metric">
+                <strong>{gates.length}</strong> extracted gate{gates.length === 1 ? "" : "s"} across <strong>{components.length}</strong> component{components.length === 1 ? "" : "s"}
+              </p>
+              <div className="circuit-helper-card__components" aria-label={`${family.title} components`}>
+                {components.map(({ component, entry }) => (
+                  <button type="button" key={component.id} onClick={() => onSelect(entry)}>
+                    {component.shortTitle}
+                  </button>
+                ))}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function CircuitSnapshot({ data }: { data: CircuitExplorerData }) {
+  return (
+    <section className="circuit-snapshot-note" aria-labelledby="circuit-snapshot-title">
+      <div className="circuit-snapshot-note__intro">
+        <p className="eyebrow">Generated Rocq snapshot</p>
+        <h2 id="circuit-snapshot-title">{data.metadata.title}</h2>
+        <p>{data.metadata.description}</p>
+      </div>
+      <dl className="circuit-snapshot-facts">
+        {data.metadata.version ? <div><dt>Version</dt><dd><code>{data.metadata.version}</code></dd></div> : null}
+        {data.metadata.field ? <div><dt>Field</dt><dd><code>{data.metadata.field}</code></dd></div> : null}
+        {data.metadata.k !== undefined ? <div><dt>k</dt><dd>{data.metadata.k}</dd></div> : null}
+        {data.metadata.floorPlanner ? <div><dt>Floor planner</dt><dd>{data.metadata.floorPlanner}</dd></div> : null}
+        {data.metadata.witnessValues ? <div><dt>Witness values</dt><dd>{titleCase(data.metadata.witnessValues)}</dd></div> : null}
+      </dl>
+      {data.metadata.placement ? <p className="circuit-snapshot-note__placement">{data.metadata.placement}</p> : null}
+      {Object.keys(data.metadata.repositoryRefs).length ? (
+        <div className="circuit-snapshot-note__revisions">
+          <h3>Pinned sources</h3>
+          <dl>
+            {Object.entries(data.metadata.repositoryRefs).map(([repository, revision]) => (
+              <div key={repository}><dt>{titleCase(repository)}</dt><dd><code>{revision.slice(0, 12)}</code></dd></div>
+            ))}
+          </dl>
+        </div>
+      ) : null}
+    </section>
   );
 }
 
@@ -1127,7 +1673,7 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   const [visibleLimit, setVisibleLimit] = useState(EXACT_PAGE_SIZE);
   const searchRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
-  const focusedRouteRef = useRef(`${route.level}:${route.itemId ?? ""}:${route.mode}`);
+  const focusedRouteRef = useRef(`${route.level}:${route.itemId ?? ""}:${route.focusId ?? ""}`);
 
   useEffect(() => {
     let active = true;
@@ -1152,7 +1698,7 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
       setRoute(parsed.route);
       setNotice(parsed.notice ?? "");
       setVisibleLimit(EXACT_PAGE_SIZE);
-      if (parsed.notice) {
+      if (parsed.notice || parsed.replace) {
         window.history.replaceState(null, "", routeHash(parsed.route) || window.location.pathname);
       }
     };
@@ -1162,17 +1708,24 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   }, [data, entries]);
 
   useEffect(() => {
-    const routeKey = `${route.level}:${route.itemId ?? ""}:${route.mode}`;
+    const routeKey = `${route.level}:${route.itemId ?? ""}:${route.focusId ?? ""}`;
     if (focusedRouteRef.current === routeKey) return;
     focusedRouteRef.current = routeKey;
     const layer = layerRef.current;
     if (!layer) return;
-    const target = layer.querySelector<HTMLElement>(
-      '.circuit-flow-node[aria-pressed="true"], h2, h3',
+    const focusedItem = route.focusId
+      ? [...layer.querySelectorAll<HTMLElement>("[data-operation-id], [data-constraint-id]")]
+          .find((candidate) =>
+            candidate.dataset.operationId === route.focusId ||
+            candidate.dataset.constraintId === route.focusId
+          )
+      : null;
+    const target = focusedItem ?? layer.querySelector<HTMLElement>(
+      '.circuit-flow-node[aria-current="true"], h2, h3',
     );
     if (target && !target.hasAttribute("tabindex")) target.tabIndex = -1;
     (target ?? layer).focus();
-  }, [route.level, route.itemId, route.mode]);
+  }, [route.level, route.itemId, route.focusId]);
 
   const navigate = useCallback((next: CircuitExplorerRoute, replace = false) => {
     const hash = routeHash(next);
@@ -1210,17 +1763,22 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
 
   const selectEntry = (entry: ExplorerEntry) => {
     setSearchOpen(false);
-    if (entry.origin === "component") {
-      navigate({ ...route, level: "component", itemId: entry.id, query: "" });
-    } else if (entry.origin === "flow") {
-      if (entry.componentId) {
-        navigate({ ...route, level: "component", itemId: entry.componentId, query: "" });
+    const presented = presentationEntryFor(data, entries, entry);
+    const focusId = presented !== entry && (entry.kind === "operation" || entry.kind === "constraint")
+      ? entry.id
+      : null;
+    if (presented.origin === "component") {
+      navigate({ ...route, level: "component", itemId: presented.id, query: "", focusId });
+    } else if (presented.origin === "flow") {
+      if (presented.componentId) {
+        navigate({ ...route, level: "component", itemId: presented.componentId, query: "", focusId: null });
       } else {
-        navigate({ ...route, level: "flow", itemId: entry.id, query: "" });
+        navigate({ ...route, level: "flow", itemId: presented.id, query: "", focusId: null });
       }
     } else {
-      navigate({ ...route, level: "detail", itemId: entry.id, query: "" });
+      navigate({ ...route, level: "detail", itemId: presented.id, query: "", focusId });
     }
+    if (presented !== entry) setNotice(entryRedirectNotice(entry, presented));
   };
 
   const selectFlowNode = (node: CircuitFlowNode) => {
@@ -1231,14 +1789,6 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   const componentRegions = selectedComponent
     ? data.synthesis.regions.filter((region) =>
         region.componentId === selectedComponent.id || selectedComponent.regionIds.includes(region.id)
-      )
-    : [];
-  const componentOccurrences = selectedComponent
-    ? data.synthesis.occurrences.filter((occurrence) =>
-        occurrence.componentId === selectedComponent.id ||
-        componentRegions.some((region) =>
-          occurrence.groupId === region.id || region.occurrenceIds.includes(occurrence.id)
-        )
       )
     : [];
   const componentGates = selectedComponent
@@ -1261,20 +1811,11 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
         (operation.componentId === selectedComponent.id && !operation.regionId)
       )
     : [];
-  const componentCanvasEntries = route.mode === "aggregate"
-    ? [
-        ...componentRegions.map((item) => entries.find((entry) => entry.item === item)),
-        ...componentGates.map((item) => entries.find((entry) => entry.item === item)),
-        ...componentLookups.map((item) => entries.find((entry) => entry.item === item)),
-        ...componentOperations.map((item) => entries.find((entry) => entry.item === item)),
-      ].filter((entry): entry is ExplorerEntry => Boolean(entry))
-    : [
-        ...(componentOccurrences.length ? componentOccurrences : componentRegions)
-          .map((item) => entries.find((entry) => entry.item === item)),
-        ...componentGates.map((item) => entries.find((entry) => entry.item === item)),
-        ...componentLookups.map((item) => entries.find((entry) => entry.item === item)),
-        ...componentOperations.map((item) => entries.find((entry) => entry.item === item)),
-      ].filter((entry): entry is ExplorerEntry => Boolean(entry));
+  const componentCanvasEntries = [
+    ...componentRegions.map((item) => entries.find((entry) => entry.item === item)),
+    ...componentGates.map((item) => entries.find((entry) => entry.item === item)),
+    ...componentLookups.map((item) => entries.find((entry) => entry.item === item)),
+  ].filter((entry): entry is ExplorerEntry => Boolean(entry));
   const filteredComponentEntries = normalizedQuery
     ? componentCanvasEntries.filter(({ searchText }) => searchText.includes(normalizedQuery))
     : componentCanvasEntries;
@@ -1347,34 +1888,13 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
           ) : null}
         </div>
 
-        <fieldset className="circuit-mode-toggle">
-          <legend>Region detail</legend>
-          <button
-            type="button"
-            aria-pressed={route.mode === "aggregate"}
-            aria-label="Aggregate repeated regions"
-            onClick={() => navigate({ ...route, mode: "aggregate" })}
-          >
-            Aggregate
-            <small>Group repeats</small>
-          </button>
-          <button
-            type="button"
-            aria-pressed={route.mode === "exact"}
-            aria-label="Show exact concrete regions"
-            onClick={() => navigate({ ...route, mode: "exact" })}
-          >
-            Exact
-            <small>Concrete regions</small>
-          </button>
-        </fieldset>
       </section>
 
       <nav className="circuit-breadcrumbs" aria-label="Circuit explorer depth">
         <button
           type="button"
           aria-current={route.level === "flow" ? "page" : undefined}
-          onClick={() => navigate({ ...route, level: "flow", itemId: null })}
+          onClick={() => navigate({ ...route, level: "flow", itemId: null, focusId: null })}
         >
           Circuit flow
         </button>
@@ -1383,7 +1903,7 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
           <button
             type="button"
             aria-current={route.level === "component" ? "page" : undefined}
-            onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id })}
+            onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id, focusId: null })}
           >
             {selectedComponent.shortTitle}
           </button>
@@ -1399,11 +1919,11 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
         {route.level === "flow"
           ? "Showing the high-level circuit flow."
           : route.level === "component"
-            ? `Showing ${selectedComponent?.title ?? "a circuit component"} in ${route.mode} mode.`
+            ? `Showing ${selectedComponent?.title ?? "a circuit component"}.`
             : `Showing ${selectedEntry?.title ?? "circuit detail"}.`}
       </p>
 
-      <section className="circuit-workspace">
+      <section className={classNames("circuit-workspace", route.level === "flow" && "circuit-workspace--flow")}>
         <div
           ref={layerRef}
           className={`circuit-canvas circuit-canvas--${route.level}`}
@@ -1412,13 +1932,35 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
           aria-label={`${titleCase(route.level)} circuit layer`}
         >
           {route.level === "flow" ? (
-            <FlowCanvas data={data} selectedId={route.itemId} onSelect={selectFlowNode} />
+            <div className="circuit-flow-view">
+              <CircuitSectionHeading
+                eyebrow="High-level Action flow"
+                id="circuit-flow-title"
+                title="Choose a circuit item"
+                description="Start with the functional circuit map. Hover or focus nodes and wire names for an explanation, then select a node to inspect the extracted regions, gates, and source anchors behind it."
+              >
+                <div className="circuit-flow-legends">
+                  <ul className="circuit-flow-legend" aria-label="Circuit item types">
+                    <li className="circuit-flow-legend--input">Input</li>
+                    <li className="circuit-flow-legend--component">Component</li>
+                    <li className="circuit-flow-legend--check">Check</li>
+                    <li className="circuit-flow-legend--output">Public output</li>
+                  </ul>
+                  <ul className="circuit-wire-legend" aria-label="Circuit wire types">
+                    <li className="circuit-wire-legend--data">Data</li>
+                    <li className="circuit-wire-legend--constraint">Constraint</li>
+                    <li className="circuit-wire-legend--public">Public value</li>
+                  </ul>
+                </div>
+              </CircuitSectionHeading>
+              <FlowCanvas data={data} selectedId={route.itemId} onSelect={selectFlowNode} />
+            </div>
           ) : route.level === "component" ? (
             selectedComponent ? (
               <div>
                 <div className="circuit-layer-heading">
                   <div>
-                    <p className="circuit-card__kind">Circuit component · {titleCase(route.mode)}</p>
+                    <p className="circuit-card__kind">Circuit component</p>
                     <h2 tabIndex={-1}>{selectedComponent.title}</h2>
                     <p>{selectedComponent.detail || selectedComponent.summary}</p>
                   </div>
@@ -1432,14 +1974,36 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
                 </div>
                 {!filteredComponentEntries.length ? (
                   <div className="circuit-empty-note">
-                    <p>No {route.mode} region or gate records match this component and search.</p>
+                    <p>No region, gate, or lookup records match this component and search.</p>
                     {route.query ? <button type="button" onClick={() => navigate({ ...route, query: "" }, true)}>Clear search</button> : null}
                   </div>
                 ) : null}
                 {filteredComponentEntries.length > visibleLimit ? (
                   <button className="circuit-show-more" type="button" onClick={() => setVisibleLimit((current) => current + EXACT_PAGE_SIZE)}>
-                    Show more exact items
+                    Show more circuit items
                   </button>
+                ) : null}
+                {componentOperations.length ? (
+                  <section className="circuit-component-operations">
+                    <div className="circuit-layer-heading">
+                      <div>
+                        <p className="circuit-card__kind">Component-level synthesis trace</p>
+                        <h3>Operations linked at component level</h3>
+                        <p>These extracted operators either belong directly to the component or bind one of its results to a public instance row.</p>
+                      </div>
+                      <p>{componentOperations.length} operation{componentOperations.length === 1 ? "" : "s"}</p>
+                    </div>
+                    <div className="circuit-operation-list">
+                      {componentOperations.slice(0, visibleLimit).map((operation) => (
+                        <OperationRecord key={operation.id} operation={operation} />
+                      ))}
+                    </div>
+                    {componentOperations.length > visibleLimit ? (
+                      <button className="circuit-show-more" type="button" onClick={() => setVisibleLimit((current) => current + EXACT_PAGE_SIZE)}>
+                        Show more operations
+                      </button>
+                    ) : null}
+                  </section>
                 ) : null}
               </div>
             ) : (
@@ -1450,63 +2014,23 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
               data={data}
               entries={entries}
               entry={selectedEntry}
-              mode={route.mode}
               visibleLimit={visibleLimit}
+              focusId={route.focusId}
               onSelect={selectEntry}
-              onShowMore={() => setVisibleLimit((current) => current + EXACT_PAGE_SIZE)}
+              onShowMore={() => setVisibleLimit(Number.MAX_SAFE_INTEGER)}
             />
           )}
         </div>
-        <CircuitInspector data={data} entry={selectedEntry} />
+        {route.level !== "flow" ? <CircuitInspector data={data} entry={selectedEntry} /> : null}
       </section>
 
-      <details className="circuit-outline-alternative">
-        <summary>Browse the circuit as an outline</summary>
-        <div>
-          {data.synthesis.components.map((component) => (
-            <section key={component.id}>
-              <h2>{component.title}</h2>
-              <p>{component.summary}</p>
-              <button
-                type="button"
-                onClick={() => selectEntry(entries.find((entry) => entry.origin === "component" && entry.id === component.id)!)}
-              >
-                Explore {component.shortTitle}
-              </button>
-              <ul>
-                {data.synthesis.regions
-                  .filter((region) => region.componentId === component.id || component.regionIds.includes(region.id))
-                  .map((region) => (
-                    <li key={region.id}>
-                      <button type="button" onClick={() => {
-                        const entry = entries.find((candidate) => candidate.item === region);
-                        if (entry) selectEntry(entry);
-                      }}>
-                        {region.title} · {region.count} occurrence{region.count === 1 ? "" : "s"}
-                      </button>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ))}
-        </div>
-      </details>
-
-      <section className="circuit-snapshot-note" aria-label="Circuit data snapshot">
-        <p>
-          <strong>{data.metadata.title}</strong>
-          {data.metadata.asOf ? ` · ${data.metadata.asOf}` : ""}
-        </p>
-        <p>{data.metadata.description}</p>
-        {data.metadata.placement ? <p>{data.metadata.placement}</p> : null}
-        {Object.keys(data.metadata.repositoryRefs).length ? (
-          <dl>
-            {Object.entries(data.metadata.repositoryRefs).map(([repository, revision]) => (
-              <div key={repository}><dt>{titleCase(repository)}</dt><dd><code>{revision.slice(0, 12)}</code></dd></div>
-            ))}
-          </dl>
-        ) : null}
-      </section>
+      {route.level === "flow" ? (
+        <>
+          <CircuitOutline data={data} entries={entries} onSelect={selectEntry} />
+          <EmbeddedGadgets data={data} entries={entries} onSelect={selectEntry} />
+          <CircuitSnapshot data={data} />
+        </>
+      ) : null}
     </main>
   );
 }

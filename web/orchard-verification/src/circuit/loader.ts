@@ -313,6 +313,7 @@ function normalizeSources(raw: unknown): CircuitSource[] {
 
 function flowKind(value: string): CircuitFlowNode["kind"] {
   if (value === "input" || value === "output" || value === "check") return value;
+  if (value === "public-input") return "input";
   if (value === "instance") return "output";
   if (value === "instance-flag") return "input";
   return "component";
@@ -358,6 +359,7 @@ function normalizeFlowEdges(section: JsonRecord): CircuitFlowEdge[] {
       from,
       to,
       label: text(item, ["label", "title", "relation"]) || undefined,
+      summary: text(item, ["summary", "description"]),
       kind: rawKind === "constraint" || rawKind === "public" ? rawKind : "data",
     };
   });
@@ -941,9 +943,14 @@ export function normalizeCircuitExplorerData(raw: unknown): CircuitExplorerData 
       description: text(
         metadata,
         ["description", "summary"],
-        "A pinned high-level and exact view of the configured gates, lookups, synthesis regions, and layouter operations captured from the Rocq model.",
+        "A pinned high-level and exact view of gates and lookups declared during configuration, synthesis regions, and layouter operations captured from the Rocq model.",
       ),
       asOf: text(metadata, ["asOf", "as_of", "generated_at", "date"]),
+      version: text(circuit, ["version"]),
+      field: text(circuit, ["field"]),
+      k: optionalNumber(circuit, ["k"]),
+      floorPlanner: text(metadata, ["floorPlanner", "floor_planner"]),
+      witnessValues: text(circuit, ["witnessValues", "witness_values"]),
       placement: text(metadata, ["placement"]),
       representations,
       repositoryRefs,

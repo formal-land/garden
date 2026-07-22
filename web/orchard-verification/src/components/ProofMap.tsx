@@ -7,9 +7,7 @@ import {
   useState,
   type Dispatch,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type SetStateAction,
-  type WheelEvent as ReactWheelEvent,
 } from "react";
 
 import type {
@@ -22,23 +20,13 @@ import type {
   ProofNode,
   ProofStatus,
   RepositoryId,
-  WorkTrack,
 } from "../data/model";
 
 const NODE_WIDTH = 176;
 const NODE_HEIGHT = 78;
 const MAP_PADDING = 54;
-const MIN_ZOOM = 0.35;
-const MAX_ZOOM = 2.5;
 
 interface ViewBox extends AtlasBounds {}
-
-interface DragState {
-  readonly pointerId: number;
-  readonly clientX: number;
-  readonly clientY: number;
-  readonly viewBox: ViewBox;
-}
 
 type FocusValue = string | readonly string[] | null;
 
@@ -278,8 +266,7 @@ export function ProofMap({
   focusNodeIds = [],
   revealedNodeIds,
 }: ProofMapProps) {
-  const svgRef = useRef<SVGSVGElement>(null);
-  const dragRef = useRef<DragState | null>(null);
+  const inspectorRef = useRef<HTMLElement>(null);
   const rawId = useId();
   const markerPrefix = rawId.replace(/:/g, "");
   const formalMarkerId = `${markerPrefix}-formal-arrow`;
@@ -318,8 +305,6 @@ export function ProofMap({
     () => calculateMapBounds(data.clusters, data.nodes),
     [data.clusters, data.nodes],
   );
-  const [viewBox, setViewBox] = useState<ViewBox>(baseViewBox);
-  const [dragging, setDragging] = useState(false);
   const [collapsedClusters, setCollapsedClusters] = useState<Set<string>>(
     () => new Set(),
   );
@@ -327,18 +312,12 @@ export function ProofMap({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(() =>
     compact ? null : readNodeFromHash(),
   );
-  const [search, setSearch] = useState("");
   const [repositoryFilters, setRepositoryFilters] = useState<Set<RepositoryId>>(
     () => new Set(),
   );
   const [statusFilters, setStatusFilters] = useState<Set<ProofStatus>>(
     () => new Set(),
   );
-  const [trackFilters, setTrackFilters] = useState<Set<WorkTrack>>(
-    () => new Set(),
-  );
-
-  useEffect(() => setViewBox(baseViewBox), [baseViewBox]);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -367,12 +346,15 @@ export function ProofMap({
     });
   }, [compact, nodeById, selectedNodeId]);
 
+  useEffect(() => {
+    if (!compact && inspectorRef.current) inspectorRef.current.scrollTop = 0;
+  }, [compact, selectedNodeId]);
+
   const isRevealed = useCallback(
     (nodeId: string) => revealedIds === null || revealedIds.has(nodeId),
     [revealedIds],
   );
 
-  const searchText = search.trim().toLocaleLowerCase();
   const nodeMatches = useMemo(() => {
     const result = new Map<string, boolean>();
     for (const node of data.nodes) {
@@ -381,40 +363,16 @@ export function ProofMap({
         node.repoIds.some((repoId) => repositoryFilters.has(repoId));
       const statusMatch =
         statusFilters.size === 0 || statusFilters.has(node.status);
-      const trackMatch =
-        trackFilters.size === 0 || trackFilters.has(node.track);
-      const haystack = [
-        node.title,
-        node.shortTitle,
-        node.summary,
-        node.detail,
-        node.status,
-        node.track,
-        ...node.tags,
-        ...node.established,
-        ...node.carried,
-        ...node.repoIds.map(
-          (repoId) => repositoryById.get(repoId)?.name ?? repoId,
-        ),
-      ]
-        .join(" ")
-        .toLocaleLowerCase();
       result.set(
         node.id,
-        repositoryMatch &&
-          statusMatch &&
-          trackMatch &&
-          (!searchText || haystack.includes(searchText)),
+        repositoryMatch && statusMatch,
       );
     }
     return result;
   }, [
     data.nodes,
-    repositoryById,
     repositoryFilters,
-    searchText,
     statusFilters,
-    trackFilters,
   ]);
 
   const resultNodes = useMemo(
@@ -427,9 +385,9 @@ export function ProofMap({
 
   const attentionIds = useMemo(() => {
     if (hoveredNodeId) return new Set([hoveredNodeId]);
-    if (selectedNodeId) return new Set([selectedNodeId]);
+    if (selectedNodeId && nodeMatches.get(selectedNodeId)) return new Set([selectedNodeId]);
     return focusedIds;
-  }, [focusedIds, hoveredNodeId, selectedNodeId]);
+  }, [focusedIds, hoveredNodeId, nodeMatches, selectedNodeId]);
 
   const neighbourIds = useMemo(() => {
     const neighbours = new Set<string>();
@@ -491,103 +449,9 @@ export function ProofMap({
   );
 
   const resetFilters = useCallback(() => {
-    setSearch("");
     setRepositoryFilters(new Set());
     setStatusFilters(new Set());
-    setTrackFilters(new Set());
   }, []);
-
-  const fitMap = useCallback(() => setViewBox(baseViewBox), [baseViewBox]);
-
-  const zoomBy = useCallback(
-    (factor: number, centre?: AtlasPoint) => {
-      setViewBox((current) => {
-        const newWidth = Math.min(
-          baseViewBox.width * MAX_ZOOM,
-          Math.max(baseViewBox.width * MIN_ZOOM, current.width * factor),
-        );
-        const ratio = newWidth / current.width;
-        const newHeight = current.height * ratio;
-        const point = centre ?? {
-          x: current.x + current.width / 2,
-          y: current.y + current.height / 2,
-        };
-        const horizontal = (point.x - current.x) / current.width;
-        const vertical = (point.y - current.y) / current.height;
-        return {
-          x: point.x - horizontal * newWidth,
-          y: point.y - vertical * newHeight,
-          width: newWidth,
-          height: newHeight,
-        };
-      });
-    },
-    [baseViewBox.width],
-  );
-
-  const onWheel = useCallback(
-    (event: ReactWheelEvent<SVGSVGElement>) => {
-      event.preventDefault();
-      const bounds = event.currentTarget.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      const point = {
-        x:
-          viewBox.x +
-          ((event.clientX - bounds.left) / bounds.width) * viewBox.width,
-        y:
-          viewBox.y +
-          ((event.clientY - bounds.top) / bounds.height) * viewBox.height,
-      };
-      zoomBy(Math.exp(event.deltaY * 0.0012), point);
-    },
-    [viewBox, zoomBy],
-  );
-
-  const onPointerDown = useCallback(
-    (event: ReactPointerEvent<SVGSVGElement>) => {
-      if (event.button !== 0) return;
-      event.currentTarget.setPointerCapture?.(event.pointerId);
-      dragRef.current = {
-        pointerId: event.pointerId,
-        clientX: event.clientX,
-        clientY: event.clientY,
-        viewBox,
-      };
-      setDragging(true);
-    },
-    [viewBox],
-  );
-
-  const onPointerMove = useCallback(
-    (event: ReactPointerEvent<SVGSVGElement>) => {
-      const drag = dragRef.current;
-      if (!drag || drag.pointerId !== event.pointerId) return;
-      const bounds = event.currentTarget.getBoundingClientRect();
-      if (!bounds.width || !bounds.height) return;
-      setViewBox({
-        ...drag.viewBox,
-        x:
-          drag.viewBox.x -
-          ((event.clientX - drag.clientX) / bounds.width) * drag.viewBox.width,
-        y:
-          drag.viewBox.y -
-          ((event.clientY - drag.clientY) / bounds.height) * drag.viewBox.height,
-      });
-    },
-    [],
-  );
-
-  const endPointerDrag = useCallback(
-    (event: ReactPointerEvent<SVGSVGElement>) => {
-      if (dragRef.current?.pointerId !== event.pointerId) return;
-      if (event.currentTarget.hasPointerCapture?.(event.pointerId)) {
-        event.currentTarget.releasePointerCapture?.(event.pointerId);
-      }
-      dragRef.current = null;
-      setDragging(false);
-    },
-    [],
-  );
 
   const selectedNode = selectedNodeId
     ? nodeById.get(selectedNodeId) ?? null
@@ -598,11 +462,8 @@ export function ProofMap({
         .filter((item) => item !== undefined)
     : [];
   const filtersAreActive =
-    searchText.length > 0 ||
     repositoryFilters.size > 0 ||
-    statusFilters.size > 0 ||
-    trackFilters.size > 0;
-  const zoomPercent = Math.round((baseViewBox.width / viewBox.width) * 100);
+    statusFilters.size > 0;
 
   const endpointFor = useCallback(
     (nodeId: string): AtlasPoint | null => {
@@ -650,22 +511,7 @@ export function ProofMap({
       data-compact={compact || undefined}
     >
       {!compact && (
-        <div className="proof-map__toolbar" aria-label="Atlas filters and controls">
-          <div className="proof-map__search-block">
-            <label htmlFor={`${markerPrefix}-search`}>Search the atlas</label>
-            <input
-              id={`${markerPrefix}-search`}
-              type="search"
-              value={search}
-              onChange={(event) => setSearch(event.currentTarget.value)}
-              placeholder="Theorem, gadget, repository…"
-              autoComplete="off"
-            />
-            <p className="proof-map__result-count" aria-live="polite">
-              {resultNodes.length} of {data.nodes.length} nodes match
-            </p>
-          </div>
-
+        <div className="proof-map__toolbar" aria-label="Atlas filters">
           <div className="proof-map__filters">
             <FilterGroup
               legend="Repositories"
@@ -680,13 +526,6 @@ export function ProofMap({
               active={statusFilters}
               onToggle={(id) => toggleSelection(setStatusFilters, id)}
               onClear={() => setStatusFilters(new Set())}
-            />
-            <FilterGroup
-              legend="Work stream"
-              options={data.filters.tracks}
-              active={trackFilters}
-              onToggle={(id) => toggleSelection(setTrackFilters, id)}
-              onClear={() => setTrackFilters(new Set())}
             />
           </div>
 
@@ -703,35 +542,12 @@ export function ProofMap({
 
       <div className="proof-map__workspace">
         <div className="proof-map__canvas-wrap">
-          {!compact && (
-            <div className="proof-map__viewport-controls" aria-label="Map view controls">
-              <button type="button" onClick={() => zoomBy(0.8)} aria-label="Zoom in">
-                +
-              </button>
-              <output aria-label="Current map zoom">{zoomPercent}%</output>
-              <button type="button" onClick={() => zoomBy(1.25)} aria-label="Zoom out">
-                −
-              </button>
-              <button type="button" onClick={fitMap}>Fit map</button>
-            </div>
-          )}
-
           <svg
-            ref={svgRef}
-            className={classNames(
-              "proof-map__canvas",
-              dragging && "proof-map__canvas--dragging",
-            )}
-            viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.width} ${viewBox.height}`}
+            className="proof-map__canvas"
+            viewBox={`${baseViewBox.x} ${baseViewBox.y} ${baseViewBox.width} ${baseViewBox.height}`}
             preserveAspectRatio="xMidYMid meet"
             role="group"
             aria-label="Interactive Orchard verification proof atlas"
-            onPointerDown={onPointerDown}
-            onPointerMove={onPointerMove}
-            onPointerUp={endPointerDrag}
-            onPointerCancel={endPointerDrag}
-            onWheel={onWheel}
-            style={{ touchAction: "none" }}
           >
             <defs>
               <marker
@@ -765,7 +581,8 @@ export function ProofMap({
                 const visibleNodeIds = cluster.nodeIds.filter(isRevealed);
                 if (revealedIds !== null && visibleNodeIds.length === 0) return null;
                 const isCollapsed = collapsedClusters.has(cluster.id);
-                const hasMatch = visibleNodeIds.some(
+                const hasSelectedNode = selectedNodeId !== null && visibleNodeIds.includes(selectedNodeId);
+                const hasMatch = hasSelectedNode || visibleNodeIds.some(
                   (nodeId) => nodeMatches.get(nodeId) ?? false,
                 );
                 return (
@@ -934,9 +751,10 @@ export function ProofMap({
                 const matches = nodeMatches.get(node.id) ?? false;
                 const isActive = attentionIds.has(node.id);
                 const isNeighbour = neighbourIds.has(node.id);
-                const isMuted =
-                  attentionIds.size > 0 && !isActive && !isNeighbour;
                 const isSelected = selectedNodeId === node.id;
+                const isMuted =
+                  attentionIds.size > 0 && !isActive && !isNeighbour && !isSelected;
+                const isInteractive = matches || isSelected;
                 const titleLines = wrapText(node.shortTitle, 23, 2);
                 const repoLabels = node.repoIds
                   .map(
@@ -951,32 +769,43 @@ export function ProofMap({
                       `proof-map__node--${node.status}`,
                       `proof-map__node--track-${node.track}`,
                       isActive && "is-active",
-                      isNeighbour && "is-neighbour",
-                      isSelected && "is-pinned",
+                      isNeighbour && "is-related",
+                      isSelected && "is-selected",
                       isMuted && "is-muted",
                       !matches && "is-filtered-out",
                     )}
                     transform={`translate(${node.position.x - NODE_WIDTH / 2} ${node.position.y - NODE_HEIGHT / 2})`}
                     role="button"
-                    tabIndex={matches ? 0 : -1}
-                    aria-hidden={!matches || undefined}
+                    tabIndex={isInteractive ? 0 : -1}
+                    aria-hidden={!isInteractive || undefined}
                     aria-label={`${node.title}. ${titleCase(node.status)}. ${node.summary}`}
                     aria-pressed={isSelected}
+                    data-emphasis={isSelected ? "selected" : isNeighbour ? "related" : undefined}
                     data-node-id={node.id}
                     data-status={node.status}
                     data-track={node.track}
-                    opacity={!matches ? 0.08 : isMuted ? 0.26 : 1}
+                    opacity={!matches && !isSelected ? 0.08 : isMuted ? 0.26 : 1}
                     onPointerDown={(event) => event.stopPropagation()}
-                    onPointerEnter={() => matches && setHoveredNodeId(node.id)}
+                    onPointerEnter={() => isInteractive && setHoveredNodeId(node.id)}
                     onPointerLeave={() => setHoveredNodeId(null)}
-                    onFocus={() => matches && setHoveredNodeId(node.id)}
+                    onFocus={() => isInteractive && setHoveredNodeId(node.id)}
                     onBlur={() => setHoveredNodeId(null)}
                     onClick={(event) => {
                       event.stopPropagation();
-                      if (matches) inspectNode(node.id);
+                      if (isInteractive) inspectNode(node.id);
                     }}
                     onKeyDown={(event) => onNodeKeyDown(event, node.id)}
                   >
+                    {isSelected ? (
+                      <rect
+                        className="proof-map__selection-ring"
+                        x="-6"
+                        y="-6"
+                        width={NODE_WIDTH + 12}
+                        height={NODE_HEIGHT + 12}
+                        rx="25"
+                      />
+                    ) : null}
                     <rect
                       className="proof-map__node-card"
                       width={NODE_WIDTH}
@@ -1006,6 +835,9 @@ export function ProofMap({
                         d="M 157 9 l 8 8 -5 2 -3 8 -3 -6 -6 -3 8 -3 z"
                       />
                     )}
+                    {isNeighbour && !isSelected ? (
+                      <circle className="proof-map__related-indicator" cx="160" cy="16" r="6" />
+                    ) : null}
                   </g>
                 );
               })}
@@ -1017,12 +849,15 @@ export function ProofMap({
               <span><i className="proof-map__legend-line proof-map__legend-line--formal" />Formal implication</span>
               <span><i className="proof-map__legend-line proof-map__legend-line--provenance" />Provenance or parity</span>
               <span><i className="proof-map__legend-node" />Node colour indicates proof status</span>
+              <span><i className="proof-map__legend-node proof-map__legend-node--selected" />Selected node</span>
+              <span><i className="proof-map__legend-node proof-map__legend-node--related" />Related node</span>
             </div>
           )}
         </div>
 
         {!compact && (
           <aside
+            ref={inspectorRef}
             className="proof-map__inspector"
             aria-label="Proof node details"
             aria-live="polite"
@@ -1167,7 +1002,7 @@ export function ProofMap({
                             type="button"
                             className={classNames(
                               "proof-map__list-node",
-                              selectedNodeId === node.id && "is-pinned",
+                              selectedNodeId === node.id && "is-selected",
                             )}
                             aria-pressed={selectedNodeId === node.id}
                             onClick={() => inspectNode(node.id)}

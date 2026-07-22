@@ -110,9 +110,11 @@ class ValidationUnitTests(unittest.TestCase):
         cyclic["flow"]["edges"].append(
             {
                 "id": "forced-cycle",
-                "from": "instance-anchor",
+                "from": "action-checks",
                 "to": "private-inputs",
                 "label": "test cycle",
+                "summary": "Creates a test-only cycle.",
+                "kind": "constraint",
             }
         )
         with self.assertRaisesRegex(GENERATOR.GenerationError, "directed acyclic graph"):

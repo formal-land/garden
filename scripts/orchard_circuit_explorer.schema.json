@@ -163,11 +163,13 @@
               { "$ref": "#/$defs/idObject" },
               {
                 "type": "object",
-                "required": ["from", "to", "label"],
+                "required": ["from", "to", "label", "summary", "kind"],
                 "properties": {
                   "from": { "type": "string", "pattern": "^component:" },
                   "to": { "type": "string", "pattern": "^component:" },
-                  "label": { "type": "string" }
+                  "label": { "type": "string" },
+                  "summary": { "type": "string", "minLength": 1 },
+                  "kind": { "enum": ["data", "constraint", "public"] }
                 }
               }
             ]

@@ -321,4 +321,23 @@ describe("Orchard verification evidence model", () => {
       }
     }
   });
+
+  it("routes Garden repository and evidence links through the selected private repository", () => {
+    const privateGardenRoot = "https://github.com/clarus/garden-private";
+    const gardenRepository = data.repositories.find(({ id }) => id === "garden")!;
+    expect(gardenRepository.url).toBe(privateGardenRoot);
+    for (const revision of gardenRepository.revisions) {
+      expect(revision.url, revision.ref).toMatch(
+        /^https:\/\/github\.com\/clarus\/garden-private\//,
+      );
+    }
+
+    const gardenEvidence = data.evidence.filter(({ repoId }) => repoId === "garden");
+    expect(gardenEvidence.length).toBeGreaterThan(0);
+    for (const evidence of gardenEvidence) {
+      expect(evidence.url, evidence.id).toMatch(
+        /^https:\/\/github\.com\/clarus\/garden-private\//,
+      );
+    }
+  });
 });

@@ -16,7 +16,7 @@ const GARDEN_REF = "8d99eeec6860f31644aebc248d9f868026bbffd5";
 const HALO2_REF = "6fcb5136a9ad1a4ee452e233d65558fe1f572665";
 const ORCHARD_REF = "8da86412a213bc6681ad7ac54daa4bd2c23c45c5";
 
-const GARDEN_URL = "https://github.com/formal-land/garden";
+const GARDEN_URL = "https://github.com/clarus/garden-private";
 const HALO2_URL = "https://github.com/formal-land/halo2";
 const ORCHARD_URL = "https://github.com/formal-land/orchard";
 const PROTOCOL_URL = "https://zips.z.cash/protocol/protocol.pdf";
@@ -501,12 +501,22 @@ const SOURCE_EVIDENCE: readonly EvidenceRef[] = [
   gardenSource(
     "source-ecc",
     "theorem",
-    "ECC gadget proofs",
-    "Proves complete and incomplete addition plus variable- and fixed-base multiplication chains.",
+    "ECC fixed-base gadget proof",
+    "Proves the fixed-base multiplication recurrence used by Orchard's commitment and key computations.",
     "Garden/Halo2/halo2_gadgets/ecc/chip/mul_fixed_proof.v",
     "deterministic",
     "proved",
     52,
+  ),
+  gardenSource(
+    "source-ecc-points",
+    "theorem",
+    "ECC point-witness validity",
+    "Proves that enabled point-witness gates enforce the Pallas curve equation, including the non-identity variant.",
+    "Garden/Halo2/halo2_gadgets/ecc/chip/witness_point_proof.v",
+    "WitnessPoint.sound / WitnessPoint.sound_non_identity",
+    "proved",
+    12,
   ),
   gardenSource(
     "source-sinsemilla",
@@ -1245,18 +1255,18 @@ export const NODES: readonly ProofNode[] = [
   {
     id: "gadgets-ecc",
     clusterId: "gadgets",
-    title: "ECC addition and scalar multiplication",
+    title: "ECC point validity, addition, and scalar multiplication",
     shortTitle: "ECC chains",
-    summary: "Complete/incomplete addition and fixed/variable multiplication are related to real Pallas group operations.",
+    summary: "Point witnesses, complete/incomplete addition, and fixed/variable multiplication are related to real Pallas group operations.",
     detail:
-      "The proofs cover canonical fixed windows, quadratic-residue sign selection, fixed-base tables, overflow handling, and the variable-base ownership chain. They feed value commitments, nullifier keys, randomized keys, note commitments, and address ownership.",
+      "The proofs cover point validity and non-identity checks, canonical fixed windows, quadratic-residue sign selection, fixed-base tables, overflow handling, and the variable-base ownership chain. They feed private-input checks, value commitments, nullifier keys, randomized keys, note commitments, and address ownership.",
     status: "proved",
     track: "gadgets",
     repoIds: ["garden"],
-    evidenceIds: ["commit-window-sign", "commit-pallas-value", "commit-var-base", "commit-fixed-base", "source-ecc"],
+    evidenceIds: ["commit-window-sign", "commit-pallas-value", "commit-var-base", "commit-fixed-base", "source-ecc", "source-ecc-points"],
     stageIds: ["stage-5-foundations", "stage-6-gadgets", "stage-8-outputs"],
     position: { x: 1220, y: 630 },
-    established: ["Circuit ECC ladders equal the corresponding Pallas additions and scalar multiples under their gate hypotheses."],
+    established: ["Enabled point-witness gates enforce curve validity, and circuit ECC ladders equal the corresponding Pallas additions and scalar multiples under their gate hypotheses."],
     carried: ["Incomplete-add exceptional cases remain explicit nondegeneracy conditions where gates intentionally do not constrain them."],
     tags: ["ecc", "fixed-base", "variable-base", "pallas"],
   },
@@ -2112,7 +2122,7 @@ export const ORCHARD_VERIFICATION_DATA: OrchardVerificationData = {
       orchard: ORCHARD_REF,
     },
     caveat:
-      "Garden URLs are prepared for the selected formal-land/garden publication target and remain marked pending until those revisions are public. Local selector-compression patches are WIP evidence only.",
+      "Garden URLs point to the selected clarus/garden-private repository and remain marked pending. Local selector-compression patches are WIP evidence only.",
   },
   repositories: REPOSITORIES,
   evidence: EVIDENCE,

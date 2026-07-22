@@ -2,7 +2,6 @@ export const CIRCUIT_EXPLORER_SCHEMA =
   "garden.orchard.circuit-highlevel.v1" as const;
 
 export type CircuitExplorerLevel = "flow" | "component" | "detail";
-export type CircuitExplorerMode = "aggregate" | "exact";
 export type CircuitSourceConfidence = "exact" | "mapped" | "ambiguous" | "unresolved";
 
 export type CircuitItemKind =
@@ -80,6 +79,7 @@ export interface CircuitFlowEdge {
   readonly from: string;
   readonly to: string;
   readonly label?: string;
+  readonly summary: string;
   readonly kind: "data" | "constraint" | "public";
 }
 
@@ -268,6 +268,11 @@ export interface CircuitMetadata {
   readonly title: string;
   readonly description: string;
   readonly asOf: string;
+  readonly version: string;
+  readonly field: string;
+  readonly k?: number;
+  readonly floorPlanner: string;
+  readonly witnessValues: string;
   readonly placement: string;
   readonly representations: Readonly<Record<string, string>>;
   readonly repositoryRefs: Readonly<Record<string, string>>;
@@ -309,8 +314,8 @@ export interface CircuitExplorerData {
 export interface CircuitExplorerRoute {
   readonly level: CircuitExplorerLevel;
   readonly itemId: string | null;
-  readonly mode: CircuitExplorerMode;
   readonly query: string;
+  readonly focusId: string | null;
 }
 
 export type InspectableCircuitItem =

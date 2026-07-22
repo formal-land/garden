@@ -7,7 +7,7 @@ function observeRuntime(page: Page) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const externalRequests: string[] = [];
-  const allowedOrigin = "http://127.0.0.1:4173";
+  const allowedOrigin = process.env.ORCHARD_E2E_ORIGIN ?? "http://127.0.0.1:4173";
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -76,11 +76,18 @@ test.describe("Orchard verification journey", () => {
 
   test("has an accessible, self-contained responsive page", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
-    await page.goto(`/index.html#stage=${data.stages[0].id}`);
+    const stage = data.stages[0];
+    const gardenEvidence = stage.evidenceIds
+      .map((id) => data.evidence.find((item) => item.id === id))
+      .find((item) => item?.repoId === "garden" && item.url)!;
+    await page.goto(`/index.html#stage=${stage.id}`);
 
     await expect(page.getByRole("navigation", { name: "Visualization views" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Journey playback" })).toBeVisible();
     await expect(page.getByRole("article").getByText("Established here")).toBeVisible();
+    await expect(page.locator(".stage-story .evidence-chip").filter({ hasText: gardenEvidence.label }))
+      .toHaveAttribute("href", gardenEvidence.url!);
+    expect(gardenEvidence.url).toMatch(/^https:\/\/github\.com\/clarus\/garden-private\//);
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
     assertRuntimeClean();
@@ -93,6 +100,12 @@ test.describe("Orchard verification atlas", () => {
     const pinned = data.nodes[0];
     const keyboardNode = data.nodes[1];
     const listNode = data.nodes[2];
+    const relatedEdge = data.edges.find(
+      ({ from, to }) => from === keyboardNode.id || to === keyboardNode.id,
+    )!;
+    const relatedNodeId = relatedEdge.from === keyboardNode.id
+      ? relatedEdge.to
+      : relatedEdge.from;
     const otherStatus = data.filters.statuses.find(({ id }) => id !== pinned.status)!;
     await page.goto(`/proof-map.html#node=${pinned.id}`);
 
@@ -110,13 +123,29 @@ test.describe("Orchard verification atlas", () => {
     await svgNode.press("Enter");
     await expect(inspector.getByRole("heading", { name: keyboardNode.title })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`#node=${keyboardNode.id}$`));
+    await expect(svgNode).toHaveClass(/is-selected/);
+    await expect(svgNode).not.toHaveClass(/is-related/);
+    await expect(svgNode).toHaveAttribute("data-emphasis", "selected");
+    await expect(svgNode).toHaveAttribute("aria-pressed", "true");
+    const relatedNode = page.locator(`svg [data-node-id="${relatedNodeId}"]`);
+    await expect(relatedNode).toHaveClass(/is-related/);
+    await expect(relatedNode).not.toHaveClass(/is-selected/);
+    await expect(relatedNode).toHaveAttribute("data-emphasis", "related");
+    await expect(relatedNode).toHaveAttribute("aria-pressed", "false");
 
     const list = page.locator(".proof-map__list-alternative");
     await list.locator("summary").click();
     await expect(list).toHaveAttribute("open", "");
-    await list.getByRole("button", { name: new RegExp(listNode.title) }).click();
+    const listButton = list.getByRole("button", { name: new RegExp(listNode.title) });
+    await inspector.evaluate((element) => {
+      element.scrollTop = 600;
+    });
+    await listButton.click();
     await expect(inspector.getByRole("heading", { name: listNode.title })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`#node=${listNode.id}$`));
+    await expect.poll(() => inspector.evaluate((element) => element.scrollTop)).toBe(0);
+    await expect(listButton).toHaveClass(/is-selected/);
+    await expect(listButton).toHaveAttribute("aria-pressed", "true");
 
     await expectNoHorizontalPageOverflow(page);
     assertRuntimeClean();
@@ -126,8 +155,35 @@ test.describe("Orchard verification atlas", () => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto("/proof-map.html");
 
-    await expect(page.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
-    await expect(page.getByRole("group", { name: "Interactive Orchard verification proof atlas" })).toBeVisible();
+    await expect(page.getByRole("searchbox", { name: "Search the atlas" })).toHaveCount(0);
+    await expect(page.getByRole("group", { name: /^Work stream/ })).toHaveCount(0);
+    await expect(page.getByLabel("Map view controls")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Zoom out" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Fit map" })).toHaveCount(0);
+    await expect(page.getByLabel("Current map zoom")).toHaveCount(0);
+
+    const atlas = page.getByRole("group", { name: "Interactive Orchard verification proof atlas" });
+    await expect(atlas).toBeVisible();
+    const fittedViewBox = await atlas.getAttribute("viewBox");
+    await atlas.dispatchEvent("wheel", { clientX: 500, clientY: 300, deltaY: -600 });
+    await atlas.dispatchEvent("pointerdown", {
+      button: 0,
+      clientX: 500,
+      clientY: 300,
+      pointerId: 1,
+    });
+    await atlas.dispatchEvent("pointermove", {
+      clientX: 650,
+      clientY: 400,
+      pointerId: 1,
+    });
+    await atlas.dispatchEvent("pointerup", {
+      clientX: 650,
+      clientY: 400,
+      pointerId: 1,
+    });
+    await expect(atlas).toHaveAttribute("viewBox", fittedViewBox!);
     await expect(page.getByText(/Browse the filtered atlas as a list/)).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
@@ -136,7 +192,7 @@ test.describe("Orchard verification atlas", () => {
 });
 
 test.describe("Orchard circuit explorer", () => {
-  test("lazy-loads the snapshot and drills from flow to exact region operations", async ({ page }) => {
+  test("lazy-loads the snapshot and drills from flow to inline region operations", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     const dataResponse = page.waitForResponse((response) =>
       new URL(response.url()).pathname.endsWith("/data/orchard-circuit-highlevel.v1.json")
@@ -146,10 +202,31 @@ test.describe("Orchard circuit explorer", () => {
     await expect((await dataResponse).ok()).toBe(true);
     await expect(page.getByRole("searchbox", { name: "Search circuit structure" })).toBeVisible();
     await expect(page.getByRole("link", { name: "Circuit", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(page.getByRole("heading", { name: "Choose a circuit item" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Circuit item details" })).toHaveCount(0);
+    await expect(page.locator(".circuit-workspace")).toHaveClass(/circuit-workspace--flow/);
+    await expect(page.getByRole("button", { name: /theme/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
 
-    const merkleNode = (page.viewportSize()?.width ?? 1280) <= 760
+    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    const merkleNode = mobile
       ? page.locator(".circuit-mobile-flow button").filter({ hasText: "Merkle path" })
       : page.locator(".circuit-flow-node").filter({ hasText: "Merkle" });
+    const flowFocus = page.locator(".circuit-flow-focus");
+    await merkleNode.focus();
+    await expect(flowFocus).toHaveAttribute("data-flow-item", "component:merkle-path");
+    await expect(flowFocus).toContainText("Merkle");
+    if (!mobile) {
+      await merkleNode.hover();
+      await expect(page.locator(".circuit-flow-edge.is-emphasized")).toHaveCount(2);
+      const rootWire = page.locator('[data-edge-id="flow-edge:flow-merkle-action"]');
+      await page.mouse.move(1, 1);
+      await rootWire.locator("text").focus();
+      await expect(flowFocus).toHaveAttribute("data-flow-item", "flow-edge:flow-merkle-action");
+      await expect(flowFocus).toContainText("Feeds the reconstructed Merkle root");
+      await expect(rootWire).toHaveClass(/is-emphasized/);
+    }
     await merkleNode.click();
     await expect(page).toHaveURL(/#level=component&item=component%3Amerkle-path/);
     const canvas = page.locator(".circuit-canvas");
@@ -157,17 +234,22 @@ test.describe("Orchard circuit explorer", () => {
     await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeFocused();
     await expect(page.getByRole("complementary", { name: "Circuit item details" }))
       .toContainText("Source mapping confidence");
+    await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
+    await expect(canvas.locator(".circuit-card--region").first()).toBeVisible();
+    await expect(canvas.locator(".circuit-card--gate").first()).toBeVisible();
+    await expect(canvas.locator(".circuit-card--region-occurrence")).toHaveCount(0);
 
-    await page.getByRole("button", { name: "Show exact concrete regions" }).click();
-    const occurrence = canvas.locator(".circuit-card--region-occurrence").first();
-    await expect(occurrence).toBeVisible();
-    await occurrence.click();
-    await expect(canvas.locator(".circuit-operation-list button").first()).toBeVisible();
-    await expect(page).toHaveURL(/#level=detail&item=region%3A\d+&mode=exact/);
+    await canvas.locator(".circuit-card--region").first().click();
+    const operation = canvas.locator(".circuit-operation-record").first();
+    await expect(operation).toBeVisible();
+    expect(await operation.evaluate((element) => element.tagName)).toBe("ARTICLE");
+    await expect(operation.getByRole("button")).toHaveCount(0);
+    await expect(page).toHaveURL(/#level=detail&item=region-group%3A/);
+    await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
 
     await page.goBack();
     await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeFocused();
-    await expect(page).toHaveURL(/#level=component&item=component%3Amerkle-path&mode=exact/);
+    await expect(page).toHaveURL(/#level=component&item=component%3Amerkle-path$/);
 
     const search = page.getByRole("searchbox", { name: "Search circuit structure" });
     await search.fill("Orchard circuit checks");
@@ -177,16 +259,22 @@ test.describe("Orchard circuit explorer", () => {
     assertRuntimeClean();
   });
 
-  test("supports exact gate deep links and an accessible responsive layout", async ({ page }) => {
+  test("canonicalizes legacy gate links and renders inline constraints accessibly", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto("/circuit.html#level=detail&item=gate%3A0&mode=exact");
 
     const canvas = page.locator(".circuit-canvas");
     await expect(canvas.getByRole("heading", { name: "Orchard circuit checks" })).toBeVisible();
-    await expect(canvas.locator(".circuit-constraint-list button").first()).toBeVisible();
+    await expect(page).toHaveURL(/#level=detail&item=gate%3A0$/);
+    const constraint = canvas.locator(".circuit-constraint-record").first();
+    await expect(constraint).toBeVisible();
+    expect(await constraint.evaluate((element) => element.tagName)).toBe("ARTICLE");
+    await expect(constraint.getByRole("button")).toHaveCount(0);
     await expect(page.getByRole("complementary", { name: "Circuit item details" }))
-      .toContainText("Exact");
-    await expect(page.getByText("Browse the circuit as an outline")).toBeVisible();
+      .toContainText("Source mapping confidence");
+    await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /theme/i })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
 
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);

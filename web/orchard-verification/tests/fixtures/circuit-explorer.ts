@@ -370,7 +370,7 @@ export const rawCircuitExplorerFixture = {
       },
       {
         id: "component:action-checks",
-        kind: "component",
+        kind: "check",
         title: "Action checks",
         shortTitle: "Checks",
         summary: "Links calculated values to the Action statement.",
@@ -384,7 +384,7 @@ export const rawCircuitExplorerFixture = {
       },
       {
         id: "component:instance-root",
-        kind: "instance",
+        kind: "public-input",
         title: "Anchor instance",
         shortTitle: "Anchor",
         summary: "Exposes the reconstructed root as a public input.",
@@ -399,9 +399,27 @@ export const rawCircuitExplorerFixture = {
       },
     ],
     edges: [
-      { id: "edge:witness-merkle", from: "component:private-inputs", to: "component:merkle-path", label: "note data" },
-      { id: "edge:merkle-check", from: "component:merkle-path", to: "component:action-checks", label: "root" },
-      { id: "edge:check-anchor", from: "component:action-checks", to: "component:instance-root", label: "anchor" },
+      {
+        id: "edge:witness-merkle",
+        from: "component:private-inputs",
+        to: "component:merkle-path",
+        label: "note data",
+        summary: "Carries private note data into Merkle reconstruction.",
+      },
+      {
+        id: "edge:merkle-check",
+        from: "component:merkle-path",
+        to: "component:action-checks",
+        label: "root",
+        summary: "Sends the reconstructed root to the Action checks.",
+      },
+      {
+        id: "edge:check-anchor",
+        from: "component:instance-root",
+        to: "component:action-checks",
+        label: "anchor",
+        summary: "Supplies the public anchor against which the reconstructed root is checked.",
+      },
     ],
   },
   sources: {
@@ -415,7 +433,7 @@ export const rawCircuitExplorerFixture = {
         symbol: "Garden.Orchard.circuit.synthesize",
         line: 420,
         verification: "scanned",
-        url: "https://github.com/formal-land/garden/blob/8d99eeec/Garden/Orchard/circuit.v#L420",
+        url: "https://github.com/clarus/garden-private/blob/8d99eeec/Garden/Orchard/circuit.v#L420",
       },
       {
         id: "source:rust",

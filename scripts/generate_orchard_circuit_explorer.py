@@ -1783,6 +1783,8 @@ def build_flow(
             "from": component_id(str(edge["from"])),
             "to": component_id(str(edge["to"])),
             "label": edge["label"],
+            "summary": edge.get("summary", ""),
+            "kind": edge.get("kind", "data"),
         }
         for edge in flow_manifest.get("edges", [])
     ]
