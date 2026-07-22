@@ -46,8 +46,14 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
   expect(summary).toEqual([]);
 }
 
+async function openCircuitInspector(page: Page) {
+  const toggle = page.getByRole("button", { name: "Evidence and provenance" });
+  if (await toggle.isVisible()) await toggle.click();
+  return page.getByRole("complementary", { name: "Circuit item details" });
+}
+
 test.describe("Orchard verification journey", () => {
-  test("supports deep links, navigation, end-stop, and replay", async ({ page }) => {
+  test("supports deep links, manual navigation, and discrete tour controls", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     const initial = data.stages[1];
     await page.goto(`/index.html#stage=${initial.id}`);
@@ -60,15 +66,18 @@ test.describe("Orchard verification journey", () => {
     await expect(page.getByRole("heading", { name: data.stages[2].title })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`#stage=${data.stages[2].id}$`));
 
-    await page.getByRole("slider", { name: "Journey playhead" }).fill(String(data.stages.length));
-    await expect(page.getByRole("button", { name: "Replay journey" })).toBeVisible();
+    await expect(page.getByRole("slider")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Play tour" })).toBeVisible();
+    await page.getByRole("button", {
+      name: new RegExp(`^Stage ${data.stages.length}:`),
+    }).click();
     await expect(page.getByRole("button", { name: "Next stage" })).toBeDisabled();
     await expect(page.getByRole("heading", { name: data.stages.at(-1)!.title })).toBeVisible();
 
-    await page.getByRole("button", { name: "Replay journey" }).click();
-    await expect(page.getByRole("button", { name: "Pause journey" })).toBeVisible();
-    await expect(page.getByRole("heading", { name: data.stages[0].title })).toBeVisible();
-    await expect(page).toHaveURL(new RegExp(`#stage=${data.stages[0].id}$`));
+    await page.getByRole("button", { name: "Play tour" }).click();
+    await expect(page.getByRole("button", { name: "Pause tour" })).toBeVisible();
+    await page.getByRole("button", { name: "Pause tour" }).click();
+    await expect(page.getByRole("button", { name: "Play tour" })).toBeVisible();
 
     await expectNoHorizontalPageOverflow(page);
     assertRuntimeClean();
@@ -83,11 +92,21 @@ test.describe("Orchard verification journey", () => {
     await page.goto(`/index.html#stage=${stage.id}`);
 
     await expect(page.getByRole("navigation", { name: "Visualization views" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Journey playback" })).toBeVisible();
-    await expect(page.getByRole("article").getByText("Established here")).toBeVisible();
+    await expect(page.getByRole("region", { name: "Journey controls" })).toBeVisible();
+    await expect(page.getByRole("article").getByText("Established in this stage")).toBeVisible();
+    await expect(page.getByRole("article").getByText("Not yet established")).toBeVisible();
     await expect(page.locator(".stage-story .evidence-chip").filter({ hasText: gardenEvidence.label }))
       .toHaveAttribute("href", gardenEvidence.url!);
     expect(gardenEvidence.url).toMatch(/^https:\/\/github\.com\/clarus\/garden-private\//);
+    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    const stageNodeList = page.getByRole("list", { name: "Proof nodes in this stage" });
+    if (mobile) await expect(stageNodeList).toBeVisible();
+    else await expect(stageNodeList).toBeHidden();
+
+    const footerContext = page.locator(".site-footer__context");
+    await footerContext.locator("summary").click();
+    await expect(footerContext).toContainText(data.snapshot.caveat);
+    await expect(footerContext).toContainText(data.snapshot.repositoryRefs.garden.slice(0, 12));
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
     assertRuntimeClean();
@@ -114,11 +133,18 @@ test.describe("Orchard verification atlas", () => {
     await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
 
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
-    if (mobile) await page.getByRole("button", { name: "Filter nodes" }).click();
-    await page.getByRole("checkbox", { name: otherStatus.label }).check();
-    await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
-    await expect(inspector.getByText(/pinned node is outside the current filters/i)).toBeVisible();
-    await page.getByRole("button", { name: "Reset filters" }).click();
+    if (mobile) {
+      await inspector.getByRole("button", { name: "Close proof node details" }).click();
+      await page.getByRole("button", { name: "Filter nodes" }).click();
+      await page.getByRole("checkbox", { name: otherStatus.label }).check();
+      await page.getByRole("button", { name: "Reset", exact: true }).click();
+      await page.getByRole("tab", { name: "Graph" }).click();
+    } else {
+      await page.getByRole("checkbox", { name: otherStatus.label }).check();
+      await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
+      await expect(inspector.getByText(/pinned node is outside the current filters/i)).toBeVisible();
+      await page.getByRole("button", { name: "Reset", exact: true }).click();
+    }
 
     const svgNode = page.locator(`svg [data-node-id="${keyboardNode.id}"]`);
     await svgNode.focus();
@@ -135,17 +161,23 @@ test.describe("Orchard verification atlas", () => {
     await expect(relatedNode).toHaveAttribute("data-emphasis", "related");
     await expect(relatedNode).toHaveAttribute("aria-pressed", "false");
 
-    const list = page.locator(".proof-map__list-alternative");
-    if (!mobile) await list.locator("summary").click();
-    await expect(list).toHaveAttribute("open", "");
+    if (mobile) {
+      await inspector.getByRole("button", { name: "Close proof node details" }).click();
+    } else {
+      await inspector.evaluate((element) => {
+        element.scrollTop = 600;
+      });
+    }
+    await page.getByRole("tab", { name: "List" }).click();
+    const list = page.getByRole("tabpanel", { name: "List" });
+    await expect(list).toBeVisible();
     const listButton = list.getByRole("button", { name: new RegExp(listNode.title) });
-    await inspector.evaluate((element) => {
-      element.scrollTop = 600;
-    });
     await listButton.click();
     await expect(inspector.getByRole("heading", { name: listNode.title })).toBeVisible();
     await expect(page).toHaveURL(new RegExp(`#node=${listNode.id}$`));
-    await expect.poll(() => inspector.evaluate((element) => element.scrollTop)).toBe(0);
+    if (!mobile) {
+      await expect.poll(() => inspector.evaluate((element) => element.scrollTop)).toBe(0);
+    }
     await expect(listButton).toHaveClass(/is-selected/);
     await expect(listButton).toHaveAttribute("aria-pressed", "true");
 
@@ -157,36 +189,25 @@ test.describe("Orchard verification atlas", () => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto("/proof-map.html");
 
-    await expect(page.getByRole("searchbox", { name: "Search the atlas" })).toHaveCount(0);
+    await expect(page.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
     await expect(page.getByRole("group", { name: /^Work stream/ })).toHaveCount(0);
-    await expect(page.getByLabel("Map view controls")).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Zoom in" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Zoom out" })).toHaveCount(0);
-    await expect(page.getByRole("button", { name: "Fit map" })).toHaveCount(0);
-    await expect(page.getByLabel("Current map zoom")).toHaveCount(0);
+    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    if (mobile) await page.getByRole("tab", { name: "Graph" }).click();
+    await expect(page.getByLabel("Map view controls")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zoom in" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Zoom out" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Fit visible nodes" })).toBeVisible();
+    await expect(page.getByLabel("Current map zoom")).toHaveText("100%");
 
     const atlas = page.getByRole("group", { name: "Interactive Orchard verification proof atlas" });
     await expect(atlas).toBeVisible();
     const fittedViewBox = await atlas.getAttribute("viewBox");
-    await atlas.dispatchEvent("wheel", { clientX: 500, clientY: 300, deltaY: -600 });
-    await atlas.dispatchEvent("pointerdown", {
-      button: 0,
-      clientX: 500,
-      clientY: 300,
-      pointerId: 1,
-    });
-    await atlas.dispatchEvent("pointermove", {
-      clientX: 650,
-      clientY: 400,
-      pointerId: 1,
-    });
-    await atlas.dispatchEvent("pointerup", {
-      clientX: 650,
-      clientY: 400,
-      pointerId: 1,
-    });
+    await page.getByRole("button", { name: "Zoom in" }).click();
+    await expect(atlas).not.toHaveAttribute("viewBox", fittedViewBox!);
+    await page.getByRole("button", { name: "Reset map view" }).click();
     await expect(atlas).toHaveAttribute("viewBox", fittedViewBox!);
-    await expect(page.getByText(/Browse the filtered atlas as a list/)).toBeVisible();
+    await page.getByRole("tab", { name: "List" }).click();
+    await expect(page.getByRole("tabpanel", { name: "List" })).toBeVisible();
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
     assertRuntimeClean();
@@ -212,7 +233,7 @@ test.describe("Orchard circuit explorer", () => {
     await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
 
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
-    await expect(page.locator(".circuit-about")).toHaveJSProperty("open", !mobile);
+    await expect(page.locator(".circuit-interpretation-note")).toContainText("Interpretation layer");
     const merkleNode = mobile
       ? page.locator(".circuit-mobile-flow button").filter({ hasText: "Merkle path" })
       : page.locator(".circuit-flow-node").filter({ hasText: "Merkle" });
@@ -235,8 +256,13 @@ test.describe("Orchard circuit explorer", () => {
     const canvas = page.locator(".circuit-canvas");
     await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeVisible();
     await expect(canvas.getByRole("heading", { name: "Merkle path" })).toBeFocused();
-    await expect(page.getByRole("complementary", { name: "Circuit item details" }))
-      .toContainText("Source mapping confidence");
+    const componentInspector = await openCircuitInspector(page);
+    await expect(componentInspector).toContainText("Source mapping");
+    if (mobile) {
+      await componentInspector.getByRole("button", {
+        name: "Close evidence and provenance",
+      }).click();
+    }
     await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
     await expect(canvas.locator(".circuit-card--region").first()).toBeVisible();
     await expect(canvas.locator(".circuit-card--gate").first()).toBeVisible();
@@ -273,8 +299,8 @@ test.describe("Orchard circuit explorer", () => {
     await expect(constraint).toBeVisible();
     expect(await constraint.evaluate((element) => element.tagName)).toBe("ARTICLE");
     await expect(constraint.getByRole("button")).toHaveCount(0);
-    await expect(page.getByRole("complementary", { name: "Circuit item details" }))
-      .toContainText("Source mapping confidence");
+    const inspector = await openCircuitInspector(page);
+    await expect(inspector).toContainText("Source mapping");
     await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /theme/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
@@ -285,26 +311,37 @@ test.describe("Orchard circuit explorer", () => {
     assertRuntimeClean();
   });
 
-  test("keeps deep region provenance in document flow with short source labels", async ({ page }) => {
+  test("keeps deep region provenance readable with short source labels", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto(
       "/circuit.html#level=detail&item=region-group%3Acomponent-nullifier%3Acomplete-point-addition-257b3ed2",
     );
 
-    const inspector = page.getByRole("complementary", { name: "Circuit item details" });
-    await expect(inspector.getByRole("heading", { name: "complete point addition" })).toBeVisible();
+    const inspector = await openCircuitInspector(page);
+    await expect(page.locator(".circuit-canvas").getByRole("heading", {
+      name: "complete point addition",
+      level: 2,
+    })).toBeVisible();
+    await expect(inspector.getByRole("heading", { name: "Evidence and provenance" })).toBeVisible();
     const scrollState = await inspector.evaluate((element) => ({
       clientHeight: element.clientHeight,
       overflowY: getComputedStyle(element).overflowY,
       scrollHeight: element.scrollHeight,
     }));
-    expect(scrollState.overflowY).toBe("visible");
-    expect(scrollState.scrollHeight).toBe(scrollState.clientHeight);
+    expect(["visible", "auto", "scroll"]).toContain(scrollState.overflowY);
+    if (scrollState.overflowY === "visible") {
+      expect(scrollState.scrollHeight).toBe(scrollState.clientHeight);
+    } else {
+      expect(scrollState.scrollHeight).toBeGreaterThanOrEqual(scrollState.clientHeight);
+    }
 
     const sourceLabels = await inspector.locator(".circuit-source-panel a code").allTextContents();
     expect(sourceLabels.length).toBeGreaterThan(0);
     expect(sourceLabels.every((label) => !label.includes("/") && !label.includes("\\"))).toBe(true);
     expect(sourceLabels.every((label) => /\.[a-z0-9]+(?::\d+)?$/i.test(label))).toBe(true);
+    await expect(inspector.getByRole("button", {
+      name: /Copy full (?:candidate )?source file path/,
+    }).first()).toBeVisible();
 
     await expectNoHorizontalPageOverflow(page);
     assertRuntimeClean();

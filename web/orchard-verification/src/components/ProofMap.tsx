@@ -21,6 +21,7 @@ import type {
   ProofStatus,
   RepositoryId,
 } from "../data/model";
+import { statusLabels } from "./EvidencePanel";
 
 const NODE_WIDTH = 176;
 const NODE_HEIGHT = 78;
@@ -29,6 +30,7 @@ const MAP_PADDING = 54;
 interface ViewBox extends AtlasBounds {}
 
 type FocusValue = string | readonly string[] | null;
+type AtlasViewMode = "graph" | "list";
 
 export interface ProofMapProps {
   readonly data: OrchardVerificationData;
@@ -93,23 +95,6 @@ function wrapText(value: string, maximum = 29, lineLimit = 3): string[] {
     lines[last] = `${lines[last].replace(/[.,;:]$/, "")}…`;
   }
   return lines;
-}
-
-function organicClusterPath(bounds: AtlasBounds): string {
-  const { x, y, width: w, height: h } = bounds;
-  const wobble = Math.min(15, Math.max(7, Math.min(w, h) * 0.025));
-  return [
-    `M ${x + w * 0.08} ${y + wobble * 0.2}`,
-    `C ${x + w * 0.29} ${y - wobble}, ${x + w * 0.69} ${y + wobble}, ${x + w * 0.92} ${y}`,
-    `Q ${x + w + wobble} ${y + h * 0.08}, ${x + w} ${y + h * 0.22}`,
-    `C ${x + w - wobble * 0.3} ${y + h * 0.46}, ${x + w + wobble} ${y + h * 0.72}, ${x + w - wobble * 0.15} ${y + h * 0.91}`,
-    `Q ${x + w * 0.91} ${y + h + wobble}, ${x + w * 0.74} ${y + h}`,
-    `C ${x + w * 0.49} ${y + h - wobble}, ${x + w * 0.25} ${y + h + wobble * 0.7}, ${x + w * 0.08} ${y + h}`,
-    `Q ${x - wobble} ${y + h * 0.92}, ${x} ${y + h * 0.75}`,
-    `C ${x + wobble * 0.5} ${y + h * 0.51}, ${x - wobble} ${y + h * 0.28}, ${x} ${y + h * 0.09}`,
-    `Q ${x + w * 0.02} ${y}, ${x + w * 0.08} ${y + wobble * 0.2}`,
-    "Z",
-  ].join(" ");
 }
 
 function calculateMapBounds(
@@ -250,7 +235,7 @@ function FilterGroup<T extends string>({
       <legend>
         {legend}
         <span className="proof-map__filter-count">
-          {active.size ? ` (${active.size})` : " (all)"}
+          {active.size ? ` · ${active.size} selected` : " · All"}
         </span>
       </legend>
       <div className="proof-map__filter-options">
@@ -292,6 +277,9 @@ export function ProofMap({
   const markerPrefix = rawId.replace(/:/g, "");
   const formalMarkerId = `${markerPrefix}-formal-arrow`;
   const provenanceMarkerId = `${markerPrefix}-provenance-arrow`;
+  const filtersPanelId = `${markerPrefix}-filters`;
+  const graphPanelId = `${markerPrefix}-graph`;
+  const listPanelId = `${markerPrefix}-list`;
 
   const nodeById = useMemo(
     () => new Map(data.nodes.map((node) => [node.id, node])),
@@ -339,17 +327,29 @@ export function ProofMap({
   const [statusFilters, setStatusFilters] = useState<Set<ProofStatus>>(
     () => new Set(),
   );
+  const [searchQuery, setSearchQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
+  const [viewMode, setViewMode] = useState<AtlasViewMode>(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(max-width: 760px)").matches
+        ? "list"
+        : "graph",
   );
+  const [graphViewBox, setGraphViewBox] = useState<ViewBox | null>(null);
+  const [showRelatedOnly, setShowRelatedOnly] = useState(false);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
-    const onChange = (event: MediaQueryListEvent) => setListOpen(event.matches);
+    const onChange = (event: MediaQueryListEvent) =>
+      setViewMode(event.matches ? "list" : "graph");
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    if (!selectedNodeId) setShowRelatedOnly(false);
+  }, [selectedNodeId]);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -389,21 +389,49 @@ export function ProofMap({
 
   const nodeMatches = useMemo(() => {
     const result = new Map<string, boolean>();
+    const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
     for (const node of data.nodes) {
       const repositoryMatch =
         repositoryFilters.size === 0 ||
         node.repoIds.some((repoId) => repositoryFilters.has(repoId));
       const statusMatch =
         statusFilters.size === 0 || statusFilters.has(node.status);
+      const cluster = clusterById.get(node.clusterId);
+      const searchMatch =
+        normalizedQuery.length === 0 ||
+        [
+          node.title,
+          node.shortTitle,
+          node.summary,
+          node.detail,
+          node.status,
+          node.track,
+          ...node.tags,
+          cluster?.title,
+          cluster?.summary,
+          ...node.repoIds.flatMap((repoId) => {
+            const repository = repositoryById.get(repoId);
+            return repository
+              ? [repository.name, repository.shortName]
+              : [repoId];
+          }),
+        ]
+          .filter((value): value is string => value !== undefined)
+          .join(" ")
+          .toLocaleLowerCase()
+          .includes(normalizedQuery);
       result.set(
         node.id,
-        repositoryMatch && statusMatch,
+        repositoryMatch && statusMatch && searchMatch,
       );
     }
     return result;
   }, [
+    clusterById,
     data.nodes,
+    repositoryById,
     repositoryFilters,
+    searchQuery,
     statusFilters,
   ]);
 
@@ -416,8 +444,9 @@ export function ProofMap({
   );
 
   const attentionIds = useMemo(() => {
-    if (hoveredNodeId) return new Set([hoveredNodeId]);
     if (selectedNodeId && nodeMatches.get(selectedNodeId)) return new Set([selectedNodeId]);
+    if (selectedNodeId) return new Set([selectedNodeId]);
+    if (hoveredNodeId) return new Set([hoveredNodeId]);
     return focusedIds;
   }, [focusedIds, hoveredNodeId, nodeMatches, selectedNodeId]);
 
@@ -483,7 +512,26 @@ export function ProofMap({
   const resetFilters = useCallback(() => {
     setRepositoryFilters(new Set());
     setStatusFilters(new Set());
+    setSearchQuery("");
   }, []);
+
+  const onViewTabKeyDown = useCallback(
+    (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+      let nextView: AtlasViewMode | null = null;
+      if (event.key === "ArrowLeft" || event.key === "Home") {
+        nextView = "graph";
+      } else if (event.key === "ArrowRight" || event.key === "End") {
+        nextView = "list";
+      }
+      if (!nextView) return;
+      event.preventDefault();
+      setViewMode(nextView);
+      document
+        .getElementById(`${markerPrefix}-${nextView}-tab`)
+        ?.focus();
+    },
+    [markerPrefix],
+  );
 
   const selectedNode = selectedNodeId
     ? nodeById.get(selectedNodeId) ?? null
@@ -495,7 +543,8 @@ export function ProofMap({
     : [];
   const filtersAreActive =
     repositoryFilters.size > 0 ||
-    statusFilters.size > 0;
+    statusFilters.size > 0 ||
+    searchQuery.trim().length > 0;
   const compactPositionById = useMemo(() => {
     const positions = new Map<string, AtlasPoint>();
     if (!compact || revealedIds === null) return positions;
@@ -557,6 +606,65 @@ export function ProofMap({
     ) ?? baseViewBox;
   }, [baseViewBox, compact, compactPositionById, data.nodes, revealedIds]);
 
+  const displayedViewBox = graphViewBox ?? fittedViewBox;
+  const graphZoom = Math.round(
+    Math.min(
+      fittedViewBox.width / displayedViewBox.width,
+      fittedViewBox.height / displayedViewBox.height,
+    ) * 100,
+  );
+
+  const zoomGraph = useCallback(
+    (factor: number) => {
+      setGraphViewBox((current) => {
+        const source = current ?? fittedViewBox;
+        const sourceScale = fittedViewBox.width / source.width;
+        const nextScale = Math.min(2.5, Math.max(0.5, sourceScale / factor));
+        const nextWidth = fittedViewBox.width / nextScale;
+        const nextHeight = source.height * (nextWidth / source.width);
+        return {
+          x: source.x + (source.width - nextWidth) / 2,
+          y: source.y + (source.height - nextHeight) / 2,
+          width: nextWidth,
+          height: nextHeight,
+        };
+      });
+    },
+    [fittedViewBox],
+  );
+
+  const fitFilteredNodes = useCallback(() => {
+    setGraphViewBox(
+      calculateNodeBounds(resultNodes, compactPositionById) ?? fittedViewBox,
+    );
+    setViewMode("graph");
+  }, [compactPositionById, fittedViewBox, resultNodes]);
+
+  const resetGraphView = useCallback(() => setGraphViewBox(null), []);
+
+  const selectedIncomingEdges = useMemo(
+    () =>
+      selectedNodeId
+        ? data.edges.filter((edge) => edge.to === selectedNodeId)
+        : [],
+    [data.edges, selectedNodeId],
+  );
+  const selectedOutgoingEdges = useMemo(
+    () =>
+      selectedNodeId
+        ? data.edges.filter((edge) => edge.from === selectedNodeId)
+        : [],
+    [data.edges, selectedNodeId],
+  );
+
+  const proofStatusCounts = useMemo(() => {
+    const counts = new Map<ProofStatus, number>();
+    for (const node of resultNodes) {
+      counts.set(node.status, (counts.get(node.status) ?? 0) + 1);
+    }
+    return counts;
+  }, [resultNodes]);
+
   return (
     <section
       className={classNames(
@@ -565,22 +673,29 @@ export function ProofMap({
         className,
       )}
       data-compact={compact || undefined}
+      data-view={compact ? "graph" : viewMode}
     >
-      {!compact && (
-        <div className="proof-map__toolbar" aria-label="Atlas filters">
+      {!compact ? (
+        <div className="proof-map__toolbar" aria-label="Atlas controls">
           <button
             className="proof-map__filter-toggle"
             type="button"
             aria-expanded={filtersOpen}
-            aria-controls="atlas-filter-groups"
+            aria-controls={filtersPanelId}
             onClick={() => setFiltersOpen((current) => !current)}
           >
             Filter nodes
-            {filtersAreActive ? ` (${repositoryFilters.size + statusFilters.size})` : ""}
+            {filtersAreActive
+              ? ` (${repositoryFilters.size + statusFilters.size + (searchQuery.trim() ? 1 : 0)})`
+              : ""}
           </button>
+
           <div
-            className={classNames("proof-map__filters", filtersOpen && "is-open")}
-            id="atlas-filter-groups"
+            className={classNames(
+              "proof-map__filters",
+              filtersOpen && "is-open",
+            )}
+            id={filtersPanelId}
           >
             <FilterGroup
               legend="Repositories"
@@ -590,7 +705,7 @@ export function ProofMap({
               onClear={() => setRepositoryFilters(new Set())}
             />
             <FilterGroup
-              legend="Status"
+              legend="Proof status"
               options={data.filters.statuses}
               active={statusFilters}
               onToggle={(id) => toggleSelection(setStatusFilters, id)}
@@ -598,89 +713,276 @@ export function ProofMap({
             />
           </div>
 
-          {filtersAreActive ? (
+          <label className="proof-map__search">
+            <span>Search</span>
+            <input
+              type="search"
+              value={searchQuery}
+              aria-label="Search the atlas"
+              placeholder="Claims, sources, repositories…"
+              onChange={(event) => setSearchQuery(event.currentTarget.value)}
+            />
+          </label>
+
+          <div className="proof-map__toolbar-actions">
+            <output className="proof-map__result-count" aria-live="polite">
+              {resultNodes.length} of {data.nodes.length} nodes
+            </output>
             <button
               className="proof-map__reset-filters"
               type="button"
+              disabled={!filtersAreActive}
               onClick={resetFilters}
             >
-              Reset filters
+              Reset
             </button>
-          ) : null}
+            <button
+              className="proof-map__fit-filtered"
+              type="button"
+              disabled={resultNodes.length === 0}
+              onClick={fitFilteredNodes}
+            >
+              Fit graph
+            </button>
+          </div>
+
+          <div className="proof-map__view-switcher" role="tablist" aria-label="Atlas view">
+            <button
+              id={`${markerPrefix}-graph-tab`}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "graph"}
+              aria-controls={graphPanelId}
+              tabIndex={viewMode === "graph" ? 0 : -1}
+              onClick={() => setViewMode("graph")}
+              onKeyDown={onViewTabKeyDown}
+            >
+              Graph
+            </button>
+            <button
+              id={`${markerPrefix}-list-tab`}
+              type="button"
+              role="tab"
+              aria-selected={viewMode === "list"}
+              aria-controls={listPanelId}
+              tabIndex={viewMode === "list" ? 0 : -1}
+              onClick={() => setViewMode("list")}
+              onKeyDown={onViewTabKeyDown}
+            >
+              List
+            </button>
+          </div>
         </div>
-      )}
+      ) : null}
 
-      <div className="proof-map__workspace">
-        <div className="proof-map__canvas-wrap">
-          <svg
-            className="proof-map__canvas"
-            viewBox={`${fittedViewBox.x} ${fittedViewBox.y} ${fittedViewBox.width} ${fittedViewBox.height}`}
-            preserveAspectRatio="xMidYMid meet"
-            role="group"
-            aria-label="Interactive Orchard verification proof atlas"
+      <div
+        className={classNames(
+          "proof-map__workspace",
+          selectedNode && !compact ? "has-inspector" : "is-visualization-only",
+        )}
+      >
+        <div className="proof-map__view-panels">
+          <div
+            className="proof-map__graph-panel"
+            id={compact ? undefined : graphPanelId}
+            role={compact ? undefined : "tabpanel"}
+            aria-labelledby={compact ? undefined : `${markerPrefix}-graph-tab`}
+            hidden={!compact && viewMode !== "graph"}
           >
-            <defs>
-              <marker
-                id={formalMarkerId}
-                className="proof-map__marker proof-map__marker--formal"
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="7"
-                markerHeight="7"
-                orient="auto-start-reverse"
+            <div className="proof-map__canvas-wrap">
+              <p className="visually-hidden" id={`${markerPrefix}-graph-instructions`}>
+                Use Tab to move between proof nodes and Enter or Space to inspect one.
+                Arrowheads show the direction of each relationship.
+              </p>
+              <svg
+                className="proof-map__canvas"
+                viewBox={`${displayedViewBox.x} ${displayedViewBox.y} ${displayedViewBox.width} ${displayedViewBox.height}`}
+                preserveAspectRatio="xMidYMid meet"
+                role="group"
+                aria-label="Interactive Orchard verification proof atlas"
+                aria-describedby={`${markerPrefix}-graph-instructions`}
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" />
-              </marker>
-              <marker
-                id={provenanceMarkerId}
-                className="proof-map__marker proof-map__marker--provenance"
-                viewBox="0 0 10 10"
-                refX="9"
-                refY="5"
-                markerWidth="7"
-                markerHeight="7"
-                orient="auto-start-reverse"
-              >
-                <path d="M 0 1 L 9 5 L 0 9 L 3 5 z" />
-              </marker>
-            </defs>
-
-            <g className="proof-map__clusters">
-              {data.clusters.map((cluster) => {
-                const visibleNodeIds = cluster.nodeIds.filter(isRevealed);
-                if (revealedIds !== null && visibleNodeIds.length === 0) return null;
-                const isCollapsed = collapsedClusters.has(cluster.id);
-                const hasSelectedNode = selectedNodeId !== null && visibleNodeIds.includes(selectedNodeId);
-                const hasMatch = hasSelectedNode || visibleNodeIds.some(
-                  (nodeId) => nodeMatches.get(nodeId) ?? false,
-                );
-                return (
-                  <g
-                    className={classNames(
-                      "proof-map__cluster",
-                      `proof-map__cluster--${cluster.status}`,
-                      `proof-map__cluster--track-${cluster.track}`,
-                      isCollapsed && "is-collapsed",
-                      !hasMatch && "is-filtered-out",
-                    )}
-                    key={cluster.id}
-                    data-cluster-id={cluster.id}
-                    data-status={cluster.status}
-                    data-track={cluster.track}
-                    opacity={hasMatch ? 1 : 0.14}
+                <defs>
+                  <marker
+                    id={formalMarkerId}
+                    className="proof-map__marker proof-map__marker--formal"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto"
                   >
-                    <path
-                      className="proof-map__cluster-shape"
-                      d={organicClusterPath(cluster.bounds)}
-                    />
-                    {!isCollapsed && (
+                    <path d="M 0 0 L 10 5 L 0 10 z" />
+                  </marker>
+                  <marker
+                    id={provenanceMarkerId}
+                    className="proof-map__marker proof-map__marker--provenance"
+                    viewBox="0 0 10 10"
+                    refX="9"
+                    refY="5"
+                    markerWidth="7"
+                    markerHeight="7"
+                    orient="auto"
+                  >
+                    <path d="M 0 1 L 9 5 L 0 9 L 3 5 z" />
+                  </marker>
+                </defs>
+
+                <g className="proof-map__clusters">
+                  {data.clusters.map((cluster) => {
+                    const visibleNodeIds = cluster.nodeIds.filter(isRevealed);
+                    if (revealedIds !== null && visibleNodeIds.length === 0) {
+                      return null;
+                    }
+                    const isCollapsed = collapsedClusters.has(cluster.id);
+                    const hasSelectedNode =
+                      selectedNodeId !== null &&
+                      visibleNodeIds.includes(selectedNodeId);
+                    const hasMatch =
+                      hasSelectedNode ||
+                      visibleNodeIds.some(
+                        (nodeId) => nodeMatches.get(nodeId) ?? false,
+                      );
+                    return (
                       <g
-                        className="proof-map__cluster-heading"
+                        className={classNames(
+                          "proof-map__cluster",
+                          `proof-map__cluster--${cluster.status}`,
+                          `proof-map__cluster--track-${cluster.track}`,
+                          isCollapsed && "is-collapsed",
+                          !hasMatch && "is-filtered-out",
+                        )}
+                        key={cluster.id}
+                        data-cluster-id={cluster.id}
+                        data-status={cluster.status}
+                        data-track={cluster.track}
+                        opacity={hasMatch ? 1 : 0.1}
+                      >
+                        <rect
+                          className="proof-map__cluster-shape"
+                          x={cluster.bounds.x}
+                          y={cluster.bounds.y}
+                          width={cluster.bounds.width}
+                          height={cluster.bounds.height}
+                          rx="12"
+                        />
+                        {!isCollapsed ? (
+                          <g
+                            className="proof-map__cluster-heading"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Collapse ${cluster.title} cluster`}
+                            aria-expanded="true"
+                            onPointerDown={(event) => event.stopPropagation()}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggleCluster(cluster.id);
+                            }}
+                            onKeyDown={(event) =>
+                              onClusterKeyDown(event, cluster.id)
+                            }
+                          >
+                            <rect
+                              className="proof-map__cluster-heading-hitbox"
+                              x={cluster.bounds.x + 8}
+                              y={cluster.bounds.y + 5}
+                              width={Math.min(250, cluster.bounds.width - 16)}
+                              height="42"
+                              rx="4"
+                            />
+                            <text
+                              x={cluster.bounds.x + 19}
+                              y={cluster.bounds.y + 31}
+                            >
+                              {cluster.shortTitle}
+                              <tspan className="proof-map__cluster-toggle-glyph"> −</tspan>
+                            </text>
+                          </g>
+                        ) : null}
+                      </g>
+                    );
+                  })}
+                </g>
+
+                <g className="proof-map__edges" aria-hidden="true">
+                  {visibleEdges.map(({ edge, from, to }) => {
+                    const isConnected =
+                      attentionIds.has(edge.from) || attentionIds.has(edge.to);
+                    const filteredOut =
+                      !nodeMatches.get(edge.from) || !nodeMatches.get(edge.to);
+                    const muted = attentionIds.size > 0 && !isConnected;
+                    const outsideFocus = showRelatedOnly && !isConnected;
+                    const point = midpoint(from, to);
+                    return (
+                      <g
+                        key={edge.id}
+                        className={classNames(
+                          "proof-map__edge",
+                          `proof-map__edge--${edge.family}`,
+                          `proof-map__edge--${edge.status}`,
+                          isConnected && "is-active",
+                          muted && "is-muted",
+                          filteredOut && "is-filtered-out",
+                          outsideFocus && "is-outside-focus",
+                        )}
+                        data-relation={edge.relation}
+                        data-direction={`${edge.from}:${edge.to}`}
+                        opacity={
+                          outsideFocus
+                            ? 0.04
+                            : filteredOut && !isConnected
+                              ? 0.08
+                              : muted
+                                ? 0.24
+                                : 1
+                        }
+                      >
+                        <path
+                          d={edgePath(from, to)}
+                          fill="none"
+                          strokeWidth={isConnected ? 2.8 : 1.7}
+                          strokeDasharray={
+                            edge.family === "provenance" ? "7 6" : undefined
+                          }
+                          markerEnd={`url(#${
+                            edge.family === "formal"
+                              ? formalMarkerId
+                              : provenanceMarkerId
+                          })`}
+                        />
+                        {isConnected && attentionIds.size > 0 ? (
+                          <text
+                            className="proof-map__edge-label"
+                            x={point.x}
+                            y={point.y - 7}
+                            textAnchor="middle"
+                          >
+                            {edge.label}
+                          </text>
+                        ) : null}
+                      </g>
+                    );
+                  })}
+                </g>
+
+                <g className="proof-map__collapsed-clusters">
+                  {data.clusters.map((cluster) => {
+                    if (!collapsedClusters.has(cluster.id)) return null;
+                    const visibleNodeIds = cluster.nodeIds.filter(isRevealed);
+                    if (revealedIds !== null && visibleNodeIds.length === 0) {
+                      return null;
+                    }
+                    const centre = clusterCentre(cluster);
+                    const lines = wrapText(cluster.collapsedSummary, 34, 3);
+                    return (
+                      <g
+                        key={cluster.id}
+                        className="proof-map__collapsed-summary"
                         role="button"
                         tabIndex={0}
-                        aria-label={`Collapse ${cluster.title} cluster`}
-                        aria-expanded="true"
+                        aria-expanded="false"
+                        aria-label={`Expand ${cluster.title} cluster. ${cluster.collapsedSummary}`}
                         onPointerDown={(event) => event.stopPropagation()}
                         onClick={(event) => {
                           event.stopPropagation();
@@ -691,233 +993,345 @@ export function ProofMap({
                         }
                       >
                         <rect
-                          x={cluster.bounds.x + 15}
-                          y={cluster.bounds.y + 13}
-                          width={Math.min(250, cluster.bounds.width - 30)}
-                          height="37"
-                          rx="18.5"
+                          x={centre.x - 116}
+                          y={centre.y - 55}
+                          width="232"
+                          height="110"
+                          rx="12"
                         />
                         <text
-                          x={cluster.bounds.x + 31}
-                          y={cluster.bounds.y + 37}
+                          className="proof-map__collapsed-title"
+                          x={centre.x}
+                          y={centre.y - 27}
+                          textAnchor="middle"
                         >
-                          {cluster.shortTitle}
-                          <tspan className="proof-map__cluster-toggle-glyph"> −</tspan>
+                          {cluster.shortTitle} +
+                        </text>
+                        <text
+                          className="proof-map__collapsed-copy"
+                          x={centre.x}
+                          y={centre.y - 5}
+                          textAnchor="middle"
+                        >
+                          {lines.map((line, index) => (
+                            <tspan
+                              x={centre.x}
+                              dy={index === 0 ? 0 : 17}
+                              key={`${index}-${line}`}
+                            >
+                              {line}
+                            </tspan>
+                          ))}
                         </text>
                       </g>
-                    )}
-                  </g>
-                );
-              })}
-            </g>
+                    );
+                  })}
+                </g>
 
-            <g className="proof-map__edges" aria-hidden="true">
-              {visibleEdges.map(({ edge, from, to }) => {
-                const isConnected =
-                  attentionIds.has(edge.from) || attentionIds.has(edge.to);
-                const filteredOut =
-                  !nodeMatches.get(edge.from) || !nodeMatches.get(edge.to);
-                const muted = attentionIds.size > 0 && !isConnected;
-                const point = midpoint(from, to);
-                return (
-                  <g
-                    key={edge.id}
-                    className={classNames(
-                      "proof-map__edge",
-                      `proof-map__edge--${edge.family}`,
-                      `proof-map__edge--${edge.status}`,
-                      isConnected && "is-active",
-                      muted && "is-muted",
-                      filteredOut && "is-filtered-out",
-                    )}
-                    data-relation={edge.relation}
-                    opacity={filteredOut ? 0.08 : muted ? 0.34 : 1}
-                  >
-                    <path
-                      d={edgePath(from, to)}
-                      fill="none"
-                      strokeWidth={isConnected ? 2.8 : 1.7}
-                      strokeDasharray={
-                        edge.family === "provenance" ? "7 6" : undefined
-                      }
-                      markerEnd={`url(#${
-                        edge.family === "formal"
-                          ? formalMarkerId
-                          : provenanceMarkerId
-                      })`}
-                    />
-                    <text
-                      className="proof-map__edge-label"
-                      x={point.x}
-                      y={point.y - 7}
-                      textAnchor="middle"
-                    >
-                      {edge.label}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
+                <g className="proof-map__nodes">
+                  {data.nodes.map((node) => {
+                    if (
+                      !isRevealed(node.id) ||
+                      collapsedClusters.has(node.clusterId)
+                    ) {
+                      return null;
+                    }
+                    const matches = nodeMatches.get(node.id) ?? false;
+                    const isActive = attentionIds.has(node.id);
+                    const isNeighbour = neighbourIds.has(node.id);
+                    const isSelected = selectedNodeId === node.id;
+                    const isMuted =
+                      attentionIds.size > 0 &&
+                      !isActive &&
+                      !isNeighbour &&
+                      !isSelected;
+                    const outsideFocus = showRelatedOnly && isMuted;
+                    const isInteractive = matches || isSelected;
+                    const titleLines = wrapText(node.shortTitle, 23, 2);
+                    const repositoryLabels = node.repoIds
+                      .map(
+                        (repoId) =>
+                          repositoryById.get(repoId)?.shortName ?? repoId,
+                      );
+                    const statusLabel = statusLabels[node.status];
+                    const primaryRepository = repositoryLabels[0];
+                    const statusWithContext = primaryRepository
+                      ? `${statusLabel} · ${primaryRepository}`
+                      : statusLabel;
+                    const nodeMeta = statusWithContext.length <= 22
+                      ? statusWithContext
+                      : statusLabel;
+                    const position =
+                      compactPositionById.get(node.id) ?? node.position;
+                    return (
+                      <g
+                        key={node.id}
+                        className={classNames(
+                          "proof-map__node",
+                          `proof-map__node--${node.status}`,
+                          `proof-map__node--track-${node.track}`,
+                          isActive && "is-active",
+                          isNeighbour && "is-related",
+                          isSelected && "is-selected",
+                          isMuted && "is-muted",
+                          outsideFocus && "is-outside-focus",
+                          !matches && "is-filtered-out",
+                        )}
+                        transform={`translate(${position.x - NODE_WIDTH / 2} ${position.y - NODE_HEIGHT / 2})`}
+                        role="button"
+                        tabIndex={isInteractive ? 0 : -1}
+                        aria-hidden={!isInteractive || undefined}
+                        aria-label={`${node.title}. ${statusLabels[node.status]}. ${node.summary}`}
+                        aria-pressed={isSelected}
+                        data-emphasis={
+                          isSelected
+                            ? "selected"
+                            : isNeighbour
+                              ? "related"
+                              : undefined
+                        }
+                        data-node-id={node.id}
+                        data-status={node.status}
+                        data-track={node.track}
+                        opacity={
+                          outsideFocus
+                            ? 0.04
+                            : !matches && !isSelected
+                              ? 0.08
+                              : isMuted
+                                ? 0.48
+                                : 1
+                        }
+                        onPointerDown={(event) => event.stopPropagation()}
+                        onPointerEnter={() =>
+                          isInteractive && setHoveredNodeId(node.id)
+                        }
+                        onPointerLeave={() => setHoveredNodeId(null)}
+                        onFocus={() =>
+                          isInteractive && setHoveredNodeId(node.id)
+                        }
+                        onBlur={() => setHoveredNodeId(null)}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (isInteractive) inspectNode(node.id);
+                        }}
+                        onKeyDown={(event) => onNodeKeyDown(event, node.id)}
+                      >
+                        {isSelected ? (
+                          <rect
+                            className="proof-map__selection-ring proof-map__selection-outline"
+                            x="-6"
+                            y="-6"
+                            width={NODE_WIDTH + 12}
+                            height={NODE_HEIGHT + 12}
+                            rx="12"
+                          />
+                        ) : null}
+                        <rect
+                          className="proof-map__node-card"
+                          width={NODE_WIDTH}
+                          height={NODE_HEIGHT}
+                          rx="9"
+                        />
+                        <circle
+                          className="proof-map__node-status-dot"
+                          cx="15"
+                          cy="16"
+                          r="5"
+                        />
+                        <text className="proof-map__node-title" x="28" y="20">
+                          {titleLines.map((line, index) => (
+                            <tspan
+                              x="28"
+                              dy={index === 0 ? 0 : 16}
+                              key={`${index}-${line}`}
+                            >
+                              {line}
+                            </tspan>
+                          ))}
+                        </text>
+                        <text className="proof-map__node-meta" x="15" y="65">
+                          <tspan>{nodeMeta}</tspan>
+                        </text>
+                        {isNeighbour && !isSelected ? (
+                          <circle
+                            className="proof-map__related-indicator"
+                            cx="160"
+                            cy="16"
+                            r="6"
+                          />
+                        ) : null}
+                      </g>
+                    );
+                  })}
+                </g>
+              </svg>
 
-            <g className="proof-map__collapsed-clusters">
-              {data.clusters.map((cluster) => {
-                if (!collapsedClusters.has(cluster.id)) return null;
-                const visibleNodeIds = cluster.nodeIds.filter(isRevealed);
-                if (revealedIds !== null && visibleNodeIds.length === 0) return null;
-                const centre = clusterCentre(cluster);
-                const lines = wrapText(cluster.collapsedSummary, 34, 3);
-                return (
-                  <g
-                    key={cluster.id}
-                    className="proof-map__collapsed-summary"
-                    role="button"
-                    tabIndex={0}
-                    aria-expanded="false"
-                    aria-label={`Expand ${cluster.title} cluster. ${cluster.collapsedSummary}`}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      toggleCluster(cluster.id);
-                    }}
-                    onKeyDown={(event) => onClusterKeyDown(event, cluster.id)}
+              {!compact ? (
+                <>
+                  <div
+                    className="proof-map__graph-controls"
+                    role="toolbar"
+                    aria-label="Map view controls"
                   >
-                    <rect
-                      x={centre.x - 116}
-                      y={centre.y - 55}
-                      width="232"
-                      height="110"
-                      rx="30"
-                    />
-                    <text
-                      className="proof-map__collapsed-title"
-                      x={centre.x}
-                      y={centre.y - 27}
-                      textAnchor="middle"
+                    <button
+                      type="button"
+                      aria-label="Zoom out"
+                      disabled={graphZoom <= 50}
+                      onClick={() => zoomGraph(1.25)}
                     >
-                      {cluster.shortTitle} +
-                    </text>
-                    <text
-                      className="proof-map__collapsed-copy"
-                      x={centre.x}
-                      y={centre.y - 5}
-                      textAnchor="middle"
+                      −
+                    </button>
+                    <output aria-label="Current map zoom">{graphZoom}%</output>
+                    <button
+                      type="button"
+                      aria-label="Zoom in"
+                      disabled={graphZoom >= 250}
+                      onClick={() => zoomGraph(0.8)}
                     >
-                      {lines.map((line, index) => (
-                        <tspan x={centre.x} dy={index === 0 ? 0 : 17} key={line}>
-                          {line}
-                        </tspan>
+                      +
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Fit visible nodes"
+                      disabled={resultNodes.length === 0}
+                      onClick={fitFilteredNodes}
+                    >
+                      Fit
+                    </button>
+                    <button
+                      type="button"
+                      aria-label="Reset map view"
+                      disabled={graphViewBox === null}
+                      onClick={resetGraphView}
+                    >
+                      Reset view
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={showRelatedOnly}
+                      disabled={!selectedNode}
+                      onClick={() => setShowRelatedOnly((current) => !current)}
+                    >
+                      Related only
+                    </button>
+                  </div>
+
+                  <details className="proof-map__legend proof-map__canvas-legend">
+                    <summary>Legend</summary>
+                    <div className="proof-map__legend-content">
+                      <span>
+                        <i className="proof-map__legend-line proof-map__legend-line--formal" />
+                        Formal implication
+                      </span>
+                      <span>
+                        <i className="proof-map__legend-line proof-map__legend-line--provenance" />
+                        Provenance or parity
+                      </span>
+                      <span>
+                        <i className="proof-map__legend-line proof-map__legend-line--assumption" />
+                        Assumption or trust boundary
+                      </span>
+                      {data.filters.statuses.map((status) => (
+                        <span key={status.id}>
+                          <i
+                            className={`proof-map__legend-node proof-map__legend-node--${status.id}`}
+                          />
+                          {status.label}
+                          {proofStatusCounts.has(status.id)
+                            ? ` (${proofStatusCounts.get(status.id)})`
+                            : ""}
+                        </span>
                       ))}
-                    </text>
-                  </g>
-                );
-              })}
-            </g>
+                      <span>
+                        <i className="proof-map__legend-node proof-map__legend-node--selected" />
+                        Selected
+                      </span>
+                      <span>
+                        <i className="proof-map__legend-node proof-map__legend-node--related" />
+                        Directly related
+                      </span>
+                    </div>
+                  </details>
 
-            <g className="proof-map__nodes">
-              {data.nodes.map((node) => {
-                if (!isRevealed(node.id) || collapsedClusters.has(node.clusterId)) {
-                  return null;
-                }
-                const matches = nodeMatches.get(node.id) ?? false;
-                const isActive = attentionIds.has(node.id);
-                const isNeighbour = neighbourIds.has(node.id);
-                const isSelected = selectedNodeId === node.id;
-                const isMuted =
-                  attentionIds.size > 0 && !isActive && !isNeighbour && !isSelected;
-                const isInteractive = matches || isSelected;
-                const titleLines = wrapText(node.shortTitle, 23, 2);
-                const repoLabels = node.repoIds
-                  .map(
-                    (repoId) => repositoryById.get(repoId)?.shortName ?? repoId,
-                  )
-                  .join(" · ");
-                const position = compactPositionById.get(node.id) ?? node.position;
-                return (
-                  <g
-                    key={node.id}
-                    className={classNames(
-                      "proof-map__node",
-                      `proof-map__node--${node.status}`,
-                      `proof-map__node--track-${node.track}`,
-                      isActive && "is-active",
-                      isNeighbour && "is-related",
-                      isSelected && "is-selected",
-                      isMuted && "is-muted",
-                      !matches && "is-filtered-out",
-                    )}
-                    transform={`translate(${position.x - NODE_WIDTH / 2} ${position.y - NODE_HEIGHT / 2})`}
-                    role="button"
-                    tabIndex={isInteractive ? 0 : -1}
-                    aria-hidden={!isInteractive || undefined}
-                    aria-label={`${node.title}. ${titleCase(node.status)}. ${node.summary}`}
-                    aria-pressed={isSelected}
-                    data-emphasis={isSelected ? "selected" : isNeighbour ? "related" : undefined}
-                    data-node-id={node.id}
-                    data-status={node.status}
-                    data-track={node.track}
-                    opacity={!matches && !isSelected ? 0.08 : isMuted ? 0.56 : 1}
-                    onPointerDown={(event) => event.stopPropagation()}
-                    onPointerEnter={() => isInteractive && setHoveredNodeId(node.id)}
-                    onPointerLeave={() => setHoveredNodeId(null)}
-                    onFocus={() => isInteractive && setHoveredNodeId(node.id)}
-                    onBlur={() => setHoveredNodeId(null)}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      if (isInteractive) inspectNode(node.id);
-                    }}
-                    onKeyDown={(event) => onNodeKeyDown(event, node.id)}
-                  >
-                    {isSelected ? (
-                      <rect
-                        className="proof-map__selection-ring"
-                        x="-6"
-                        y="-6"
-                        width={NODE_WIDTH + 12}
-                        height={NODE_HEIGHT + 12}
-                        rx="25"
-                      />
-                    ) : null}
-                    <rect
-                      className="proof-map__node-card"
-                      width={NODE_WIDTH}
-                      height={NODE_HEIGHT}
-                      rx="19"
-                    />
-                    <circle
-                      className="proof-map__node-status-dot"
-                      cx="15"
-                      cy="16"
-                      r="5"
-                    />
-                    <text className="proof-map__node-title" x="28" y="20">
-                      {titleLines.map((line, index) => (
-                        <tspan x="28" dy={index === 0 ? 0 : 16} key={line}>
-                          {line}
-                        </tspan>
-                      ))}
-                    </text>
-                    <text className="proof-map__node-meta" x="15" y="65">
-                      <tspan>{titleCase(node.status)}</tspan>
-                      <tspan> · {repoLabels}</tspan>
-                    </text>
-                    {isSelected && (
-                      <path
-                        className="proof-map__pin-indicator"
-                        d="M 157 9 l 8 8 -5 2 -3 8 -3 -6 -6 -3 8 -3 z"
-                      />
-                    )}
-                    {isNeighbour && !isSelected ? (
-                      <circle className="proof-map__related-indicator" cx="160" cy="16" r="6" />
-                    ) : null}
-                  </g>
-                );
-              })}
-            </g>
-          </svg>
+                  {resultNodes.length === 0 ? (
+                    <div className="proof-map__graph-empty" role="status">
+                      <p>No proof nodes match these filters.</p>
+                      <button type="button" onClick={resetFilters}>
+                        Reset filters
+                      </button>
+                    </div>
+                  ) : null}
+                </>
+              ) : null}
+            </div>
+          </div>
 
+          {!compact ? (
+            <section
+              className="proof-map__list-alternative"
+              id={listPanelId}
+              role="tabpanel"
+              aria-labelledby={`${markerPrefix}-list-tab`}
+              hidden={viewMode !== "list"}
+            >
+              <header className="proof-map__list-heading">
+                <div>
+                  <h2 id={`${markerPrefix}-list-heading`}>Atlas nodes</h2>
+                  <p>
+                    {resultNodes.length} of {data.nodes.length} nodes match the current filters.
+                  </p>
+                </div>
+              </header>
+              {resultNodes.length ? (
+                <div className="proof-map__list-clusters">
+                  {data.clusters.map((cluster) => {
+                    const nodes = resultNodes.filter(
+                      (node) => node.clusterId === cluster.id,
+                    );
+                    if (!nodes.length) return null;
+                    return (
+                      <section key={cluster.id}>
+                        <h3>{cluster.title}</h3>
+                        <p>{cluster.summary}</p>
+                        <ul>
+                          {nodes.map((node) => (
+                            <li key={node.id}>
+                              <button
+                                type="button"
+                                className={classNames(
+                                  "proof-map__list-node",
+                                  selectedNodeId === node.id && "is-selected",
+                                )}
+                                aria-pressed={selectedNodeId === node.id}
+                                onClick={() => inspectNode(node.id)}
+                              >
+                                <span>{node.title}</span>
+                                <span>
+                                  {statusLabels[node.status]} · {titleCase(node.track)}
+                                </span>
+                                <span>{node.summary}</span>
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </section>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="proof-map__empty-results">
+                  <p>No proof nodes match these filters.</p>
+                  <button type="button" onClick={resetFilters}>
+                    Reset filters
+                  </button>
+                </div>
+              )}
+            </section>
+          ) : null}
         </div>
 
-        {!compact && (
+        {!compact && selectedNode ? (
           <aside
             ref={inspectorRef}
             className="proof-map__inspector"
@@ -925,185 +1339,242 @@ export function ProofMap({
             aria-live="polite"
             aria-atomic="false"
           >
-            {selectedNode ? (
-              <div
-                className="proof-map__inspector-content"
-                data-node-id={selectedNode.id}
-                data-filtered-out={!nodeMatches.get(selectedNode.id) || undefined}
-              >
-                <div className="proof-map__inspector-heading">
-                  <div>
-                    <p className="proof-map__eyebrow">
-                      {titleCase(selectedNode.status)} · {titleCase(selectedNode.track)}
-                    </p>
-                    <h2>{selectedNode.title}</h2>
-                  </div>
-                  <button
-                    type="button"
-                    aria-label="Close proof node details"
-                    onClick={() => inspectNode(selectedNode.id)}
-                  >
-                    ×
-                  </button>
-                </div>
-
-                {!nodeMatches.get(selectedNode.id) && (
-                  <p className="proof-map__filter-notice">
-                    This pinned node is outside the current filters. Its details remain available.
+            <div
+              className="proof-map__inspector-content"
+              data-node-id={selectedNode.id}
+              data-filtered-out={!nodeMatches.get(selectedNode.id) || undefined}
+            >
+              <div className="proof-map__inspector-heading">
+                <div>
+                  <p className="proof-map__eyebrow">
+                    Proof node · {statusLabels[selectedNode.status]}
                   </p>
-                )}
-                <p className="proof-map__inspector-summary">{selectedNode.summary}</p>
-                <p>{selectedNode.detail}</p>
+                  <h2>{selectedNode.title}</h2>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Close proof node details"
+                  onClick={() => inspectNode(selectedNode.id)}
+                >
+                  ×
+                </button>
+              </div>
 
-                <ul className="proof-map__repo-chips" aria-label="Repositories">
-                  {selectedNode.repoIds.map((repoId) => (
-                    <li key={repoId}>
-                      {repositoryById.get(repoId)?.name ?? repoId}
-                    </li>
+              {!nodeMatches.get(selectedNode.id) ? (
+                <p className="proof-map__filter-notice">
+                  This pinned node is outside the current filters. Its details remain available.
+                </p>
+              ) : null}
+
+              <dl className="proof-map__inspector-facts">
+                <div>
+                  <dt>Proof status</dt>
+                  <dd>{statusLabels[selectedNode.status]}</dd>
+                </div>
+                <div>
+                  <dt>Work stream</dt>
+                  <dd>{titleCase(selectedNode.track)}</dd>
+                </div>
+                <div>
+                  <dt>Repositories</dt>
+                  <dd>
+                    {selectedNode.repoIds
+                      .map(
+                        (repoId) =>
+                          repositoryById.get(repoId)?.shortName ?? repoId,
+                      )
+                      .join(", ")}
+                  </dd>
+                </div>
+              </dl>
+
+              <section className="proof-map__inspector-section proof-map__claim">
+                <h3>Exact claim</h3>
+                <p className="proof-map__inspector-summary">
+                  {selectedNode.summary}
+                </p>
+                <p>{selectedNode.detail}</p>
+                <ul>
+                  {selectedNode.established.map((claim) => (
+                    <li key={claim}>{claim}</li>
                   ))}
                 </ul>
+              </section>
 
-                {selectedNode.metrics?.length ? (
-                  <dl className="proof-map__metrics">
-                    {selectedNode.metrics.map((metric) => (
-                      <div key={metric.label}>
-                        <dt>{metric.label}</dt>
-                        <dd>{metric.value}</dd>
-                        {metric.detail && <dd>{metric.detail}</dd>}
-                      </div>
-                    ))}
-                  </dl>
-                ) : null}
+              {selectedNode.metrics?.length ? (
+                <dl className="proof-map__metrics" aria-label="Claim metrics">
+                  {selectedNode.metrics.map((metric) => (
+                    <div key={metric.label}>
+                      <dt>{metric.label}</dt>
+                      <dd>{metric.value}</dd>
+                      {metric.detail ? <dd>{metric.detail}</dd> : null}
+                    </div>
+                  ))}
+                </dl>
+              ) : null}
 
-                <div className="proof-map__claim-columns">
-                  <section>
-                    <h3>Established here</h3>
-                    <ul>
-                      {selectedNode.established.map((claim) => (
-                        <li key={claim}>{claim}</li>
-                      ))}
-                    </ul>
-                  </section>
-                  <section>
-                    <h3>Still carried</h3>
-                    <ul>
-                      {selectedNode.carried.map((claim) => (
-                        <li key={claim}>{claim}</li>
-                      ))}
-                    </ul>
-                  </section>
-                </div>
-
-                <section className="proof-map__evidence">
-                  <h3>Evidence</h3>
-                  <ul>
-                    {selectedEvidence.map((item) => {
-                      const href = item.url ?? item.publicFallbackUrl;
-                      return (
-                        <li key={item.id}>
-                          <p>
-                            {href ? (
-                              <a href={href} target="_blank" rel="noreferrer">
-                                {item.label}
-                              </a>
-                            ) : (
-                              <strong>{item.label}</strong>
-                            )}
-                            <span className={`proof-map__publication proof-map__publication--${item.publication}`}>
-                              {titleCase(item.publication)}
-                            </span>
-                          </p>
-                          <p>{item.description}</p>
-                          {item.anchor && (
-                            <code>
-                              {item.anchor.path}
-                              {item.anchor.symbol ? ` :: ${item.anchor.symbol}` : ""}
-                              {item.anchor.line ? `:${item.anchor.line}` : ""}
-                            </code>
+              <section className="proof-map__inspector-section proof-map__evidence">
+                <h3>Supporting evidence</h3>
+                <ul>
+                  {selectedEvidence.map((item) => {
+                    const href = item.url ?? item.publicFallbackUrl;
+                    return (
+                      <li key={item.id}>
+                        <p>
+                          {href ? (
+                            <a href={href} target="_blank" rel="noreferrer">
+                              {item.label}
+                            </a>
+                          ) : (
+                            <strong>{item.label}</strong>
                           )}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </section>
-              </div>
-            ) : (
-              <div className="proof-map__inspector-empty">
-                <p className="proof-map__eyebrow">Node inspector</p>
-                <h2>Choose a proof node</h2>
-                <p>
-                  Select a node in the map or accessible list to pin its claims,
-                  evidence, and remaining trust boundary here.
-                </p>
-              </div>
-            )}
-          </aside>
-        )}
-      </div>
-
-      {!compact && (
-        <div className="proof-map__legend" aria-label="Map legend">
-          <span><i className="proof-map__legend-line proof-map__legend-line--formal" />Formal implication</span>
-          <span><i className="proof-map__legend-line proof-map__legend-line--provenance" />Provenance or parity</span>
-          <span><i className="proof-map__legend-node" />Node colour indicates proof status</span>
-          <span><i className="proof-map__legend-node proof-map__legend-node--selected" />Selected node</span>
-          <span><i className="proof-map__legend-node proof-map__legend-node--related" />Related node</span>
-        </div>
-      )}
-
-      {!compact && (
-        <details
-          className="proof-map__list-alternative"
-          open={listOpen}
-          onToggle={(event) => setListOpen(event.currentTarget.open)}
-        >
-          <summary>
-            Browse the filtered atlas as a list ({resultNodes.length})
-          </summary>
-          {resultNodes.length ? (
-            <div className="proof-map__list-clusters">
-              {data.clusters.map((cluster) => {
-                const nodes = resultNodes.filter(
-                  (node) => node.clusterId === cluster.id,
-                );
-                if (!nodes.length) return null;
-                return (
-                  <section key={cluster.id}>
-                    <h2>{cluster.title}</h2>
-                    <p>{cluster.summary}</p>
-                    <ul>
-                      {nodes.map((node) => (
-                        <li key={node.id}>
-                          <button
-                            type="button"
-                            className={classNames(
-                              "proof-map__list-node",
-                              selectedNodeId === node.id && "is-selected",
-                            )}
-                            aria-pressed={selectedNodeId === node.id}
-                            onClick={() => inspectNode(node.id)}
+                          <span
+                            className={`proof-map__publication proof-map__publication--${item.publication}`}
                           >
-                            <span>{node.title}</span>
-                            <span>
-                              {titleCase(node.status)} · {titleCase(node.track)}
-                            </span>
-                            <span>{node.summary}</span>
-                          </button>
+                            {titleCase(item.publication)}
+                          </span>
+                        </p>
+                        <p>{item.description}</p>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
+
+              <section className="proof-map__inspector-section proof-map__relationships">
+                <h3>Relationships</h3>
+                {selectedIncomingEdges.length || selectedOutgoingEdges.length ? (
+                  <div className="proof-map__relationship-groups">
+                    {selectedIncomingEdges.length ? (
+                      <div>
+                        <h4>Incoming</h4>
+                        <ul>
+                          {selectedIncomingEdges.map((edge) => {
+                            const source = nodeById.get(edge.from);
+                            if (!source) return null;
+                            return (
+                              <li key={edge.id}>
+                                <button type="button" onClick={() => inspectNode(source.id)}>
+                                  <span>{source.title}</span>
+                                  <small>
+                                    {titleCase(edge.relation)} · {edge.label}
+                                  </small>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+                    {selectedOutgoingEdges.length ? (
+                      <div>
+                        <h4>Outgoing</h4>
+                        <ul>
+                          {selectedOutgoingEdges.map((edge) => {
+                            const target = nodeById.get(edge.to);
+                            if (!target) return null;
+                            return (
+                              <li key={edge.id}>
+                                <button type="button" onClick={() => inspectNode(target.id)}>
+                                  <span>{target.title}</span>
+                                  <small>
+                                    {titleCase(edge.relation)} · {edge.label}
+                                  </small>
+                                </button>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : (
+                  <p>No direct relationships are recorded for this node.</p>
+                )}
+              </section>
+
+              <section className="proof-map__inspector-section proof-map__remaining-boundary">
+                <h3>Remaining assumptions or trust boundary</h3>
+                {selectedNode.carried.length ? (
+                  <ul>
+                    {selectedNode.carried.map((claim) => (
+                      <li key={claim}>{claim}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p>No additional carried assumption is recorded.</p>
+                )}
+              </section>
+
+              <section className="proof-map__inspector-section proof-map__provenance">
+                <h3>Source provenance</h3>
+                {selectedEvidence.some((item) => item.anchor) ? (
+                  <ul>
+                    {selectedEvidence.map((item) =>
+                      item.anchor ? (
+                        <li key={item.id}>
+                          <strong>{item.label}</strong>
+                          <dl>
+                            <div>
+                              <dt>Repository</dt>
+                              <dd>
+                                {repositoryById.get(item.repoId)?.shortName ??
+                                  item.repoId}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>File</dt>
+                              <dd>
+                                <code>
+                                  {item.anchor.path}
+                                  {item.anchor.line ? `:${item.anchor.line}` : ""}
+                                </code>
+                              </dd>
+                            </div>
+                            {item.anchor.symbol ? (
+                              <div>
+                                <dt>Symbol</dt>
+                                <dd>
+                                  <code>{item.anchor.symbol}</code>
+                                </dd>
+                              </div>
+                            ) : null}
+                          </dl>
                         </li>
-                      ))}
-                    </ul>
-                  </section>
-                );
-              })}
+                      ) : null,
+                    )}
+                  </ul>
+                ) : (
+                  <p>No exact source anchor is recorded for this node.</p>
+                )}
+              </section>
+
+              <nav className="proof-map__inspector-section proof-map__cross-links" aria-label="Open this claim elsewhere">
+                <h3>Explore further</h3>
+                <ul>
+                  {selectedNode.stageIds.map((stageId) => {
+                    const stage = data.stages.find((item) => item.id === stageId);
+                    return stage ? (
+                      <li key={stage.id}>
+                        <a href={`./#stage=${encodeURIComponent(stage.id)}`}>
+                          <span>{stage.title}</span>
+                          <small>Journey · Stage {stage.ordinal}</small>
+                        </a>
+                      </li>
+                    ) : null;
+                  })}
+                  <li>
+                    <a href="./circuit.html">
+                      <span>Open Circuit Explorer</span>
+                      <small>Implementation structure and source mappings</small>
+                    </a>
+                  </li>
+                </ul>
+              </nav>
             </div>
-          ) : (
-            <div className="proof-map__empty-results">
-              <p>No proof nodes match these filters.</p>
-              <button type="button" onClick={resetFilters}>Reset filters</button>
-            </div>
-          )}
-        </details>
-      )}
+          </aside>
+        ) : null}
+      </div>
     </section>
   );
 }

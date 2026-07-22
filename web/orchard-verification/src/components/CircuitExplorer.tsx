@@ -29,13 +29,14 @@ import type {
   CircuitRegionOccurrence,
   CircuitRegionOperation,
   CircuitSource,
+  CircuitSourceCandidate,
   CircuitSourceConfidence,
   CircuitSourceResolutionCandidate,
   InspectableCircuitItem,
 } from "../circuit/model";
 
 const EXACT_PAGE_SIZE = 60;
-const RELATIONSHIP_PREVIEW_SIZE = 12;
+const RELATIONSHIP_PREVIEW_SIZE = 8;
 
 type DataLoader = () => Promise<CircuitExplorerData>;
 type EntryOrigin = "flow" | "component" | "detail";
@@ -87,6 +88,41 @@ function titleCase(value: string): string {
 function sourceLocation(path: string, line?: number): string {
   const filename = path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
   return `${filename}${line ? `:${line}` : ""}`;
+}
+
+function fullSourceLocation(path: string, line?: number): string {
+  return `${path}${line ? `:${line}` : ""}`;
+}
+
+function middleEllipsis(value: string, maximumLength = 38): string {
+  if (value.length <= maximumLength) return value;
+  const visibleLength = maximumLength - 1;
+  const leadingLength = Math.ceil(visibleLength / 2);
+  const trailingLength = Math.floor(visibleLength / 2);
+  return `${value.slice(0, leadingLength)}…${value.slice(-trailingLength)}`;
+}
+
+function symbolParts(value: string): { module?: string; symbol: string } {
+  const separator = value.includes("::") ? "::" : ".";
+  const parts = value.split(separator).filter(Boolean);
+  if (parts.length < 2) return { symbol: value };
+  return {
+    module: parts.slice(0, -1).join(separator),
+    symbol: parts.at(-1) ?? value,
+  };
+}
+
+function atlasActionLabel(id: string): string {
+  const labels: Readonly<Record<string, string>> = {
+    "capture-synthesis-model": "Open synthesis model",
+    "gadgets-poseidon-range": "Open range-check proofs",
+    "gadgets-ecc": "Open ECC proofs",
+    "gadgets-sinsemilla-merkle": "Open Merkle proofs",
+    "action-valid-inputs": "Open input proofs",
+    "action-seven-outputs": "Open output proofs",
+    "action-theorem": "Open Action theorem",
+  };
+  return labels[id] ?? "Open in Atlas";
 }
 
 function metricDescription(label: string): string | undefined {
@@ -580,15 +616,75 @@ function metricsWithFallback(entry: ExplorerEntry): CircuitMetric[] {
   return [];
 }
 
-function MetricGrid({ metrics }: { metrics: readonly CircuitMetric[] }) {
+function CanonicalValue({
+  value,
+  maximumLength = 38,
+}: {
+  value: string;
+  maximumLength?: number;
+}) {
+  return (
+    <code className="circuit-canonical-value" title={value} aria-label={value}>
+      {middleEllipsis(value, maximumLength)}
+    </code>
+  );
+}
+
+function CopyCanonicalButton({
+  value,
+  label,
+}: {
+  value: string;
+  label: string;
+}) {
+  const [status, setStatus] = useState<"idle" | "copied" | "failed">("idle");
+
+  useEffect(() => setStatus("idle"), [value]);
+
+  const copy = async () => {
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+      await navigator.clipboard.writeText(value);
+      setStatus("copied");
+    } catch {
+      setStatus("failed");
+    }
+  };
+
+  const buttonLabel = status === "copied"
+    ? `Copied full ${label}`
+    : status === "failed"
+      ? `Could not copy full ${label}`
+      : `Copy full ${label}`;
+
+  return (
+    <button
+      type="button"
+      className="circuit-copy-canonical"
+      title={buttonLabel}
+      aria-label={buttonLabel}
+      onClick={copy}
+    >
+      {status === "copied" ? "Copied" : status === "failed" ? "Copy failed" : "Copy"}
+    </button>
+  );
+}
+
+function MetricGrid({
+  metrics,
+  compact = false,
+}: {
+  metrics: readonly CircuitMetric[];
+  compact?: boolean;
+}) {
   if (!metrics.length) return null;
   return (
-    <dl className="circuit-metrics">
+    <dl className={classNames("circuit-metrics", compact && "circuit-metrics--strip")}>
       {metrics.map((metric) => (
         <div key={metric.id}>
           <dt>{metric.label}</dt>
           <dd>{formatMetricValue(metric.value)}</dd>
-          {metric.detail || metricDescription(metric.label) ? (
+          {!compact && (metric.detail || metricDescription(metric.label)) ? (
             <dd>{metric.detail ?? metricDescription(metric.label)}</dd>
           ) : null}
         </div>
@@ -615,33 +711,84 @@ function RelationshipLinks({
   const [expanded, setExpanded] = useState(false);
   useEffect(() => setExpanded(false), [ids]);
   if (!ids.length) return null;
-  const visibleIds = expanded ? ids : ids.slice(0, RELATIONSHIP_PREVIEW_SIZE);
+
+  const relationshipItems = ids.reduce<Array<{
+    key: string;
+    canonicalId: string;
+    count: number;
+    target?: ExplorerEntry;
+    title: string;
+  }>>((items, id) => {
+    const target = entries.find((candidate) =>
+      candidate.id === id && candidate.origin === origin && (!kind || candidate.kind === kind)
+    );
+    if (kind !== "region-occurrence" || !target) {
+      items.push({
+        key: id,
+        canonicalId: id,
+        count: 1,
+        target,
+        title: target?.title ?? id,
+      });
+      return items;
+    }
+
+    const occurrence = target.item as CircuitRegionOccurrence;
+    const groupId = occurrence.groupId || target.title;
+    const existing = items.find(({ key }) => key === groupId);
+    if (existing) {
+      existing.count += 1;
+      return items;
+    }
+    const groupedTarget = entries.find((candidate) =>
+      candidate.origin === "detail" && candidate.kind === "region" && candidate.id === occurrence.groupId
+    );
+    items.push({
+      key: groupId,
+      canonicalId: occurrence.groupId || id,
+      count: 1,
+      target: groupedTarget ?? target,
+      title: groupedTarget?.title ?? target.title,
+    });
+    return items;
+  }, []);
+  const visibleItems = expanded
+    ? relationshipItems
+    : relationshipItems.slice(0, RELATIONSHIP_PREVIEW_SIZE);
+  const modifier = kind === "region-occurrence" ? "regions" : label;
   return (
-    <section className="circuit-relationship-links">
+    <section className={`circuit-relationship-links circuit-relationship-links--${modifier.replace(/\s+/g, "-")}`}>
       <h3>{ids.length} linked {label}</h3>
       <ul>
-        {visibleIds.map((id) => {
-          const target = entries.find((candidate) =>
-            candidate.id === id && candidate.origin === origin && (!kind || candidate.kind === kind)
-          );
-          return (
-            <li key={id}>
-              {target ? (
-                <button type="button" onClick={() => onSelect(target)}>
-                  {target.title}<code>{id}</code>
-                </button>
-              ) : <code>{id}</code>}
-            </li>
-          );
-        })}
+        {visibleItems.map(({ canonicalId, count, key, target, title }) => (
+          <li key={key}>
+            {target ? (
+              <button
+                type="button"
+                title={`Open ${title} · ${canonicalId}`}
+                aria-label={`Open ${title}; canonical identifier ${canonicalId}`}
+                onClick={() => onSelect(target)}
+              >
+                <span className="circuit-relationship-links__identity">
+                  <strong>{title}</strong>
+                  <CanonicalValue value={canonicalId} maximumLength={46} />
+                </span>
+                <span className="circuit-relationship-links__affordance">
+                  {count > 1 ? `${count} exact regions` : null}
+                  <span aria-hidden="true">›</span>
+                </span>
+              </button>
+            ) : <CanonicalValue value={canonicalId} maximumLength={46} />}
+          </li>
+        ))}
       </ul>
-      {!expanded && ids.length > visibleIds.length ? (
+      {!expanded && relationshipItems.length > visibleItems.length ? (
         <button
           className="circuit-relationship-links__more"
           type="button"
           onClick={() => setExpanded(true)}
         >
-          Show all {ids.length} linked {label}
+          View {relationshipItems.length - visibleItems.length} more
         </button>
       ) : null}
     </section>
@@ -659,13 +806,14 @@ function EntryCard({
     <button
       type="button"
       className={`circuit-card circuit-card--${entry.kind}`}
+      title={`${entry.title} · ${entry.id}`}
       onClick={() => onSelect(entry)}
     >
       <span className="circuit-card__kind">{titleCase(entry.kind)}</span>
-      <strong>{entry.title}</strong>
-      <span>{entry.summary}</span>
+      <strong title={entry.title}>{entry.title}</strong>
+      <span title={entry.summary}>{entry.summary}</span>
       {entry.namespacePath.length ? (
-        <code>{entry.namespacePath.join(" / ")}</code>
+        <CanonicalValue value={entry.namespacePath.join(" / ")} maximumLength={54} />
       ) : null}
     </button>
   );
@@ -1008,17 +1156,29 @@ function OperationRecord({ operation }: { operation: CircuitRegionOperation }) {
 function ConstraintRecord({ constraint }: { constraint: CircuitConstraint }) {
   return (
     <article className="circuit-constraint-record" data-constraint-id={constraint.id}>
-      <p className="circuit-card__kind">Polynomial constraint</p>
-      <h3>{constraint.title}</h3>
-      <pre><code>{constraint.expression}</code></pre>
-      <dl>
+      <header className="circuit-constraint-record__header">
+        <p className="circuit-card__kind">Constraint</p>
+        <h3>{constraint.title}</h3>
+      </header>
+      <pre tabIndex={0} aria-label={`Formula for ${constraint.title}`}>
+        <code>{constraint.expression}</code>
+      </pre>
+      <dl className="circuit-constraint-meta" aria-label="Constraint references">
         <div>
           <dt>Columns</dt>
-          <dd>{constraint.columns.length ? constraint.columns.join(", ") : "Derived from the expression"}</dd>
+          <dd>
+            <code title={constraint.columns.join(", ") || "Derived from the expression"}>
+              {constraint.columns.length ? constraint.columns.join(", ") : "Derived from expression"}
+            </code>
+          </dd>
         </div>
         <div>
           <dt>Rotations</dt>
-          <dd>{constraint.rotations.length ? constraint.rotations.join(", ") : "0 / not annotated"}</dd>
+          <dd>
+            <code title={constraint.rotations.join(", ") || "0 / not annotated"}>
+              {constraint.rotations.length ? constraint.rotations.join(", ") : "0 / not annotated"}
+            </code>
+          </dd>
         </div>
       </dl>
     </article>
@@ -1249,16 +1409,22 @@ function DetailCanvas({
     );
     return (
       <div>
-        <div className="circuit-layer-heading">
-          <div>
-            <p className="circuit-card__kind">Gate</p>
-            <h2>{gate.title}</h2>
-            <p>{gate.summary}</p>
-            {gate.selector ? <p>Enabled by <code>{gate.selector}</code></p> : null}
-          </div>
-          <p>{constraints.length} constraint{constraints.length === 1 ? "" : "s"}</p>
-        </div>
-        <MetricGrid metrics={metricsWithFallback(entry)} />
+        <header className="circuit-entity-heading">
+          <h2>{gate.title}</h2>
+          <ul className="circuit-entity-meta" aria-label="Selected gate summary">
+            <li>Gate</li>
+            {gate.selector ? (
+              <li>
+                Selector <CanonicalValue value={gate.selector} maximumLength={24} />
+              </li>
+            ) : null}
+            <li>{constraints.length} constraint{constraints.length === 1 ? "" : "s"}</li>
+            {entry.sourceConfidence ? (
+              <li>{titleCase(entry.sourceConfidence)} source mapping</li>
+            ) : null}
+          </ul>
+          {gate.summary ? <p>{gate.summary}</p> : null}
+        </header>
         <div className="circuit-constraint-list">
           {constraints.map((constraint) => (
             <ConstraintRecord key={constraint.id} constraint={constraint} />
@@ -1316,16 +1482,151 @@ function sourceForIds(data: CircuitExplorerData, ids: readonly string[]): Circui
   });
 }
 
+function SourceFileLink({
+  path,
+  line,
+  url,
+}: Pick<CircuitSource, "path" | "line" | "url">) {
+  const visibleLocation = sourceLocation(path, line);
+  const completeLocation = fullSourceLocation(path, line);
+  if (!url) {
+    return <CanonicalValue value={completeLocation} maximumLength={34} />;
+  }
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      title={`Open ${completeLocation}`}
+      aria-label={visibleLocation}
+    >
+      <code>{visibleLocation}</code>
+      <span aria-hidden="true"> ↗</span>
+    </a>
+  );
+}
+
+function SourceCandidateRecord({ candidate }: { candidate: CircuitSourceCandidate }) {
+  const canonicalSymbol = candidate.symbol ?? candidate.label;
+  const { module, symbol } = symbolParts(canonicalSymbol);
+  const completeLocation = fullSourceLocation(candidate.path, candidate.line);
+  return (
+    <li className="circuit-source-candidate-record">
+      <div className="circuit-source-candidate-record__heading">
+        <strong>Source candidate</strong>
+        {candidate.confidence ? <small>{candidate.confidence}</small> : null}
+      </div>
+      <dl className="circuit-source-fields">
+        <div>
+          <dt>Symbol</dt>
+          <dd>
+            <CanonicalValue value={symbol} maximumLength={26} />
+            <CopyCanonicalButton value={canonicalSymbol} label="candidate symbol" />
+          </dd>
+        </div>
+        {module ? (
+          <div>
+            <dt>Module</dt>
+            <dd><CanonicalValue value={module} maximumLength={30} /></dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>File</dt>
+          <dd>
+            <CanonicalValue value={completeLocation} maximumLength={30} />
+            <CopyCanonicalButton value={completeLocation} label="candidate file path" />
+          </dd>
+        </div>
+      </dl>
+    </li>
+  );
+}
+
+function SourceProvenanceRecord({ source }: { source: CircuitSource }) {
+  const canonicalSymbol = source.symbol ?? source.label;
+  const { module, symbol } = symbolParts(canonicalSymbol);
+  const completeLocation = fullSourceLocation(source.path, source.line);
+  return (
+    <li className="circuit-source-record">
+      <div className="circuit-source-record__heading">
+        <strong>{source.repository ? `${titleCase(source.repository)} source` : "Source"}</strong>
+        <span className={`circuit-confidence circuit-confidence--${source.confidence}`}>
+          {titleCase(source.confidence)}
+        </span>
+      </div>
+      <dl className="circuit-source-fields">
+        <div>
+          <dt>Symbol</dt>
+          <dd>
+            <CanonicalValue value={symbol} maximumLength={28} />
+            <CopyCanonicalButton value={canonicalSymbol} label="canonical symbol" />
+          </dd>
+        </div>
+        {module ? (
+          <div>
+            <dt>Module</dt>
+            <dd><CanonicalValue value={module} maximumLength={34} /></dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>File</dt>
+          <dd>
+            <SourceFileLink path={source.path} line={source.line} url={source.url} />
+            <CopyCanonicalButton value={completeLocation} label="source file path" />
+          </dd>
+        </div>
+        {source.revision ? (
+          <div>
+            <dt>Revision</dt>
+            <dd>
+              <CanonicalValue value={source.revision} maximumLength={14} />
+              <CopyCanonicalButton value={source.revision} label="source revision" />
+            </dd>
+          </div>
+        ) : null}
+        <div>
+          <dt>Mapping</dt>
+          <dd>{titleCase(source.confidence)}</dd>
+        </div>
+      </dl>
+      {source.candidates.length ? (
+        <div className="circuit-source-candidates">
+          <h4>{source.candidates.length} source candidate{source.candidates.length === 1 ? "" : "s"}</h4>
+          <ul>
+            {source.candidates.map((candidate, index) => (
+              <SourceCandidateRecord
+                key={`${candidate.path}:${candidate.symbol}:${index}`}
+                candidate={candidate}
+              />
+            ))}
+          </ul>
+        </div>
+      ) : null}
+    </li>
+  );
+}
+
 function CircuitInspector({
   data,
   entry,
+  mobileHidden = false,
+  onMobileClose,
 }: {
   data: CircuitExplorerData;
   entry: ExplorerEntry | null;
+  mobileHidden?: boolean;
+  onMobileClose?: () => void;
 }) {
   if (!entry) {
     return (
-      <aside className="circuit-inspector" aria-label="Circuit item details" aria-live="polite">
+      <aside
+        className="circuit-inspector"
+        id="circuit-inspector"
+        aria-label="Circuit item details"
+        aria-live="polite"
+        hidden={mobileHidden}
+        tabIndex={-1}
+      >
         <div className="circuit-inspector__empty">
           <p className="eyebrow">Circuit inspector</p>
           <h2>Choose a circuit item</h2>
@@ -1340,63 +1641,68 @@ function CircuitInspector({
   const diagnostics = data.diagnostics.filter(({ itemId, itemIds }) =>
     itemId === entry.id || itemIds.includes(entry.id)
   );
-  const metrics = metricsWithFallback(entry);
 
   return (
-    <aside className="circuit-inspector" aria-label="Circuit item details" aria-live="polite">
+    <aside
+      className="circuit-inspector"
+      id="circuit-inspector"
+      aria-label="Circuit item details"
+      aria-live="polite"
+      hidden={mobileHidden}
+      tabIndex={-1}
+    >
       <div className="circuit-inspector__content" data-item-id={entry.id}>
-        <p className="circuit-inspector__eyebrow">{titleCase(entry.kind)}</p>
-        <h2>{entry.title}</h2>
-        <p className="circuit-inspector__summary">{entry.summary}</p>
-        {entry.namespacePath.length ? (
-          <p className="circuit-namespace-path"><span>Namespace</span>{entry.namespacePath.join(" / ")}</p>
-        ) : null}
-        <MetricGrid metrics={metrics} />
-
-        {entry.sourceConfidence ? (
-          <p className="circuit-source-confidence">
-            Source mapping confidence:{" "}
-            <span className={`circuit-confidence circuit-confidence--${entry.sourceConfidence}`}>
-              {titleCase(entry.sourceConfidence)}
-            </span>
-          </p>
-        ) : null}
+        <header className="circuit-inspector__heading">
+          <div>
+            <p className="circuit-inspector__eyebrow">{titleCase(entry.kind)} evidence</p>
+            <h2>Evidence and provenance</h2>
+          </div>
+          {onMobileClose ? (
+            <button
+              className="circuit-inspector__mobile-close"
+              type="button"
+              onClick={onMobileClose}
+              aria-label="Close evidence and provenance"
+            >
+              <span aria-hidden="true">×</span>
+              Close
+            </button>
+          ) : null}
+        </header>
+        <dl className="circuit-inspector__facts">
+          <div>
+            <dt>Selected item</dt>
+            <dd>
+              <CanonicalValue value={entry.id} maximumLength={34} />
+              <CopyCanonicalButton value={entry.id} label="item identifier" />
+            </dd>
+          </div>
+          {entry.namespacePath.length ? (
+            <div>
+              <dt>Namespace</dt>
+              <dd>
+                <CanonicalValue value={entry.namespacePath.join(" / ")} maximumLength={34} />
+              </dd>
+            </div>
+          ) : null}
+          {entry.sourceConfidence ? (
+            <div>
+              <dt>Source mapping</dt>
+              <dd>
+                <span className={`circuit-confidence circuit-confidence--${entry.sourceConfidence}`}>
+                  {titleCase(entry.sourceConfidence)}
+                </span>
+              </dd>
+            </div>
+          ) : null}
+        </dl>
 
         <section className="circuit-source-panel">
           <h3>Source provenance</h3>
           {sources.length ? (
             <ul>
               {sources.map((source) => (
-                <li key={source.id}>
-                  <div>
-                    <strong>{source.label}</strong>
-                    <span className={`circuit-confidence circuit-confidence--${source.confidence}`}>
-                      {titleCase(source.confidence)}
-                    </span>
-                  </div>
-                  {source.url ? (
-                    <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.path}>
-                      <code>{sourceLocation(source.path, source.line)}</code>
-                      <span aria-hidden="true"> ↗</span>
-                    </a>
-                  ) : (
-                    <code title={source.path}>{sourceLocation(source.path, source.line)}</code>
-                  )}
-                  {source.candidates.length ? (
-                    <div className="circuit-source-candidates">
-                      <h4>{source.candidates.length} source candidate{source.candidates.length === 1 ? "" : "s"}</h4>
-                      <ul>
-                        {source.candidates.map((candidate, index) => (
-                          <li key={`${candidate.path}:${candidate.symbol}:${index}`}>
-                            <strong>{candidate.label}</strong>
-                            <code title={candidate.path}>{sourceLocation(candidate.path, candidate.line)}</code>
-                            {candidate.confidence ? <small>{candidate.confidence}</small> : null}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  ) : null}
-                </li>
+                <SourceProvenanceRecord key={source.id} source={source} />
               ))}
             </ul>
           ) : (
@@ -1414,16 +1720,30 @@ function CircuitInspector({
                     ? sourceLocation(source.path, source.line)
                     : candidate.sourceId;
                   return (
-                    <li key={`${entry.id}:${candidate.sourceId}:${candidate.confidence}:${index}`}>
-                      <strong>{source?.label ?? candidate.sourceId}</strong>
-                      <span className={`circuit-confidence circuit-confidence--${candidate.confidence}`}>
-                        {titleCase(candidate.confidence)}
-                      </span>
-                      {source?.url ? (
-                        <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.path}>
-                          <code>{sourceLabel}</code><span aria-hidden="true"> ↗</span>
-                        </a>
-                      ) : <code>{sourceLabel}</code>}
+                    <li
+                      className="circuit-source-mapping-candidate"
+                      key={`${entry.id}:${candidate.sourceId}:${candidate.confidence}:${index}`}
+                    >
+                      <div>
+                        <strong
+                          title={source?.label ?? candidate.sourceId}
+                          aria-label={source?.label ?? candidate.sourceId}
+                        >
+                          {source?.repository ? `${titleCase(source.repository)} source` : source?.label ?? candidate.sourceId}
+                        </strong>
+                        <span className={`circuit-confidence circuit-confidence--${candidate.confidence}`}>
+                          {titleCase(candidate.confidence)}
+                        </span>
+                      </div>
+                      {source ? (
+                        <span className="circuit-source-mapping-candidate__location">
+                          <SourceFileLink path={source.path} line={source.line} url={source.url} />
+                          <CopyCanonicalButton
+                            value={fullSourceLocation(source.path, source.line)}
+                            label="candidate source file path"
+                          />
+                        </span>
+                      ) : <CanonicalValue value={sourceLabel} maximumLength={34} />}
                       {candidate.reason ? <small>{candidate.reason}</small> : null}
                     </li>
                   );
@@ -1439,8 +1759,13 @@ function CircuitInspector({
             <ul>
               {entry.proofNodeIds.map((nodeId) => (
                 <li key={nodeId}>
-                  <a href={`./proof-map.html#node=${encodeURIComponent(nodeId)}`}>
-                    Open {proofNodeTitle(nodeId)} in the Atlas <span aria-hidden="true">→</span>
+                  <a
+                    href={`./proof-map.html#node=${encodeURIComponent(nodeId)}`}
+                    aria-label={`${atlasActionLabel(nodeId)}; Atlas: ${proofNodeTitle(nodeId)}`}
+                  >
+                    <strong>{atlasActionLabel(nodeId)}</strong>
+                    <span>Atlas · {proofNodeTitle(nodeId)}</span>
+                    <span aria-hidden="true">→</span>
                   </a>
                 </li>
               ))}
@@ -1505,7 +1830,7 @@ function CircuitOutline({
         eyebrow="Component index"
         id="circuit-outline-title"
         title="Explore the circuit by component"
-        description="Each card is a functional part of the Orchard Action circuit. Within each card, the list contains aggregated synthesis-region names; the occurrence count tells you how many exact regions the Rocq evaluator emitted."
+        description="Browse functional components and their grouped synthesis regions. Each occurrence count reports how many exact regions the Rocq evaluator emitted."
       />
       <div>
         {data.synthesis.components.map((component) => {
@@ -1693,13 +2018,13 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   const [notice, setNotice] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(EXACT_PAGE_SIZE);
-  const [aboutOpen, setAboutOpen] = useState(() =>
-    typeof window === "undefined" ||
-    typeof window.matchMedia !== "function" ||
-    !window.matchMedia("(max-width: 760px)").matches
+  const [narrowInspector, setNarrowInspector] = useState(
+    () => window.matchMedia("(max-width: 1160px)").matches,
   );
+  const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
+  const inspectorToggleRef = useRef<HTMLButtonElement>(null);
   const focusedRouteRef = useRef(`${route.level}:${route.itemId ?? ""}:${route.focusId ?? ""}`);
 
   useEffect(() => {
@@ -1717,12 +2042,29 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   }, [attempt, loader]);
 
   useEffect(() => {
-    if (typeof window.matchMedia !== "function") return undefined;
-    const query = window.matchMedia("(max-width: 760px)");
-    const onChange = (event: MediaQueryListEvent) => setAboutOpen(!event.matches);
+    const query = window.matchMedia("(max-width: 1160px)");
+    const onChange = (event: MediaQueryListEvent) => {
+      setNarrowInspector(event.matches);
+      if (!event.matches) setMobileInspectorOpen(false);
+    };
     query.addEventListener("change", onChange);
     return () => query.removeEventListener("change", onChange);
   }, []);
+
+  useEffect(() => {
+    setMobileInspectorOpen(false);
+  }, [route.level, route.itemId]);
+
+  useEffect(() => {
+    if (!mobileInspectorOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      setMobileInspectorOpen(false);
+      window.requestAnimationFrame(() => inspectorToggleRef.current?.focus());
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [mobileInspectorOpen]);
 
   const entries = useMemo(() => data ? buildEntries(data) : [], [data]);
 
@@ -1770,6 +2112,18 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
     setNotice("");
     setVisibleLimit(EXACT_PAGE_SIZE);
   }, []);
+
+  const openMobileInspector = () => {
+    setMobileInspectorOpen(true);
+    window.requestAnimationFrame(() => {
+      document.querySelector<HTMLElement>("#circuit-inspector")?.focus();
+    });
+  };
+
+  const closeMobileInspector = () => {
+    setMobileInspectorOpen(false);
+    window.requestAnimationFrame(() => inspectorToggleRef.current?.focus());
+  };
 
   if (loadError) {
     return (
@@ -1858,29 +2212,54 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   return (
     <main id="main-content" className="circuit-page" tabIndex={-1}>
       <section className="circuit-intro" aria-labelledby="circuit-title">
-        <div>
+        <div className="circuit-intro__copy">
           <p className="eyebrow">Rocq model · configure · synthesis · source</p>
           <h1 id="circuit-title">Orchard Circuit Explorer</h1>
           <p>
-            Follow the high-level Action circuit, then drill into its semantic
-            regions, exact layouter operations, gates, lookups, and pinned source provenance.
+            Inspect the Orchard Action circuit from components and synthesis regions
+            down to gates, lookups, constraints, and source locations.
+          </p>
+          <p className="circuit-interpretation-note" role="note">
+            <strong>Interpretation layer:</strong>{" "}
+            {data.metadata.representations.flow ??
+              "Curated from source metadata; not itself a proof claim."}
           </p>
         </div>
-        <details
-          className="circuit-about"
-          open={aboutOpen}
-          onToggle={(event) => setAboutOpen(event.currentTarget.open)}
-        >
-          <summary>About this circuit</summary>
-          <p className="circuit-trust-note">
-            {data.metadata.representations.flow ??
-              "The functional flow is curated navigation; it is not inferred proof evidence."}
-          </p>
-          <MetricGrid metrics={data.metadata.metrics.slice(0, 6)} />
-        </details>
+        <MetricGrid compact metrics={data.metadata.metrics.slice(0, 6)} />
       </section>
 
-      <section className="circuit-toolbar" aria-label="Circuit explorer controls">
+      <nav className="circuit-breadcrumbs" aria-label="Circuit explorer depth">
+        <button
+          type="button"
+          aria-current={route.level === "flow" ? "page" : undefined}
+          onClick={() => navigate({ ...route, level: "flow", itemId: null, focusId: null })}
+        >
+          Circuit flow
+        </button>
+        <span aria-hidden="true">/</span>
+        {selectedComponent ? (
+          <button
+            type="button"
+            title={selectedComponent.title}
+            aria-label={selectedComponent.title}
+            aria-current={route.level === "component" ? "page" : undefined}
+            onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id, focusId: null })}
+          >
+            {selectedComponent.shortTitle}
+          </button>
+        ) : <span>Component</span>}
+        <span aria-hidden="true">/</span>
+        <span
+          className="circuit-breadcrumbs__current"
+          title={route.level === "detail" && selectedEntry ? selectedEntry.title : undefined}
+          aria-label={route.level === "detail" && selectedEntry ? selectedEntry.title : undefined}
+          aria-current={route.level === "detail" ? "page" : undefined}
+        >
+          {route.level === "detail" && selectedEntry ? selectedEntry.title : "Region or gate"}
+        </span>
+      </nav>
+
+      <section className="circuit-toolbar" aria-label="Circuit search">
         <div className="circuit-search">
           <label htmlFor="circuit-search">Search circuit structure</label>
           <input
@@ -1919,8 +2298,8 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
                         onClick={() => selectEntry(entry)}
                       >
                         <span>{titleCase(entry.kind)}</span>
-                        <strong>{entry.title}</strong>
-                        <small>{entry.summary}</small>
+                        <strong title={entry.title}>{entry.title}</strong>
+                        <small title={entry.summary}>{entry.summary}</small>
                       </button>
                     </li>
                   ))}
@@ -1929,29 +2308,6 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
             </div>
           ) : null}
         </div>
-        <nav className="circuit-breadcrumbs" aria-label="Circuit explorer depth">
-          <button
-            type="button"
-            aria-current={route.level === "flow" ? "page" : undefined}
-            onClick={() => navigate({ ...route, level: "flow", itemId: null, focusId: null })}
-          >
-            Circuit flow
-          </button>
-          <span aria-hidden="true">/</span>
-          {selectedComponent ? (
-            <button
-              type="button"
-              aria-current={route.level === "component" ? "page" : undefined}
-              onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id, focusId: null })}
-            >
-              {selectedComponent.shortTitle}
-            </button>
-          ) : <span>Component</span>}
-          <span aria-hidden="true">/</span>
-          <span aria-current={route.level === "detail" ? "page" : undefined}>
-            {route.level === "detail" && selectedEntry ? selectedEntry.title : "Region or gate"}
-          </span>
-        </nav>
       </section>
 
       {notice ? <p className="circuit-route-notice" role="status">{notice}</p> : null}
@@ -1962,6 +2318,29 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
             ? `Showing ${selectedComponent?.title ?? "a circuit component"}.`
             : `Showing ${selectedEntry?.title ?? "circuit detail"}.`}
       </p>
+
+      {route.level !== "flow" && selectedEntry ? (
+        <button
+          ref={inspectorToggleRef}
+          className="circuit-inspector-toggle"
+          type="button"
+          aria-controls="circuit-inspector"
+          aria-expanded={mobileInspectorOpen}
+          onClick={openMobileInspector}
+        >
+          Evidence and provenance
+          <span aria-hidden="true">→</span>
+        </button>
+      ) : null}
+
+      {narrowInspector && mobileInspectorOpen ? (
+        <button
+          className="circuit-inspector-backdrop"
+          type="button"
+          aria-label="Close evidence and provenance"
+          onClick={closeMobileInspector}
+        />
+      ) : null}
 
       <section className={classNames("circuit-workspace", route.level === "flow" && "circuit-workspace--flow")}>
         <div
@@ -2061,7 +2440,14 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
             />
           )}
         </div>
-        {route.level !== "flow" ? <CircuitInspector data={data} entry={selectedEntry} /> : null}
+        {route.level !== "flow" ? (
+          <CircuitInspector
+            data={data}
+            entry={selectedEntry}
+            mobileHidden={narrowInspector && !mobileInspectorOpen}
+            onMobileClose={narrowInspector ? closeMobileInspector : undefined}
+          />
+        ) : null}
       </section>
 
       {route.level === "flow" ? (

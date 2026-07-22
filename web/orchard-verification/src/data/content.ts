@@ -2093,7 +2093,7 @@ export const STATUS_FILTERS: readonly FilterOption<ProofStatus>[] = [
   { id: "checked", label: "Checked", description: "Computed certificate, parity check, or audit" },
   { id: "implemented", label: "Implemented", description: "Translation, exporter, or refactoring work" },
   { id: "assumption", label: "Assumption", description: "Explicit theorem premise" },
-  { id: "boundary", label: "Boundary", description: "Intentionally outside the proved claim" },
+  { id: "boundary", label: "Trust boundary", description: "Intentionally outside the proved claim" },
   { id: "wip", label: "Work in progress", description: "Experimental or side-branch evidence" },
 ];
 

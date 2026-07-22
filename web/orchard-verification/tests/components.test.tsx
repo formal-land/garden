@@ -81,19 +81,25 @@ describe("journey application", () => {
     );
   });
 
-  it("stops at the end and replays from stage one", () => {
+  it("starts manually, stops at the end, and replays from stage one", () => {
+    vi.useFakeTimers();
     render(<JourneyView data={data} />);
 
-    fireEvent.change(screen.getByRole("slider", { name: "Journey playhead" }), {
-      target: { value: String(data.stages.length) },
-    });
+    expect(screen.getByRole("button", { name: "Play tour" })).toBeVisible();
+    expect(screen.queryByRole("slider")).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox", { name: /playback speed/i })).not.toBeInTheDocument();
 
-    const replay = screen.getByRole("button", { name: "Replay journey" });
-    expect(replay).toHaveTextContent("Replay");
+    fireEvent.click(screen.getByRole("button", {
+      name: new RegExp(`^Stage ${data.stages.length}:`),
+    }));
+    fireEvent.click(screen.getByRole("button", { name: "Play tour" }));
+    act(() => vi.advanceTimersByTime(30_000));
+
+    const replay = screen.getByRole("button", { name: "Replay tour" });
     expect(screen.getByRole("heading", { name: data.stages.at(-1)!.title, level: 2 })).toBeVisible();
 
     fireEvent.click(replay);
-    expect(screen.getByRole("button", { name: "Pause journey" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Pause tour" })).toBeVisible();
     expect(screen.getByRole("heading", { name: data.stages[0].title, level: 2 })).toBeVisible();
   });
 
@@ -104,7 +110,7 @@ describe("journey application", () => {
 
     act(() => vi.advanceTimersByTime(30_000));
 
-    expect(screen.getByRole("button", { name: "Play journey" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Play tour" })).toBeVisible();
     expect(screen.getByText(`Stage 1 of ${data.stages.length}`)).toBeVisible();
   });
 
@@ -119,7 +125,7 @@ describe("journey application", () => {
     document.documentElement.dataset.view = "atlas";
     render(<App />);
     expect(screen.getByRole("heading", { name: "Orchard Verification Atlas", level: 1 })).toBeVisible();
-    expect(screen.queryByRole("searchbox", { name: "Search the atlas" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
   });
 });
@@ -140,37 +146,23 @@ describe("proof atlas interactions", () => {
     expect(screen.getByText(/pinned node is outside the current filters/i)).toBeVisible();
   });
 
-  it("uses a fixed fitted viewport without search, work-stream, or zoom controls", () => {
+  it("provides search, graph controls, and a resettable fitted viewport", () => {
     const { container } = render(<ProofMap data={data} />);
 
-    expect(screen.queryByRole("searchbox", { name: "Search the atlas" })).not.toBeInTheDocument();
+    expect(screen.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
     expect(screen.queryByRole("group", { name: /^Work stream/ })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Map view controls")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zoom in" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zoom out" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Fit map" })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Current map zoom")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Map view controls")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Zoom in" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Zoom out" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Fit visible nodes" })).toBeVisible();
+    expect(screen.getByLabelText("Current map zoom")).toHaveTextContent("100%");
 
     const atlas = container.querySelector<SVGSVGElement>(".proof-map__canvas")!;
     const fittedViewBox = atlas.getAttribute("viewBox");
-    Object.defineProperty(atlas, "getBoundingClientRect", {
-      configurable: true,
-      value: () => ({
-        bottom: 600,
-        height: 600,
-        left: 0,
-        right: 1000,
-        top: 0,
-        width: 1000,
-        x: 0,
-        y: 0,
-        toJSON: () => ({}),
-      }),
-    });
-    fireEvent.wheel(atlas, { clientX: 500, clientY: 300, deltaY: -600 });
-    fireEvent.pointerDown(atlas, { button: 0, clientX: 500, clientY: 300, pointerId: 1 });
-    fireEvent.pointerMove(atlas, { clientX: 650, clientY: 400, pointerId: 1 });
-    fireEvent.pointerUp(atlas, { clientX: 650, clientY: 400, pointerId: 1 });
+    fireEvent.click(screen.getByRole("button", { name: "Zoom in" }));
+    expect(atlas).not.toHaveAttribute("viewBox", fittedViewBox!);
+    expect(screen.getByLabelText("Current map zoom")).toHaveTextContent("125%");
+    fireEvent.click(screen.getByRole("button", { name: "Reset map view" }));
     expect(atlas).toHaveAttribute("viewBox", fittedViewBox!);
   });
 
@@ -188,12 +180,13 @@ describe("proof atlas interactions", () => {
     const { container } = render(<ProofMap data={data} />);
 
     expect(screen.getByRole("group", { name: /^Repositories/ })).toBeVisible();
-    expect(screen.getByRole("group", { name: /^Status/ })).toBeVisible();
+    expect(screen.getByRole("group", { name: /^Proof status/ })).toBeVisible();
+    expect(screen.getByLabelText("Trust boundary")).toBeVisible();
     expect(screen.queryByRole("group", { name: /^Work stream/ })).not.toBeInTheDocument();
     const repositoryFilter = screen.getByLabelText(data.filters.repositories[0].label);
     fireEvent.click(repositoryFilter);
-    expect(screen.getByRole("button", { name: "Reset filters" })).toBeEnabled();
-    fireEvent.click(screen.getByRole("button", { name: "Reset filters" }));
+    expect(screen.getByRole("button", { name: "Reset" })).toBeEnabled();
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
     expect(repositoryFilter).not.toBeChecked();
 
     const selected = container.querySelector<SVGGElement>(
@@ -218,10 +211,9 @@ describe("proof atlas interactions", () => {
     const inspector = screen.getByRole("complementary", { name: "Proof node details" });
     inspector.scrollTop = 480;
 
-    const details = container.querySelector<HTMLDetailsElement>(".proof-map__list-alternative")!;
-    fireEvent.click(within(details).getByText(/Browse the filtered atlas as a list/));
-    expect(details).toHaveAttribute("open");
-    const listButton = within(details).getByRole("button", {
+    fireEvent.click(screen.getByRole("tab", { name: "List" }));
+    const listPanel = screen.getByRole("tabpanel", { name: "List" });
+    const listButton = within(listPanel).getByRole("button", {
       name: new RegExp(listNode.title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
     });
     fireEvent.click(listButton);
@@ -235,7 +227,9 @@ describe("proof atlas interactions", () => {
       .map((id) => data.evidence.find((item) => item.id === id))
       .find((item) => item?.repoId === "garden" && item.url);
     expect(gardenEvidence).toBeDefined();
-    const gardenEvidenceLink = within(inspector).getByText(gardenEvidence!.label).closest("a");
+    const gardenEvidenceLink = within(inspector).getByRole("link", {
+      name: gardenEvidence!.label,
+    });
     expect(gardenEvidenceLink).toHaveAttribute("href", gardenEvidence!.url);
     expect(gardenEvidenceLink?.getAttribute("href")).toMatch(
       /^https:\/\/github\.com\/clarus\/garden-private\//,

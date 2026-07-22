@@ -235,9 +235,10 @@ describe("circuit explorer interactions", () => {
     const componentHeading = within(container.querySelector(".circuit-canvas") as HTMLElement)
       .getByRole("heading", { name: "Merkle path" });
     expect(componentHeading).toHaveFocus();
-    expect(screen.getByRole("link", { name: /Open Sinsemilla and Merkle proofs in the Atlas/ }))
+    expect(screen.getByRole("link", { name: /Open Merkle proofs; Atlas: Sinsemilla and Merkle proofs/ }))
       .toHaveAttribute("href", "./proof-map.html#node=gadgets-sinsemilla-merkle");
-    expect(screen.getByText(/Source mapping confidence:/)).toHaveTextContent("Mapped");
+    expect(screen.getByText("Source mapping").closest("div")).toHaveTextContent("Mapped");
+    expect(screen.getByRole("button", { name: "Copy full canonical symbol" })).toBeVisible();
     expect(container.querySelectorAll(".circuit-card--region")).toHaveLength(1);
     expect(container.querySelectorAll(".circuit-card--gate")).toHaveLength(1);
     expect(container.querySelectorAll(".circuit-card--lookup")).toHaveLength(1);
@@ -278,7 +279,7 @@ describe("circuit explorer interactions", () => {
     expect(within(container.querySelector(".circuit-canvas") as HTMLElement)
       .queryByRole("heading", { name: "Copy", level: 2 })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole("button", { name: "Merkle" }));
+    fireEvent.click(screen.getByRole("button", { name: "Merkle path" }));
     expect(await within(container.querySelector(".circuit-canvas") as HTMLElement)
       .findByRole("heading", { name: "Merkle path", level: 2 })).toHaveFocus();
     fireEvent.click(screen.getByRole("button", { name: "Circuit flow" }));
@@ -330,7 +331,16 @@ describe("circuit explorer interactions", () => {
     expect(constraint).toHaveTextContent("QMerkle");
     expect(constraint).toHaveTextContent("A2, F3");
     expect(constraint).toHaveTextContent("-1, 0");
+    expect(within(constraint).getByLabelText("Formula for Current root matches the parent"))
+      .toHaveAttribute("tabindex", "0");
     expect(within(constraint).queryByRole("button")).not.toBeInTheDocument();
+    expect(container.querySelectorAll(".circuit-relationship-links--regions li")).toHaveLength(1);
+    expect(screen.getByRole("button", {
+      name: /Open Merkle layer; canonical identifier region-group:merkle-layer/,
+    })).toHaveTextContent("2 exact regions");
+    const gateInspector = screen.getByRole("complementary", { name: "Circuit item details" });
+    expect(within(gateInspector).queryByRole("heading", { name: "Merkle consistency" }))
+      .not.toBeInTheDocument();
     await waitFor(() => expect(constraint).toHaveFocus());
     expect(screen.queryByRole("heading", { name: "Explore the circuit by component" })).not.toBeInTheDocument();
 

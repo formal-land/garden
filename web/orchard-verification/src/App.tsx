@@ -1,12 +1,53 @@
 import { useMemo } from "react";
 import gardenLogo from "../../../garden.svg?url";
-import footerGarden from "./assets/garden-footer.webp";
 import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
 import { ProofMap } from "./components/ProofMap";
 import { CircuitExplorer } from "./components/CircuitExplorer";
 
 type View = "journey" | "atlas" | "circuit";
+
+function formatSnapshotDate(value: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${value}T00:00:00Z`));
+}
+
+function EvidenceContext() {
+  const snapshot = orchardVerificationData.snapshot;
+  const refs = snapshot.repositoryRefs;
+
+  return (
+    <details className="evidence-context" id="evidence-context">
+      <summary>
+        <span>Snapshot</span>
+        <time dateTime={snapshot.asOf}>{formatSnapshotDate(snapshot.asOf)}</time>
+        <span className="evidence-context__short-refs" aria-hidden="true">
+          Garden {refs.garden.slice(0, 6)}… · Halo2 {refs.halo2.slice(0, 6)}… · Orchard {refs.orchard.slice(0, 6)}…
+        </span>
+      </summary>
+      <div className="evidence-context__panel">
+        <div>
+          <p className="context-label">Evidence status</p>
+          <strong>{snapshot.title}</strong>
+          <p>{snapshot.description}</p>
+          <p className="evidence-context__caveat">{snapshot.caveat}</p>
+        </div>
+        <div>
+          <p className="context-label">Repository versions</p>
+          <dl className="revision-list">
+            <div><dt>Garden</dt><dd><code title={refs.garden}>{refs.garden.slice(0, 8)}</code></dd></div>
+            <div><dt>Halo2</dt><dd><code title={refs.halo2}>{refs.halo2.slice(0, 8)}</code></dd></div>
+            <div><dt>Orchard</dt><dd><code title={refs.orchard}>{refs.orchard.slice(0, 8)}</code></dd></div>
+          </dl>
+        </div>
+      </div>
+    </details>
+  );
+}
 
 function SiteHeader({ view }: { view: View }) {
   return (
@@ -29,6 +70,7 @@ function SiteHeader({ view }: { view: View }) {
           Circuit
         </a>
       </nav>
+      <EvidenceContext />
     </header>
   );
 }
@@ -38,16 +80,17 @@ function AtlasView() {
     <main id="main-content" className="atlas-page" tabIndex={-1}>
       <section className="atlas-intro" aria-labelledby="atlas-title">
         <div>
-          <p className="eyebrow">The complete evidence landscape</p>
+          <p className="eyebrow">Verification atlas</p>
           <h1 id="atlas-title">Orchard Verification Atlas</h1>
           <p>
-            Explore how implementation capture, checked parity, semantics,
-            reusable gadget proofs, and protocol claims connect. The boundary
-            nodes are part of the map on purpose.
+            Trace the evidence chain from implementation capture to protocol
+            claims. Inspect any node to see its proof state, sources,
+            dependencies, and open assumptions. Boundary nodes make the
+            remaining trust assumptions explicit.
           </p>
         </div>
         <a className="text-link" href="./">
-          Watch the guided journey <span aria-hidden="true">→</span>
+          Open guided journey <span aria-hidden="true">→</span>
         </a>
       </section>
       <ProofMap data={orchardVerificationData} />
@@ -56,23 +99,31 @@ function AtlasView() {
 }
 
 function SiteFooter() {
-  const refs = orchardVerificationData.snapshot.repositoryRefs;
+  const snapshot = orchardVerificationData.snapshot;
+  const refs = snapshot.repositoryRefs;
   return (
     <footer className="site-footer">
-      <div className="site-footer__mark" aria-hidden="true">✦</div>
-      <div>
-        <strong>{orchardVerificationData.snapshot.title}</strong>
-        <p>{orchardVerificationData.snapshot.description}</p>
-      </div>
-      <dl className="revision-list">
-        <div><dt>Garden</dt><dd><code>{refs.garden.slice(0, 8)}</code></dd></div>
-        <div><dt>Halo2</dt><dd><code>{refs.halo2.slice(0, 8)}</code></dd></div>
-        <div><dt>Orchard</dt><dd><code>{refs.orchard.slice(0, 8)}</code></dd></div>
-      </dl>
-      <p className="site-footer__caveat">{orchardVerificationData.snapshot.caveat}</p>
-      <div className="site-footer__art" aria-hidden="true">
-        <img src={footerGarden} alt="" width="1600" height="533" loading="lazy" />
-      </div>
+      <p>
+        Verification work by <strong>Formal Land</strong> · Garden framework · Snapshot{" "}
+        <time dateTime={snapshot.asOf}>
+          {formatSnapshotDate(snapshot.asOf)}
+        </time>
+      </p>
+      <details className="site-footer__context">
+        <summary>Methodology · Repository versions · Known limitations</summary>
+        <div className="site-footer__context-panel">
+          <div>
+            <strong>{snapshot.title}</strong>
+            <p>{snapshot.description}</p>
+            <p>{snapshot.caveat}</p>
+          </div>
+          <dl className="revision-list" aria-label="Pinned repository versions">
+            <div><dt>Garden</dt><dd><code title={refs.garden}>{refs.garden.slice(0, 12)}</code></dd></div>
+            <div><dt>Halo2</dt><dd><code title={refs.halo2}>{refs.halo2.slice(0, 12)}</code></dd></div>
+            <div><dt>Orchard</dt><dd><code title={refs.orchard}>{refs.orchard.slice(0, 12)}</code></dd></div>
+          </dl>
+        </div>
+      </details>
     </footer>
   );
 }

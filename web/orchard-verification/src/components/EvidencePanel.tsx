@@ -6,11 +6,11 @@ import type {
 } from "../data/model";
 
 const statusLabels: Record<ProofStatus, string> = {
-  proved: "Proved in Rocq",
-  checked: "Checked artifact",
+  proved: "Proved",
+  checked: "Checked",
   implemented: "Implemented",
-  assumption: "Explicit hypothesis",
-  boundary: "External boundary",
+  assumption: "Assumption",
+  boundary: "Trust boundary",
   wip: "Work in progress",
 };
 
@@ -23,13 +23,13 @@ function EvidenceAnchor({
 }) {
   const content = (
     <>
-      <span className="evidence-chip__repo">{repoName}</span>
       <span className="evidence-chip__label">{evidence.label}</span>
+      <span className="evidence-chip__repo">{repoName}</span>
       {evidence.anchor?.symbol ? (
         <code className="evidence-chip__symbol">{evidence.anchor.symbol}</code>
       ) : null}
       {evidence.publication === "pending" ? (
-        <span className="evidence-chip__pending">publishes with branch</span>
+        <span className="evidence-chip__pending">Pending publication</span>
       ) : null}
     </>
   );

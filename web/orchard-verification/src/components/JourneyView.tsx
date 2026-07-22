@@ -1,12 +1,16 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
 import type { JourneyStage, OrchardVerificationData } from "../data/model";
-import { EvidencePanel, RepositoryBadges, StatusBadge } from "./EvidencePanel";
+import {
+  EvidencePanel,
+  RepositoryBadges,
+  StatusBadge,
+  statusLabels,
+} from "./EvidencePanel";
 import { ProofMap } from "./ProofMap";
 
 const BASE_STAGE_DURATION = 9_000;
@@ -18,11 +22,6 @@ function stageDuration(stage: JourneyStage) {
   );
 }
 
-function formatTime(milliseconds: number) {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
-  return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
-}
-
 function stageFromHash(stages: readonly JourneyStage[]) {
   const match = window.location.hash.match(/(?:^#|&)stage=([^&]+)/);
   if (!match) return -1;
@@ -32,26 +31,31 @@ function stageFromHash(stages: readonly JourneyStage[]) {
 
 export function JourneyView({ data }: { data: OrchardVerificationData }) {
   const initialIndex = Math.max(0, stageFromHash(data.stages));
-  const arrivedWithHash = stageFromHash(data.stages) >= 0;
   const [stageIndex, setStageIndex] = useState(initialIndex);
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
-  const [speed, setSpeed] = useState(1);
   const [progressive, setProgressive] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(
+    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
+  );
   const [evidenceOpen, setEvidenceOpen] = useState(
     () => !window.matchMedia("(max-width: 760px)").matches,
   );
+  const shellRef = useRef<HTMLElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
+  const progressRef = useRef(0);
   const resumeOnVisible = useRef(false);
-  const currentTimelineButton = useRef<HTMLButtonElement | null>(null);
+  const timelineButtons = useRef<Array<HTMLButtonElement | null>>([]);
   const stage = data.stages[stageIndex];
   const duration = stageDuration(stage);
-  const reducedMotion = useMemo(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-    [],
-  );
+
+  const updateProgress = useCallback((nextProgress: number) => {
+    progressRef.current = nextProgress;
+    setProgress(nextProgress);
+  }, []);
 
   const stopAnimation = useCallback(() => {
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
@@ -64,15 +68,15 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
   }, [stopAnimation]);
 
   const goTo = useCallback(
-    (nextIndex: number, options?: { progressive?: boolean; keepPlaying?: boolean }) => {
+    (nextIndex: number, options?: { progressive?: boolean }) => {
       const bounded = Math.max(0, Math.min(data.stages.length - 1, nextIndex));
-      if (!options?.keepPlaying) pause();
+      pause();
       setStageIndex(bounded);
-      setProgress(0);
+      updateProgress(0);
       setProgressive(Boolean(options?.progressive));
       setEnded(false);
     },
-    [data.stages.length, pause],
+    [data.stages.length, pause, updateProgress],
   );
 
   useEffect(() => {
@@ -81,7 +85,9 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
   }, [stage.id]);
 
   useEffect(() => {
-    currentTimelineButton.current?.scrollIntoView({
+    const currentButton = timelineButtons.current[stageIndex];
+    if (typeof currentButton?.scrollIntoView !== "function") return;
+    currentButton.scrollIntoView({
       block: "nearest",
       inline: "center",
       behavior: reducedMotion ? "auto" : "smooth",
@@ -89,13 +95,14 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
   }, [reducedMotion, stageIndex]);
 
   useEffect(() => {
-    if (reducedMotion || arrivedWithHash) return undefined;
-    const timer = window.setTimeout(() => {
-      setProgressive(true);
-      setPlaying(true);
-    }, 1_200);
-    return () => window.clearTimeout(timer);
-  }, [arrivedWithHash, reducedMotion]);
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const onChange = (event: MediaQueryListEvent) => {
+      setReducedMotion(event.matches);
+      if (event.matches) setProgressive(false);
+    };
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(max-width: 760px)");
@@ -106,32 +113,73 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
 
   useEffect(() => {
     if (!playing) return undefined;
-    const effectiveDuration = duration / speed;
-    startedAtRef.current = performance.now() - progress * effectiveDuration;
+
+    if (reducedMotion) {
+      const remainingDuration = Math.max(
+        1_000,
+        duration * (1 - progressRef.current),
+      );
+      const timer = window.setTimeout(() => {
+        if (stageIndex === data.stages.length - 1) {
+          updateProgress(1);
+          setEnded(true);
+          setPlaying(false);
+          return;
+        }
+        setStageIndex((current) => current + 1);
+        updateProgress(0);
+        setProgressive(false);
+      }, remainingDuration);
+      return () => window.clearTimeout(timer);
+    }
+
+    startedAtRef.current = performance.now() - progressRef.current * duration;
 
     const tick = (timestamp: number) => {
-      const nextProgress = (timestamp - startedAtRef.current) / effectiveDuration;
+      const nextProgress = (timestamp - startedAtRef.current) / duration;
       if (nextProgress >= 1) {
         if (stageIndex === data.stages.length - 1) {
-          setProgress(1);
+          updateProgress(1);
           setEnded(true);
           setPlaying(false);
           frameRef.current = null;
           return;
         }
         setStageIndex((current) => current + 1);
-        setProgress(0);
+        updateProgress(0);
         setProgressive(true);
         startedAtRef.current = timestamp;
       } else {
-        setProgress(nextProgress);
+        updateProgress(nextProgress);
       }
       frameRef.current = requestAnimationFrame(tick);
     };
 
     frameRef.current = requestAnimationFrame(tick);
     return stopAnimation;
-  }, [data.stages.length, duration, playing, progress, speed, stageIndex, stopAnimation]);
+  }, [
+    data.stages.length,
+    duration,
+    playing,
+    reducedMotion,
+    stageIndex,
+    stopAnimation,
+    updateProgress,
+  ]);
+
+  const toggleTour = useCallback(() => {
+    if (playing) {
+      pause();
+      return;
+    }
+
+    if (ended) {
+      goTo(0, { progressive: !reducedMotion });
+    } else {
+      setProgressive(!reducedMotion);
+    }
+    setPlaying(true);
+  }, [ended, goTo, pause, playing, reducedMotion]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -141,13 +189,12 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
       if (event.key === "ArrowRight") goTo(stageIndex + 1);
       if (event.key === " ") {
         event.preventDefault();
-        setProgressive(true);
-        setPlaying((current) => !current);
+        toggleTour();
       }
     };
     document.addEventListener("keydown", onKeyDown);
     return () => document.removeEventListener("keydown", onKeyDown);
-  }, [goTo, stageIndex]);
+  }, [goTo, stageIndex, toggleTour]);
 
   useEffect(() => {
     const onVisibilityChange = () => {
@@ -163,6 +210,14 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
     return () => document.removeEventListener("visibilitychange", onVisibilityChange);
   }, [pause, playing]);
 
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      setIsFullscreen(document.fullscreenElement === shellRef.current);
+    };
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => document.removeEventListener("fullscreenchange", onFullscreenChange);
+  }, []);
+
   const priorNodes = data.stages
     .slice(0, stageIndex)
     .flatMap((item) => item.nodeIds);
@@ -170,46 +225,62 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
     stage.nodeIds.length - 1,
     Math.floor(Math.min(progress, 0.999_999) * Math.max(1, stage.nodeIds.length)),
   );
-  const currentReveal = progressive
+  const usesProgressiveReveal = progressive && !reducedMotion;
+  const currentReveal = usesProgressiveReveal
     ? stage.nodeIds.slice(0, activeNodeIndex + 1)
     : stage.nodeIds;
-  const focusNodes = progressive
+  const focusNodes = usesProgressiveReveal
     ? stage.nodeIds.slice(Math.max(0, activeNodeIndex - 1), activeNodeIndex + 1)
     : stage.nodeIds;
   const revealedNodes = [...new Set([...priorNodes, ...currentReveal])];
+  const focusedEvidenceNodes = focusNodes.flatMap((nodeId) => {
+    const node = data.nodes.find(({ id }) => id === nodeId);
+    return node ? [node] : [];
+  });
 
-  const scrubberValue = stageIndex + progress;
-  const onScrub = (value: number) => {
-    pause();
-    const bounded = Math.max(0, Math.min(data.stages.length, value));
-    const nextStage = Math.min(data.stages.length - 1, Math.floor(bounded));
-    const nextProgress = bounded === data.stages.length ? 1 : bounded - nextStage;
-    setStageIndex(nextStage);
-    setProgress(nextProgress);
-    setProgressive(true);
-    setEnded(bounded === data.stages.length);
+  const onTimelineKeyDown = (
+    event: React.KeyboardEvent<HTMLButtonElement>,
+    index: number,
+  ) => {
+    let nextIndex: number | null = null;
+    if (event.key === "ArrowLeft") nextIndex = Math.max(0, index - 1);
+    if (event.key === "ArrowRight") {
+      nextIndex = Math.min(data.stages.length - 1, index + 1);
+    }
+    if (event.key === "Home") nextIndex = 0;
+    if (event.key === "End") nextIndex = data.stages.length - 1;
+    if (nextIndex === null) return;
+
+    event.preventDefault();
+    goTo(nextIndex);
+    window.requestAnimationFrame(() => timelineButtons.current[nextIndex]?.focus());
   };
 
   const toggleFullscreen = async () => {
-    const shell = document.querySelector<HTMLElement>(".journey-shell");
+    const shell = shellRef.current;
     if (!shell || !document.fullscreenEnabled) return;
     if (document.fullscreenElement) await document.exitFullscreen();
     else await shell.requestFullscreen();
   };
 
   return (
-    <main id="main-content" className="journey-shell" tabIndex={-1}>
+    <main
+      id="main-content"
+      className="journey-shell"
+      ref={shellRef}
+      tabIndex={-1}
+    >
       <section className="journey-intro" aria-labelledby="journey-title">
         <p className="eyebrow">Garden · Rocq · Evidence snapshot {data.snapshot.asOf}</p>
         <h1 id="journey-title">Orchard Verification Journey</h1>
         <p>
-          Follow how the post-NU6.2 Orchard Action implementation was captured in a checked model,
-          a proof of its seven public outputs, and a transaction-level balance
-          argument—without hiding what remains assumed.
+          A {data.stages.length}-stage account of how the post-NU6.2 Orchard Action
+          implementation was captured in Rocq and connected to public-output and
+          balance arguments.
         </p>
       </section>
 
-      <section className="transport" aria-label="Journey playback">
+      <section className="transport" aria-label="Journey controls">
         <div className="transport__buttons">
           <button
             className="icon-button"
@@ -222,23 +293,9 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             <span aria-hidden="true">←</span>
             <span className="icon-button__label">Previous</span>
           </button>
-          <button
-            className="play-button"
-            type="button"
-            onClick={() => {
-              if (ended) {
-                goTo(0, { progressive: true });
-                setPlaying(true);
-              } else {
-                setProgressive(true);
-                setPlaying((current) => !current);
-              }
-            }}
-            aria-label={ended ? "Replay journey" : playing ? "Pause journey" : "Play journey"}
-          >
-            <span aria-hidden="true">{ended ? "↻" : playing ? "Ⅱ" : "▶"}</span>
-            {ended ? "Replay" : playing ? "Pause" : "Play"}
-          </button>
+          <p className="transport__stage" aria-live="polite" aria-atomic="true">
+            Stage {stageIndex + 1} of {data.stages.length}
+          </p>
           <button
             className="icon-button"
             type="button"
@@ -251,48 +308,29 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             <span aria-hidden="true">→</span>
           </button>
           <button
+            className="play-button"
+            type="button"
+            onClick={toggleTour}
+            aria-label={ended ? "Replay tour" : playing ? "Pause tour" : "Play tour"}
+            aria-pressed={playing}
+          >
+            <span aria-hidden="true">{ended ? "↻" : playing ? "Ⅱ" : "▶"}</span>
+            {ended ? "Replay tour" : playing ? "Pause tour" : "Play tour"}
+          </button>
+          <button
             className="icon-button fullscreen-button"
             type="button"
             onClick={toggleFullscreen}
-            aria-label="Toggle full screen"
-            title="Toggle full screen"
+            aria-label={isFullscreen ? "Exit full screen" : "Full screen"}
+            aria-pressed={isFullscreen}
+            title={isFullscreen ? "Exit full screen" : "Full screen"}
           >
             <span aria-hidden="true">⛶</span>
-            <span className="icon-button__label">Full screen</span>
+            <span className="icon-button__label">
+              {isFullscreen ? "Exit full screen" : "Full screen"}
+            </span>
           </button>
         </div>
-        <div className="progress-control">
-          <div className="progress-control__meta">
-            <span>
-              Stage {stageIndex + 1} of {data.stages.length}
-            </span>
-            <span>
-              {formatTime(progress * duration)} / {formatTime(duration)}
-            </span>
-          </div>
-          <input
-            aria-label="Journey playhead"
-            type="range"
-            min={0}
-            max={data.stages.length}
-            step={0.001}
-            value={scrubberValue}
-            onChange={(event) => onScrub(Number(event.target.value))}
-          />
-        </div>
-        <label className="speed-control">
-          <span className="visually-hidden">Playback speed</span>
-          <select
-            value={speed}
-            onChange={(event) => setSpeed(Number(event.target.value))}
-            aria-label="Playback speed"
-          >
-            <option value={0.75}>0.75×</option>
-            <option value={1}>1×</option>
-            <option value={1.5}>1.5×</option>
-            <option value={2}>2×</option>
-          </select>
-        </label>
       </section>
 
       <nav className="stage-timeline" aria-label="Verification journey stages">
@@ -300,31 +338,52 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
           <button
             type="button"
             key={item.id}
-            ref={index === stageIndex ? currentTimelineButton : undefined}
+            ref={(button) => {
+              timelineButtons.current[index] = button;
+            }}
             className={`stage-step ${index < stageIndex ? "stage-step--past" : ""} ${
               index === stageIndex ? "stage-step--current" : ""
             }`}
             onClick={() => goTo(index)}
+            onKeyDown={(event) => onTimelineKeyDown(event, index)}
             aria-current={index === stageIndex ? "step" : undefined}
-            title={item.title}
+            aria-label={`Stage ${index + 1}: ${item.title}. ${item.date}`}
+            tabIndex={index === stageIndex ? 0 : -1}
+            title={`${item.title} · ${item.date}`}
           >
+            <span className="stage-step__number">Stage {index + 1}</span>
+            <span className="stage-step__label">{item.title}</span>
             <span className="stage-step__date">{item.date}</span>
-            <span className="stage-step__label">{item.eyebrow}</span>
           </button>
         ))}
       </nav>
 
-      <article className="stage-story" aria-live="polite" key={stage.id}>
+      <article
+        className="stage-story"
+        aria-labelledby={`journey-stage-title-${stage.id}`}
+        key={stage.id}
+      >
         <div className="stage-story__copy">
-          <div className="stage-story__meta">
-            <StatusBadge status={stage.status} />
-            <RepositoryBadges data={data} repoIds={stage.repoIds} />
-          </div>
-          <p className="chapter-label">{stage.eyebrow} · {stage.date}</p>
-          <h2>{stage.title}</h2>
-          <p className="stage-purpose">{stage.purpose}</p>
-          <blockquote>{stage.claim}</blockquote>
-          <p>{stage.narrative}</p>
+          <header className="stage-story__header">
+            <p className="chapter-label">
+              Stage {stage.ordinal} · {stage.date}
+            </p>
+            <h2 id={`journey-stage-title-${stage.id}`}>{stage.title}</h2>
+            <p className="stage-story__theme">{stage.eyebrow}</p>
+            <p className="stage-purpose">{stage.purpose}</p>
+            <div className="stage-story__meta">
+              <StatusBadge status={stage.status} />
+              <RepositoryBadges data={data} repoIds={stage.repoIds} />
+            </div>
+          </header>
+          <section
+            className="stage-story__narrative"
+            aria-labelledby={`journey-stage-claim-${stage.id}`}
+          >
+            <h3 id={`journey-stage-claim-${stage.id}`}>Claim and context</h3>
+            <blockquote>{stage.claim}</blockquote>
+            <p>{stage.narrative}</p>
+          </section>
         </div>
         <details
           className="stage-story__evidence"
@@ -336,7 +395,7 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
         </details>
         <div className="stage-story__outcomes">
           <section>
-            <h3>Established here</h3>
+            <h3>Established in this stage</h3>
             <ul className="fact-list fact-list--established">
               {stage.established.map((fact) => (
                 <li key={fact}>{fact}</li>
@@ -344,7 +403,7 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             </ul>
           </section>
           <section>
-            <h3>Still carried</h3>
+            <h3>Not yet established</h3>
             <ul className="fact-list fact-list--carried">
               {stage.carried.map((fact) => (
                 <li key={fact}>{fact}</li>
@@ -354,13 +413,44 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
         </div>
       </article>
 
-      <section className="journey-map" aria-label="Progressive verification atlas">
-        <ProofMap
-          data={data}
-          compact
-          focusNodeIds={focusNodes}
-          revealedNodeIds={revealedNodes}
-        />
+      <section
+        className={`journey-map journey-visual ${
+          stage.nodeIds.length === 0 ? "journey-visual--empty" : ""
+        }`}
+        aria-label={`Evidence path for stage ${stageIndex + 1}: ${stage.title}`}
+      >
+        {stage.nodeIds.length > 0 ? (
+          <>
+            <div className="journey-visual__graph">
+              <ProofMap
+                data={data}
+                compact
+                focusNodeIds={focusNodes}
+                revealedNodeIds={revealedNodes}
+              />
+            </div>
+            <ul className="journey-visual__list" aria-label="Proof nodes in this stage">
+              {focusedEvidenceNodes.map((node) => (
+                <li className={`journey-visual__node journey-visual__node--${node.status}`} key={node.id}>
+                  <span className="journey-visual__node-dot" aria-hidden="true" />
+                  <span>
+                    <strong>{node.title}</strong>
+                    <small>
+                      {statusLabels[node.status]} · {node.repoIds
+                        .map((repoId) => data.repositories.find(({ id }) => id === repoId)?.shortName ?? repoId)
+                        .join(", ")}
+                    </small>
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : (
+          <div className="journey-visual__empty" role="status">
+            <h2>No visualization for this stage</h2>
+            <p>The evidence and claims remain available in this stage.</p>
+          </div>
+        )}
       </section>
     </main>
   );
