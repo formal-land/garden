@@ -84,6 +84,29 @@ function titleCase(value: string): string {
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function sourceLocation(path: string, line?: number): string {
+  const filename = path.split(/[\\/]/).filter(Boolean).at(-1) ?? path;
+  return `${filename}${line ? `:${line}` : ""}`;
+}
+
+function metricDescription(label: string): string | undefined {
+  const descriptions: Readonly<Record<string, string>> = {
+    Gates: "Configured polynomial gates",
+    Constraints: "Polynomial equations across all gates",
+    Lookups: "Configured lookup arguments",
+    "Exact regions": "Concrete synthesis-region executions",
+    Operations: "Recorded layouter operations",
+    Namespaces: "Nested synthesis scopes",
+  };
+  return descriptions[label];
+}
+
+function formatMetricValue(value: string): string {
+  return /^\d{4,}$/.test(value)
+    ? Number(value).toLocaleString("en-US")
+    : value;
+}
+
 const PROOF_NODE_TITLES: Readonly<Record<string, string>> = {
   "gadgets-ecc": "ECC gadget proofs",
   "gadgets-poseidon-range": "Poseidon and range-check proofs",
@@ -564,8 +587,10 @@ function MetricGrid({ metrics }: { metrics: readonly CircuitMetric[] }) {
       {metrics.map((metric) => (
         <div key={metric.id}>
           <dt>{metric.label}</dt>
-          <dd>{metric.value}</dd>
-          {metric.detail ? <dd>{metric.detail}</dd> : null}
+          <dd>{formatMetricValue(metric.value)}</dd>
+          {metric.detail || metricDescription(metric.label) ? (
+            <dd>{metric.detail ?? metricDescription(metric.label)}</dd>
+          ) : null}
         </div>
       ))}
     </dl>
@@ -1234,9 +1259,6 @@ function DetailCanvas({
           <p>{constraints.length} constraint{constraints.length === 1 ? "" : "s"}</p>
         </div>
         <MetricGrid metrics={metricsWithFallback(entry)} />
-        <div className="circuit-direct-explanation">
-          In Halo2, every gate is declared during circuit configuration. The extracted configure free monad defines the following polynomial constraints for this gate.
-        </div>
         <div className="circuit-constraint-list">
           {constraints.map((constraint) => (
             <ConstraintRecord key={constraint.id} constraint={constraint} />
@@ -1353,12 +1375,12 @@ function CircuitInspector({
                     </span>
                   </div>
                   {source.url ? (
-                    <a href={source.url} target="_blank" rel="noopener noreferrer">
-                      <code>{source.path}{source.symbol ? ` :: ${source.symbol}` : ""}{source.line ? `:${source.line}` : ""}</code>
+                    <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.path}>
+                      <code>{sourceLocation(source.path, source.line)}</code>
                       <span aria-hidden="true"> ↗</span>
                     </a>
                   ) : (
-                    <code>{source.path}{source.symbol ? ` :: ${source.symbol}` : ""}{source.line ? `:${source.line}` : ""}</code>
+                    <code title={source.path}>{sourceLocation(source.path, source.line)}</code>
                   )}
                   {source.candidates.length ? (
                     <div className="circuit-source-candidates">
@@ -1367,7 +1389,7 @@ function CircuitInspector({
                         {source.candidates.map((candidate, index) => (
                           <li key={`${candidate.path}:${candidate.symbol}:${index}`}>
                             <strong>{candidate.label}</strong>
-                            <code>{candidate.path}{candidate.symbol ? ` :: ${candidate.symbol}` : ""}</code>
+                            <code title={candidate.path}>{sourceLocation(candidate.path, candidate.line)}</code>
                             {candidate.confidence ? <small>{candidate.confidence}</small> : null}
                           </li>
                         ))}
@@ -1389,7 +1411,7 @@ function CircuitInspector({
                 {entry.sourceCandidates.map((candidate, index) => {
                   const source = sourcesById.get(candidate.sourceId);
                   const sourceLabel = source
-                    ? `${source.path}${source.symbol ? ` :: ${source.symbol}` : ""}${source.line ? `:${source.line}` : ""}`
+                    ? sourceLocation(source.path, source.line)
                     : candidate.sourceId;
                   return (
                     <li key={`${entry.id}:${candidate.sourceId}:${candidate.confidence}:${index}`}>
@@ -1398,7 +1420,7 @@ function CircuitInspector({
                         {titleCase(candidate.confidence)}
                       </span>
                       {source?.url ? (
-                        <a href={source.url} target="_blank" rel="noopener noreferrer">
+                        <a href={source.url} target="_blank" rel="noopener noreferrer" title={source.path}>
                           <code>{sourceLabel}</code><span aria-hidden="true"> ↗</span>
                         </a>
                       ) : <code>{sourceLabel}</code>}
@@ -1671,6 +1693,11 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   const [notice, setNotice] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(EXACT_PAGE_SIZE);
+  const [aboutOpen, setAboutOpen] = useState(() =>
+    typeof window === "undefined" ||
+    typeof window.matchMedia !== "function" ||
+    !window.matchMedia("(max-width: 760px)").matches
+  );
   const searchRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
   const focusedRouteRef = useRef(`${route.level}:${route.itemId ?? ""}:${route.focusId ?? ""}`);
@@ -1688,6 +1715,14 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
     );
     return () => { active = false; };
   }, [attempt, loader]);
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== "function") return undefined;
+    const query = window.matchMedia("(max-width: 760px)");
+    const onChange = (event: MediaQueryListEvent) => setAboutOpen(!event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   const entries = useMemo(() => data ? buildEntries(data) : [], [data]);
 
@@ -1830,12 +1865,19 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
             Follow the high-level Action circuit, then drill into its semantic
             regions, exact layouter operations, gates, lookups, and pinned source provenance.
           </p>
+        </div>
+        <details
+          className="circuit-about"
+          open={aboutOpen}
+          onToggle={(event) => setAboutOpen(event.currentTarget.open)}
+        >
+          <summary>About this circuit</summary>
           <p className="circuit-trust-note">
             {data.metadata.representations.flow ??
               "The functional flow is curated navigation; it is not inferred proof evidence."}
           </p>
-        </div>
-        <MetricGrid metrics={data.metadata.metrics.slice(0, 6)} />
+          <MetricGrid metrics={data.metadata.metrics.slice(0, 6)} />
+        </details>
       </section>
 
       <section className="circuit-toolbar" aria-label="Circuit explorer controls">
@@ -1887,32 +1929,30 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
             </div>
           ) : null}
         </div>
-
-      </section>
-
-      <nav className="circuit-breadcrumbs" aria-label="Circuit explorer depth">
-        <button
-          type="button"
-          aria-current={route.level === "flow" ? "page" : undefined}
-          onClick={() => navigate({ ...route, level: "flow", itemId: null, focusId: null })}
-        >
-          Circuit flow
-        </button>
-        <span aria-hidden="true">/</span>
-        {selectedComponent ? (
+        <nav className="circuit-breadcrumbs" aria-label="Circuit explorer depth">
           <button
             type="button"
-            aria-current={route.level === "component" ? "page" : undefined}
-            onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id, focusId: null })}
+            aria-current={route.level === "flow" ? "page" : undefined}
+            onClick={() => navigate({ ...route, level: "flow", itemId: null, focusId: null })}
           >
-            {selectedComponent.shortTitle}
+            Circuit flow
           </button>
-        ) : <span>Component</span>}
-        <span aria-hidden="true">/</span>
-        <span aria-current={route.level === "detail" ? "page" : undefined}>
-          {route.level === "detail" && selectedEntry ? selectedEntry.title : "Region or gate"}
-        </span>
-      </nav>
+          <span aria-hidden="true">/</span>
+          {selectedComponent ? (
+            <button
+              type="button"
+              aria-current={route.level === "component" ? "page" : undefined}
+              onClick={() => navigate({ ...route, level: "component", itemId: selectedComponent.id, focusId: null })}
+            >
+              {selectedComponent.shortTitle}
+            </button>
+          ) : <span>Component</span>}
+          <span aria-hidden="true">/</span>
+          <span aria-current={route.level === "detail" ? "page" : undefined}>
+            {route.level === "detail" && selectedEntry ? selectedEntry.title : "Region or gate"}
+          </span>
+        </nav>
+      </section>
 
       {notice ? <p className="circuit-route-notice" role="status">{notice}</p> : null}
       <p className="visually-hidden" aria-live="polite">

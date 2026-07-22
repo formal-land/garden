@@ -113,6 +113,8 @@ test.describe("Orchard verification atlas", () => {
     await expect(page.getByRole("heading", { name: "Orchard Verification Atlas" })).toBeVisible();
     await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
 
+    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    if (mobile) await page.getByRole("button", { name: "Filter nodes" }).click();
     await page.getByRole("checkbox", { name: otherStatus.label }).check();
     await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
     await expect(inspector.getByText(/pinned node is outside the current filters/i)).toBeVisible();
@@ -134,7 +136,7 @@ test.describe("Orchard verification atlas", () => {
     await expect(relatedNode).toHaveAttribute("aria-pressed", "false");
 
     const list = page.locator(".proof-map__list-alternative");
-    await list.locator("summary").click();
+    if (!mobile) await list.locator("summary").click();
     await expect(list).toHaveAttribute("open", "");
     const listButton = list.getByRole("button", { name: new RegExp(listNode.title) });
     await inspector.evaluate((element) => {
@@ -210,6 +212,7 @@ test.describe("Orchard circuit explorer", () => {
     await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
 
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    await expect(page.locator(".circuit-about")).toHaveJSProperty("open", !mobile);
     const merkleNode = mobile
       ? page.locator(".circuit-mobile-flow button").filter({ hasText: "Merkle path" })
       : page.locator(".circuit-flow-node").filter({ hasText: "Merkle" });
@@ -275,9 +278,35 @@ test.describe("Orchard circuit explorer", () => {
     await expect(page.getByRole("heading", { name: "Explore the circuit by component" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /theme/i })).toHaveCount(0);
     await expect(page.getByRole("button", { name: /exact concrete|aggregate repeated/i })).toHaveCount(0);
+    await expect(canvas.getByText(/^In Halo2, every gate/)).toHaveCount(0);
 
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
+    assertRuntimeClean();
+  });
+
+  test("keeps deep region provenance in document flow with short source labels", async ({ page }) => {
+    const assertRuntimeClean = observeRuntime(page);
+    await page.goto(
+      "/circuit.html#level=detail&item=region-group%3Acomponent-nullifier%3Acomplete-point-addition-257b3ed2",
+    );
+
+    const inspector = page.getByRole("complementary", { name: "Circuit item details" });
+    await expect(inspector.getByRole("heading", { name: "complete point addition" })).toBeVisible();
+    const scrollState = await inspector.evaluate((element) => ({
+      clientHeight: element.clientHeight,
+      overflowY: getComputedStyle(element).overflowY,
+      scrollHeight: element.scrollHeight,
+    }));
+    expect(scrollState.overflowY).toBe("visible");
+    expect(scrollState.scrollHeight).toBe(scrollState.clientHeight);
+
+    const sourceLabels = await inspector.locator(".circuit-source-panel a code").allTextContents();
+    expect(sourceLabels.length).toBeGreaterThan(0);
+    expect(sourceLabels.every((label) => !label.includes("/") && !label.includes("\\"))).toBe(true);
+    expect(sourceLabels.every((label) => /\.[a-z0-9]+(?::\d+)?$/i.test(label))).toBe(true);
+
+    await expectNoHorizontalPageOverflow(page);
     assertRuntimeClean();
   });
 });

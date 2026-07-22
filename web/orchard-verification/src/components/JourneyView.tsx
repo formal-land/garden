@@ -39,6 +39,9 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
   const [speed, setSpeed] = useState(1);
   const [progressive, setProgressive] = useState(false);
   const [ended, setEnded] = useState(false);
+  const [evidenceOpen, setEvidenceOpen] = useState(
+    () => !window.matchMedia("(max-width: 760px)").matches,
+  );
   const frameRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
   const resumeOnVisible = useRef(false);
@@ -93,6 +96,13 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
     }, 1_200);
     return () => window.clearTimeout(timer);
   }, [arrivedWithHash, reducedMotion]);
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    const onChange = (event: MediaQueryListEvent) => setEvidenceOpen(!event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (!playing) return undefined;
@@ -209,7 +219,8 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             aria-label="Previous stage"
             title="Previous stage"
           >
-            ←
+            <span aria-hidden="true">←</span>
+            <span className="icon-button__label">Previous</span>
           </button>
           <button
             className="play-button"
@@ -236,7 +247,8 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             aria-label="Next stage"
             title="Next stage"
           >
-            →
+            <span className="icon-button__label">Next</span>
+            <span aria-hidden="true">→</span>
           </button>
           <button
             className="icon-button fullscreen-button"
@@ -245,7 +257,8 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             aria-label="Toggle full screen"
             title="Toggle full screen"
           >
-            ⛶
+            <span aria-hidden="true">⛶</span>
+            <span className="icon-button__label">Full screen</span>
           </button>
         </div>
         <div className="progress-control">
@@ -301,15 +314,6 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
         ))}
       </nav>
 
-      <section className="journey-map" aria-label="Progressive verification atlas">
-        <ProofMap
-          data={data}
-          compact
-          focusNodeIds={focusNodes}
-          revealedNodeIds={revealedNodes}
-        />
-      </section>
-
       <article className="stage-story" aria-live="polite" key={stage.id}>
         <div className="stage-story__copy">
           <div className="stage-story__meta">
@@ -322,7 +326,14 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
           <blockquote>{stage.claim}</blockquote>
           <p>{stage.narrative}</p>
         </div>
-        <EvidencePanel data={data} evidenceIds={stage.evidenceIds} />
+        <details
+          className="stage-story__evidence"
+          open={evidenceOpen}
+          onToggle={(event) => setEvidenceOpen(event.currentTarget.open)}
+        >
+          <summary>Evidence ({stage.evidenceIds.length})</summary>
+          <EvidencePanel data={data} evidenceIds={stage.evidenceIds} />
+        </details>
         <div className="stage-story__outcomes">
           <section>
             <h3>Established here</h3>
@@ -342,6 +353,15 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
           </section>
         </div>
       </article>
+
+      <section className="journey-map" aria-label="Progressive verification atlas">
+        <ProofMap
+          data={data}
+          compact
+          focusNodeIds={focusNodes}
+          revealedNodeIds={revealedNodes}
+        />
+      </section>
     </main>
   );
 }

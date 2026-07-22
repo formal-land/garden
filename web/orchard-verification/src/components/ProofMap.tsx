@@ -145,6 +145,26 @@ function calculateMapBounds(
   };
 }
 
+function calculateNodeBounds(
+  nodes: readonly ProofNode[],
+  positions: ReadonlyMap<string, AtlasPoint> = new Map(),
+): ViewBox | null {
+  if (!nodes.length) return null;
+  const padding = 92;
+  const positionFor = (node: ProofNode) => positions.get(node.id) ?? node.position;
+  const left = Math.min(...nodes.map((node) => positionFor(node).x - NODE_WIDTH / 2));
+  const top = Math.min(...nodes.map((node) => positionFor(node).y - NODE_HEIGHT / 2));
+  const right = Math.max(...nodes.map((node) => positionFor(node).x + NODE_WIDTH / 2));
+  const bottom = Math.max(...nodes.map((node) => positionFor(node).y + NODE_HEIGHT / 2));
+
+  return {
+    x: left - padding,
+    y: top - padding,
+    width: Math.max(360, right - left + padding * 2),
+    height: Math.max(260, bottom - top + padding * 2),
+  };
+}
+
 function clusterCentre(cluster: ProofCluster): AtlasPoint {
   return {
     x: cluster.bounds.x + cluster.bounds.width / 2,
@@ -245,14 +265,15 @@ function FilterGroup<T extends string>({
           </label>
         ))}
       </div>
-      <button
-        className="proof-map__filter-clear"
-        type="button"
-        disabled={active.size === 0}
-        onClick={onClear}
-      >
-        Show all {legend.toLowerCase()}
-      </button>
+      {active.size ? (
+        <button
+          className="proof-map__filter-clear"
+          type="button"
+          onClick={onClear}
+        >
+          Clear {legend.toLowerCase()}
+        </button>
+      ) : null}
     </fieldset>
   );
 }
@@ -318,6 +339,17 @@ export function ProofMap({
   const [statusFilters, setStatusFilters] = useState<Set<ProofStatus>>(
     () => new Set(),
   );
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 760px)").matches,
+  );
+
+  useEffect(() => {
+    const query = window.matchMedia("(max-width: 760px)");
+    const onChange = (event: MediaQueryListEvent) => setListOpen(event.matches);
+    query.addEventListener("change", onChange);
+    return () => query.removeEventListener("change", onChange);
+  }, []);
 
   useEffect(() => {
     if (compact) return undefined;
@@ -464,6 +496,23 @@ export function ProofMap({
   const filtersAreActive =
     repositoryFilters.size > 0 ||
     statusFilters.size > 0;
+  const compactPositionById = useMemo(() => {
+    const positions = new Map<string, AtlasPoint>();
+    if (!compact || revealedIds === null) return positions;
+    const visibleNodes = data.nodes
+      .filter((node) => revealedIds.has(node.id))
+      .sort((left, right) =>
+        left.position.y - right.position.y || left.position.x - right.position.x
+      );
+    const columns = Math.min(5, Math.max(1, Math.ceil(Math.sqrt(visibleNodes.length * 1.6))));
+    visibleNodes.forEach((node, index) => {
+      positions.set(node.id, {
+        x: 120 + (index % columns) * 240,
+        y: 90 + Math.floor(index / columns) * 140,
+      });
+    });
+    return positions;
+  }, [compact, data.nodes, revealedIds]);
 
   const endpointFor = useCallback(
     (nodeId: string): AtlasPoint | null => {
@@ -473,9 +522,9 @@ export function ProofMap({
       if (cluster && collapsedClusters.has(cluster.id)) {
         return clusterCentre(cluster);
       }
-      return node.position;
+      return compactPositionById.get(nodeId) ?? node.position;
     },
-    [clusterById, collapsedClusters, isRevealed, nodeById],
+    [clusterById, collapsedClusters, compactPositionById, isRevealed, nodeById],
   );
 
   const visibleEdges = useMemo(
@@ -500,6 +549,13 @@ export function ProofMap({
         ),
     [data.edges, endpointFor],
   );
+  const fittedViewBox = useMemo(() => {
+    if (!compact || revealedIds === null) return baseViewBox;
+    return calculateNodeBounds(
+      data.nodes.filter((node) => revealedIds.has(node.id)),
+      compactPositionById,
+    ) ?? baseViewBox;
+  }, [baseViewBox, compact, compactPositionById, data.nodes, revealedIds]);
 
   return (
     <section
@@ -512,7 +568,20 @@ export function ProofMap({
     >
       {!compact && (
         <div className="proof-map__toolbar" aria-label="Atlas filters">
-          <div className="proof-map__filters">
+          <button
+            className="proof-map__filter-toggle"
+            type="button"
+            aria-expanded={filtersOpen}
+            aria-controls="atlas-filter-groups"
+            onClick={() => setFiltersOpen((current) => !current)}
+          >
+            Filter nodes
+            {filtersAreActive ? ` (${repositoryFilters.size + statusFilters.size})` : ""}
+          </button>
+          <div
+            className={classNames("proof-map__filters", filtersOpen && "is-open")}
+            id="atlas-filter-groups"
+          >
             <FilterGroup
               legend="Repositories"
               options={data.filters.repositories}
@@ -529,14 +598,15 @@ export function ProofMap({
             />
           </div>
 
-          <button
-            className="proof-map__reset-filters"
-            type="button"
-            onClick={resetFilters}
-            disabled={!filtersAreActive}
-          >
-            Reset filters
-          </button>
+          {filtersAreActive ? (
+            <button
+              className="proof-map__reset-filters"
+              type="button"
+              onClick={resetFilters}
+            >
+              Reset filters
+            </button>
+          ) : null}
         </div>
       )}
 
@@ -544,7 +614,7 @@ export function ProofMap({
         <div className="proof-map__canvas-wrap">
           <svg
             className="proof-map__canvas"
-            viewBox={`${baseViewBox.x} ${baseViewBox.y} ${baseViewBox.width} ${baseViewBox.height}`}
+            viewBox={`${fittedViewBox.x} ${fittedViewBox.y} ${fittedViewBox.width} ${fittedViewBox.height}`}
             preserveAspectRatio="xMidYMid meet"
             role="group"
             aria-label="Interactive Orchard verification proof atlas"
@@ -661,7 +731,7 @@ export function ProofMap({
                       filteredOut && "is-filtered-out",
                     )}
                     data-relation={edge.relation}
-                    opacity={filteredOut ? 0.08 : muted ? 0.16 : 1}
+                    opacity={filteredOut ? 0.08 : muted ? 0.34 : 1}
                   >
                     <path
                       d={edgePath(from, to)}
@@ -761,6 +831,7 @@ export function ProofMap({
                     (repoId) => repositoryById.get(repoId)?.shortName ?? repoId,
                   )
                   .join(" · ");
+                const position = compactPositionById.get(node.id) ?? node.position;
                 return (
                   <g
                     key={node.id}
@@ -774,7 +845,7 @@ export function ProofMap({
                       isMuted && "is-muted",
                       !matches && "is-filtered-out",
                     )}
-                    transform={`translate(${node.position.x - NODE_WIDTH / 2} ${node.position.y - NODE_HEIGHT / 2})`}
+                    transform={`translate(${position.x - NODE_WIDTH / 2} ${position.y - NODE_HEIGHT / 2})`}
                     role="button"
                     tabIndex={isInteractive ? 0 : -1}
                     aria-hidden={!isInteractive || undefined}
@@ -784,7 +855,7 @@ export function ProofMap({
                     data-node-id={node.id}
                     data-status={node.status}
                     data-track={node.track}
-                    opacity={!matches && !isSelected ? 0.08 : isMuted ? 0.26 : 1}
+                    opacity={!matches && !isSelected ? 0.08 : isMuted ? 0.56 : 1}
                     onPointerDown={(event) => event.stopPropagation()}
                     onPointerEnter={() => isInteractive && setHoveredNodeId(node.id)}
                     onPointerLeave={() => setHoveredNodeId(null)}
@@ -844,15 +915,6 @@ export function ProofMap({
             </g>
           </svg>
 
-          {!compact && (
-            <div className="proof-map__legend" aria-label="Map legend">
-              <span><i className="proof-map__legend-line proof-map__legend-line--formal" />Formal implication</span>
-              <span><i className="proof-map__legend-line proof-map__legend-line--provenance" />Provenance or parity</span>
-              <span><i className="proof-map__legend-node" />Node colour indicates proof status</span>
-              <span><i className="proof-map__legend-node proof-map__legend-node--selected" />Selected node</span>
-              <span><i className="proof-map__legend-node proof-map__legend-node--related" />Related node</span>
-            </div>
-          )}
         </div>
 
         {!compact && (
@@ -980,7 +1042,21 @@ export function ProofMap({
       </div>
 
       {!compact && (
-        <details className="proof-map__list-alternative">
+        <div className="proof-map__legend" aria-label="Map legend">
+          <span><i className="proof-map__legend-line proof-map__legend-line--formal" />Formal implication</span>
+          <span><i className="proof-map__legend-line proof-map__legend-line--provenance" />Provenance or parity</span>
+          <span><i className="proof-map__legend-node" />Node colour indicates proof status</span>
+          <span><i className="proof-map__legend-node proof-map__legend-node--selected" />Selected node</span>
+          <span><i className="proof-map__legend-node proof-map__legend-node--related" />Related node</span>
+        </div>
+      )}
+
+      {!compact && (
+        <details
+          className="proof-map__list-alternative"
+          open={listOpen}
+          onToggle={(event) => setListOpen(event.currentTarget.open)}
+        >
           <summary>
             Browse the filtered atlas as a list ({resultNodes.length})
           </summary>

@@ -255,7 +255,7 @@ describe("circuit explorer interactions", () => {
     expect(container.querySelectorAll(".circuit-operation-record")).toHaveLength(4);
     const inspector = screen.getByRole("complementary", { name: "Circuit item details" });
     expect(within(inspector).getByText("2 mapping candidates")).toBeVisible();
-    expect(within(inspector).getByRole("link", { name: /src\/circuit\.rs/ }))
+    expect(within(inspector).getByRole("link", { name: /^circuit\.rs(?::\d+)?$/ }))
       .toHaveAttribute("href", rawCircuitExplorerFixture.sources.records[1].url);
     expect(within(container.querySelector(".circuit-canvas") as HTMLElement)
       .getByText("action / merkle path")).toBeVisible();
