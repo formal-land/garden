@@ -36,7 +36,7 @@ We handle circuits at the implementation level in:
 Garden also contains the formal verification of the Orchard Action circuit,
 from the captured Halo 2 configuration and synthesis through the gadget,
 Action-statement, transaction-balance, and operational-soundness proofs.
-Explore the work through three complementary views:
+Explore the work through four complementary views:
 
 - [Orchard Verification Journey](docs/orchard-verification/index.html), an
   animated, guided account of how the proof developed;
@@ -45,7 +45,10 @@ Explore the work through three complementary views:
   remaining boundaries;
 - [Orchard Circuit Explorer](docs/orchard-verification/circuit.html), a
   generated, interactive view of the high-level Rocq circuit, from functional
-  components down to free-monad regions, gates, and source definitions.
+  components down to free-monad regions, gates, and source definitions;
+- [Orchard Circuit Grid](docs/orchard-verification/circuit-grid.html), a
+  parity-backed, row-and-column view of the V1 circuit placement before
+  selector compression.
 
 The pages are self-contained and committed with the documentation. See
 [BUILD.md](docs/BUILD.md#orchard-verification-visualization) for local viewing,

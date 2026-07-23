@@ -20,6 +20,7 @@ export default defineConfig({
         journey: fileURLToPath(new URL("index.html", import.meta.url)),
         map: fileURLToPath(new URL("proof-map.html", import.meta.url)),
         circuit: fileURLToPath(new URL("circuit.html", import.meta.url)),
+        grid: fileURLToPath(new URL("circuit-grid.html", import.meta.url)),
       },
     },
   },

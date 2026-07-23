@@ -2,6 +2,7 @@
 .PHONY: orchard-json-from-model orchard-configure-json-from-model orchard-configure-json-compare
 .PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare orchard-synthesis-json-compare-normalized
 .PHONY: orchard-structure-json-from-model orchard-circuit-visualization-json orchard-circuit-visualization-check
+.PHONY: orchard-circuit-grid-json orchard-circuit-grid-check orchard-circuit-grid-test
 
 VFILES := $(shell find -L . -name "*.v" | grep -v -f blacklist.txt | sort)
 
@@ -31,6 +32,8 @@ ORCHARD_SYNTHESIS_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_synthesis_generated_
 ORCHARD_STRUCTURE_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_structure_generated_from_model.json
 ORCHARD_CIRCUIT_VISUALIZATION_JSON := ../web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
 ORCHARD_CIRCUIT_VISUALIZATION_GENERATOR := ../scripts/generate_orchard_circuit_explorer.py
+ORCHARD_CIRCUIT_GRID_JSON := ../web/orchard-verification/public/data/orchard-circuit-grid.v1.json
+ORCHARD_CIRCUIT_GRID_GENERATOR := ../scripts/generate_orchard_circuit_grid.py
 ORCHARD_SYNTHESIS_EXTRACT := Orchard/circuit_synthesis_json_extract.v
 ORCHARD_SYNTHESIS_EXTRACTED_ML := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.ml
 ORCHARD_SYNTHESIS_EXTRACTED_MLI := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.mli
@@ -100,6 +103,28 @@ orchard-synthesis-json-compare-normalized: orchard-synthesis-json-from-model
 	  --normalize-rows \
 	  $(ORCHARD_SYNTHESIS_MODEL_JSON) \
 	  $(ORCHARD_SYNTHESIS_IMPL_JSON)
+
+orchard-circuit-grid-json: orchard-configure-json-compare orchard-synthesis-json-compare orchard-circuit-visualization-json
+	python3 $(ORCHARD_CIRCUIT_GRID_GENERATOR) \
+	  --configure-model $(ORCHARD_CONFIGURE_MODEL_JSON) \
+	  --configure-implementation $(ORCHARD_CONFIGURE_IMPL_JSON) \
+	  --synthesis-model $(ORCHARD_SYNTHESIS_MODEL_JSON) \
+	  --synthesis-implementation $(ORCHARD_SYNTHESIS_IMPL_JSON) \
+	  --explorer $(ORCHARD_CIRCUIT_VISUALIZATION_JSON) \
+	  --output $(ORCHARD_CIRCUIT_GRID_JSON)
+
+orchard-circuit-grid-check: orchard-configure-json-compare orchard-synthesis-json-compare orchard-circuit-visualization-json
+	python3 $(ORCHARD_CIRCUIT_GRID_GENERATOR) \
+	  --configure-model $(ORCHARD_CONFIGURE_MODEL_JSON) \
+	  --configure-implementation $(ORCHARD_CONFIGURE_IMPL_JSON) \
+	  --synthesis-model $(ORCHARD_SYNTHESIS_MODEL_JSON) \
+	  --synthesis-implementation $(ORCHARD_SYNTHESIS_IMPL_JSON) \
+	  --explorer $(ORCHARD_CIRCUIT_VISUALIZATION_JSON) \
+	  --output $(ORCHARD_CIRCUIT_GRID_JSON) \
+	  --check
+
+orchard-circuit-grid-test:
+	python3 ../scripts/tests/test_generate_orchard_circuit_grid.py
 
 # Detect OS and set appropriate commands
 UTILHEADNAME_S := $(shell uname -s)

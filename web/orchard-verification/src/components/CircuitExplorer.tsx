@@ -34,6 +34,10 @@ import type {
   CircuitSourceResolutionCandidate,
   InspectableCircuitItem,
 } from "../circuit/model";
+import {
+  circuitExplorerRouteHash as routeHash,
+  defaultCircuitExplorerRoute as defaultRoute,
+} from "../circuit/routing";
 
 const EXACT_PAGE_SIZE = 60;
 const RELATIONSHIP_PREVIEW_SIZE = 8;
@@ -155,20 +159,6 @@ const PROOF_NODE_TITLES: Readonly<Record<string, string>> = {
 
 function proofNodeTitle(id: string): string {
   return PROOF_NODE_TITLES[id] ?? titleCase(id);
-}
-
-function defaultRoute(): CircuitExplorerRoute {
-  return { level: "flow", itemId: null, query: "", focusId: null };
-}
-
-function routeHash(route: CircuitExplorerRoute): string {
-  const parameters = new URLSearchParams();
-  if (route.level !== "flow") parameters.set("level", route.level);
-  if (route.itemId) parameters.set("item", route.itemId);
-  if (route.query) parameters.set("q", route.query);
-  if (route.focusId) parameters.set("focus", route.focusId);
-  const value = parameters.toString();
-  return value ? `#${value}` : "";
 }
 
 function entryForFlowNode(

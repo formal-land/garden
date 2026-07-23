@@ -7,10 +7,16 @@ on:
       - "web/orchard-verification/**"
       - "docs/orchard-verification/**"
       - "Garden/Halo2/high_level_trace*.v"
+      - "Garden/Makefile"
+      - "Garden/Orchard/Snapshots/circuit_configure_generated_from_*.json"
+      - "Garden/Orchard/Snapshots/circuit_synthesis_generated_from_*.json"
       - "Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json"
+      - "scripts/generate_orchard_circuit_grid.py"
       - "scripts/generate_orchard_circuit_explorer.py"
+      - "scripts/orchard_circuit_grid.schema.json"
       - "scripts/orchard_circuit_explorer.schema.json"
       - "scripts/orchard_circuit_explorer_manifest.v1.json"
+      - "scripts/tests/test_generate_orchard_circuit_grid.py"
       - "scripts/tests/test_generate_orchard_circuit_explorer.py"
       - "docs/BUILD.md"
       - "README.md"
@@ -22,10 +28,16 @@ on:
       - "web/orchard-verification/**"
       - "docs/orchard-verification/**"
       - "Garden/Halo2/high_level_trace*.v"
+      - "Garden/Makefile"
+      - "Garden/Orchard/Snapshots/circuit_configure_generated_from_*.json"
+      - "Garden/Orchard/Snapshots/circuit_synthesis_generated_from_*.json"
       - "Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json"
+      - "scripts/generate_orchard_circuit_grid.py"
       - "scripts/generate_orchard_circuit_explorer.py"
+      - "scripts/orchard_circuit_grid.schema.json"
       - "scripts/orchard_circuit_explorer.schema.json"
       - "scripts/orchard_circuit_explorer_manifest.v1.json"
+      - "scripts/tests/test_generate_orchard_circuit_grid.py"
       - "scripts/tests/test_generate_orchard_circuit_explorer.py"
       - "docs/BUILD.md"
       - "README.md"
@@ -61,6 +73,8 @@ jobs:
         run: |
           python3 -m unittest scripts.tests.test_generate_orchard_circuit_explorer
           python3 scripts/generate_orchard_circuit_explorer.py --validate web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
+          python3 -m unittest scripts.tests.test_generate_orchard_circuit_grid
+          python3 scripts/generate_orchard_circuit_grid.py --check
 
       - name: Type-check and run component tests
         run: npm run check

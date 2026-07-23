@@ -4,8 +4,9 @@ import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
 import { ProofMap } from "./components/ProofMap";
 import { CircuitExplorer } from "./components/CircuitExplorer";
+import { CircuitGrid } from "./components/CircuitGrid";
 
-type View = "journey" | "atlas" | "circuit";
+type View = "journey" | "atlas" | "circuit" | "grid";
 
 function formatSnapshotDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -99,6 +100,9 @@ function SiteHeader({ view }: { view: View }) {
         <a href="./circuit.html" aria-current={view === "circuit" ? "page" : undefined}>
           Circuit
         </a>
+        <a href="./circuit-grid.html" aria-current={view === "grid" ? "page" : undefined}>
+          Grid
+        </a>
       </nav>
       <EvidenceContext />
     </header>
@@ -160,6 +164,7 @@ export function App() {
     () => {
       if (document.documentElement.dataset.view === "atlas") return "atlas";
       if (document.documentElement.dataset.view === "circuit") return "circuit";
+      if (document.documentElement.dataset.view === "grid") return "grid";
       return "journey";
     },
     [],
@@ -171,8 +176,10 @@ export function App() {
         <JourneyView data={orchardVerificationData} />
       ) : view === "atlas" ? (
         <AtlasView />
-      ) : (
+      ) : view === "circuit" ? (
         <CircuitExplorer />
+      ) : (
+        <CircuitGrid />
       )}
       <SiteFooter />
     </div>

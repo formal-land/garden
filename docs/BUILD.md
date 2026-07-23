@@ -117,8 +117,8 @@ cd ..
 
 ## Orchard Verification Visualization
 
-The source for the Orchard Verification Journey, Atlas, and Circuit Explorer lives in
-`web/orchard-verification`. Its production bundle is committed in
+The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and
+Circuit Grid lives in `web/orchard-verification`. Its production bundle is committed in
 `docs/orchard-verification` so the experience can be served as static files
 without Node.js or a runtime network connection.
 
@@ -132,7 +132,8 @@ npm run dev
 ```
 
 Open the URL printed by Vite for the Journey. Add `/proof-map.html` for the
-Atlas or `/circuit.html` for the generated high-level Rocq circuit explorer.
+Atlas, `/circuit.html` for the generated high-level Rocq circuit explorer, or
+`/circuit-grid.html` for the parity-backed circuit layout grid.
 
 The Circuit Explorer loads its versioned JSON from `public/data`. When the
 Rocq circuit, free-monad evaluator, source mapping, or functional-flow manifest
@@ -144,6 +145,23 @@ make orchard-circuit-visualization-json
 make orchard-circuit-visualization-check
 cd ..
 ```
+
+The Circuit Grid combines the parsed-equal Rocq-model and Rust-implementation
+configure/synthesis snapshots with the source-enriched Circuit Explorer
+artifact. Regenerate it only after exact parity succeeds:
+
+```sh
+cd Garden
+make orchard-circuit-grid-json
+make orchard-circuit-grid-check
+make orchard-circuit-grid-test
+cd ..
+```
+
+The generated `garden.halo2.circuit-grid.v1` data records V1 placement,
+selector activations, fixed assignments, fill ranges, and copy endpoints. It
+does not contain witness values or omitted ordinary advice assignments; its
+metadata states those coverage limits explicitly.
 
 The generation step requires the Rocq/OCaml environment described above. It
 does not modify or build the sibling Halo2 and Orchard repositories.
@@ -172,7 +190,8 @@ python3 -m http.server 4173 --directory docs/orchard-verification
 
 Then open `http://localhost:4173/` for the Journey,
 `http://localhost:4173/proof-map.html` for the Atlas, or
-`http://localhost:4173/circuit.html` for the Circuit Explorer. Do not open the
+`http://localhost:4173/circuit.html` for the Circuit Explorer, or
+`http://localhost:4173/circuit-grid.html` for the Circuit Grid. Do not open the
 HTML files directly with a `file:` URL; an HTTP server matches the way their
 relative assets and circuit JSON are deployed.
 

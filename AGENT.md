@@ -48,6 +48,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   gate, and source structure. Its React/TypeScript source, generated data, and
   the other visualization sources live in `web/orchard-verification/`; build
   and validation commands are documented in `docs/BUILD.md`.
+- `docs/orchard-verification/circuit-grid.html`: the generated Orchard Circuit
+  Grid, a parity-backed view of pre-selector-compression rows, columns,
+  selectors, fixed assignments, copy endpoints, and synthesis regions. Its
+  source and generated data live with the other visualization sources under
+  `web/orchard-verification/`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.

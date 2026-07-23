@@ -47,9 +47,14 @@ async function expectNoAxeViolations(page: Page): Promise<void> {
 }
 
 async function openCircuitInspector(page: Page) {
+  const inspector = page.getByRole("complementary", { name: "Circuit item details" });
   const toggle = page.getByRole("button", { name: "Evidence and provenance" });
-  if (await toggle.isVisible()) await toggle.click();
-  return page.getByRole("complementary", { name: "Circuit item details" });
+  if ((page.viewportSize()?.width ?? 1280) <= 1160) {
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+  }
+  await expect(inspector).toBeVisible();
+  return inspector;
 }
 
 test.describe("Orchard verification journey", () => {
@@ -359,6 +364,85 @@ test.describe("Orchard circuit explorer", () => {
     }).first()).toBeVisible();
 
     await expectNoHorizontalPageOverflow(page);
+    assertRuntimeClean();
+  });
+});
+
+test.describe("Orchard circuit grid", () => {
+  test("lazy-loads the placement trace and pins a selector cell with a Circuit link", async ({ page }) => {
+    const assertRuntimeClean = observeRuntime(page);
+    const dataResponse = page.waitForResponse((response) =>
+      new URL(response.url()).pathname.endsWith("/data/orchard-circuit-grid.v1.json")
+    );
+    await page.goto("/circuit-grid.html");
+
+    await expect(page.getByRole("heading", { name: "Orchard Circuit Grid" })).toBeVisible();
+    await expect((await dataResponse).ok()).toBe(true);
+    await expect(page.getByRole("link", { name: "Grid", exact: true })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await expect(page.getByRole("navigation", { name: "Visualization views" }).getByRole("link"))
+      .toHaveCount(4);
+    await expect(page.getByRole("searchbox", { name: "Search circuit grid" })).toBeVisible();
+
+    const gridTab = page.getByRole("tab", { name: "Grid", exact: true });
+    if (await gridTab.getAttribute("aria-selected") !== "true") await gridTab.click();
+    const grid = page.getByRole("region", { name: "Circuit grid", exact: true });
+    await expect(grid).toBeVisible();
+    await expect(grid).toHaveAttribute("data-track-count", "26");
+
+    await page.getByRole("button", { name: "Expand 56 selectors" }).click();
+    await expect(grid).toHaveAttribute("data-track-count", "81");
+
+    await page.evaluate(() => {
+      window.location.hash = "row=1758&column=selector%3A5";
+    });
+    const selectorCell = grid.locator('[data-row="1758"][data-column="selector:5"]');
+    await expect(selectorCell).toBeVisible();
+    await expect(selectorCell).toBeInViewport();
+    const inspector = page.getByRole("complementary", { name: "Cell details" });
+    await expect(inspector.getByRole("heading", { name: /^Row 1758 · / })).toBeVisible();
+    await expect(inspector).toContainText("QWitnessPoint");
+    const circuitLink = inspector.getByRole("link", { name: /Open .* in Circuit/i }).first();
+    await expect(circuitLink).toHaveAttribute("href", /circuit\.html#level=detail&item=/);
+
+    await inspector.getByRole("button", { name: "Close cell details" }).click();
+    await expect(inspector).toHaveCount(0);
+    await selectorCell.click();
+    await expect(page.getByRole("complementary", { name: "Cell details" })).toBeVisible();
+    await expect(page).toHaveURL(/#row=1758&column=selector%3A5$/);
+
+    const localOverflow = await grid.evaluate((element) => ({
+      clientWidth: element.clientWidth,
+      scrollWidth: element.scrollWidth,
+    }));
+    expect(localOverflow.scrollWidth).toBeGreaterThan(localOverflow.clientWidth);
+    await expectNoHorizontalPageOverflow(page);
+    assertRuntimeClean();
+  });
+
+  test("provides a responsive List alternative and an accessible self-contained page", async ({ page }) => {
+    const assertRuntimeClean = observeRuntime(page);
+    await page.goto("/circuit-grid.html");
+
+    const listTab = page.getByRole("tab", { name: "List", exact: true });
+    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
+    if (mobile) {
+      await expect(listTab).toHaveAttribute("aria-selected", "true");
+    } else {
+      await listTab.click();
+    }
+
+    const list = page.getByRole("tabpanel", { name: "List" });
+    await expect(list).toBeVisible();
+    await expect(list.locator(".circuit-grid-list li button").first()).toBeVisible();
+    await expect(page.locator(".circuit-grid-coverage"))
+      .toContainText(/ordinary(?: witness)? assignments are not recorded/i);
+    await expect(page.locator(".circuit-grid-coverage")).toContainText("references-only");
+
+    await expectNoHorizontalPageOverflow(page);
+    await expectNoAxeViolations(page);
     assertRuntimeClean();
   });
 });
