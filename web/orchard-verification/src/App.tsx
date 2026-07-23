@@ -131,7 +131,6 @@ function AtlasView() {
 
 function SiteFooter() {
   const snapshot = orchardVerificationData.snapshot;
-  const refs = snapshot.repositoryRefs;
   return (
     <footer className="site-footer">
       <p>
@@ -140,21 +139,6 @@ function SiteFooter() {
           {formatSnapshotDate(snapshot.asOf)}
         </time>
       </p>
-      <details className="site-footer__context">
-        <summary>Repository versions · Known limitations</summary>
-        <div className="site-footer__context-panel">
-          <div>
-            <strong>{snapshot.title}</strong>
-            <p>{snapshot.description}</p>
-            <p>{snapshot.caveat}</p>
-          </div>
-          <dl className="revision-list" aria-label="Pinned repository versions">
-            <div><dt>Garden</dt><dd><code title={refs.garden}>{refs.garden.slice(0, 12)}</code></dd></div>
-            <div><dt>Halo2</dt><dd><code title={refs.halo2}>{refs.halo2.slice(0, 12)}</code></dd></div>
-            <div><dt>Orchard</dt><dd><code title={refs.orchard}>{refs.orchard.slice(0, 12)}</code></dd></div>
-          </dl>
-        </div>
-      </details>
     </footer>
   );
 }

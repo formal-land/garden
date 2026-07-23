@@ -257,13 +257,13 @@ describe("circuit grid interactions", () => {
     await screen.findByRole("heading", { name: "Orchard Circuit Grid" });
     expect(loader).toHaveBeenCalledOnce();
     expect(screen.getByRole("searchbox", { name: "Search circuit grid" })).toBeVisible();
-    expect(screen.getByRole("tab", { name: "Grid" })).toHaveAttribute(
-      "aria-selected",
-      "true",
-    );
+    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
 
-    const trackSurface = container.querySelector<HTMLElement>("[data-track-count]")!;
+    const trackSurface = screen.getByRole("region", { name: "Circuit grid" });
     expect(trackSurface).toHaveAttribute("data-track-count", "26");
+    const sheet = container.querySelector<HTMLElement>(".circuit-grid-sheet")!;
+    expect(sheet.style.getPropertyValue("--circuit-grid-region-width"))
+      .toBe("10.5rem");
     fireEvent.click(screen.getByRole("button", { name: "Expand 56 selectors" }));
     expect(trackSurface).toHaveAttribute("data-track-count", "81");
     expect(screen.getByRole("button", { name: "Collapse 56 selectors" })).toBeVisible();
@@ -359,23 +359,15 @@ describe("circuit grid interactions", () => {
       .toBeVisible();
   });
 
-  it("offers a keyboard-accessible List view without implying absent witness data", async () => {
+  it("keeps trace coverage explicit without a secondary presentation mode", async () => {
     render(<CircuitGrid loader={async () => circuitGridFixture} />);
     await screen.findByRole("heading", { name: "Orchard Circuit Grid" });
 
-    fireEvent.click(screen.getByRole("tab", { name: "List" }));
-    const list = screen.getByRole("tabpanel", { name: "List" });
-    expect(list).toBeVisible();
-    expect(within(list).getByText(/Witness point/)).toBeVisible();
+    expect(screen.queryByRole("tablist")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tabpanel")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Circuit grid" })).toBeVisible();
     const coverage = screen.getByRole("note");
     expect(coverage).toHaveTextContent(/ordinary(?: witness)? assignments are not recorded/i);
     expect(coverage).toHaveTextContent("references-only");
-
-    const rowItem = within(list).getByRole("button", { name: /Row 1758.*Witness point/i });
-    rowItem.focus();
-    expect(rowItem).toHaveFocus();
-    fireEvent.click(rowItem);
-    expect(screen.getByRole("complementary", { name: "Cell details" })).toBeVisible();
-    expect(window.location.hash).toContain("row=1758");
   });
 });

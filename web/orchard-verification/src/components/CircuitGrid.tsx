@@ -28,10 +28,10 @@ import {
 const ROW_HEIGHT = 32;
 const OVERSCAN_ROWS = 8;
 const DEFAULT_VIEWPORT_HEIGHT = 620;
-const LIST_PAGE_SIZE = 80;
+const REGION_COLUMN_WIDTH_REM = 10.5;
+const ROW_NUMBER_COLUMN_WIDTH_REM = 3.5;
 
 type DataLoader = () => Promise<CircuitGridData>;
-type GridView = "grid" | "list";
 
 interface HoverPreview {
   readonly cell: CircuitGridCellProjection;
@@ -407,7 +407,9 @@ function GridCanvas({
     { length: Math.max(0, endRow - startRow + 1) },
     (_, index) => startRow + index,
   );
-  const gridTemplateColumns = `minmax(9rem, 9rem) 3.5rem repeat(${projection.tracks.length}, 3rem)`;
+  const gridTemplateColumns =
+    `${REGION_COLUMN_WIDTH_REM}rem ${ROW_NUMBER_COLUMN_WIDTH_REM}rem ` +
+    `repeat(${projection.tracks.length}, 3rem)`;
   const effectiveActive = active.row >= startRow && active.row <= endRow
     ? active
     : { row: startRow, columnId: projection.tracks[0]?.id ?? "" };
@@ -520,7 +522,12 @@ function GridCanvas({
         aria-label={`${projection.data.metadata.circuit.name} structural placement`}
         aria-rowcount={rowCount + 1}
         aria-colcount={projection.tracks.length + 2}
-        style={{ "--circuit-grid-width": `${14.5 + projection.tracks.length * 3}rem` } as CSSProperties}
+        style={{
+          "--circuit-grid-region-width": `${REGION_COLUMN_WIDTH_REM}rem`,
+          "--circuit-grid-width":
+            `${REGION_COLUMN_WIDTH_REM + ROW_NUMBER_COLUMN_WIDTH_REM + 2 +
+              projection.tracks.length * 3}rem`,
+        } as CSSProperties}
       >
         <div
           className="circuit-grid-header"
@@ -659,82 +666,6 @@ function GridCanvas({
   );
 }
 
-function GridList({
-  projection,
-  visibleLimit,
-  onMore,
-  onSelect,
-}: {
-  readonly projection: CircuitGridProjection;
-  readonly visibleLimit: number;
-  readonly onMore: () => void;
-  readonly onSelect: (selection: CircuitGridSelection) => void;
-}) {
-  const rows = projection.rowsWithData.slice(0, visibleLimit);
-  return (
-    <section className="circuit-grid-list" aria-label="Circuit grid list">
-      <div className="circuit-grid-list__heading">
-        <div>
-          <h2>Recorded rows and region starts</h2>
-          <p>
-            A keyboard-friendly alternative to the coordinate grid. Fill events
-            are represented once at their recorded range boundary.
-          </p>
-        </div>
-        <span>{projection.rowsWithData.length.toLocaleString("en-US")} rows with records</span>
-      </div>
-      <ol>
-        {rows.map((row) => {
-          const events = projection.rowEvents(row);
-          const regions = projection.regionStarts.get(row) ?? [];
-          const sparseRow = projection.data.rows.find((item) => item.row === row);
-          const selectorNames = (sparseRow?.selectorIds ?? []).flatMap((id) => {
-            const selector = projection.data.selectors.find((item) => item.id === id);
-            return selector ? [selector.name] : [];
-          });
-          const firstSelectorId = sparseRow?.selectorIds[0];
-          const columnId = firstSelectorId
-            ? projection.tracks.some(({ id }) => id === firstSelectorId)
-              ? firstSelectorId
-              : projection.tracks.some(({ id }) => id === "selectors:collapsed")
-                ? "selectors:collapsed"
-                : projection.tracks[0]?.id ?? ""
-            : sparseRow?.columnIds.find((id) =>
-                projection.tracks.some((track) => track.id === id)
-              ) ?? projection.tracks[0]?.id ?? "";
-          return (
-            <li key={row}>
-              <button type="button" onClick={() => onSelect({ row, columnId })}>
-                <strong>Row {row}</strong>
-                <span>
-                  {events.length
-                    ? `${events.length} event${events.length === 1 ? "" : "s"}`
-                    : "Region boundary"}
-                </span>
-                <small>
-                  {[
-                    ...selectorNames,
-                    ...regions.map(({ name }) => name),
-                  ].join(" · ") ||
-                    events.slice(0, 2).map((event) =>
-                      event.annotation || titleCase(event.kind)
-                    ).join(" · ")}
-                </small>
-                <span aria-hidden="true">→</span>
-              </button>
-            </li>
-          );
-        })}
-      </ol>
-      {projection.rowsWithData.length > visibleLimit ? (
-        <button className="circuit-grid-list__more" type="button" onClick={onMore}>
-          View {Math.min(LIST_PAGE_SIZE, projection.rowsWithData.length - visibleLimit)} more rows
-        </button>
-      ) : null}
-    </section>
-  );
-}
-
 function LoadingGrid() {
   return (
     <main id="main-content" className="circuit-grid-page" tabIndex={-1}>
@@ -771,13 +702,6 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
   const [data, setData] = useState<CircuitGridData | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const [view, setView] = useState<GridView>(() =>
-    typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(max-width: 760px)").matches
-      ? "list"
-      : "grid"
-  );
   const [selection, setSelection] = useState<CircuitGridSelection | null>(
     () => parseCircuitGridHash(),
   );
@@ -786,7 +710,6 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
   );
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<HoverPreview | null>(null);
-  const [visibleLimit, setVisibleLimit] = useState(LIST_PAGE_SIZE);
   const selectionOriginRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -889,31 +812,11 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
 
   const chooseSearchResult = (result: CircuitGridSearchResult) => {
     if (result.columnId?.startsWith("selector:")) setSelectorsExpanded(true);
-    setView("grid");
     commitSelection({
       row: result.row,
       columnId: result.columnId ??
         projection.tracks[0]?.id ??
         "",
-    });
-  };
-
-  const changeViewFromKeyboard = (
-    event: ReactKeyboardEvent<HTMLButtonElement>,
-    current: GridView,
-  ) => {
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-    event.preventDefault();
-    const next: GridView = event.key === "ArrowLeft" || event.key === "Home"
-      ? "grid"
-      : event.key === "ArrowRight" || event.key === "End"
-        ? "list"
-        : current;
-    setView(next);
-    window.requestAnimationFrame(() => {
-      document.getElementById(
-        next === "grid" ? "circuit-grid-tab" : "circuit-grid-list-tab",
-      )?.focus();
     });
   };
 
@@ -941,38 +844,10 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
         </dl>
       </section>
 
-      <div className="circuit-grid-viewbar">
-        <div role="tablist" aria-label="Circuit grid presentation">
-          <button
-            type="button"
-            role="tab"
-            id="circuit-grid-tab"
-            aria-selected={view === "grid"}
-            aria-controls={view === "grid" ? "circuit-grid-panel" : undefined}
-            tabIndex={view === "grid" ? 0 : -1}
-            onClick={() => setView("grid")}
-            onKeyDown={(event) => changeViewFromKeyboard(event, "grid")}
-          >
-            Grid
-          </button>
-          <button
-            type="button"
-            role="tab"
-            id="circuit-grid-list-tab"
-            aria-selected={view === "list"}
-            aria-controls={view === "list" ? "circuit-grid-list-panel" : undefined}
-            tabIndex={view === "list" ? 0 : -1}
-            onClick={() => setView("list")}
-            onKeyDown={(event) => changeViewFromKeyboard(event, "list")}
-          >
-            List
-          </button>
-        </div>
-        <p>
-          {data.metadata.circuit.version} · k = {data.metadata.circuit.k} ·{" "}
-          {data.metadata.circuit.floorPlanner} floor planner
-        </p>
-      </div>
+      <p className="circuit-grid-context">
+        {data.metadata.circuit.version} · k = {data.metadata.circuit.k} ·{" "}
+        {data.metadata.circuit.floorPlanner} floor planner
+      </p>
 
       <SearchToolbar
         projection={projection}
@@ -1016,36 +891,20 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
           selectedCell && "has-inspector",
         )}
       >
-        <div
-          id={view === "grid" ? "circuit-grid-panel" : "circuit-grid-list-panel"}
-          role="tabpanel"
-          aria-labelledby={view === "grid" ? "circuit-grid-tab" : "circuit-grid-list-tab"}
-          className="circuit-grid-primary"
-        >
-          {view === "grid" ? (
-            <>
-              <ul className="circuit-grid-legend" aria-label="Grid activity legend">
-                <li className="is-selector">Selector</li>
-                <li className="is-fixed">Fixed assignment</li>
-                <li className="is-copy">Copy endpoint</li>
-                <li className="is-public">Public / constant</li>
-                <li className="is-advice">Advice reference</li>
-              </ul>
-              <GridCanvas
-                projection={projection}
-                selection={validSelection}
-                onSelect={commitSelection}
-                onPreview={setPreview}
-              />
-            </>
-          ) : (
-            <GridList
-              projection={projection}
-              visibleLimit={visibleLimit}
-              onMore={() => setVisibleLimit((current) => current + LIST_PAGE_SIZE)}
-              onSelect={commitSelection}
-            />
-          )}
+        <div className="circuit-grid-primary">
+          <ul className="circuit-grid-legend" aria-label="Grid activity legend">
+            <li className="is-selector">Selector</li>
+            <li className="is-fixed">Fixed assignment</li>
+            <li className="is-copy">Copy endpoint</li>
+            <li className="is-public">Public / constant</li>
+            <li className="is-advice">Advice reference</li>
+          </ul>
+          <GridCanvas
+            projection={projection}
+            selection={validSelection}
+            onSelect={commitSelection}
+            onPreview={setPreview}
+          />
         </div>
         {narrow && selectedCell ? (
           <button

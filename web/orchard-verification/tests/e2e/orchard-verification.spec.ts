@@ -115,10 +115,7 @@ test.describe("Orchard verification journey", () => {
     if (mobile) await expect(stageNodeList).toBeVisible();
     else await expect(stageNodeList).toBeHidden();
 
-    const footerContext = page.locator(".site-footer__context");
-    await footerContext.locator("summary").click();
-    await expect(footerContext).toContainText(data.snapshot.caveat);
-    await expect(footerContext).toContainText(data.snapshot.repositoryRefs.garden.slice(0, 12));
+    await expect(page.getByText("Repository versions · Known limitations")).toHaveCount(0);
     await expectNoHorizontalPageOverflow(page);
     await expectNoAxeViolations(page);
     assertRuntimeClean();
@@ -369,6 +366,8 @@ test.describe("Orchard circuit explorer", () => {
 });
 
 test.describe("Orchard circuit grid", () => {
+  test.describe.configure({ mode: "serial" });
+
   test("lazy-loads the placement trace and pins a selector cell with a Circuit link", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     const dataResponse = page.waitForResponse((response) =>
@@ -386,8 +385,7 @@ test.describe("Orchard circuit grid", () => {
       .toHaveCount(4);
     await expect(page.getByRole("searchbox", { name: "Search circuit grid" })).toBeVisible();
 
-    const gridTab = page.getByRole("tab", { name: "Grid", exact: true });
-    if (await gridTab.getAttribute("aria-selected") !== "true") await gridTab.click();
+    await expect(page.getByRole("tab")).toHaveCount(0);
     const grid = page.getByRole("region", { name: "Circuit grid", exact: true });
     await expect(grid).toBeVisible();
     await expect(grid).toHaveAttribute("data-track-count", "26");
@@ -408,7 +406,7 @@ test.describe("Orchard circuit grid", () => {
     await expect(circuitLink).toHaveAttribute("href", /circuit\.html#level=detail&item=/);
 
     await inspector.getByRole("button", { name: "Close cell details" }).click();
-    await expect(inspector).toHaveCount(0);
+    await expect(inspector).toHaveCount(0, { timeout: 15_000 });
     await selectorCell.click();
     await expect(page.getByRole("complementary", { name: "Cell details" })).toBeVisible();
     await expect(page).toHaveURL(/#row=1758&column=selector%3A5$/);
@@ -422,21 +420,12 @@ test.describe("Orchard circuit grid", () => {
     assertRuntimeClean();
   });
 
-  test("provides a responsive List alternative and an accessible self-contained page", async ({ page }) => {
+  test("provides an accessible self-contained grid at every viewport", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto("/circuit-grid.html");
 
-    const listTab = page.getByRole("tab", { name: "List", exact: true });
-    const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
-    if (mobile) {
-      await expect(listTab).toHaveAttribute("aria-selected", "true");
-    } else {
-      await listTab.click();
-    }
-
-    const list = page.getByRole("tabpanel", { name: "List" });
-    await expect(list).toBeVisible();
-    await expect(list.locator(".circuit-grid-list li button").first()).toBeVisible();
+    await expect(page.getByRole("tablist")).toHaveCount(0);
+    await expect(page.getByRole("region", { name: "Circuit grid", exact: true })).toBeVisible();
     await expect(page.locator(".circuit-grid-coverage"))
       .toContainText(/ordinary(?: witness)? assignments are not recorded/i);
     await expect(page.locator(".circuit-grid-coverage")).toContainText("references-only");

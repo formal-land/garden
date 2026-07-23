@@ -179,7 +179,6 @@ export function circuitHref(
 export interface CircuitGridProjection {
   readonly data: CircuitGridData;
   readonly tracks: readonly CircuitGridTrack[];
-  readonly rowsWithData: readonly number[];
   readonly regionStarts: ReadonlyMap<number, readonly CircuitGridRegion[]>;
   readonly cell: (row: number, columnId: string) => CircuitGridCellProjection;
   readonly rowEvents: (row: number) => readonly CircuitGridEvent[];
@@ -345,17 +344,6 @@ export function createCircuitGridProjection(
     };
   };
 
-  const rowsWithData = [...new Set([
-    ...data.rows.map(({ row }) => row),
-    ...data.regions.map(({ startRow }) => startRow),
-    ...data.events.flatMap((event) => [
-      ...(event.row === undefined ? [] : [event.row]),
-      ...(event.fromRow === undefined ? [] : [event.fromRow]),
-      ...event.endpoints.map(({ row }) => row),
-    ]),
-  ])].filter((row) => row >= 0 && row < data.metadata.circuit.rowCount)
-    .sort((left, right) => left - right);
-
   const search = (rawQuery: string, limit = 14): CircuitGridSearchResult[] => {
     const query = rawQuery.trim().toLocaleLowerCase();
     if (!query) return [];
@@ -435,7 +423,6 @@ export function createCircuitGridProjection(
   return {
     data,
     tracks,
-    rowsWithData,
     regionStarts,
     cell,
     rowEvents,

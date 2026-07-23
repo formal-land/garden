@@ -120,7 +120,8 @@ describe("journey application", () => {
     expect(screen.getByRole("heading", { name: "Orchard Verification Journey", level: 1 })).toBeVisible();
     expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
     expect(document.querySelector(".theme-toggle")).not.toBeInTheDocument();
-    expect(screen.getByText("Repository versions · Known limitations")).toBeVisible();
+    expect(screen.queryByText("Repository versions · Known limitations"))
+      .not.toBeInTheDocument();
     expect(screen.queryByText(/Methodology/)).not.toBeInTheDocument();
 
     const snapshotSummary = screen.getByText("Snapshot").closest("summary")!;
