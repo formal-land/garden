@@ -166,6 +166,67 @@ Definition completeness_statement
 It is stated as a `Prop` only (well-formedness checked). Its proof is the C2
 follow-up campaign.
 
+The statement API of that campaign is
+`Garden/Orchard/circuit_completeness/forward/api.v`
+(`OrchardCompletenessForward`, all `Qed`): the per-family symbolic
+obligations `family_gates_ok` / `family_lookups_ok` (the `Hgates` /
+`Hlookups` premises of `circuit_holds_intro` at `honest_assignment w`,
+restricted to a list of `family_index` values and quantified over every
+valid, nondegenerate input), `witness_facts_forward_ok` and `read_back_ok`,
+the coverage layer (`covers`, `all_families`, `all_families_covers`) over
+the `instance_defs.v` family partition, union/anti-monotonicity combinators
+(`family_gates_ok_app` / `_incl`, likewise for lookups), and the assembly
+skeleton `completeness_statement_of_families`: covering gate and lookup
+obligations plus the witness facts and the read-back compose through
+`circuit_holds_intro` (with the three checker certificates and
+`honest_planes_ok`) into `orchard_completeness_statement`. The per-family
+forward lemmas plug into this join as they are proved.
+
+`forward/lookups_witness.v` (`OrchardForwardLookupsWitness`) carries the
+lookup and witness-fact sides of that join:
+
+- `lookups_forward_ok : family_lookups_ok all_families` — the whole-circuit
+  lookup obligation. The site inventory is certified by one input-independent
+  `vm_compute` scan over the 4,858 enabled points (`lookup_scan`), and every
+  10-bit range-check site is proved symbolically: the 20 running-sum lookup
+  sites (nullifier α canonicity, variable-base overflow, `Commit^ivk` and
+  `NoteCommit` canonicity, y-canonicity `j`/`j′`) through
+  `running_site_lemma`, and the 89 short range-check sites (the 64 Merkle
+  `b_1`/`b_2` checks, the `Commit^ivk` `b_0`/`b_2`/`d_0` checks, the
+  `NoteCommit` sub-piece and `k_0`/`k_2` checks) through `short_site_lemma`,
+  with the honest cells' div/mod bounds. Open: the five Sinsemilla
+  generator-table site leaves (`sins_site_merkle_1`/`_2`, `sins_site_civk`,
+  `sins_site_nc_old`/`_new`, currently `Admitted`) — the hash-region round
+  tuples `(word, x_p, y_p)`, whose closure needs the `bits`-column
+  telescoping and the `y_p` reconstruction algebra over the non-vertical
+  chords of `nondegenerate w`.
+- `witness_facts_ok : witness_facts_forward_ok` — split by the Boolean
+  `fact_trivial`: the 2,076 self-copy facts hold of any assignment
+  (`fact_trivial_sound`); the residue (716 cross-region copies, 166 pinned
+  constants, 6 instance rows) is the open leaf `nontrivial_witness_facts`
+  (`Admitted`).
+
+`forward/running_sums.v` (`OrchardForwardRunningSums`, all `Qed`) carries the
+running-sum decomposition and lookup range-check gate families, stated as the
+selector-keyed refinement of the api obligations
+(`selector_gates_ok`/`selector_lookups_ok` fix the point's guarding selector
+instead of its region family; the family joins follow by case analysis on the
+selector). Delivered: `qbitshift_gates_ok` (the short-lookup bitshift gate —
+the honest row-1 cells satisfy `word·2^10·inv_two_pow_s = shifted` via the
+five `1024·inv_two_pow_s ≡ 2^{10−s}` constants), `qmulfixedrs_range_gates_ok`
+(the range-check constraint at every enabled `QMulFixedRunningSum` point —
+the honest `A4` cells are the base-8 running sums `z_i = k/8^i`, so
+`z_i − 8·z_{i+1} = z_i mod 8` is a genuine digit; the coordinates-check
+constraints under the same selector are split off to the fixed-base window
+family by `qmulfixedrs_body_eq`), `qlookup_lookups_ok`/`qrunning_lookups_ok`
+(the range-check lookup argument: the `q_running` telescoping step
+`z_i − 2^10·z_{i+1} = z_i mod 2^10` and the bounded short-row element resolve
+to rows of the 1024-row `TableIdx` table), and the vacuous complements
+(`QLookup`/`QRunning` guard no gate; no lookup argument mentions
+`QBitshift`/`QMulFixedRunningSum`). Each selector's enabled-point domain and
+constraint/argument classification is pinned by one input-independent
+`vm_compute` certificate over the reified synthesis facts.
+
 ## Status and what remains
 
 Proved and clean (`PrimString.string` + impredicative `Set`):
