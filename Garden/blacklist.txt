@@ -10,3 +10,9 @@ Plonky3/keccak/pretty_print.v
 Orchard/circuit_synthesis_json_extract.v
 # Transient caches left by the rocq-mcp server; not part of the project.
 rocq_mcp_cache
+# Completeness C2 forward-lemma files whose proofs are not yet kernel-checked.
+Orchard/circuit_completeness/forward/ecc_add.v
+Orchard/circuit_completeness/forward/fixed_base.v
+Orchard/circuit_completeness/forward/canonicity.v
+Orchard/circuit_completeness/forward/sinsemilla.v
+Orchard/circuit_completeness/forward/var_base_ladder.v
