@@ -14,6 +14,7 @@ import {
   loadCircuitExplorerData,
 } from "../circuit/loader";
 import type {
+  CircuitCell,
   CircuitComponent,
   CircuitConstraint,
   CircuitExplorerData,
@@ -1088,12 +1089,51 @@ function FlowCanvas({
   );
 }
 
-function OperationRecord({ operation }: { operation: CircuitRegionOperation }) {
+function cellsIdentifySamePhysicalCell(
+  source: CircuitCell,
+  destination: CircuitCell,
+): boolean {
+  if (source.id && destination.id && source.id === destination.id) return true;
+  if (
+    source.kind !== destination.kind ||
+    !source.column ||
+    source.column !== destination.column
+  ) {
+    return false;
+  }
+  if (
+    source.absoluteRow !== undefined &&
+    destination.absoluteRow !== undefined
+  ) {
+    return source.absoluteRow === destination.absoluteRow;
+  }
+  return Boolean(
+    source.regionId &&
+    source.regionId === destination.regionId &&
+    source.relativeOffset !== undefined &&
+    source.relativeOffset === destination.relativeOffset,
+  );
+}
+
+export function CircuitOperationRecord({
+  operation,
+}: {
+  readonly operation: CircuitRegionOperation;
+}) {
+  const selfCopy = operation.kind === "copy" &&
+    operation.cells.length >= 2 &&
+    cellsIdentifySamePhysicalCell(operation.cells[0], operation.cells[1]);
   return (
     <article className="circuit-operation-record" data-operation-id={operation.id} tabIndex={-1}>
       <p className="circuit-card__kind">{titleCase(operation.kind)}</p>
-      <h4>{operation.title}</h4>
+      <h4>{selfCopy ? "Self-copy" : operation.title}</h4>
       {operation.annotation ? <p>{operation.annotation}</p> : null}
+      {selfCopy ? (
+        <p className="circuit-operation-self-copy" role="note">
+          Source and destination identify the same physical cell, so this copy
+          is a permutation no-op. Both exact endpoint records are retained below.
+        </p>
+      ) : null}
       <dl className="circuit-operation-facts">
         {operation.selectorId ? <><dt>Selector ID</dt><dd><code>{operation.selectorId}</code></dd></> : null}
         {operation.selectorName ? <><dt>Selector name</dt><dd><code>{operation.selectorName}</code></dd></> : null}
@@ -1282,7 +1322,7 @@ function RegionOperationList({
             ) : null}
             <div className="circuit-operation-list">
               {visibleOperations.map((operation) => (
-                <OperationRecord key={operation.id} operation={operation} />
+                <CircuitOperationRecord key={operation.id} operation={operation} />
               ))}
             </div>
           </section>
@@ -2386,7 +2426,7 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
                     </div>
                     <div className="circuit-operation-list">
                       {componentOperations.slice(0, visibleLimit).map((operation) => (
-                        <OperationRecord key={operation.id} operation={operation} />
+                        <CircuitOperationRecord key={operation.id} operation={operation} />
                       ))}
                     </div>
                     {componentOperations.length > visibleLimit ? (

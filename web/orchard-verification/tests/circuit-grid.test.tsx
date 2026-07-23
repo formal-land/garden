@@ -310,6 +310,55 @@ describe("circuit grid interactions", () => {
     expect(window.location.hash).toBe("#row=1758&column=selector%3A5");
   });
 
+  it("names every activation in the collapsed selector activity list", async () => {
+    const primaryActivation = circuitGridFixture.events.find(
+      ({ selectorId }) => selectorId === "selector:5",
+    )!;
+    const secondaryActivation = {
+      ...primaryActivation,
+      id: "trace-event:secondary-selector",
+      selectorId: "selector:6",
+      annotation: "Enable auxiliary check",
+      operationIds: ["region:2/op:9"],
+      circuitTarget: undefined,
+    };
+    const dataWithStackedSelectors = {
+      ...circuitGridFixture,
+      events: [...circuitGridFixture.events, secondaryActivation],
+      rows: circuitGridFixture.rows.map((row) =>
+        row.row === 1758
+          ? {
+              ...row,
+              eventIds: [...row.eventIds, secondaryActivation.id],
+              selectorIds: [...row.selectorIds, "selector:6"],
+            }
+          : row
+      ),
+    };
+    window.history.replaceState(
+      null,
+      "",
+      "/circuit-grid.html#row=1758&column=selectors%3Acollapsed",
+    );
+    render(<CircuitGrid loader={async () => dataWithStackedSelectors} />);
+
+    const inspector = await screen.findByRole("complementary", {
+      name: "Cell details",
+    });
+    const activity = within(inspector).getByRole("heading", {
+      name: "Recorded activity",
+    }).parentElement!;
+    expect(within(activity).getByText("Enable Selector · QWitnessPoint"))
+      .toBeVisible();
+    expect(within(activity).getByText("selector:5")).toBeVisible();
+    expect(within(activity).getByText("Enable Selector · Q6")).toBeVisible();
+    expect(within(activity).getByText("selector:6")).toBeVisible();
+    expect(within(activity).getByText(/Enable auxiliary check · row 1758/))
+      .toBeVisible();
+    expect(within(activity).getByText("trace-event:secondary-selector"))
+      .toBeVisible();
+  });
+
   it("offers a keyboard-accessible List view without implying absent witness data", async () => {
     render(<CircuitGrid loader={async () => circuitGridFixture} />);
     await screen.findByRole("heading", { name: "Orchard Circuit Grid" });

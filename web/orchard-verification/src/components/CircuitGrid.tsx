@@ -144,8 +144,8 @@ function SelectionInspector({
   }, [narrow, cell.row, cell.track.id]);
 
   const peers = cell.marks.flatMap(({ peer }) => peer ? [peer] : []);
-  const events = [...new Map(
-    cell.marks.map(({ event }) => [event.id, event]),
+  const activities = [...new Map(
+    cell.marks.map((activity) => [activity.event.id, activity]),
   ).values()];
 
   return (
@@ -167,17 +167,31 @@ function SelectionInspector({
         <div><dt>Row</dt><dd>{cell.row.toLocaleString("en-US")}</dd></div>
         <div><dt>Track</dt><dd><code>{cell.track.id}</code></dd></div>
         <div><dt>Type</dt><dd>{titleCase(cell.track.kind)}</dd></div>
-        <div><dt>Events</dt><dd>{events.length}</dd></div>
+        <div><dt>Events</dt><dd>{activities.length}</dd></div>
       </dl>
 
-      {events.length ? (
+      {activities.length ? (
         <section className="circuit-grid-inspector__section">
           <h3>Recorded activity</h3>
           <ul className="circuit-grid-inspector__events">
-            {events.map((event) => (
+            {activities.map(({ event, selector }) => (
               <li key={event.id}>
-                <strong>{titleCase(event.kind)}</strong>
-                <p>{eventSummary(event) || "Recorded by the structural parity trace."}</p>
+                <strong>
+                  {titleCase(event.kind)}
+                  {selector ? ` · ${selector.name}` : ""}
+                </strong>
+                <p>
+                  {selector ? (
+                    <span className="circuit-grid-inspector__selector-id">
+                      {selector.id}
+                    </span>
+                  ) : null}
+                  {selector && eventSummary(event) ? " · " : null}
+                  {eventSummary(event) ||
+                    (selector
+                      ? "Activated in the structural parity trace."
+                      : "Recorded by the structural parity trace.")}
+                </p>
                 <code title={event.id}>{event.id}</code>
               </li>
             ))}

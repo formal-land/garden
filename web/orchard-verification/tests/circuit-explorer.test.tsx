@@ -9,7 +9,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { normalizeCircuitExplorerData } from "../src/circuit/loader";
-import { CircuitExplorer } from "../src/components/CircuitExplorer";
+import {
+  CircuitExplorer,
+  CircuitOperationRecord,
+} from "../src/components/CircuitExplorer";
 import {
   circuitExplorerFixture,
   rawCircuitExplorerFixture,
@@ -178,6 +181,40 @@ describe("circuit explorer schema adapter", () => {
 });
 
 describe("circuit explorer interactions", () => {
+  it("labels same-cell copies without hiding either exact endpoint", () => {
+    const regularCopy = circuitExplorerFixture.synthesis.operations.find(
+      ({ id }) => id === "region:0/op:2",
+    )!;
+    const source = regularCopy.cells[0];
+    const selfCopy = {
+      ...regularCopy,
+      id: "region:0/op:self-copy",
+      cells: [source, { ...source }],
+    };
+    const { container, rerender } = render(
+      <CircuitOperationRecord operation={selfCopy} />,
+    );
+
+    const record = container.querySelector<HTMLElement>(
+      '[data-operation-id="region:0/op:self-copy"]',
+    )!;
+    expect(within(record).getByRole("heading", { name: "Self-copy", level: 4 }))
+      .toBeVisible();
+    expect(within(record).getByRole("note"))
+      .toHaveTextContent(/same physical cell.*permutation no-op/i);
+    expect(within(record).getAllByText(source.label)).toHaveLength(2);
+    expect(within(record).getAllByText("column A2")).toHaveLength(2);
+    expect(within(record).getAllByText("offset 0")).toHaveLength(2);
+    expect(within(record).getAllByText("row 12")).toHaveLength(2);
+
+    rerender(<CircuitOperationRecord operation={regularCopy} />);
+    expect(screen.getByRole("heading", { name: "Copy", level: 4 })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Self-copy", level: 4 }))
+      .not.toBeInTheDocument();
+    expect(screen.getByText("row 12")).toBeVisible();
+    expect(screen.getByText("row 20")).toBeVisible();
+  });
+
   it("explains flow nodes and wires on pointer and keyboard focus", async () => {
     const loader = vi.fn(async () => circuitExplorerFixture);
     const { container } = render(<CircuitExplorer loader={loader} />);

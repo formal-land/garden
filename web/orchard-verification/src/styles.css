@@ -3157,6 +3157,12 @@ input[type="range"] {
   font-size: 0.68rem;
 }
 
+.circuit-grid-inspector__selector-id {
+  color: var(--ink-strong);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.64rem;
+}
+
 .circuit-grid-inspector__events code,
 .circuit-grid-inspector__regions code {
   display: block;
@@ -5603,6 +5609,16 @@ input[type="range"] {
   margin: 0.2rem 0 0;
   color: var(--muted);
   font-size: 0.72rem;
+}
+
+.circuit-operation-record > .circuit-operation-self-copy {
+  margin: 0.45rem 0 0.25rem;
+  padding: 0.45rem 0.55rem;
+  border-left: 2px solid var(--cyan);
+  color: var(--ink);
+  background: var(--surface-cool);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
 }
 
 .circuit-operation-cells {
