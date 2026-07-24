@@ -86,7 +86,7 @@ Definition event_fixed_values_ok_b (check : Z -> bool)
     (fun event =>
       match event with
       | Raw.Event.AssignFixed _ _ _ value => check value
-      | Raw.Event.FillFromRow _ _ value => check value
+      | Raw.Event.FillFromRow _ _ _ value => check value
       | _ => true
       end)
     events.
@@ -105,11 +105,13 @@ Definition lookup_tables_avoid_b (avoid : list Z)
     lookups.
 
 (** Every table column of the given lookup arguments is padded by a
-    [FillFromRow] whose extent starts at or before [table_rows] and whose
-    value is also pinned at table row [0] — the padding rows of the table
-    plane repeat row [0], the coherence witness of
+    [FillFromRow] whose extent starts at or before [table_rows], reaches
+    [usable_rows], and whose value is also pinned at table row [0] — one
+    constant covers the usable padding band [[table_rows, usable_rows)] and
+    repeats row [0], the coherence witness of
     [PlonkishLookupPoly.table_prefix_coherent]. *)
-Definition tables_fill_row0_b (events : list Raw.Event.t) (table_rows : Z)
+Definition tables_fill_row0_b (events : list Raw.Event.t)
+    (table_rows usable_rows : Z)
     (lookups : list (LookupArgument.t Configure.indexed_columns)) : bool :=
   List.forallb
     (fun lookup : LookupArgument.t Configure.indexed_columns =>
@@ -118,9 +120,11 @@ Definition tables_fill_row0_b (events : list Raw.Event.t) (table_rows : Z)
           List.existsb
             (fun event =>
               match event with
-              | Raw.Event.FillFromRow column from_row value =>
+              | Raw.Event.FillFromRow column from_row to_row value =>
                   andb
-                    (andb (column =? snd pair) (from_row <=? table_rows))
+                    (andb
+                      (andb (column =? snd pair) (from_row <=? table_rows))
+                      (usable_rows <=? to_row))
                     (PlonkishMock.table_default_pinned_b events column value)
               | _ => false
               end)
@@ -140,7 +144,7 @@ Lemma apply_event_fixed_plane (P : Z -> Prop)
     (Hvalue :
       match event with
       | Raw.Event.AssignFixed _ _ _ value => P value
-      | Raw.Event.FillFromRow _ _ value => P value
+      | Raw.Event.FillFromRow _ _ _ value => P value
       | _ => True
       end)
     (Hplane : forall column row : Z,
@@ -154,7 +158,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     cbn [apply_event] in Happly;
     try (injection Happly as <-; apply Hplane).
   - (* EnableSelector *)
@@ -172,7 +176,8 @@ Proof.
     destruct (orb _ _) in Happly; [discriminate Happly |].
     injection Happly as <-.
     cbn [ReplayState.grid RawGrid.fill_fixed RawGrid.cell].
-    destruct (andb (column =? column') (from_row <=? row)); [exact Hvalue |].
+    destruct (andb (column =? column') (andb (from_row <=? row) (row <? to_row)));
+      [exact Hvalue |].
     apply Hplane.
 Qed.
 
@@ -184,7 +189,7 @@ Lemma apply_events_log_fixed_plane (P : Z -> Prop)
     (fun event =>
       match event with
       | Raw.Event.AssignFixed _ _ _ value => P value
-      | Raw.Event.FillFromRow _ _ value => P value
+      | Raw.Event.FillFromRow _ _ _ value => P value
       | _ => True
       end)
     events ->
@@ -319,9 +324,11 @@ Section WithPrime.
             List.existsb
               (fun event =>
                 match event with
-                | Raw.Event.FillFromRow column from_row value =>
+                | Raw.Event.FillFromRow column from_row to_row value =>
                     andb
-                      (andb (column =? snd pair) (from_row <=? table_rows))
+                      (andb
+                        (andb (column =? snd pair) (from_row <=? table_rows))
+                        (Domain.usable_rows domain <=? to_row))
                       (PlonkishMock.table_default_pinned_b events column value)
                 | _ => false
                 end)
@@ -366,18 +373,22 @@ Section WithPrime.
     destruct event as
       [ name | name | name | name | selector' row' annotation
       | column' row' annotation value | left_cell right_cell
-      | column' from_row value ];
+      | column' from_row to_row value ];
       try discriminate Hev_check.
     apply Bool.andb_true_iff in Hev_check.
     destruct Hev_check as [Hev_check Hpinned].
     apply Bool.andb_true_iff in Hev_check.
+    destruct Hev_check as [Hev_check Hcover].
+    apply Bool.andb_true_iff in Hev_check.
     destruct Hev_check as [Hcolumn Hfrom].
     apply Z.eqb_eq in Hcolumn.
     apply Z.leb_le in Hfrom.
+    apply Z.leb_le in Hcover.
     subst column'.
     rewrite (replay_fill_pinned events (initial_grid advice instance_) grid
-      (snd pair) from_row value row Hreplay Hev_in
-      (Z.le_trans _ _ _ Hfrom (proj1 Hrow))).
+      (snd pair) from_row to_row value row Hreplay Hev_in
+      (Z.le_trans _ _ _ Hfrom (proj1 Hrow))
+      (Z.lt_le_trans _ _ _ (proj2 Hrow) Hcover)).
     rewrite (PlonkishMock.table_default_pinned_value events
       (initial_grid advice instance_) grid (snd pair) value Hreplay Hpinned).
     reflexivity.
@@ -576,7 +587,7 @@ Section WithPrime.
           event_fixed_values_ok_b
             (fun value => andb (0 <=? value) (value <? p)) events = true)
         (Hfill :
-          tables_fill_row0_b events table_rows
+          tables_fill_row0_b events table_rows (Domain.usable_rows domain)
             compiled.(CompiledSystem.lookups) = true)
         (Htables_avoid :
           lookup_tables_avoid_b
@@ -715,7 +726,7 @@ Section WithPrime.
           event_fixed_values_ok_b
             (fun value => andb (0 <=? value) (value <? p)) events = true)
         (Hfill :
-          tables_fill_row0_b events table_rows
+          tables_fill_row0_b events table_rows (Domain.usable_rows domain)
             compiled.(CompiledSystem.lookups) = true)
         (Htables_avoid :
           lookup_tables_avoid_b

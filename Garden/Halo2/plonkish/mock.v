@@ -27,11 +27,12 @@
       off the enabled rows;
     - [gate_rotations_within_b] and [tables_prefix_b]: every gate rotation
       from an enabled row stays inside the domain, and each table column's
-      [FillFromRow] padding covers all rows from the table prefix on — the
-      row-boundary facts the compiled-system transfer consumes
+      [FillFromRow] padding covers the usable rows from the table prefix on
+      — the row-boundary facts the compiled-system transfer consumes
       ([replay_gate_rotation_in_domain]: plain rotation agrees with the
       cyclic [Domain.rot] at every active row; [replay_table_padding]: the
-      padding value is constant across the [l_last] and blinding rows).
+      padding value is constant across the usable rows above the table
+      prefix, the [l_last] and blinding rows left at their initial value).
 
     The gate and lookup conjuncts are stated against the indexed,
     selector-carrying system of [serialize.v] — the same system
@@ -98,19 +99,22 @@ Definition table_default_pinned_b (events : list Raw.Event.t)
       match event with
       | Raw.Event.AssignFixed column' row _ value' =>
           andb (andb (column' =? column) (row =? 0)) (value' =? value)
-      | Raw.Event.FillFromRow column' from_row value' =>
-          andb (andb (column' =? column) (from_row <=? 0)) (value' =? value)
+      | Raw.Event.FillFromRow column' from_row to_row value' =>
+          andb
+            (andb (andb (column' =? column) (from_row <=? 0)) (0 <? to_row))
+            (value' =? value)
       | _ => false
       end)
     events.
 
 (** Every table column of every lookup argument is padded by a
-    [FillFromRow] whose extent starts at or before [table_rows] — the table
-    occupies a row prefix and one constant value covers every later row,
-    the [l_last] and blinding rows included. *)
+    [FillFromRow] whose extent starts at or before [table_rows] and reaches
+    [usable_rows] — the table occupies a row prefix and one constant value
+    covers the usable rows above it, the [l_last] and blinding rows left at
+    their initial value. *)
 Definition tables_prefix_b (events : list Raw.Event.t)
     (system : ConstraintSystem.t Configure.indexed_columns)
-    (table_rows : Z) : bool :=
+    (table_rows usable_rows : Z) : bool :=
   List.forallb
     (fun arg : LookupArgument.t Configure.indexed_columns =>
       List.forallb
@@ -118,8 +122,9 @@ Definition tables_prefix_b (events : list Raw.Event.t)
           List.existsb
             (fun event =>
               match event with
-              | Raw.Event.FillFromRow column' from_row _ =>
-                  andb (column' =? snd pair) (from_row <=? table_rows)
+              | Raw.Event.FillFromRow column' from_row to_row _ =>
+                  andb (andb (column' =? snd pair) (from_row <=? table_rows))
+                    (usable_rows <=? to_row)
               | _ => false
               end)
             events)
@@ -240,7 +245,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     cbn;
     try (intros Happly _; injection Happly as <-; reflexivity).
   - (* EnableSelector *)
@@ -263,11 +268,11 @@ Proof.
     injection Happly as <-.
     reflexivity.
   - (* FillFromRow *)
-    destruct (List.existsb (fill_conflicts_write column' from_row value)
+    destruct (List.existsb (fill_conflicts_write column' from_row to_row value)
         state.(ReplayState.log).(Log.fixeds));
       intros Happly _; [discriminate |].
     revert Happly.
-    destruct (List.existsb (fill_conflicts_fill column' value)
+    destruct (List.existsb (fill_conflicts_fill column' from_row to_row value)
         state.(ReplayState.log).(Log.fills));
       intros Happly; [discriminate |].
     injection Happly as <-.
@@ -329,7 +334,7 @@ Proof.
     destruct event as
       [ name | name | name | name | selector' row' annotation
       | column' row' annotation value | left_cell right_cell
-      | column' from_row value ];
+      | column' from_row to_row value ];
       try discriminate.
     apply Bool.andb_true_iff in Hcheck.
     destruct Hcheck as [_ Hrow].
@@ -363,7 +368,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value' | left_cell right_cell
-    | column' from_row value' ];
+    | column' from_row to_row value' ];
     try discriminate.
   - (* AssignFixed *)
     apply Bool.andb_true_iff in Hcheck.
@@ -377,29 +382,35 @@ Proof.
     apply Bool.andb_true_iff in Hcheck.
     destruct Hcheck as [Hcheck Hvalue].
     apply Bool.andb_true_iff in Hcheck.
+    destruct Hcheck as [Hcheck Hto].
+    apply Bool.andb_true_iff in Hcheck.
     destruct Hcheck as [Hcolumn Hfrom].
     apply Z.eqb_eq in Hcolumn, Hvalue.
     apply Z.leb_le in Hfrom.
+    apply Z.ltb_lt in Hto.
     subst column' value'.
-    exact (replay_fill_pinned _ _ _ _ _ _ _ Hreplay Hin Hfrom).
+    exact (replay_fill_pinned _ _ _ _ _ _ _ _ Hreplay Hin Hfrom Hto).
 Qed.
 
-(** Each checked table column holds one constant value on every row from
-    [table_rows] on — the padding the [l_last] and blinding rows see. *)
+(** Each checked table column holds one constant value on the usable rows
+    from [table_rows] on — the padding above the table prefix.  The [l_last]
+    and blinding rows at [usable_rows] and beyond are left at their initial
+    value, matching keygen's unblinded fixed column. *)
 Lemma replay_table_padding (events : list Raw.Event.t)
     (initial grid : RawGrid.t)
     (system : ConstraintSystem.t Configure.indexed_columns)
-    (table_rows : Z)
+    (table_rows usable_rows : Z)
     (arg : LookupArgument.t Configure.indexed_columns)
     (expression : Expression.t Configure.indexed_columns)
     (column : Z) :
   apply_events events initial = Some grid ->
-  tables_prefix_b events system table_rows = true ->
+  tables_prefix_b events system table_rows usable_rows = true ->
   List.In arg system.(ConstraintSystem.lookups) ->
   List.In (expression, column) arg.(LookupArgument.pairs) ->
   exists default : Z,
     forall row : Z,
       table_rows <= row ->
+      row < usable_rows ->
       grid.(RawGrid.cell) Raw.ColumnKind.Fixed column row = default.
 Proof.
   intros Hreplay Hprefix Hargs Hpairs.
@@ -414,17 +425,19 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     try discriminate.
+  apply Bool.andb_true_iff in Hcheck.
+  destruct Hcheck as [Hcheck Hto].
   apply Bool.andb_true_iff in Hcheck.
   destruct Hcheck as [Hcolumn Hfrom].
   apply Z.eqb_eq in Hcolumn.
   apply Z.leb_le in Hfrom.
+  apply Z.leb_le in Hto.
   subst column'.
   exists value.
-  intros row Hrow.
-  apply (replay_fill_pinned _ _ _ _ _ _ _ Hreplay Hin).
-  lia.
+  intros row Hrow Hrowu.
+  apply (replay_fill_pinned _ _ _ _ _ _ _ _ Hreplay Hin); lia.
 Qed.
 
 (** ** Rotations from active rows stay inside the domain *)
@@ -458,7 +471,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     try discriminate.
   apply Bool.andb_true_iff in Hcheck.
   destruct Hcheck as [Hsel_eq Hrow_eq].
@@ -806,7 +819,8 @@ Section WithPrime.
        | [] => true
        | _ :: _ =>
            andb
-             (tables_prefix_b events system table_rows)
+             (tables_prefix_b events system table_rows
+               (Domain.usable_rows domain))
              (table_rows <=? Domain.usable_rows domain)
        end).
 

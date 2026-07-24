@@ -400,6 +400,7 @@ Section WithPrime.
             (fun value => andb (0 <=? value) (value <? p)) events = true)
         (Hfill :
           PlonkishAlgebraic.tables_fill_row0_b events table_rows
+            (Domain.usable_rows domain)
             compiled.(CompiledSystem.lookups) = true)
         (Htables_avoid :
           PlonkishAlgebraic.lookup_tables_avoid_b

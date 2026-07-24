@@ -824,9 +824,11 @@ Proof.
   vm_cast_no_check (@eq_refl bool true).
 Qed.
 
-(** Every table column's padding fill value is also pinned at row [0]. *)
+(** Every table column's padding fill covers the usable band
+    [[table_rows, usable_rows)] and its value is pinned at row [0]. *)
 Lemma orchard_tables_fill_row0 :
   PlonkishAlgebraic.tables_fill_row0_b orchard_events orchard_table_rows
+    (Domain.usable_rows OrchardCompiled.orchard_domain)
     (OrchardCompiledCheck.compiled.(CompiledSystem.lookups)) = true.
 Proof.
   vm_cast_no_check (@eq_refl bool true).
