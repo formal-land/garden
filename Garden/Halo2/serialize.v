@@ -55,6 +55,7 @@ Module Raw.
     | FillFromRow
         (column : Z)
         (from_row : Z)
+        (to_row : Z)
         (value : Z).
   End Event.
 End Raw.
@@ -406,6 +407,7 @@ Module V1.
 
   Fixpoint fill_lookup_entries {columns : Columns.t}
       (indices : Indices.t columns)
+      (usable_rows : Z)
       (entries : list (LookupTableColumn.t columns)) : list Raw.Event.t :=
     match entries with
     | [] => []
@@ -414,22 +416,25 @@ Module V1.
           Raw.Event.FillFromRow
             (indices.(Indices.lookup) (LookupTableColumn.lookup entry))
             (Z.of_nat (List.length (LookupTableColumn.values entry)))
+            usable_rows
             (LookupTableColumn.default_value entry)
-        ] ++ fill_lookup_entries indices entries
+        ] ++ fill_lookup_entries indices usable_rows entries
     end.
 
   Definition init_lookup_table_events {columns : Columns.t}
       (indices : Indices.t columns)
+      (usable_rows : Z)
       (name : string)
       (entries : list (LookupTableColumn.t columns)) : list Raw.Event.t :=
     [Raw.Event.EnterRegion name]
       ++ assign_lookup_rows indices (max_entry_length entries) 0%nat entries
       ++ [Raw.Event.ExitRegion name]
-      ++ fill_lookup_entries indices entries.
+      ++ fill_lookup_entries indices usable_rows entries.
 
   Fixpoint eval_layouter {columns : Columns.t} {RegionId : Set} {A : Set}
       (indices : Indices.t columns)
       (region_start : RegionId -> Z)
+      (usable_rows : Z)
       (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A) {struct program}
       : A * list Raw.Event.t :=
     match program with
@@ -437,9 +442,9 @@ Module V1.
         (value, [])
     | Garden.Halo2.Synthesis.𝓛.Bind first second =>
         let '(value, events_first) :=
-          eval_layouter indices region_start first in
+          eval_layouter indices region_start usable_rows first in
         let '(value, events_second) :=
-          eval_layouter indices region_start (second value) in
+          eval_layouter indices region_start usable_rows (second value) in
         (value, events_first ++ events_second)
     | Garden.Halo2.Synthesis.𝓛.AddRegion region name region_program =>
         let '(value, events) :=
@@ -458,10 +463,10 @@ Module V1.
               (Cell.instance_raw indices instance row)
           ])
     | Garden.Halo2.Synthesis.𝓛.InitLookupTables name entries =>
-        (tt, init_lookup_table_events indices name entries)
+        (tt, init_lookup_table_events indices usable_rows name entries)
     | Garden.Halo2.Synthesis.𝓛.InNamespace name nested =>
         let '(value, events) :=
-          eval_layouter indices region_start nested in
+          eval_layouter indices region_start usable_rows nested in
         (
           value,
           [Raw.Event.PushNamespace name]
@@ -472,7 +477,8 @@ Module V1.
   Definition run_with_region_start {columns : Columns.t} {RegionId : Set} {A : Set}
       (indices : Indices.t columns)
       (region_start : RegionId -> Z)
+      (usable_rows : Z)
       (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A)
       : A * list Raw.Event.t :=
-    eval_layouter indices region_start program.
+    eval_layouter indices region_start usable_rows program.
 End V1.

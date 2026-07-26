@@ -48,9 +48,9 @@ Qed.
     component of [V1.eval_layouter].  By induction on the program; the
     [AddRegion] case delegates to [eval_region_value]. *)
 Lemma operational_sound_value {columns : Columns.t} {RegionId : Set} {A : Set}
-    (idx : Indices.t columns) (rs : RegionId -> Z)
+    (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
     (program : Garden.Halo2.Synthesis.𝓛 columns RegionId A) :
-  layouter_value program = fst (V1.eval_layouter idx rs program).
+  layouter_value program = fst (V1.eval_layouter idx rs usable_rows program).
 Proof.
   revert A program.
   fix IH 2.
@@ -61,10 +61,10 @@ Proof.
     cbn [layouter_value V1.eval_layouter].
   - reflexivity.
   - rewrite (IH _ first).
-    destruct (V1.eval_layouter idx rs first) as [value events_first].
+    destruct (V1.eval_layouter idx rs usable_rows first) as [value events_first].
     cbn [fst].
     rewrite (IH _ (second value)).
-    destruct (V1.eval_layouter idx rs (second value))
+    destruct (V1.eval_layouter idx rs usable_rows (second value))
       as [value_second events_second].
     reflexivity.
   - rewrite (eval_region_value idx rs region (region_program region)).
@@ -74,6 +74,6 @@ Proof.
   - reflexivity.
   - reflexivity.
   - rewrite (IH _ nested).
-    destruct (V1.eval_layouter idx rs nested) as [value events].
+    destruct (V1.eval_layouter idx rs usable_rows nested) as [value events].
     reflexivity.
 Qed.

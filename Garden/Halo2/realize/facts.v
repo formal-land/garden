@@ -107,12 +107,14 @@ Lemma write_conflicts_fill_false (column row value : Z) (fill : Fill.t) :
   write_conflicts_fill column row value fill = false ->
   fill.(Fill.column) = column ->
   fill.(Fill.from_row) <= row ->
+  row < fill.(Fill.to_row) ->
   fill.(Fill.value) = value.
 Proof.
   unfold write_conflicts_fill.
-  intros Hcheck Hcolumn Hle.
+  intros Hcheck Hcolumn Hle Hlt.
   rewrite Hcolumn, Z.eqb_refl in Hcheck.
   rewrite (proj2 (Z.leb_le fill.(Fill.from_row) row) Hle) in Hcheck.
+  rewrite (proj2 (Z.ltb_lt row fill.(Fill.to_row)) Hlt) in Hcheck.
   cbn in Hcheck.
   destruct (fill.(Fill.value) =? value) eqn:Hvalue.
   - apply Z.eqb_eq in Hvalue.
@@ -120,16 +122,19 @@ Proof.
   - discriminate Hcheck.
 Qed.
 
-Lemma fill_conflicts_write_false (column from_row value : Z) (write : Write.t) :
-  fill_conflicts_write column from_row value write = false ->
+Lemma fill_conflicts_write_false (column from_row to_row value : Z)
+    (write : Write.t) :
+  fill_conflicts_write column from_row to_row value write = false ->
   write.(Write.column) = column ->
   from_row <= write.(Write.row) ->
+  write.(Write.row) < to_row ->
   write.(Write.value) = value.
 Proof.
   unfold fill_conflicts_write.
-  intros Hcheck Hcolumn Hle.
+  intros Hcheck Hcolumn Hle Hlt.
   rewrite Hcolumn, Z.eqb_refl in Hcheck.
   rewrite (proj2 (Z.leb_le from_row write.(Write.row)) Hle) in Hcheck.
+  rewrite (proj2 (Z.ltb_lt write.(Write.row) to_row) Hlt) in Hcheck.
   cbn in Hcheck.
   destruct (write.(Write.value) =? value) eqn:Hvalue.
   - apply Z.eqb_eq in Hvalue.
@@ -137,14 +142,17 @@ Proof.
   - discriminate Hcheck.
 Qed.
 
-Lemma fill_conflicts_fill_false (column value : Z) (fill : Fill.t) :
-  fill_conflicts_fill column value fill = false ->
+Lemma fill_conflicts_fill_false (column from_row to_row value : Z)
+    (fill : Fill.t) :
+  fill_conflicts_fill column from_row to_row value fill = false ->
   fill.(Fill.column) = column ->
+  Z.max from_row fill.(Fill.from_row) < Z.min to_row fill.(Fill.to_row) ->
   fill.(Fill.value) = value.
 Proof.
   unfold fill_conflicts_fill.
-  intros Hcheck Hcolumn.
+  intros Hcheck Hcolumn Hinter.
   rewrite Hcolumn, Z.eqb_refl in Hcheck.
+  rewrite (proj2 (Z.ltb_lt _ _) Hinter) in Hcheck.
   cbn in Hcheck.
   destruct (fill.(Fill.value) =? value) eqn:Hvalue.
   - apply Z.eqb_eq in Hvalue.
@@ -172,6 +180,7 @@ Definition log_pins_grid (log : Log.t) (grid : RawGrid.t) : Prop :=
   (forall fill row,
     List.In fill log.(Log.fills) ->
     fill.(Fill.from_row) <= row ->
+    row < fill.(Fill.to_row) ->
     grid.(RawGrid.cell) Raw.ColumnKind.Fixed fill.(Fill.column) row =
       fill.(Fill.value)).
 
@@ -191,7 +200,7 @@ Proof.
   destruct event as
     [name | name | name | name | column row annotation
     | column row annotation value | left_cell right_cell
-    | column from_row value];
+    | column from_row to_row value];
     cbn;
     try (intros Happly; injection Happly as <-; exact Hpins).
   - (* EnableSelector *)
@@ -241,7 +250,7 @@ Proof.
              Hcolumn_eq Hrow_eq).
            reflexivity.
         -- apply Hfixed, Hin.
-    + intros fill fill_row Hin Hle; cbn.
+    + intros fill fill_row Hin Hle Hlt; cbn.
       destruct (andb (fill.(Fill.column) =? column)
           (fill_row =? row)) eqn:Hpoint.
       * apply andb_prop in Hpoint.
@@ -250,15 +259,15 @@ Proof.
         subst fill_row.
         rewrite (write_conflicts_fill_false column row value fill
           (existsb_false_forall _ _ Hconflict_fill fill Hin)
-          Hcolumn_eq Hle).
+          Hcolumn_eq Hle Hlt).
         reflexivity.
       * apply Hfill; assumption.
   - (* FillFromRow *)
-    destruct (List.existsb (fill_conflicts_write column from_row value)
+    destruct (List.existsb (fill_conflicts_write column from_row to_row value)
         state.(ReplayState.log).(Log.fixeds)) eqn:Hconflict_write;
       intros Happly; [discriminate |].
     revert Happly.
-    destruct (List.existsb (fill_conflicts_fill column value)
+    destruct (List.existsb (fill_conflicts_fill column from_row to_row value)
         state.(ReplayState.log).(Log.fills)) eqn:Hconflict_fill;
       intros Happly; [discriminate |].
     injection Happly as <-.
@@ -267,31 +276,42 @@ Proof.
     + exact Hsel.
     + intros write Hin; cbn.
       destruct (andb (write.(Write.column) =? column)
-          (from_row <=? write.(Write.row))) eqn:Hcover.
+          (andb (from_row <=? write.(Write.row))
+            (write.(Write.row) <? to_row))) eqn:Hcover.
       * apply andb_prop in Hcover.
-        destruct Hcover as [Hcolumn_eq Hrow_le].
+        destruct Hcover as [Hcolumn_eq Hextent].
+        apply andb_prop in Hextent.
+        destruct Hextent as [Hrow_le Hrow_lt].
         apply Z.eqb_eq in Hcolumn_eq.
         apply Z.leb_le in Hrow_le.
-        rewrite (fill_conflicts_write_false column from_row value write
+        apply Z.ltb_lt in Hrow_lt.
+        rewrite (fill_conflicts_write_false column from_row to_row value write
           (existsb_false_forall _ _ Hconflict_write write Hin)
-          Hcolumn_eq Hrow_le).
+          Hcolumn_eq Hrow_le Hrow_lt).
         reflexivity.
       * apply Hfixed, Hin.
-    + intros fill fill_row [<- | Hin] Hle.
+    + intros fill fill_row [<- | Hin] Hle Hlt.
       * (* the fill just performed *)
-        cbn.
+        cbn in Hle, Hlt |- *.
         rewrite Z.eqb_refl.
         rewrite (proj2 (Z.leb_le from_row fill_row) Hle).
+        rewrite (proj2 (Z.ltb_lt fill_row to_row) Hlt).
         reflexivity.
       * cbn.
         destruct (andb (fill.(Fill.column) =? column)
-            (from_row <=? fill_row)) eqn:Hcover.
+            (andb (from_row <=? fill_row) (fill_row <? to_row))) eqn:Hcover.
         -- apply andb_prop in Hcover.
-           destruct Hcover as [Hcolumn_eq _].
+           destruct Hcover as [Hcolumn_eq Hextent].
+           apply andb_prop in Hextent.
+           destruct Hextent as [Hfrom_le Hto_lt].
            apply Z.eqb_eq in Hcolumn_eq.
-           rewrite (fill_conflicts_fill_false column value fill
+           apply Z.leb_le in Hfrom_le.
+           apply Z.ltb_lt in Hto_lt.
+           assert (Hinter : Z.max from_row fill.(Fill.from_row) <
+                            Z.min to_row fill.(Fill.to_row)) by lia.
+           rewrite (fill_conflicts_fill_false column from_row to_row value fill
              (existsb_false_forall _ _ Hconflict_fill fill Hin)
-             Hcolumn_eq).
+             Hcolumn_eq Hinter).
            reflexivity.
         -- apply Hfill; assumption.
 Qed.
@@ -347,7 +367,7 @@ Proof.
   destruct event as
     [name | name | name | name | column row annotation
     | column row annotation value | left_cell right_cell
-    | column from_row value];
+    | column from_row to_row value];
     cbn;
     try (intros Happly; injection Happly as <-; apply log_extends_refl).
   - (* EnableSelector *)
@@ -367,11 +387,11 @@ Proof.
     injection Happly as <-.
     split; [| split]; cbn; intros; [| right |]; assumption.
   - (* FillFromRow *)
-    destruct (List.existsb (fill_conflicts_write column from_row value)
+    destruct (List.existsb (fill_conflicts_write column from_row to_row value)
         state.(ReplayState.log).(Log.fixeds));
       intros Happly; [discriminate |].
     revert Happly.
-    destruct (List.existsb (fill_conflicts_fill column value)
+    destruct (List.existsb (fill_conflicts_fill column from_row to_row value)
         state.(ReplayState.log).(Log.fills));
       intros Happly; [discriminate |].
     injection Happly as <-.
@@ -433,19 +453,24 @@ Proof.
 Qed.
 
 Lemma apply_event_fill_logged (state state' : ReplayState.t)
-    (column from_row value : Z) :
-  apply_event state (Raw.Event.FillFromRow column from_row value) =
+    (column from_row to_row value : Z) :
+  apply_event state (Raw.Event.FillFromRow column from_row to_row value) =
     Some state' ->
   List.In
-    {| Fill.column := column; Fill.from_row := from_row; Fill.value := value |}
+    {|
+      Fill.column := column;
+      Fill.from_row := from_row;
+      Fill.to_row := to_row;
+      Fill.value := value;
+    |}
     state'.(ReplayState.log).(Log.fills).
 Proof.
   cbn.
-  destruct (List.existsb (fill_conflicts_write column from_row value)
+  destruct (List.existsb (fill_conflicts_write column from_row to_row value)
       state.(ReplayState.log).(Log.fixeds));
     intros Happly; [discriminate |].
   revert Happly.
-  destruct (List.existsb (fill_conflicts_fill column value)
+  destruct (List.existsb (fill_conflicts_fill column from_row to_row value)
       state.(ReplayState.log).(Log.fills));
     intros Happly; [discriminate |].
   injection Happly as <-.
@@ -498,11 +523,16 @@ Qed.
 
 Lemma apply_events_log_fill_in (events : list Raw.Event.t)
     (state state' : ReplayState.t)
-    (column from_row value : Z) :
+    (column from_row to_row value : Z) :
   apply_events_log events state = Some state' ->
-  List.In (Raw.Event.FillFromRow column from_row value) events ->
+  List.In (Raw.Event.FillFromRow column from_row to_row value) events ->
   List.In
-    {| Fill.column := column; Fill.from_row := from_row; Fill.value := value |}
+    {|
+      Fill.column := column;
+      Fill.from_row := from_row;
+      Fill.to_row := to_row;
+      Fill.value := value;
+    |}
     state'.(ReplayState.log).(Log.fills).
 Proof.
   revert state.
@@ -514,7 +544,7 @@ Proof.
   destruct Hin as [-> | Hin].
   - destruct (apply_events_log_extends _ _ _ Happly) as (_ & _ & Hmono).
     apply Hmono.
-    exact (apply_event_fill_logged _ _ _ _ _ Hevent).
+    exact (apply_event_fill_logged _ _ _ _ _ _ Hevent).
   - exact (IH _ Happly Hin).
 Qed.
 
@@ -554,26 +584,27 @@ Proof.
 Qed.
 
 Lemma replay_fill_pinned (events : list Raw.Event.t)
-    (initial final : RawGrid.t) (column from_row value row : Z) :
+    (initial final : RawGrid.t) (column from_row to_row value row : Z) :
   apply_events events initial = Some final ->
-  List.In (Raw.Event.FillFromRow column from_row value) events ->
+  List.In (Raw.Event.FillFromRow column from_row to_row value) events ->
   from_row <= row ->
+  row < to_row ->
   final.(RawGrid.cell) Raw.ColumnKind.Fixed column row = value.
 Proof.
   unfold apply_events.
   destruct (apply_events_log events (ReplayState.init initial))
     as [state |] eqn:Hreplay; [| discriminate].
-  intros Hfinal Hin Hle.
+  intros Hfinal Hin Hle Hlt.
   injection Hfinal as <-.
   destruct (apply_events_log_pins _ _ _ Hreplay (log_pins_grid_empty initial))
     as (_ & _ & Hfill).
-  exact (Hfill _ _ (apply_events_log_fill_in _ _ _ _ _ _ Hreplay Hin) Hle).
+  exact (Hfill _ _ (apply_events_log_fill_in _ _ _ _ _ _ _ Hreplay Hin) Hle Hlt).
 Qed.
 
 (** ** Where the table-load events land
 
     [V1.init_lookup_table_events] assigns each entry's rows [0 ..
-    length values) and fills the rows from [length values] on with the
+    length values) and fills the rows [length values .. usable_rows) with the
     default value; the lemmas below exhibit the corresponding events as
     members of the emitted stream. *)
 
@@ -628,7 +659,7 @@ Proof.
 Qed.
 
 Lemma fill_lookup_entries_in {columns : Columns.t}
-    (idx : Indices.t columns)
+    (idx : Indices.t columns) (usable_rows : Z)
     (entries : list (LookupTableColumn.t columns))
     (entry : LookupTableColumn.t columns) :
   List.In entry entries ->
@@ -636,8 +667,9 @@ Lemma fill_lookup_entries_in {columns : Columns.t}
     (Raw.Event.FillFromRow
       (idx.(Indices.lookup) (LookupTableColumn.lookup entry))
       (Z.of_nat (List.length (LookupTableColumn.values entry)))
+      usable_rows
       (LookupTableColumn.default_value entry))
-    (V1.fill_lookup_entries idx entries).
+    (V1.fill_lookup_entries idx usable_rows entries).
 Proof.
   induction entries as [| entry' entries IH]; intros Hentry;
     [contradiction |].
@@ -692,9 +724,9 @@ Section DeterminedFacts.
   Qed.
 
   Lemma layouter_value_agrees {A : Set}
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       (program : 𝓛 columns RegionId A) :
-    layouter_value program = fst (V1.eval_layouter idx rs program).
+    layouter_value program = fst (V1.eval_layouter idx rs usable_rows program).
   Proof.
     induction program as
       [A value | A B first IHfirst second IHsecond
@@ -703,11 +735,11 @@ Section DeterminedFacts.
       cbn [layouter_value V1.eval_layouter]; try reflexivity.
     - (* Bind *)
       rewrite IHfirst.
-      destruct (V1.eval_layouter idx rs first)
+      destruct (V1.eval_layouter idx rs usable_rows first)
         as [value_first events_first].
       cbn [fst].
       rewrite (IHsecond value_first).
-      destruct (V1.eval_layouter idx rs (second value_first))
+      destruct (V1.eval_layouter idx rs usable_rows (second value_first))
         as [value_second events_second].
       reflexivity.
     - (* AddRegion *)
@@ -717,7 +749,7 @@ Section DeterminedFacts.
       reflexivity.
     - (* InNamespace *)
       rewrite IHnested.
-      destruct (V1.eval_layouter idx rs nested) as [value events].
+      destruct (V1.eval_layouter idx rs usable_rows nested) as [value events].
       reflexivity.
   Qed.
 
@@ -725,11 +757,15 @@ Section DeterminedFacts.
     Variable grid : RawGrid.t.
     Variable events_all : list Raw.Event.t.
 
-    (** The pinning facts a successful replay provides
-        ([replay_selector_pinned] / [replay_fixed_pinned] /
-        [replay_fill_pinned]), abstracted over the event list so that the
+    (** The pinning facts a successful replay provides for the two
+        program-determined planes ([replay_selector_pinned] /
+        [replay_fixed_pinned]), abstracted over the event list so that the
         induction below can pass to sub-lists of the replayed stream by
-        [List.incl]. *)
+        [List.incl].  Rows of a table column past its value-list length are no
+        longer program-determined (the keygen-faithful fill leaves the
+        [l_last] and blinding tail unwritten), so the fill-pinning
+        [replay_fill_pinned] is consumed operationally rather than as a
+        pinning hypothesis here. *)
     Hypothesis H_selector_pinned :
       forall (column row : Z) (annotation : string),
         List.In (Raw.Event.EnableSelector column row annotation) events_all ->
@@ -739,23 +775,21 @@ Section DeterminedFacts.
         List.In (Raw.Event.AssignFixed column row annotation value)
           events_all ->
         grid.(RawGrid.cell) Raw.ColumnKind.Fixed column row = value.
-    Hypothesis H_fill_pinned :
-      forall (column from_row value row : Z),
-        List.In (Raw.Event.FillFromRow column from_row value) events_all ->
-        from_row <= row ->
-        grid.(RawGrid.cell) Raw.ColumnKind.Fixed column row = value.
 
-    (** The [Fact.LookupTableLoaded] interpretation for one table entry:
-        rows below the value-list length are pinned by the row assignments,
-        rows from the length on by the [FillFromRow] event. *)
-    Lemma lookup_entry_pinned (idx : Indices.t columns) (name : string)
+    (** The [Fact.LookupTableLoaded] interpretation for one table entry over
+        its assigned rows [0 .. length values): each such row is pinned by the
+        corresponding [AssignFixed] row-assignment event. *)
+    Lemma lookup_entry_pinned (idx : Indices.t columns) (usable_rows : Z)
+        (name : string)
         (entries : list (LookupTableColumn.t columns))
         (entry : LookupTableColumn.t columns)
         (Hentry : List.In entry entries)
         (Hincl :
-          List.incl (V1.init_lookup_table_events idx name entries) events_all)
+          List.incl (V1.init_lookup_table_events idx usable_rows name entries)
+            events_all)
         (row : Z)
-        (Hrow : 0 <= row) :
+        (Hrow :
+          0 <= row < Z.of_nat (List.length (LookupTableColumn.values entry))) :
       grid.(RawGrid.cell) Raw.ColumnKind.Fixed
         (idx.(Indices.lookup) (LookupTableColumn.lookup entry)) row =
       value_at_row row (LookupTableColumn.values entry)
@@ -763,37 +797,25 @@ Section DeterminedFacts.
     Proof.
       unfold value_at_row.
       assert (Hrow_eq : row = Z.of_nat (Z.to_nat row)) by lia.
-      destruct (Nat.lt_ge_cases (Z.to_nat row)
-          (List.length (LookupTableColumn.values entry))) as [Hlt | Hge].
-      - (* a row of the assigned prefix *)
-        rewrite Hrow_eq, Nat2Z.id.
-        apply (H_fixed_pinned _ _ (LookupTableColumn.annotation entry)).
-        apply Hincl.
-        unfold V1.init_lookup_table_events.
-        apply List.in_or_app; right.
-        apply List.in_or_app; left.
-        apply (assign_lookup_rows_in idx (V1.max_entry_length entries)
-          0%nat (Z.to_nat row) entries).
-        + pose proof (max_entry_length_bound entries entry Hentry).
-          lia.
-        + apply (assign_lookup_row_in idx (Z.to_nat row) entries entry _
-            Hentry).
-          unfold V1.assign_lookup_entry_at_row.
-          rewrite (value_at_row_some (Z.to_nat row)
-            (LookupTableColumn.values entry)
-            (LookupTableColumn.default_value entry) Hlt).
-          apply List.in_eq.
-      - (* a row of the filled tail *)
-        rewrite List.nth_overflow by exact Hge.
-        apply (H_fill_pinned _
-          (Z.of_nat (List.length (LookupTableColumn.values entry))) _ row).
-        + apply Hincl.
-          unfold V1.init_lookup_table_events.
-          apply List.in_or_app; right.
-          apply List.in_or_app; right.
-          apply List.in_or_app; right.
-          apply (fill_lookup_entries_in idx entries entry Hentry).
-        + lia.
+      assert (Hlt : (Z.to_nat row <
+          List.length (LookupTableColumn.values entry))%nat) by lia.
+      rewrite Hrow_eq, Nat2Z.id.
+      apply (H_fixed_pinned _ _ (LookupTableColumn.annotation entry)).
+      apply Hincl.
+      unfold V1.init_lookup_table_events.
+      apply List.in_or_app; right.
+      apply List.in_or_app; left.
+      apply (assign_lookup_rows_in idx (V1.max_entry_length entries)
+        0%nat (Z.to_nat row) entries).
+      + pose proof (max_entry_length_bound entries entry Hentry).
+        lia.
+      + apply (assign_lookup_row_in idx (Z.to_nat row) entries entry _
+          Hentry).
+        unfold V1.assign_lookup_entry_at_row.
+        rewrite (value_at_row_some (Z.to_nat row)
+          (LookupTableColumn.values entry)
+          (LookupTableColumn.default_value entry) Hlt).
+        apply List.in_eq.
     Qed.
 
     Lemma region_determined_facts
@@ -852,9 +874,9 @@ Section DeterminedFacts.
     Qed.
 
     Lemma layouter_determined_facts
-        (idx : Indices.t columns) (rs : RegionId -> Z)
+        (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
         {A : Set} (program : 𝓛 columns RegionId A) :
-      List.incl (snd (V1.eval_layouter idx rs program)) events_all ->
+      List.incl (snd (V1.eval_layouter idx rs usable_rows program)) events_all ->
       interpret_facts (realize idx rs grid)
         (determined_facts (layouter_facts program)).
     Proof.
@@ -867,11 +889,11 @@ Section DeterminedFacts.
         exact I.
       - (* Bind *)
         cbn [V1.eval_layouter layouter_facts].
-        rewrite (layouter_value_agrees idx rs first).
-        destruct (V1.eval_layouter idx rs first)
+        rewrite (layouter_value_agrees idx rs usable_rows first).
+        destruct (V1.eval_layouter idx rs usable_rows first)
           as [value_first events_first] eqn:Hfirst.
         cbn [fst snd].
-        destruct (V1.eval_layouter idx rs (second value_first))
+        destruct (V1.eval_layouter idx rs usable_rows (second value_first))
           as [value_second events_second] eqn:Hsecond.
         cbn [snd].
         intros Hincl.
@@ -913,11 +935,11 @@ Section DeterminedFacts.
         subst fact.
         cbn [interpret_fact].
         intros row Hrow.
-        exact (lookup_entry_pinned idx name entries entry Hentry Hincl
-          row Hrow).
+        exact (lookup_entry_pinned idx usable_rows name entries entry Hentry
+          Hincl row Hrow).
       - (* InNamespace *)
         cbn [V1.eval_layouter layouter_facts].
-        destruct (V1.eval_layouter idx rs nested)
+        destruct (V1.eval_layouter idx rs usable_rows nested)
           as [value events] eqn:Hnested.
         cbn [snd].
         intros Hincl.
@@ -935,23 +957,21 @@ Section DeterminedFacts.
       grid: replay success alone makes the program-determined facts of the
       synthesis program hold in the realized assignment. *)
   Theorem determined_facts_hold
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (initial final : RawGrid.t) :
-    apply_events (snd (V1.eval_layouter idx rs program)) initial =
+    apply_events (snd (V1.eval_layouter idx rs usable_rows program)) initial =
       Some final ->
     interpret_facts (realize idx rs final)
       (determined_facts (layouter_facts program)).
   Proof.
     intros Hreplay.
-    apply (layouter_determined_facts final
-      (snd (V1.eval_layouter idx rs program))).
+    eapply (layouter_determined_facts final
+      (snd (V1.eval_layouter idx rs usable_rows program))).
     - intros column row annotation Hin.
       exact (replay_selector_pinned _ _ _ _ _ _ Hreplay Hin).
     - intros column row annotation value Hin.
       exact (replay_fixed_pinned _ _ _ _ _ _ _ Hreplay Hin).
-    - intros column from_row value row Hin Hle.
-      exact (replay_fill_pinned _ _ _ _ _ _ _ Hreplay Hin Hle).
     - apply List.incl_refl.
   Qed.
 
@@ -959,10 +979,10 @@ Section DeterminedFacts.
       consumed by the operational-soundness theorem, whose replay premise
       starts from [initial_grid advice instance_]. *)
   Theorem operational_sound_determined_facts
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (advice instance_ : Z -> Z -> Z) (final : RawGrid.t) :
-    apply_events (snd (V1.eval_layouter idx rs program))
+    apply_events (snd (V1.eval_layouter idx rs usable_rows program))
       (initial_grid advice instance_) = Some final ->
     interpret_facts (realize idx rs final)
       (determined_facts (layouter_facts program)).

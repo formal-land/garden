@@ -48,11 +48,11 @@ Module RawGrid.
     sel := grid.(sel);
   |}.
 
-  Definition fill_fixed (grid : t) (column from_row value : Z) : t := {|
+  Definition fill_fixed (grid : t) (column from_row to_row value : Z) : t := {|
     cell := fun kind c r =>
       match kind with
       | Raw.ColumnKind.Fixed =>
-          if andb (c =? column) (from_row <=? r)
+          if andb (c =? column) (andb (from_row <=? r) (r <? to_row))
           then value
           else grid.(cell) kind c r
       | _ => grid.(cell) kind c r
@@ -79,7 +79,7 @@ Definition initial_grid (advice instance_ : Z -> Z -> Z) : RawGrid.t := {|
     The grid is a function, so "this cell was already written" is not
     decidable from the grid alone.  Replay therefore threads a finite log of
     the performed writes — point writes per plane, plus one record per
-    [FillFromRow] for its unbounded extent — and the conflict check computes
+    [FillFromRow] for its half-open extent — and the conflict check computes
     over the log. *)
 
 Module Write.
@@ -93,10 +93,11 @@ End Write.
 
 Module Fill.
   (** A recorded [FillFromRow]: [value] written to every row of [column] in
-      the extent [[from_row, ∞)]. *)
+      the half-open extent [[from_row, to_row)]. *)
   Record t : Set := {
     column : Z;
     from_row : Z;
+    to_row : Z;
     value : Z;
   }.
 End Fill.
@@ -141,26 +142,33 @@ Definition write_conflicts_write (column row value : Z) (write : Write.t)
     (andb (write.(Write.column) =? column) (write.(Write.row) =? row))
     (negb (write.(Write.value) =? value)).
 
-(** A pending point write lands inside an earlier fill extent with a
-    different value. *)
+(** A pending point write lands inside an earlier fill's half-open extent
+    with a different value. *)
 Definition write_conflicts_fill (column row value : Z) (fill : Fill.t)
     : bool :=
   andb
-    (andb (fill.(Fill.column) =? column) (fill.(Fill.from_row) <=? row))
+    (andb (fill.(Fill.column) =? column)
+      (andb (fill.(Fill.from_row) <=? row) (row <? fill.(Fill.to_row))))
     (negb (fill.(Fill.value) =? value)).
 
-(** A pending fill [(column, from_row, value)] covers an earlier point write
-    holding a different value. *)
-Definition fill_conflicts_write (column from_row value : Z) (write : Write.t)
-    : bool :=
+(** A pending fill [(column, from_row, to_row, value)] covers an earlier point
+    write inside its half-open extent holding a different value. *)
+Definition fill_conflicts_write (column from_row to_row value : Z)
+    (write : Write.t) : bool :=
   andb
-    (andb (write.(Write.column) =? column) (from_row <=? write.(Write.row)))
+    (andb (write.(Write.column) =? column)
+      (andb (from_row <=? write.(Write.row)) (write.(Write.row) <? to_row)))
     (negb (write.(Write.value) =? value)).
 
-(** Two fills of one column overlap on a final segment whatever their start
-    rows, so they conflict exactly when their values differ. *)
-Definition fill_conflicts_fill (column value : Z) (fill : Fill.t) : bool :=
-  andb (fill.(Fill.column) =? column) (negb (fill.(Fill.value) =? value)).
+(** Two fills of one column conflict exactly when their half-open extents
+    [[from_row, to_row)] and [[fill.from_row, fill.to_row)] intersect and their
+    values differ. *)
+Definition fill_conflicts_fill (column from_row to_row value : Z)
+    (fill : Fill.t) : bool :=
+  andb (fill.(Fill.column) =? column)
+    (andb
+      (Z.max from_row fill.(Fill.from_row) <? Z.min to_row fill.(Fill.to_row))
+      (negb (fill.(Fill.value) =? value))).
 
 (** ** Partial event replay *)
 
@@ -217,21 +225,22 @@ Definition apply_event (state : ReplayState.t) (event : Raw.Event.t)
             Log.add_fixed log
               {| Write.column := column; Write.row := row; Write.value := value |};
         |}
-  | Raw.Event.FillFromRow column from_row value =>
+  | Raw.Event.FillFromRow column from_row to_row value =>
       if orb
-           (List.existsb (fill_conflicts_write column from_row value)
+           (List.existsb (fill_conflicts_write column from_row to_row value)
              log.(Log.fixeds))
-           (List.existsb (fill_conflicts_fill column value)
+           (List.existsb (fill_conflicts_fill column from_row to_row value)
              log.(Log.fills))
       then None
       else
         Some {|
-          ReplayState.grid := RawGrid.fill_fixed grid column from_row value;
+          ReplayState.grid := RawGrid.fill_fixed grid column from_row to_row value;
           ReplayState.log :=
             Log.add_fill log
               {|
                 Fill.column := column;
                 Fill.from_row := from_row;
+                Fill.to_row := to_row;
                 Fill.value := value;
               |};
         |}

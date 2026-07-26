@@ -900,7 +900,7 @@ Section Completeness.
         (witness_facts_In facts _ Hin eq_refl)).
     - (* LookupTableLoaded *)
       cbn [interpret_fact].
-      intros row Hrow.
+      intros row [Hrow _].
       unfold honest_lookup_plane in Hlookup.
       rewrite (Hlookup column row Hrow).
       exact (no_conflicting_writes_table facts column values default_value
