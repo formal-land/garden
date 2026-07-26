@@ -376,10 +376,31 @@ hypotheses. Both instantiation layers are proved:
     valid input): all 4,858 enabled gate points and all 2,964 witness facts
     are machine-verified by `vm_compute`.
 
-  Remaining: the universally quantified theorem
-  `completeness_statement honest_assignment` (stated as
-  `OrchardHonestAssignment.orchard_completeness_statement`, `Prop` only) — the
-  C2 campaign.
+  - `OrchardCompletenessAssembly.orchard_completeness`
+    (`Orchard/circuit_completeness/forward/assembly.v`, `Qed`) is the
+    universally quantified C2 theorem
+    `OrchardHonestAssignment.orchard_completeness_statement` — every valid,
+    nondegenerate honest input yields a satisfying Γ that reads back to the
+    input. It composes, through `forward/api.v`'s
+    `completeness_statement_of_families`, the whole-circuit gate side
+    (`gates_all : family_gates_ok all_families`, a total case analysis over
+    the 56 gate selectors into the per-family `forward/` lanes), the lookup
+    side (`lookups_forward_ok`), the read-back (`read_back_forward`) and the
+    witness-fact side (`witness_facts_ok`).
+
+  Remaining: nothing. `orchard_completeness`'s assumption audit is exactly the
+  repo baseline, so the universal whole-circuit completeness claim is
+  unconditional — the concrete C1 instance is now a special case of it rather
+  than the strongest available statement. The last leaf, the 97 witness facts
+  whose two cell addresses the generator fills through *different* derivations
+  of one value, closed as the five group files of
+  `forward/witness/`. There is no `Admitted`, `Axiom` or `admit` anywhere
+  under `Garden/Orchard/` or `Garden/Halo2/` (per-file account in
+  [`circuit-completeness.md`](circuit-completeness.md)).
+
+  This bounds only what completeness means here: honest witnesses are accepted
+  by the *relational* `circuit_holds` model, with the model idealizations
+  listed elsewhere in this file still in force.
 - **Cyclic-domain refinement** (item 3) — *partially discharged at the
   compiled level.* The finite domain now exists one layer below the relational
   model: `Halo2/plonkish/main.v`'s `Domain` carries `n = 2^k` rows,

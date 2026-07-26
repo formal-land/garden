@@ -464,6 +464,197 @@ hypothesis* (never in a goal that contains the pow term) followed by
 `unfold Fpow, UnOp.from in H; exact H`, and wrap the transfer lemma in
 `Strategy opaque [Z.pow Z.pow_pos]`.
 
+### The completeness `forward/` gate-obligation files: reducing spec terms
+
+`Orchard/circuit_completeness/forward/{ecc_add,fixed_base,canonicity,
+sinsemilla,var_base_ladder}.v` (the C2 per-family gate obligations) were
+written by an interrupted run and initially blacklisted as "not yet
+kernel-checked" — four hung, one errored (measured 2026-07-24 against a full
+`.vo` tree).  They now kernel-check clean (0 Admitted, baseline
+`PrimString.string` + impredicative Set) and are un-blacklisted (2026-07-25):
+`ecc_add` 27 s (was ~490 s), `fixed_base` 149 s, `sinsemilla` 39 s,
+`canonicity` / `var_base_ladder` comparable.  The shared cause was the one
+this section warns about: a proof let a reduction engine touch the
+generator's spec terms.
+
+Measured full `.vo` costs of the `forward/` files (2026-07-25 for the family
+files, 2026-07-26 for `read_back`, `assembly` and `witness/`, on an otherwise
+idle 32-core machine, real time):
+`fixed_base` 149 s, `poseidon` 119 s (1.1 GB peak), `running_sums` 75 s
+(2.8 GB peak — the largest resident set in the directory), `canonicity` 73 s,
+`lookups_witness` 45 s, `sinsemilla` 40 s, `ecc_add` 27 s,
+`fixed_base_certs` 83 s, `var_base_ladder` 13 s, `residual` 3 s,
+`read_back` 2 s, `assembly` 2 s, `api` 1 s; and the five `witness/` group
+files, all cheap: `fixed_legs` 6 s, `bits_column` 2 s, `slice_bounds` 2 s,
+`chain_outputs` 2 s, `var_base` 2 s.
+`lookups_witness` grew from 37 s to 45 s when `nt_open` became the
+concatenation of the five `witness/` fact lists: the `nt_cover` scan now
+unfolds those definitions across module boundaries. That is the whole cost of
+the regrouping, and it is why splitting the residue into separate files was
+affordable — each group carries its own facts and proofs, and the joining
+file pays only the re-run of one order-insensitive `existsb` scan.
+`poseidon` and `running_sums` are dominated by their per-row case analyses
+(36 permutation rows; the range-check/telescoping row lemmas), not by any
+certificate — like the rest of the directory they contain no
+input-dependent `vm_compute`.
+
+Auditing the whole C2 surface is a *load* cost, not a proof cost: a scratch
+file that `Require`s the thirteen `forward/` modules plus `instance_cert.v`
+and runs the ~37 `Print Assumptions` takes 56 s against a full `.vo` tree
+(2026-07-26), essentially all of it loading the closure. Batch the audit into
+one file rather than one `coqc` run per theorem. `Print Assumptions` prints
+its blocks back to back with no name echo, so interleave a delimiter (a
+`Check` of a marker, or split on the trailing `Theory:` line) before
+attributing a block to a theorem — an off-by-one there silently misreports
+which theorem carries a leaf.
+
+Packaging a family obligation on top of that algebra re-pays the
+enabled-point scan and the guarded-body inventory once per file:
+`canonicity.v` went 8 s → 73 s when its `family_gates_ok [38; 39; 40]`
+assembly landed (2026-07-25) — the 23 per-selector `guarded sel = <bodies>`
+certificates and the 1,711-point `shard_classify` scan, plus the load of the
+three sibling lanes it dispatches into.  All of it is input-independent
+(facts, enabled points, selector membership — never a `Γ` advice
+evaluation), so the file stays off the heavy-certificate cost map.  Note
+that requiring a sibling forward file imports its persistent `Strategy
+opaque` set: `ecc_add.v` exports `[BinOp.div mod_inverse
+CompleteAddition.output]` and `[Pallas.mul Weierstrass.mul]`, which makes
+`unfold` on those constants fail in the requiring file.  Re-enable them with
+a scoped `Strategy transparent … / Strategy opaque …` pair around the
+coordinate-projection lemmas that need them, rather than dropping the
+opacity for the whole file.
+
+- `canonicity.v` `padd_coords` (line 976): `unfold EccSpec.point_add,
+  CompleteAddition.output` then `destruct (Point.x P =? 0); [cbn; auto |]`
+  puts `cbn` on the unfolded complete-addition output, whose field division
+  is a Fermat inverse `Z.pow _ (pallas_p − 2)` (exponent ≈ 2^254).
+  Confirmed non-terminating — 99% CPU / ~1 GB and climbing, no `-time`
+  progress past that sentence in > 2 min.  The same `unfold …point_add,
+  CompleteAddition.output` sites are in `ecc_add.v` (≈ 427–462) and
+  `var_base_ladder.v` (758).
+- The Poseidon `3^36` chain (see "Never normalize Poseidon round chains"):
+  `canonicity.v` `t_nf_spec_eq` (line 1081) proves `t_nf_spec (tables_of w)
+  = <expr naming the 36th state of `pose_states_of w`>` by bare
+  `reflexivity`; `sinsemilla.v` carries seven `pose_states_of` references in
+  the same shape.
+- `var_base_ladder.v` (line 950) does not hang — it *fails* after ≈ 196 s:
+  `mod_ring_zero` on a gradient goal carrying a `BinOp.div` reports "not a
+  valid ring equation" (the `mod_ring_solve`-not-ring trap below).
+
+Resolution (statement-preserving; the techniques that worked):
+
+- Persistent `Strategy opaque [BinOp.div mod_inverse CompleteAddition.output]`
+  — NOT `with_strategy`, which speeds the tactic but leaves the `Qed`
+  re-check slow — so the Fermat inverse (`mod_inverse` runs `mod_inv_loop`
+  at concrete fuel ≈ 512) is never forced at tactic *or* kernel-check time.
+  This alone took `ecc_add`'s `hash_go_snd` 45 s → 0.05 s.
+- `#[local] Opaque poseidon_state pose_states_of` (and
+  `Poseidon.poseidon_hash2`) to keep the 3^36 round chain folded; where a
+  shallow projection must stay transparent, place the `Opaque` after it.
+- Generic point-add projection lemmas `padd_x` / `padd_y` proved by
+  `reflexivity` over *variable* points (the inverse never appears), applied
+  by `rewrite` instead of letting `reflexivity` / `change` normalize a
+  coordinate — this turned a 158 s `change` cheap in `sinsemilla.v`.
+- `Opaque` on the ladder / table accumulators (`vb_columns`, `rr_mid`) so
+  residual conversions match as stuck atoms.
+- `cbn [tables_of <projections>]; reflexivity` (the `cell_refl` shape of
+  `forward/lookups_witness.v`) for the `tables_of`-projection cell
+  equalities, and `cbn [Z.eqb Pos.eqb]` — not just `Z.eqb` — so
+  `mod_ring_solve` / `mod_ring_zero` sees a valid ring equation on a
+  positive-literal boolean (var_base_ladder line 950).
+
+Clearing the hangs also surfaced genuine proof bugs the hangs had masked
+(a `List.nth_indep` called without its index, a wrong-occurrence `rewrite`,
+an `f_equal` that already closed the goal so the trailing `lia` hit "No such
+goal", a mis-ordered `unfold`); those were fixed with no weakened statements.
+
+Two more members of the same family, from the variable-base ladder rows of
+`forward/var_base_ladder.v` (2026-07-25):
+
+- **State the gate bodies over abstract row values, never over the
+  generator's projections.**  `mod_ring_zero` on a secant-line goal whose
+  atoms were `sr_l1 (vstep …)` / `Point.x (macc …)` projections failed after
+  its `setoid_rewrite` pass had delta-expanded them (the projections whnf to
+  `BinOp.div`, which the occurrence search unfolds to `_ mod p`), leaving a
+  goal in `mod_inverse` terms that is no longer a ring equation.  Fix: prove
+  each gate body as a lemma universally quantified over plain `Z` row values
+  (`q_mul_1_gate` / `q_mul_2_gate` / `q_mul_3_gate`), with the cell readings
+  and the chord identities as hypotheses; the instance layer then supplies
+  the generator's values by `refine` without any reduction.  This is the
+  `generalize`-before-`setoid_rewrite` rule below, applied at the statement
+  level instead of inside the proof.
+- **Never let `f_equal`/`reflexivity` bridge two spellings of a row index.**
+  `rewrite <- (hi_row w 254 …); f_equal` on
+  `hi_at tb 2 = hi_at tb (256 − Z.of_nat 254)` does not stop at the index:
+  `f_equal` tries `reflexivity` first, which unfolds `hi_at` to a `List.nth`
+  and forces the 125-step ladder fold at a symbolic input — no termination
+  (killed at 10 min).  Parameterize the row-reading lemmas by the row
+  (`hi_row`/`lo_row` take `r` with `Hr : r = 256 − Z.of_nat m`), and thread
+  the neighbouring rows as explicit parameters (`prow`/`nrow` with
+  `prow = row − 1`, `nrow = row + 1`) so every instantiation is syntactic.
+  With that, the whole family obligation costs ≈ 2.5 s on top of the file's
+  previous 10 s.
+
+### `split` on an equality goal is `eq_refl` — never enumerate facts with `repeat split`
+
+`interpret_facts Γ [f₁; …; fₙ]` is a right-nested conjunction whose leaves
+are equalities, so `repeat split` does not stop at the conjunctions: `eq`
+has one constructor, and `split` on a leaf `a = b` is `apply eq_refl`, i.e.
+a full conversion check between the two cell readings.  On the 888-fact
+witness-fact enumeration of `circuit_completeness/forward/lookups_witness.v`
+(2026-07-26) that conversion unfolds the hoisted record — `Strategy opaque`
+only *delays* delta, the kernel still unfolds as a last resort — so the four
+blinding-leg copies cost ≈ 10.7 s each and the Merkle-chain group (whose
+sides are *not* convertible) did not terminate in 10 minutes.  Split with
+`repeat apply conj` instead (it fails on a non-conjunction, leaving the leaf
+to the intended tactic) and close the trailing `True` with `exact I`: the
+same enumeration then costs ≈ 6 s in total.
+
+Two companions from the same enumeration:
+
+- **Keep the per-fact tactic away from bare `cbn` once a hand lemma has
+  rewritten one side.**  With the goal `Point.x (t_cm_old (tables_of w)) =
+  Γ.(advice) A0 (WitnessInput CmOld) 0`, a bare `cbn` ran > 6 min; stating
+  the cell reading as its own `reflexivity` lemma (`cmold_read`) and closing
+  by `rewrite` is instant.  Bare `cbn` is safe only where *both* sides are
+  advice dispatches at concrete addresses (the 723-fact mechanical group,
+  ≈ 0.06 s per 46-fact chunk).
+- **Pin the fact list as a literal and certify coverage, not equality.**
+  The list is reached by `List.forallb (fun f => existsb (fact_beq f) …)`
+  over the reified `witness_facts` (one `vm_cast_no_check`, 0.4 s), so the
+  pinned list may be regrouped by proof shape without re-running the scan;
+  `fact_beq` needs no completeness proof, only `fact_beq f g = true → f = g`.
+  The 294 KB of literal `Definition`s elaborate in ≈ 0.03 s per 46-fact
+  chunk — the literal-table superlinearity above does not appear at this
+  entry size.
+
+### Generalize every compound atom before stripping `mod`s with `setoid_rewrite`
+
+The `Zdiv.eqm` toolkit strips the guarding `mod` of each `BinOp`/`UnOp` by
+`setoid_rewrite` through the ring morphisms.  Its occurrence search reduces
+the terms it traverses, so any *constant* left in the goal is delta-expanded
+and then evaluated: `constants.two_inv` (`(pallas_p + 1) / 2`, over
+`pallas_p = 2 ^ 254 + t_p`) turned the Sinsemilla generator-table ordinate
+goal into a 15 kB iterated product of `2`s in 36 s, and a second pass did not
+terminate within 120 s (measured 2026-07-25 on
+`circuit_completeness/forward/lookups_witness.v`, `sins_row`) — the `Z.pow`
+trap above, reached through rewriting rather than a reduction tactic.  The
+same search descends into a folded gradient (`rr_l1 A G`, a `BinOp.div`) and
+forces the field inverse.
+
+Rule: before the strip, replace every compound subterm and every named
+constant by a variable — `revert` the fact hypotheses, then
+`generalize <term>; intro x` for each of the chord gradients, the point
+coordinates, the derived point's coordinates and the numeric constants, and
+re-`intro` the facts.  The goal becomes a polynomial over variables, the
+strip is instant, and the closing step is one `eqm_of_diff` with an explicit
+linear combination plus `ring`.  This is the same discipline
+`forward/sinsemilla.v` applies with `generalize (rr_l1 A G); intro l1` in
+`mid_x_eqm`; `lookups_witness.v` extends it to the constants.  Cost of the
+resulting file: 30 s (was 13 s before the five Sinsemilla site leaves, whose
+per-row fixed-plane `vm_compute` certificates over 32 layers × 52 rows add
+≈ 5 s).
+
 ### Concrete-fuel divide-and-conquer fixpoints explode under unification
 
 `fft 11 w v` (the radix-2 inverse-NTT, two recursive calls per level)

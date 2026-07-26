@@ -29,20 +29,29 @@
       nullifier and variable-base overflow lookups, the [Commit^ivk] and
       [NoteCommit] canonicity lookups and short range checks, the
       y-canonicity blocks, and the Merkle [b_1]/[b_2] short checks;
-    - the Sinsemilla generator-table sites (the hash-region rounds) are
-      stated as the five [sins_site_sound] leaves, currently [Admitted] (the
-      round algebra of the [y_p] reconstruction and the [bits]-column
-      telescoping); the dispatch and assembly around them are complete;
+    - the Sinsemilla generator-table sites (the hash-region rounds) are the
+      five [sins_site_sound] leaves, proved in the nested module
+      [SinsemillaSites] from one generic site lemma: the loaded table's
+      index/abscissa/ordinate columns read back as the identity and the two
+      [sinsemilla_s] coordinates, the [bits]-column telescoping supplies the
+      round word against the [q_sinsemilla2] piece schedule, and the [y_p]
+      reconstruction runs on the round algebra of [forward/sinsemilla.v]
+      under the non-vertical chords of [nondegenerate w];
     - the witness facts split by the Boolean [fact_trivial]: the
       self-copy facts (identical source and target cell) hold by
-      reflexivity for any assignment; the residue is the [Admitted] leaf
-      [nontrivial_witness_facts].
+      reflexivity for any assignment, and the non-self-copy facts are
+      pinned as the literal [nt_closed ++ nt_open], covered by one
+      input-independent [vm_compute] scan ([nt_cover]).  [nt_closed] is
+      proved by group: the copies whose two cell addresses the advice
+      dispatch sends to one reader expression, the blinding-leg
+      boundaries, and the Merkle running-node chain.  [nt_open] — the
+      facts whose two sides are different derivations of one value — is
+      the [Admitted] leaf [open_witness_facts].
 
     Exports: [lookups_forward_ok : family_lookups_ok all_families] (the
-    [Hlookups] side of [completeness_statement_of_families], complete
-    modulo the five Sinsemilla site leaves) and
+    [Hlookups] side of [completeness_statement_of_families]) and
     [witness_facts_ok : witness_facts_forward_ok] (complete modulo
-    [nontrivial_witness_facts]).
+    [open_witness_facts]).
 
     Every [vm_compute] certificate here is input-independent (facts, enabled
     points and selector membership only — never a [Γ] advice evaluation), so
@@ -68,18 +77,30 @@ Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_completeness.witness_input.
 Require Import Garden.Orchard.circuit_completeness.certificates.
 Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
 Require Import Garden.Orchard.circuit_completeness.tables_vb.
 Require Import Garden.Orchard.circuit_completeness.tables_nc.
 Require Import Garden.Orchard.circuit_completeness.tables.
 Require Import Garden.Orchard.circuit_completeness.honest_assignment.
 Require Import Garden.Orchard.circuit_completeness.instance_defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
+Require Import Garden.Orchard.circuit_completeness.forward.sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.forward.witness.bits_column.
+Require Import Garden.Orchard.circuit_completeness.forward.witness.chain_outputs.
+Require Import Garden.Orchard.circuit_completeness.forward.witness.slice_bounds.
+Require Import Garden.Orchard.circuit_completeness.forward.witness.fixed_legs.
+Require Import Garden.Orchard.circuit_completeness.forward.witness.var_base.
+Require Import Garden.Field.Div.
+Require Import Garden.Halo2.halo2_gadgets.ecc.chip.add_proof.
+Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_proof.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.protocol_spec.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
 Require Import Stdlib.Lists.List.
 Require Import Stdlib.micromega.Lia.
+Require Import Stdlib.Setoids.Setoid.
+Require Import Stdlib.Classes.Morphisms.
 
 Import ListNotations.
 Global Open Scope Z_scope.
@@ -1499,37 +1520,848 @@ Module OrchardForwardLookupsWitness.
       [(word, x_p, y_p)]: the [bits]-column telescoping gives the word, the
       stored round row gives [x_p], and the [y_p] reconstruction identity
       ((λ₁+λ₂)·(x_a − x_r)·2⁻¹ − λ₁·(x_a − x_p) = y_p, over the non-vertical
-      chords that [nondegenerate w] supplies) gives the [TableY] pair.  Open:
-      the five leaves below. *)
+      chords that [nondegenerate w] supplies) gives the [TableY] pair.
+
+      The proofs live in the nested module below, whose imports (the hoisted
+      cell layer, the Merkle/Sinsemilla generator and the round algebra of
+      [forward/sinsemilla.v]) are confined to that scope; the leaves
+      themselves are stated and proved after it. *)
+  Module SinsemillaSites.
+    Module SC := Garden.Halo2.halo2_gadgets.sinsemilla.chip.
+
+    Import OrchardCompletenessTables.
+    Import OrchardAdviceMerkleSinsemilla.
+    Import OrchardForwardSinsemilla.
+
+    Strategy opaque [BinOp.div mod_inverse CompleteAddition.output].
+
+    (** ** The congruence toolkit
+
+        The [Zdiv.eqm] setoid instances and the [BinOp]-to-[eqm] morphism
+        lemmas, in the spelling of [forward/sinsemilla.v] (whose own
+        declarations are file-local). *)
+
+    #[local] Instance eqm_equiv (q : Z) : Equivalence (Zdiv.eqm q).
+    Proof.
+      unfold Zdiv.eqm; split;
+        [intro | intros ? ? | intros ? ? ?]; congruence.
+    Qed.
+
+    #[local] Instance eqm_iff_proper (q : Z) :
+      Proper (Zdiv.eqm q ==> Zdiv.eqm q ==> iff) (Zdiv.eqm q).
+    Proof.
+      intros a b Hab c d Hcd.
+      unfold Zdiv.eqm in *.
+      split; congruence.
+    Qed.
+
+    #[local] Existing Instances Zdiv.Zplus_eqm Zdiv.Zmult_eqm Zdiv.Zopp_eqm
+      Zdiv.Zminus_eqm.
+
+    Lemma unop_from_eqm (x : Z) :
+      Zdiv.eqm Primes.pallas_p (UnOp.from x) x.
+    Proof. unfold UnOp.from. apply Zdiv.Zmod_eqm. Qed.
+
+    Lemma binop_add_eqm (x y : Z) :
+      Zdiv.eqm Primes.pallas_p (BinOp.add x y) (x + y).
+    Proof. unfold BinOp.add. apply Zdiv.Zmod_eqm. Qed.
+
+    (** Strip every field operation of its guarding [mod]. *)
+    Ltac strip_mods :=
+      repeat (setoid_rewrite binop_mul_eqm || setoid_rewrite binop_sub_eqm
+              || setoid_rewrite binop_add_eqm || setoid_rewrite unop_from_eqm).
+
+    (** A congruence between reduced values is an equality. *)
+    Lemma eqm_reduced (X Y : Z) :
+      Zdiv.eqm Primes.pallas_p X Y ->
+      X mod Primes.pallas_p = X ->
+      0 <= Y < Primes.pallas_p ->
+      X = Y.
+    Proof.
+      unfold Zdiv.eqm.
+      intros Heq Hx Hy.
+      rewrite <- Hx, Heq.
+      apply Z.mod_small. exact Hy.
+    Qed.
+
+    Lemma binop_mul_reduced (x y : Z) :
+      BinOp.mul x y mod Primes.pallas_p = BinOp.mul x y.
+    Proof.
+      unfold BinOp.mul. rewrite Zdiv.Zmod_mod. reflexivity.
+    Qed.
+
+    Lemma binop_add_reduced (x y : Z) :
+      BinOp.add x y mod Primes.pallas_p = BinOp.add x y.
+    Proof.
+      unfold BinOp.add. rewrite Zdiv.Zmod_mod. reflexivity.
+    Qed.
+
+    (** Linear combinations of congruences. *)
+    Lemma mod0_mul (c a : Z) :
+      a mod Primes.pallas_p = 0 -> (c * a) mod Primes.pallas_p = 0.
+    Proof.
+      intros Ha.
+      rewrite Zdiv.Zmult_mod, Ha, Z.mul_0_r, Zdiv.Zmod_0_l.
+      reflexivity.
+    Qed.
+
+    Lemma mod0_add (a b : Z) :
+      a mod Primes.pallas_p = 0 -> b mod Primes.pallas_p = 0 ->
+      (a + b) mod Primes.pallas_p = 0.
+    Proof.
+      intros Ha Hb.
+      rewrite Zdiv.Zplus_mod, Ha, Hb, Z.add_0_r, Zdiv.Zmod_0_l.
+      reflexivity.
+    Qed.
+
+    Lemma eqm_of_diff (X Y D : Z) :
+      D mod Primes.pallas_p = 0 -> X - Y = D -> Zdiv.eqm Primes.pallas_p X Y.
+    Proof.
+      intros HD Hdiff.
+      unfold Zdiv.eqm.
+      replace X with (Y + D) by lia.
+      rewrite Zdiv.Zplus_mod, HD, Z.add_0_r, Zdiv.Zmod_mod.
+      reflexivity.
+    Qed.
+
+    (** ** The first chord's exactness *)
+
+    Lemma chord1_mul (A G : Point.t)
+        (Hnd : BinOp.sub (Point.x A) (Point.x G) <> 0) :
+      Zdiv.eqm Primes.pallas_p
+        (rr_l1 A G * (Point.x A - Point.x G))
+        (Point.y A - Point.y G).
+    Proof.
+      assert (Hp2 : 2 < Primes.pallas_p)
+        by (unfold Primes.pallas_p, Primes.t_p; lia).
+      assert (Hden :
+          BinOp.sub (Point.x A) (Point.x G) mod Primes.pallas_p <> 0).
+      { unfold BinOp.sub.
+        rewrite Zdiv.Zmod_mod.
+        exact Hnd. }
+      pose proof (div_mul
+        (BinOp.sub (Point.y A) (Point.y G))
+        (BinOp.sub (Point.x A) (Point.x G))
+        Hp2 Hden) as Hmul.
+      change (BinOp.div (BinOp.sub (Point.y A) (Point.y G))
+          (BinOp.sub (Point.x A) (Point.x G)))
+        with (rr_l1 A G) in Hmul.
+      unfold Zdiv.eqm.
+      unfold BinOp.mul, BinOp.sub in Hmul.
+      rewrite Zdiv.Zmult_mod_idemp_r in Hmul.
+      rewrite Zdiv.Zmod_mod in Hmul.
+      exact Hmul.
+    Qed.
+
+    Lemma chord1_nonzero (Q : Point.t) (ws : list Z) (j : nat)
+        (HQ : 0 <= Point.x Q < Primes.pallas_p)
+        (Hj : (j < List.length ws)%nat)
+        (Hg : 0 <= Point.x (SinsemillaSpec.generator (List.nth j ws 0))
+                < Primes.pallas_p)
+        (Hnd : SinsemillaHash.nondegenerate Q ws) :
+      BinOp.sub (Point.x (sinsemilla_acc Q ws j))
+        (Point.x (SinsemillaSpec.generator (List.nth j ws 0))) <> 0.
+    Proof.
+      destruct (Hnd j Hj) as [Hneq _].
+      intros Hzero.
+      apply sub_zero_equiv in Hzero.
+      unfold UnOp.from in Hzero.
+      rewrite (Z.mod_small _ _ (acc_x_reduced Q ws j HQ)) in Hzero.
+      rewrite (Z.mod_small _ _ Hg) in Hzero.
+      exact (Hneq Hzero).
+    Qed.
+
+    (** [two_inv] halves. *)
+    Lemma two_inv_eqm :
+      Zdiv.eqm Primes.pallas_p
+        (2 * 14474011154664524427946373126085988481681528240970780357977338382174983815169)
+        1.
+    Proof. vm_cast_no_check (@eq_refl Z 1). Qed.
+
+    (** ** bits telescoping *)
+
+    (** The running-sum column telescopes within a piece. *)
+    Lemma sds_step (l : list Z) :
+      forall i : nat,
+        (i < List.length l)%nat ->
+        List.nth i (suffix_digit_sums l) 0 =
+          List.nth i l 0 + 2 ^ 10 * List.nth (S i) (suffix_digit_sums l) 0.
+    Proof.
+      induction l as [| x l IH]; intros i Hi; cbn [List.length] in Hi; [lia |].
+      destruct i as [| i].
+      - cbn [suffix_digit_sums List.nth].
+        destruct (suffix_digit_sums l) as [| y r]; reflexivity.
+      - cbn [suffix_digit_sums List.nth].
+        apply IH. lia.
+    Qed.
+
+    (** The last index of a piece, computed from the piece-length layout. *)
+    Fixpoint bnd_lens (lens : list nat) (j : nat) : bool :=
+      match lens with
+      | [] => false
+      | a :: lens' =>
+          if (S j =? a)%nat then true
+          else if (j <? a)%nat then false
+          else bnd_lens lens' (j - a)
+      end.
+
+    Lemma nth_firstn_lt {A : Type} (d : A) (n : nat) (l : list A) :
+      forall i : nat,
+        (i < n)%nat -> List.nth i (List.firstn n l) d = List.nth i l d.
+    Proof.
+      revert l; induction n as [| n IH]; intros l i Hi; [lia |].
+      destruct l as [| x l]; cbn [List.firstn].
+      - destruct i; reflexivity.
+      - destruct i as [| i]; cbn [List.nth]; [reflexivity |].
+        apply IH. lia.
+    Qed.
+
+    Lemma split_cons (a : nat) (lens : list nat) (l : list Z) :
+      split_pieces (a :: lens) l =
+        List.firstn a l :: split_pieces lens (List.skipn a l).
+    Proof. reflexivity. Qed.
+
+    Lemma bits_cons (p : list Z) (ps : list (list Z)) :
+      bits_column (p :: ps) = suffix_digit_sums p ++ bits_column ps.
+    Proof. reflexivity. Qed.
+
+    Lemma bits_step (lens : list nat) :
+      forall (l : list Z) (j : nat),
+        OrchardForwardSinsemilla.lens_sum lens = List.length l ->
+        (j < List.length l)%nat ->
+        List.nth j (bits_column (split_pieces lens l)) 0 =
+          List.nth j l 0 +
+          (if bnd_lens lens j
+           then 0
+           else 2 ^ 10 *
+             List.nth (S j) (bits_column (split_pieces lens l)) 0).
+    Proof.
+      induction lens as [| a lens IH]; intros l j Hlen Hj;
+        cbn [OrchardForwardSinsemilla.lens_sum] in Hlen.
+      - cbn [List.length] in Hj. lia.
+      - rewrite split_cons, bits_cons.
+        assert (Ha : (a <= List.length l)%nat) by lia.
+        assert (Hp : List.length (suffix_digit_sums (List.firstn a l)) = a).
+        { rewrite suffix_digit_sums_length, List.length_firstn. lia. }
+        cbn [bnd_lens].
+        destruct (Nat.lt_ge_cases j a) as [Hlt | Hge].
+        + rewrite List.app_nth1 by lia.
+          rewrite sds_step
+            by (rewrite List.length_firstn; lia).
+          rewrite nth_firstn_lt by lia.
+          destruct (Nat.eq_dec (S j) a) as [Heq | Hne].
+          * rewrite (proj2 (Nat.eqb_eq (S j) a) Heq).
+            assert (Hz : List.nth (S j)
+              (suffix_digit_sums (List.firstn a l)) 0 = 0)
+              by (apply List.nth_overflow; lia).
+            rewrite Hz.
+            lazy beta iota.
+            lia.
+          * rewrite (proj2 (Nat.eqb_neq (S j) a) Hne).
+            rewrite (proj2 (Nat.ltb_lt j a) Hlt).
+            lazy beta iota.
+            rewrite List.app_nth1 by lia.
+            reflexivity.
+        + rewrite (proj2 (Nat.eqb_neq (S j) a)) by lia.
+          rewrite (proj2 (Nat.ltb_ge j a) Hge).
+          lazy beta iota.
+          rewrite List.app_nth2 by lia.
+          rewrite Hp.
+          rewrite (IH (List.skipn a l) (j - a)%nat)
+            by (rewrite List.length_skipn; lia).
+          rewrite List.nth_skipn.
+          replace (a + (j - a))%nat with j by lia.
+          destruct (bnd_lens lens (j - a)%nat).
+          * reflexivity.
+          * rewrite List.app_nth2 by lia.
+            rewrite Hp.
+            replace (S j - a)%nat with (S (j - a))%nat by lia.
+            reflexivity.
+    Qed.
+
+    (** ** table plane *)
+
+
+
+    Lemma table_x_entry :
+      Complete.table_lookup OrchardHonestAssignment.lookup_eqb
+        (Complete.table_entries OrchardHonestAssignment.facts) Lookup.TableX =
+      Some (List.map SC.sinsemilla_s_x SC.generator_table_indexes,
+            SC.sinsemilla_s0_x).
+    Proof.
+      vm_cast_no_check
+        (@eq_refl (option (list Z * Z))
+          (Some (List.map SC.sinsemilla_s_x SC.generator_table_indexes,
+                 SC.sinsemilla_s0_x))).
+    Qed.
+
+    Lemma table_y_entry :
+      Complete.table_lookup OrchardHonestAssignment.lookup_eqb
+        (Complete.table_entries OrchardHonestAssignment.facts) Lookup.TableY =
+      Some (List.map SC.sinsemilla_s_y SC.generator_table_indexes,
+            SC.sinsemilla_s0_y).
+    Proof.
+      vm_cast_no_check
+        (@eq_refl (option (list Z * Z))
+          (Some (List.map SC.sinsemilla_s_y SC.generator_table_indexes,
+                 SC.sinsemilla_s0_y))).
+    Qed.
+
+    Lemma indexes_nth (r : Z) :
+      0 <= r < 1024 ->
+      List.nth (Z.to_nat r) SC.generator_table_indexes 0 = r.
+    Proof.
+      intros Hr.
+      unfold SC.generator_table_indexes.
+      change (Z.to_nat (2 ^ SC.sinsemilla_k)) with 1024%nat.
+      change 0 with (Z.of_nat 0%nat).
+      rewrite List.map_nth.
+      rewrite List.seq_nth by lia.
+      lia.
+    Qed.
+
+    Lemma indexes_length :
+      List.length SC.generator_table_indexes = 1024%nat.
+    Proof.
+      unfold SC.generator_table_indexes.
+      rewrite List.length_map, List.length_seq.
+      reflexivity.
+    Qed.
+
+    Lemma lookup_plane_x (w : HonestInput) (r : Z) :
+      0 <= r < 1024 ->
+      (Γw w).(Assignment.lookup) Lookup.TableX r = SC.sinsemilla_s_x r.
+    Proof.
+      intros Hr.
+      rewrite lookup_plane.
+      unfold Complete.table_value.
+      rewrite table_x_entry.
+      unfold value_at_row.
+      assert (Hlen : (Z.to_nat r <
+        List.length (List.map SC.sinsemilla_s_x
+          SC.generator_table_indexes))%nat).
+      { rewrite List.length_map, indexes_length. lia. }
+      rewrite (List.nth_indep _ _ (SC.sinsemilla_s_x 0) Hlen).
+      rewrite List.map_nth.
+      rewrite indexes_nth by lia.
+      reflexivity.
+    Qed.
+
+    Lemma lookup_plane_y (w : HonestInput) (r : Z) :
+      0 <= r < 1024 ->
+      (Γw w).(Assignment.lookup) Lookup.TableY r = SC.sinsemilla_s_y r.
+    Proof.
+      intros Hr.
+      rewrite lookup_plane.
+      unfold Complete.table_value.
+      rewrite table_y_entry.
+      unfold value_at_row.
+      assert (Hlen : (Z.to_nat r <
+        List.length (List.map SC.sinsemilla_s_y
+          SC.generator_table_indexes))%nat).
+      { rewrite List.length_map, indexes_length. lia. }
+      rewrite (List.nth_indep _ _ (SC.sinsemilla_s_y 0) Hlen).
+      rewrite List.map_nth.
+      rewrite indexes_nth by lia.
+      reflexivity.
+    Qed.
+
+    (** The generator table's entries are reduced field elements. *)
+    Definition s_entry_ok (i : Z) : bool :=
+      (0 <=? SC.sinsemilla_s_x i) &&
+      (SC.sinsemilla_s_x i <? Primes.pallas_p) &&
+      (0 <=? SC.sinsemilla_s_y i) &&
+      (SC.sinsemilla_s_y i <? Primes.pallas_p).
+
+    Lemma s_entries_ok :
+      List.forallb s_entry_ok SC.generator_table_indexes = true.
+    Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+    Lemma s_reduced (r : Z) (Hr : 0 <= r < 1024) :
+      0 <= SC.sinsemilla_s_x r < Primes.pallas_p /\
+      0 <= SC.sinsemilla_s_y r < Primes.pallas_p.
+    Proof.
+      assert (Hin : List.In r SC.generator_table_indexes).
+      { unfold SC.generator_table_indexes.
+        change (Z.to_nat (2 ^ SC.sinsemilla_k)) with 1024%nat.
+        apply List.in_map_iff.
+        exists (Z.to_nat r).
+        split; [lia |].
+        apply List.in_seq. lia. }
+      pose proof (proj1 (List.forallb_forall s_entry_ok
+        SC.generator_table_indexes) s_entries_ok _ Hin) as Hb.
+      unfold s_entry_ok in Hb.
+      repeat (apply andb_true_iff in Hb; destruct Hb as [Hb ?]).
+      repeat match goal with
+      | H : (_ <=? _) = true |- _ => apply Z.leb_le in H
+      | H : (_ <? _) = true |- _ => apply Z.ltb_lt in H
+      end.
+      lia.
+    Qed.
+
+    (** ** The per-row pair obligations *)
+
+    Definition sins_sel (second : bool) : Selector.t :=
+      if second then Selector.QSinsemilla1_2 else Selector.QSinsemilla1_1.
+
+    Definition sins_arg (second : bool) : LookupArgument.t columns :=
+      if second then sins2_arg else sins1_arg.
+
+    Definition bits_col (second : bool) : Advice.t :=
+      if second then Advice.A7 else Advice.A2.
+
+    Definition qfac (q : Z) : Z := q - q * (q - 1).
+
+    Lemma sins_row (second : bool) (w : HonestInput) (region : RegionId.t)
+        (row : Z) (A G : Point.t) (zc zn qv wd : Z)
+        (Hsel : (Γw w).(Assignment.selector) (sins_sel second) region row = 1)
+        (Hxa : (Γw w).(Assignment.advice) (xa_col second) region row = Point.x A)
+        (Hxp : (Γw w).(Assignment.advice) (xp_col second) region row = Point.x G)
+        (Hl1 : (Γw w).(Assignment.advice) (l1_col second) region row = rr_l1 A G)
+        (Hl2 : (Γw w).(Assignment.advice) (l2_col second) region row = rr_l2 A G)
+        (Hzc : (Γw w).(Assignment.advice) (bits_col second) region row = zc)
+        (Hzn : (Γw w).(Assignment.advice) (bits_col second) region (row + 1) = zn)
+        (Hq : (Γw w).(Assignment.fixed) (q2_col second) region row = qv)
+        (Hwd : 0 <= wd < 1024)
+        (HG : G = SinsemillaSpec.generator wd)
+        (Hword : zc = wd + qfac qv * 1024 * zn)
+        (Hnd1 : BinOp.sub (Point.x A) (Point.x G) <> 0)
+        (Hnd2 : BinOp.sub (Point.x (rr_mid A G)) (Point.x A) <> 0) :
+      eval_lookup_argument (Γw w) (region, row) 1024 (sins_arg second).
+    Proof.
+      assert (Harg : forall s : bool, sins_arg s =
+        SC.generator_table_argument (sins_sel s) (q2_col s)
+          (xa_col s) (xp_col s) (bits_col s) (l1_col s) (l2_col s))
+        by (intro s; destruct s; reflexivity).
+      unfold eval_lookup_argument.
+      exists wd.
+      split; [lia |].
+      rewrite Harg.
+      unfold SC.generator_table_argument.
+      cbn [LookupArgument.pairs].
+      repeat apply List.Forall_cons; [ | | | apply List.Forall_nil ].
+      all: unfold SC.generator_table_word, SC.generator_table_y_p,
+        SC.q_s3, SC.y_a.
+      all: cbn [eval_expression eval_selector].
+      all: unfold rotated_row.
+      all: cbn [Rotation.offset].
+      all: rewrite !Z.add_0_r.
+      all: rewrite ?Hsel, ?Hxa, ?Hxp, ?Hl1, ?Hl2, ?Hzc, ?Hzn, ?Hq.
+      all: unfold SC.x_r.
+      all: cbn [eval_expression Rotation.next Rotation.cur Rotation.offset].
+      all: unfold rotated_row.
+      all: cbn [Rotation.cur Rotation.offset].
+      all: rewrite ?Z.add_0_r.
+      all: rewrite ?Hsel, ?Hxa, ?Hxp, ?Hl1, ?Hl2, ?Hzc, ?Hzn, ?Hq.
+      change (2 ^ SC.sinsemilla_k) with 1024.
+      3: unfold Garden.Halo2.halo2_gadgets.utilities.square.
+      3: cbn [eval_expression].
+      3: unfold rotated_row.
+      3: cbn [Rotation.cur Rotation.offset].
+      3: rewrite ?Z.add_0_r.
+      3: rewrite ?Hl1.
+      (* The word pair: the running-sum slice telescopes to the round word. *)
+      1: rewrite lookup_plane_idx by lia.
+      1: apply eqm_reduced;
+         [ | apply binop_mul_reduced | pose proof pallas_p_1024; lia ].
+      1: strip_mods.
+      1: apply eqm_of_ring.
+      1: rewrite Hword; unfold qfac; ring.
+      (* The abscissa pair: the stored generator abscissa is the table entry. *)
+      1: rewrite lookup_plane_x by lia.
+      1: apply eqm_reduced;
+         [ | apply binop_add_reduced | exact (proj1 (s_reduced wd ltac:(lia))) ].
+      1: strip_mods.
+      1: apply eqm_of_ring.
+      1: rewrite HG; unfold SC.sinsemilla_s_x, SinsemillaSpec.generator;
+         cbn [Point.x]; ring.
+      (* The ordinate pair: the [y_p] reconstruction over the two chords. *)
+      rewrite lookup_plane_y by lia.
+      replace (SC.sinsemilla_s_y wd) with (Point.y G)
+        by (rewrite HG; unfold SC.sinsemilla_s_y, SinsemillaSpec.generator;
+            cbn [Point.y]; reflexivity).
+      apply eqm_reduced;
+        [ | apply binop_add_reduced
+          | rewrite HG; unfold SinsemillaSpec.generator; cbn [Point.y];
+            exact (proj2 (s_reduced wd ltac:(lia))) ].
+      pose proof (mid_x_eqm A G) as F1.
+      pose proof (mid_y_eqm A G) as F2.
+      pose proof (chord2_mul A G Hnd2) as F3.
+      pose proof (chord1_mul A G Hnd1) as F4.
+      assert (Ht : Zdiv.eqm Primes.pallas_p (2 * constants.two_inv) 1)
+        by (vm_cast_no_check (@eq_refl Z 1)).
+      clear - F1 F2 F3 F4 Ht.
+      revert F1 F2 F3 F4 Ht.
+      generalize (Point.y (rr_mid A G)); intro ym.
+      generalize (Point.x (rr_mid A G)); intro m.
+      generalize (rr_l1 A G); intro l1.
+      generalize (rr_l2 A G); intro l2.
+      generalize (Point.x A); intro xa.
+      generalize (Point.y A); intro ya.
+      generalize (Point.x G); intro xp.
+      generalize (Point.y G); intro yp.
+      generalize constants.two_inv; intro t.
+      generalize SC.sinsemilla_s0_y; intro c.
+      intros F1 F2 F3 F4 Ht.
+      strip_mods.
+      apply (eqm_of_diff _ _
+        (ya * (2 * t - 1) +
+         ((l1 + l2) * t * (m - (l1 * l1 - xa - xp)) +
+          ((- t) * (ym - (l1 * (xa - m) - ya)) +
+           ((- t) * (l2 * (m - xa) - (ym - ya)) +
+            (- (1)) * (l1 * (xa - xp) - (ya - yp))))))).
+      - repeat apply mod0_add; apply mod0_mul; apply eqm_diff_zero;
+          [ exact Ht | exact F1 | exact F2 | exact F3 | exact F4 ].
+      - ring.
+    Qed.
+
+    (** ** The [bits] column cell *)
+
+    Lemma hd_bits_of (Q : Point.t) (pieces : list (list Z)) :
+      hd_bits (hash_data_of Q pieces) = bits_column pieces.
+    Proof.
+      unfold hash_data_of.
+      destruct (hash_go Q (Stdlib.Lists.List.concat pieces)) as [rows out].
+      reflexivity.
+    Qed.
+
+    Lemma logical_bits (second : bool) :
+      logical_col second (bits_col second) = Some 2%nat.
+    Proof. destruct second; reflexivity. Qed.
+
+    Lemma hash_cell_bits (Q : Point.t) (pieces : list (list Z)) (second : bool)
+        (j : nat) :
+      hash_region_advice_t (hash_data_of Q pieces) second (bits_col second)
+        (Z.of_nat j) = List.nth j (bits_column pieces) 0.
+    Proof.
+      unfold hash_region_advice_t.
+      rewrite logical_bits, hd_bits_of.
+      rewrite (proj2 (Z.leb_le 0 (Z.of_nat j)) ltac:(lia)).
+      rewrite Nat2Z.id.
+      reflexivity.
+    Qed.
+
+    (** ** The site lemma *)
+
+    Definition row_cert (second : bool) (region : RegionId.t) (lens : list nat)
+        (j : nat) : bool :=
+      memb (sins_sel second) region (Z.of_nat j) &&
+      (qfac (fixed_at (q2_col second) region (Z.of_nat j)) =?
+         (if bnd_lens lens j then 0 else 1)).
+
+    Lemma sins_site_generic
+        (second : bool) (region : RegionId.t) (Q : Point.t) (lens : list nat)
+        (n : nat) (msg : HonestInput -> list Z)
+        (Hadv : forall (w : HonestInput) (col : Advice.t) (row : Z),
+          (Γw w).(Assignment.advice) col region row =
+          hash_region_advice_t (hash_data_of Q (split_pieces lens (msg w)))
+            second col row)
+        (Hlen : forall w : HonestInput, List.length (msg w) = n)
+        (Hlens : lens_sum lens = n)
+        (Hbound : forall w : HonestInput,
+          List.Forall (fun d => 0 <= d < 1024) (msg w))
+        (HQ : 0 <= Point.x Q < Primes.pallas_p)
+        (Hnondeg : forall w : HonestInput, valid w -> nondegenerate w ->
+          SinsemillaHash.nondegenerate Q (msg w))
+        (Hcert : List.forallb (row_cert second region lens)
+          (List.seq 0%nat n) = true) :
+      sins_site_sound (sins_arg second) region (Z.of_nat n).
+    Proof.
+      intros w Hv Hnd row Hrow.
+      pose proof (Hlen w) as Hlw.
+      pose proof (Hnondeg w Hv Hnd) as Hnw.
+      pose proof (Hadv w) as Hadvw.
+      set (ws := msg w) in *.
+      assert (Hcat : Stdlib.Lists.List.concat (split_pieces lens ws) = ws).
+      { apply concat_split_pieces. rewrite Hlw. exact Hlens. }
+      set (j := Z.to_nat row).
+      assert (Hjn : (j < n)%nat) by (unfold j; lia).
+      assert (Hrowj : row = Z.of_nat j) by (unfold j; lia).
+      pose proof (forallb_seq_sound _ 0%nat n Hcert j ltac:(lia)) as Hc.
+      apply andb_true_iff in Hc.
+      destruct Hc as [Hmemb Hqf].
+      apply Z.eqb_eq in Hqf.
+      assert (Hjw : (j < List.length ws)%nat) by lia.
+      set (wd := List.nth j ws 0).
+      assert (Hwd : 0 <= wd < 1024)
+        by (apply nth_bound_1024; apply Hbound).
+      apply (sins_row second w region row
+        (sinsemilla_acc Q ws j) (SinsemillaSpec.generator wd)
+        (List.nth j (bits_column (split_pieces lens ws)) 0)
+        (List.nth (S j) (bits_column (split_pieces lens ws)) 0)
+        (fixed_at (q2_col second) region (Z.of_nat j))
+        wd).
+      - rewrite selector_plane, Hrowj, Hmemb. reflexivity.
+      - rewrite Hadvw, Hrowj.
+        rewrite (hash_cell_xa Q (split_pieces lens ws) second j ltac:(rewrite Hcat; lia)).
+        rewrite Hcat. reflexivity.
+      - rewrite Hadvw, Hrowj.
+        rewrite (hash_cell_xp Q (split_pieces lens ws) second j ltac:(rewrite Hcat; lia)).
+        rewrite Hcat. reflexivity.
+      - rewrite Hadvw, Hrowj.
+        rewrite (hash_cell_l1 Q (split_pieces lens ws) second j ltac:(rewrite Hcat; lia)).
+        rewrite Hcat. reflexivity.
+      - rewrite Hadvw, Hrowj.
+        rewrite (hash_cell_l2 Q (split_pieces lens ws) second j ltac:(rewrite Hcat; lia)).
+        rewrite Hcat. reflexivity.
+      - rewrite Hadvw, Hrowj.
+        apply hash_cell_bits.
+      - rewrite Hadvw, Hrowj.
+        replace (Z.of_nat j + 1) with (Z.of_nat (S j)) by lia.
+        apply hash_cell_bits.
+      - rewrite Hrowj. apply fixed_at_read.
+      - exact Hwd.
+      - reflexivity.
+      - rewrite Hqf.
+        rewrite (bits_step lens ws j ltac:(rewrite Hlw; exact Hlens) Hjw).
+        change (2 ^ 10) with 1024.
+        destruct (bnd_lens lens j); lia.
+      - apply (chord1_nonzero Q ws j HQ Hjw); [| exact Hnw].
+        exact (proj1 (s_reduced wd Hwd)).
+      - exact (chord2_nonzero Q ws j HQ Hjw Hnw).
+    Qed.
+
+    (** ** Domain-point reducedness *)
+
+    Ltac bool_bounds H :=
+      apply andb_true_iff in H; destruct H as [H ?];
+      apply andb_true_iff in H; destruct H as [H ?];
+      apply andb_true_iff in H; destruct H as [H ?];
+      repeat match goal with
+      | K : (_ <=? _) = true |- _ => apply Z.leb_le in K
+      | K : (_ <? _) = true |- _ => apply Z.ltb_lt in K
+      end;
+      apply Z.leb_le in H.
+
+    Lemma merkle_Q_x : 0 <= Point.x merkle_Q < Primes.pallas_p.
+    Proof. pose proof merkle_Q_reduced as H. bool_bounds H. lia. Qed.
+
+    Lemma nc_Q_x : 0 <= Point.x note_commit_Q < Primes.pallas_p.
+    Proof.
+      pose proof nc_Q_reduced as H.
+      unfold note_commit_Q.
+      bool_bounds H. lia.
+    Qed.
+
+    Lemma civk_Q_x : 0 <= Point.x commit_ivk_Q < Primes.pallas_p.
+    Proof.
+      pose proof civk_Q_reduced as H.
+      unfold commit_ivk_Q.
+      bool_bounds H. lia.
+    Qed.
+
+    (** ** The Merkle hash-region sites *)
+
+    Lemma layer_index_lt (layer : RegionId.Merkle.Layer.t) :
+      (Z.to_nat (RegionId.Merkle.Layer.to_index layer) < 32)%nat.
+    Proof. destruct layer; cbn; lia. Qed.
+
+    Lemma advice_merkle_hash (w : HonestInput)
+        (layer : RegionId.Merkle.Layer.t) (col : Advice.t) (row : Z) :
+      (Γw w).(Assignment.advice) col (merkle_h2p layer) row =
+      hash_region_advice_t
+        (hash_data_of merkle_Q
+          (split_pieces merkle_lens
+            (merkle_layer_words w
+              (Z.to_nat (RegionId.Merkle.Layer.to_index layer)))))
+        (layer_second layer) col row.
+    Proof.
+      rewrite advice_merkle_h2p.
+      rewrite (t_layers_nth w _ (layer_index_lt layer)).
+      reflexivity.
+    Qed.
+
+    Lemma merkle_row_certs :
+      List.forallb
+        (fun layer =>
+          List.forallb
+            (row_cert (layer_second layer) (merkle_h2p layer) merkle_lens)
+            (List.seq 0%nat 52%nat))
+        all_layers = true.
+    Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+    Lemma sins_site_merkle (layer : RegionId.Merkle.Layer.t) :
+      sins_site_sound (sins_arg (layer_second layer)) (merkle_h2p layer) 52.
+    Proof.
+      change 52 with (Z.of_nat 52%nat).
+      apply (sins_site_generic (layer_second layer) (merkle_h2p layer) merkle_Q
+        merkle_lens 52%nat
+        (fun w =>
+          merkle_layer_words w
+            (Z.to_nat (RegionId.Merkle.Layer.to_index layer)))).
+      - intros w col row. apply advice_merkle_hash.
+      - intros w. apply merkle_words_length.
+      - reflexivity.
+      - intros w.
+        unfold merkle_layer_words.
+        cbv zeta.
+        destruct (path_bit w _);
+          unfold SinsemillaSpec.merkle_message; apply words_le_bound.
+      - exact merkle_Q_x.
+      - intros w Hv Hnd.
+        exact (proj1 Hnd _ (layer_index_lt layer)).
+      - exact (proj1 (List.forallb_forall _ all_layers) merkle_row_certs layer
+          (all_layers_complete layer)).
+    Qed.
+
+    (** ** The note-commitment and [Commit^ivk] hash-region sites *)
+
+    Lemma civk_row_certs :
+      List.forallb (row_cert false civk_h2p commit_ivk_lens)
+        (List.seq 0%nat 51%nat) = true.
+    Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+    Lemma nc_old_row_certs :
+      List.forallb
+        (row_cert false (nc_h2p RegionId.NoteCommit.Which.Old) note_commit_lens)
+        (List.seq 0%nat 109%nat) = true.
+    Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+    Lemma nc_new_row_certs :
+      List.forallb
+        (row_cert true (nc_h2p RegionId.NoteCommit.Which.New) note_commit_lens)
+        (List.seq 0%nat 109%nat) = true.
+    Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+    Lemma sins_site_civk_go :
+      sins_site_sound (sins_arg false) civk_h2p 51.
+    Proof.
+      change 51 with (Z.of_nat 51%nat).
+      apply (sins_site_generic false civk_h2p commit_ivk_Q commit_ivk_lens
+        51%nat commit_ivk_words).
+      - intros w col row.
+        rewrite advice_civk_h2p, t_civk_hash_of.
+        reflexivity.
+      - intros w. apply commit_ivk_words_length.
+      - reflexivity.
+      - intros w. apply words_le_bound.
+      - exact civk_Q_x.
+      - intros w Hv Hnd.
+        exact (proj1 (proj2 (proj2 (proj2 Hnd)))).
+      - exact civk_row_certs.
+    Qed.
+
+    Lemma sins_site_nc_old_go :
+      sins_site_sound (sins_arg false) (nc_h2p RegionId.NoteCommit.Which.Old) 109.
+    Proof.
+      change 109 with (Z.of_nat 109%nat).
+      apply (sins_site_generic false (nc_h2p RegionId.NoteCommit.Which.Old)
+        note_commit_Q note_commit_lens 109%nat note_commit_old_words).
+      - intros w col row.
+        rewrite advice_nc_old_h2p, t_nc_old_hash_of.
+        reflexivity.
+      - intros w. apply note_commit_message_length.
+      - reflexivity.
+      - intros w. apply words_le_bound.
+      - exact nc_Q_x.
+      - intros w Hv Hnd.
+        exact (proj1 (proj2 Hnd)).
+      - exact nc_old_row_certs.
+    Qed.
+
+    Lemma sins_site_nc_new_go :
+      sins_site_sound (sins_arg true) (nc_h2p RegionId.NoteCommit.Which.New) 109.
+    Proof.
+      change 109 with (Z.of_nat 109%nat).
+      apply (sins_site_generic true (nc_h2p RegionId.NoteCommit.Which.New)
+        note_commit_Q note_commit_lens 109%nat note_commit_new_words).
+      - intros w col row.
+        rewrite advice_nc_new_h2p, t_nc_new_hash_of.
+        reflexivity.
+      - intros w. apply note_commit_message_length.
+      - reflexivity.
+      - intros w. apply words_le_bound.
+      - exact nc_Q_x.
+      - intros w Hv Hnd.
+        exact (proj1 (proj2 (proj2 Hnd))).
+      - exact nc_new_row_certs.
+    Qed.
+
+    (** ** The variant split of the Merkle layers *)
+
+    Lemma layers_1_second (layer : RegionId.Merkle.Layer.t) :
+      List.In layer layers_1 -> layer_second layer = false.
+    Proof.
+      destruct layer; intros Hlay; try reflexivity;
+        exfalso; vm_compute in Hlay; intuition discriminate.
+    Qed.
+
+    Lemma layers_2_second (layer : RegionId.Merkle.Layer.t) :
+      List.In layer layers_2 -> layer_second layer = true.
+    Proof.
+      destruct layer; intros Hlay; try reflexivity;
+        exfalso; vm_compute in Hlay; intuition discriminate.
+    Qed.
+
+    (** ** The five site leaves *)
+
+    Lemma leaf_merkle_1 (layer : RegionId.Merkle.Layer.t)
+        (Hlay : List.In layer layers_1) :
+      sins_site_sound sins1_arg
+        (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 52.
+    Proof.
+      pose proof (sins_site_merkle layer) as H.
+      rewrite (layers_1_second layer Hlay) in H.
+      exact H.
+    Qed.
+
+    Lemma leaf_merkle_2 (layer : RegionId.Merkle.Layer.t)
+        (Hlay : List.In layer layers_2) :
+      sins_site_sound sins2_arg
+        (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 52.
+    Proof.
+      pose proof (sins_site_merkle layer) as H.
+      rewrite (layers_2_second layer Hlay) in H.
+      exact H.
+    Qed.
+
+    Lemma leaf_civk :
+      sins_site_sound sins1_arg
+        (RegionId.CommitIvk RegionId.CommitIvk.HashToPoint) 51.
+    Proof. exact sins_site_civk_go. Qed.
+
+    Lemma leaf_nc_old :
+      sins_site_sound sins1_arg
+        (RegionId.NoteCommit RegionId.NoteCommit.Which.Old
+          RegionId.NoteCommit.HashToPoint) 109.
+    Proof. exact sins_site_nc_old_go. Qed.
+
+    Lemma leaf_nc_new :
+      sins_site_sound sins2_arg
+        (RegionId.NoteCommit RegionId.NoteCommit.Which.New
+          RegionId.NoteCommit.HashToPoint) 109.
+    Proof. exact sins_site_nc_new_go. Qed.
+
+  End SinsemillaSites.
 
   Lemma sins_site_merkle_1 (layer : RegionId.Merkle.Layer.t)
       (Hlay : List.In layer layers_1) :
     sins_site_sound sins1_arg
       (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 52.
-  Admitted.
+  Proof. exact (SinsemillaSites.leaf_merkle_1 layer Hlay). Qed.
 
   Lemma sins_site_merkle_2 (layer : RegionId.Merkle.Layer.t)
       (Hlay : List.In layer layers_2) :
     sins_site_sound sins2_arg
       (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 52.
-  Admitted.
+  Proof. exact (SinsemillaSites.leaf_merkle_2 layer Hlay). Qed.
 
   Lemma sins_site_civk :
     sins_site_sound sins1_arg
       (RegionId.CommitIvk RegionId.CommitIvk.HashToPoint) 51.
-  Admitted.
+  Proof. exact SinsemillaSites.leaf_civk. Qed.
 
   Lemma sins_site_nc_old :
     sins_site_sound sins1_arg
       (RegionId.NoteCommit RegionId.NoteCommit.Which.Old
         RegionId.NoteCommit.HashToPoint) 109.
-  Admitted.
+  Proof. exact SinsemillaSites.leaf_nc_old. Qed.
 
   Lemma sins_site_nc_new :
     sins_site_sound sins2_arg
       (RegionId.NoteCommit RegionId.NoteCommit.Which.New
         RegionId.NoteCommit.HashToPoint) 109.
-  Admitted.
+  Proof. exact SinsemillaSites.leaf_nc_new. Qed.
 
   (** ** Site-table soundness *)
 
@@ -1833,9 +2665,1268 @@ Module OrchardForwardLookupsWitness.
     reflexivity.
   Qed.
 
-  (** The open residue: the 716 cross-region copies, 166 pinned constants
-      and 6 instance rows of the synthesis program, under the honest
-      assignment. *)
+  (** ** The nontrivial witness facts
+
+      The non-self-copy residue of [witness_facts facts]: the genuine
+      cross-region copies, the pinned constants and the instance rows.
+      The list is pinned as a literal, and its coverage of the reified
+      facts is one input-independent [vm_compute] scan ([nt_cover]).
+
+      [nt_closed] carries the facts proved here, grouped by the shape of
+      their proof: the bulk are the copies whose two cell addresses the
+      advice dispatch sends to the same reader expression, so the goal is
+      a syntactic identity between two stuck projections of the hoisted
+      record; the remaining groups are the blinding-leg boundaries and
+      the Merkle chain, closed from the projection lemmas below.
+      [nt_open] carries the residue, whose two sides are different
+      derivations of one value. *)
+
+  (** The hoisted derivation record stays a stuck atom for the rest of
+      the module: a reduction that unfolds [tables_of] on symbolic input
+      normalizes the Sinsemilla, ladder and Poseidon folds it carries.
+      The field inverse, the complete-addition output and the scalar
+      multiplications join it, so a cell reduction stops at the reader
+      leaves (docs/compile-performance.md). *)
+  #[local] Strategy opaque
+    [OrchardCompletenessTables.tables_of
+     BinOp.div mod_inverse CompleteAddition.output
+     Pallas.mul Weierstrass.mul].
+
+  Definition fact_beq (f g : Fact.t columns RegionId.t) : bool :=
+    match f, g with
+    | Fact.CellsEqual a b, Fact.CellsEqual c d =>
+        cell_eqb a c && cell_eqb b d
+    | Fact.CellIsConstant a u, Fact.CellIsConstant c v =>
+        cell_eqb a c && (u =? v)
+    | Fact.InstanceIs a i r, Fact.InstanceIs c j s =>
+        cell_eqb a c && OrchardDecidableEq.instance_eqb i j && (r =? s)
+    | _, _ => false
+    end.
+
+  Lemma fact_beq_eq (f g : Fact.t columns RegionId.t) :
+    fact_beq f g = true -> f = g.
+  Proof.
+    destruct f, g; cbn [fact_beq]; intros Hb; try discriminate Hb.
+    - apply andb_true_iff in Hb; destruct Hb as [H1 H2].
+      rewrite (cell_eqb_eq _ _ H1), (cell_eqb_eq _ _ H2). reflexivity.
+    - apply andb_true_iff in Hb; destruct Hb as [Hb Hr].
+      apply andb_true_iff in Hb; destruct Hb as [H1 Hi].
+      apply Z.eqb_eq in Hr.
+      apply OrchardDecidableEq.instance_eqb_eq in Hi.
+      rewrite (cell_eqb_eq _ _ H1). subst. reflexivity.
+    - apply andb_true_iff in Hb; destruct Hb as [H1 Hv].
+      apply Z.eqb_eq in Hv.
+      rewrite (cell_eqb_eq _ _ H1). subst. reflexivity.
+  Qed.
+
+  Lemma in_of_beq (f : Fact.t columns RegionId.t)
+      (l : list (Fact.t columns RegionId.t)) :
+    List.existsb (fact_beq f) l = true -> List.In f l.
+  Proof.
+    intros Hex.
+    apply List.existsb_exists in Hex.
+    destruct Hex as [g Hg].
+    destruct Hg as [Hin Hb].
+    rewrite (fact_beq_eq _ _ Hb).
+    exact Hin.
+  Qed.
+
+  Definition wf_mnode_0 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.CmOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 52 |}].
+
+  Definition wf_mech_0 : list (Fact.t columns RegionId.t) := [
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 0;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 1;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 2;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889].
+
+  Definition wf_mech_1 : list (Fact.t columns RegionId.t) := [
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 3;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 4;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 5;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889].
+
+  Definition wf_mech_2 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 6;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 7;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 8;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_3 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 9;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 10;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 11;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_4 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 12;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 13;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 14;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_5 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 15;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 16;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 17;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_6 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 18;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 19;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 20;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_7 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 21;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 22;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 23;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_8 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 24;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 25;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 26;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_9 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 27;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 28;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 29;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_10 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 30;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 25 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 27 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.NodePosition; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 26 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.RangeB1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.Decomposition; Cell.row_offset := 1 |} 31;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 21 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 21 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 21 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 21 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.SignRangeCheck; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete; Cell.row_offset := 21 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVMsb; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRLast; Cell.row_offset := 1 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |} 0;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |} 0;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |} 36893488147419103232;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Poseidon RegionId.Poseidon.InitialState; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.Nk; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.RhoOld; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 1 |}].
+
+  Definition wf_mech_11 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.PermuteState; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 2 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.PermuteState; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 2 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Poseidon RegionId.Poseidon.PermuteState; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Poseidon RegionId.Poseidon.AddInput; Cell.row_offset := 2 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Nullifier RegionId.Nullifier.ScalarAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.PsiOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Nullifier RegionId.Nullifier.CanonicityChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.Nullifier RegionId.Nullifier.CanonicityChecks; Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.Nullifier RegionId.Nullifier.AlphaLookup; Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.Nullifier RegionId.Nullifier.CanonicityChecks; Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 44 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.Nullifier RegionId.Nullifier.CanonicityChecks; Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete; Cell.row_offset := 43 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Nullifier RegionId.Nullifier.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.CmOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.Nullifier RegionId.Nullifier.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.CmOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Nullifier RegionId.Nullifier.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Nullifier RegionId.Nullifier.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.Nullifier RegionId.Nullifier.BaseFieldComplete; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.AkP; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.SpendAuthority RegionId.SpendAuthority.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.AkP; Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeB0; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeB2; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeD0; Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.HashToPoint; Cell.row_offset := 0 |} 2593820817260930114322133467408868473290945477826616247349533151445648376562;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.FixedBaseLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.AkP; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeB0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeB2; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.AkLookup; Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.Nk; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.WitnessC; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_12 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.WitnessD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.RangeD0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.CanonicityGate; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.CommitIvk RegionId.CommitIvk.NkLookup; Cell.row_offset := 14 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 126 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A4; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 127 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 129 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 127 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 130 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 129 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 129 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 128 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 129 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 128 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 130 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 128 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 130 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 128 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 132 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 131 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 132 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 131 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 132 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 131 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 134 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 133 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 134 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 133 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 134 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 133 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 136 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 136 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowCheck); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 136 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowCheck); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 126 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowCheck); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.VariableBase); Cell.row_offset := 2 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowCheck); Cell.row_offset := 2 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowCheck); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.AddressIntegrity (RegionId.AddressIntegrity.Mul RegionId.AddressIntegrity.Mul.OverflowS); Cell.row_offset := 0 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB0; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB3; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeD2; Cell.row_offset := 2 |} 28834944097183232258799415212124430178349919542558976494407978808239225569281;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE0; Cell.row_offset := 2 |} 28495709460745782467519422091981789823310508724411223829767884939906999386113;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE1; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeG1; Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeH0; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441].
+
+  Definition wf_mech_13 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JPrimeLookup); Cell.row_offset := 13 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JPrimeLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.HashToPoint; Cell.row_offset := 0 |} 10629404576683096409262958701336170057000067777256141967953463442979689100381;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB3; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeD2; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessE; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessG; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeG1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessH; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeH0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.GDOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputGD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputGD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.XGDLookup; Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPkD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeB3; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPkD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPkD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPkD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.XPKDLookup; Cell.row_offset := 14 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.VOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeD2; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputRho; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.RhoOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputRho; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeE1; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_14 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputRho; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputRho; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.WitnessF; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputRho; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RhoLookup; Cell.row_offset := 14 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPsi; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.PsiOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeH0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPsi; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.RangeG1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.PsiLookup; Cell.row_offset := 13 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB0; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB3; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeD2; Cell.row_offset := 2 |} 28834944097183232258799415212124430178349919542558976494407978808239225569281;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE0; Cell.row_offset := 2 |} 28495709460745782467519422091981789823310508724411223829767884939906999386113;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE1; Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeG1; Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeH0; Cell.row_offset := 2 |} 28043396612162516079146097931791602683257960966880886943581093115464031141889;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommitNewWitnessGD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.GD RegionId.NoteCommit.YCanonicity.JPrimeLookup); Cell.row_offset := 13 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 2 |} 28891483203256140557346080732148203570856488012250268605181327786294596599809;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 2 |} 27138770914995983302399449611411228403152865451820213171207509466578094653441;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommitNewWitnessPkD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK0); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.RangeK2); Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.Gate); Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New (RegionId.NoteCommit.YCanonicity RegionId.NoteCommit.YSubject.PkD RegionId.NoteCommit.YCanonicity.JPrimeLookup); Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseIncomplete; Cell.row_offset := 84 |};
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.HashToPoint; Cell.row_offset := 0 |} 10629404576683096409262958701336170057000067777256141967953463442979689100381;
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB3; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeD2; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessE; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceE; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE1; Cell.row_offset := 0 |}].
+
+  Definition wf_mech_15 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessG; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeG1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessH; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeH0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommitNewWitnessGD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputGD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceB; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputGD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessA; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputGD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.XGDLookup; Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPkD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommitNewWitnessPkD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPkD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeB3; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPkD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceD; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPkD; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessC; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPkD; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.XPKDLookup; Cell.row_offset := 14 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.VNew; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeD2; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputValue; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputRho; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeE1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputRho; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceG; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputRho; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.WitnessF; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputRho; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RhoLookup; Cell.row_offset := 14 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPsi; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.NoteCommitNewWitnessPsi; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeH0; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPsi; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.RangeG1; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A8; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.MessagePieceH; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.InputPsi; Cell.row_offset := 1 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.PsiLookup; Cell.row_offset := 13 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.VOld; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A1; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.WitnessInput RegionId.WitnessInput.VNew; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.MagnitudeRangeCheck; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A9; Cell.region := RegionId.ValueCommitment RegionId.ValueCommitment.SignRangeCheck; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Instance_ Instance_.Primary; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A6; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Instance_ Instance_.Primary; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 7 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A7; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Instance_ Instance_.Primary; Cell.region := RegionId.OrchardCircuitChecks; Cell.row_offset := 8 |}].
+
+  Definition wf_minit_0 : list (Fact.t columns RegionId.t) := [
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L0 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L1 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L2 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L3 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L4 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L5 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L6 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L7 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L8 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L9 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L10 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L11 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L12 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L13 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L14 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A0; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L15 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L16 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L17 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L18 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L19 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L20 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L21 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L22 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L23 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L24 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L25 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L26 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L27 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L28 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L29 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L30 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296;
+    Fact.CellIsConstant {| Cell.column := ColumnRef.Advice Advice.A5; Cell.region := RegionId.Merkle RegionId.Merkle.Layer.L31 RegionId.Merkle.Region.HashToPoint; Cell.row_offset := 0 |} 9991206725476878888751475603038274618448000607209514551456795194094072219296].
+
+  Definition wf_shape_0 : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.Old RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |};
+    Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |}].
+
+  Definition nt_closed : list (Fact.t columns RegionId.t) :=
+    wf_mnode_0 ++
+    wf_mech_0 ++
+    wf_mech_1 ++
+    wf_mech_2 ++
+    wf_mech_3 ++
+    wf_mech_4 ++
+    wf_mech_5 ++
+    wf_mech_6 ++
+    wf_mech_7 ++
+    wf_mech_8 ++
+    wf_mech_9 ++
+    wf_mech_10 ++
+    wf_mech_11 ++
+    wf_mech_12 ++
+    wf_mech_13 ++
+    wf_mech_14 ++
+    wf_mech_15 ++
+    wf_minit_0 ++
+    wf_shape_0.
+
+  (** The residue of the 888 non-self-copy facts: the facts whose two sides
+      are distinct derivations of one value.  Each group is pinned and proved
+      in its own file under [forward/witness/]; regrouping is sound because
+      [nt_cover] is an order-insensitive [existsb] scan over the same
+      multiset. *)
+  Definition nt_open : list (Fact.t columns RegionId.t) :=
+    OrchardWitnessBitsColumn.orchardwitnessbitscolumn_facts ++
+    OrchardWitnessChainOutputs.orchardwitnesschainoutputs_facts ++
+    OrchardWitnessSliceBounds.orchardwitnessslicebounds_facts ++
+    OrchardWitnessFixedLegs.orchardwitnessfixedlegs_facts ++
+    OrchardWitnessVarBase.orchardwitnessvarbase_facts.
+
+  (** Coverage: every non-self-copy witness fact of the synthesis program
+      is one of the pinned facts. *)
+  Lemma nt_cover :
+    List.forallb
+      (fun f => List.existsb (fact_beq f) (nt_closed ++ nt_open))
+      (List.filter (fun f => negb (fact_trivial f))
+        (Complete.witness_facts facts)) = true.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+  (** *** Cell readings used by the grouped proofs
+
+      Each is a definitional reading of the advice dispatch at one address,
+      or a zeta expansion of one field of the hoisted record: the right-hand
+      sides are the exact stuck terms the dispatch produces, so no reduction
+      engine ever traverses a spec fold. *)
+  Module CopySites.
+    Import OrchardCompletenessTables.
+    Import OrchardAdviceMerkleSinsemilla.
+    Import OrchardForwardSinsemilla.
+
+    (** The two note-commitment blinding legs' sums. *)
+    Lemma t_nco_pt_shape (w : HonestInput) :
+      t_nco_pt (tables_of w) =
+      EccSpec.point_add (leg_pt (t_nco_leg (tables_of w)) 84%nat)
+        (leg_acc (t_nco_leg (tables_of w)) 83%nat).
+    Proof. reflexivity. Qed.
+
+    Lemma t_ncn_pt_shape (w : HonestInput) :
+      t_ncn_pt (tables_of w) =
+      EccSpec.point_add (leg_pt (t_ncn_leg (tables_of w)) 84%nat)
+        (leg_acc (t_ncn_leg (tables_of w)) 83%nat).
+    Proof. reflexivity. Qed.
+
+    (** ** The Merkle chain
+
+        The [NodePosition] row of a layer carries the running node, the
+        layer's hash region starts at the domain point and ends at the next
+        running node, and the chain starts at the old note commitment. *)
+
+    Definition node_col (second : bool) : Advice.t :=
+      if second then Advice.A5 else Advice.A0.
+
+    Lemma merkle_node_read (w : HonestInput)
+        (layer : RegionId.Merkle.Layer.t) (col : Advice.t)
+        (Hcol : col = node_col (layer_second layer)) :
+      (Γw w).(Assignment.advice) col
+        (RegionId.Merkle layer RegionId.Merkle.Region.NodePosition) 0 =
+      merkle_node w (Z.to_nat (RegionId.Merkle.Layer.to_index layer)).
+    Proof.
+      subst col.
+      assert (Hshape :
+        (Γw w).(Assignment.advice) (node_col (layer_second layer))
+          (RegionId.Merkle layer RegionId.Merkle.Region.NodePosition) 0 =
+        lyd_node (List.nth (Z.to_nat (RegionId.Merkle.Layer.to_index layer))
+          (t_layers (tables_of w)) layer0))
+        by (destruct layer; reflexivity).
+      rewrite Hshape.
+      rewrite (t_layers_nth w _ (layer_index_lt layer)).
+      reflexivity.
+    Qed.
+
+    Lemma merkle_h2p_init (w : HonestInput)
+        (layer : RegionId.Merkle.Layer.t) (col : Advice.t)
+        (Hcol : col = xa_col (layer_second layer)) :
+      (Γw w).(Assignment.advice) col
+        (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 0 =
+      Point.x merkle_Q.
+    Proof.
+      subst col.
+      change (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint)
+        with (merkle_h2p layer).
+      rewrite merkle_hash_adv.
+      change 0 with (Z.of_nat 0%nat).
+      rewrite (hash_cell_xa merkle_Q _ (layer_second layer) 0%nat
+        (Nat.le_0_l _)).
+      rewrite sinsemilla_acc_zero.
+      reflexivity.
+    Qed.
+
+    Lemma merkle_h2p_out (w : HonestInput)
+        (layer : RegionId.Merkle.Layer.t) (col : Advice.t)
+        (Hcol : col = xa_col (layer_second layer)) :
+      (Γw w).(Assignment.advice) col
+        (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint) 52 =
+      merkle_node w (S (Z.to_nat (RegionId.Merkle.Layer.to_index layer))).
+    Proof.
+      subst col.
+      pose proof (merkle_hash_len w
+        (Z.to_nat (RegionId.Merkle.Layer.to_index layer))) as Hlen.
+      change (RegionId.Merkle layer RegionId.Merkle.Region.HashToPoint)
+        with (merkle_h2p layer).
+      rewrite merkle_hash_adv.
+      change 52 with (Z.of_nat 52%nat).
+      rewrite (hash_cell_xa merkle_Q _ (layer_second layer) 52%nat
+        ltac:(rewrite Hlen; lia)).
+      rewrite <- Hlen.
+      rewrite sinsemilla_acc_full.
+      rewrite merkle_words_concat.
+      rewrite (merkle_node_succ w _ (layer_index_lt layer)).
+      rewrite merkle_layer_words_spec.
+      reflexivity.
+    Qed.
+
+    Lemma merkle_node_zero (w : HonestInput) :
+      merkle_node w 0%nat = Point.x (t_cm_old (tables_of w)).
+    Proof. rewrite t_cm_old_of. reflexivity. Qed.
+
+    Lemma cmold_read (w : HonestInput) :
+      (Γw w).(Assignment.advice) Advice.A0
+        (RegionId.WitnessInput RegionId.WitnessInput.CmOld) 0 =
+      Point.x (t_cm_old (tables_of w)).
+    Proof. reflexivity. Qed.
+  End CopySites.
+
+  Import CopySites.
+
+  (** The head of a witness-fact goal: the two cell addresses, with the
+      advice dispatch left folded. *)
+  Ltac wf_head :=
+    cbn [interpret_fact eval_cell Cell.column Cell.region Cell.row_offset].
+
+  (** The advice dispatch at the two cell addresses, reduced with the
+      hoisted record held opaque: both sides become the same stuck
+      projection of [tables_of w]. *)
+  Ltac wf_fact :=
+    wf_head;
+    cbn [Assignment.advice Assignment.instance_
+         OrchardHonestAssignment.honest_assignment];
+    cbn; reflexivity.
+
+  (** The blinding legs' final complete additions: the second summand of the
+      commitment region is the leg sum the last window row emits. *)
+  Ltac wf_shape :=
+    wf_head;
+    cbn [Assignment.advice OrchardHonestAssignment.honest_assignment
+         OrchardCompletenessTables.advice_t];
+    rewrite ?t_nco_pt_shape, ?t_ncn_pt_shape;
+    cbn [OrchardAdviceEccMuls.cadd_advice Z.eqb Pos.eqb];
+    reflexivity.
+
+  (** The initial accumulator abscissa of a Merkle hash region is the
+      domain point's. *)
+  Ltac wf_minit :=
+    wf_head; rewrite merkle_h2p_init by reflexivity; vm_compute; reflexivity.
+
+  (** The running node of a layer is the previous layer's hash output (and,
+      at the first layer, the old note commitment). *)
+  Ltac wf_mnode :=
+    wf_head;
+    rewrite merkle_node_read by reflexivity;
+    first
+      [ rewrite merkle_h2p_out by reflexivity; reflexivity
+      | rewrite merkle_node_zero, cmold_read; reflexivity ].
+
+  Lemma facts_app_intro (Gamma : Assignment.t columns RegionId.t)
+      (l1 l2 : list (Fact.t columns RegionId.t)) :
+    interpret_facts Gamma l1 -> interpret_facts Gamma l2 ->
+    interpret_facts Gamma (l1 ++ l2).
+  Proof. intros H1 H2. apply interpret_facts_app. split; assumption. Qed.
+
+  Lemma wf_mnode_0_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mnode_0.
+  Proof.
+    unfold wf_mnode_0; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_mnode ].
+  Qed.
+
+  Lemma wf_mech_0_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_0.
+  Proof.
+    unfold wf_mech_0; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_1_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_1.
+  Proof.
+    unfold wf_mech_1; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_2_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_2.
+  Proof.
+    unfold wf_mech_2; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_3_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_3.
+  Proof.
+    unfold wf_mech_3; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_4_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_4.
+  Proof.
+    unfold wf_mech_4; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_5_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_5.
+  Proof.
+    unfold wf_mech_5; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_6_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_6.
+  Proof.
+    unfold wf_mech_6; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_7_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_7.
+  Proof.
+    unfold wf_mech_7; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_8_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_8.
+  Proof.
+    unfold wf_mech_8; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_9_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_9.
+  Proof.
+    unfold wf_mech_9; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_10_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_10.
+  Proof.
+    unfold wf_mech_10; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_11_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_11.
+  Proof.
+    unfold wf_mech_11; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_12_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_12.
+  Proof.
+    unfold wf_mech_12; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_13_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_13.
+  Proof.
+    unfold wf_mech_13; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_14_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_14.
+  Proof.
+    unfold wf_mech_14; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_mech_15_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_mech_15.
+  Proof.
+    unfold wf_mech_15; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_fact ].
+  Qed.
+
+  Lemma wf_minit_0_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_minit_0.
+  Proof.
+    unfold wf_minit_0; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_minit ].
+  Qed.
+
+  Lemma wf_shape_0_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_shape_0.
+  Proof.
+    unfold wf_shape_0; cbn [interpret_facts]; repeat apply conj;
+      first [ exact I | wf_shape ].
+  Qed.
+
+  Lemma nt_closed_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) nt_closed.
+  Proof.
+    unfold nt_closed.
+    repeat apply facts_app_intro;
+      first
+        [ exact (wf_mnode_0_ok w Hv Hnd)
+        | exact (wf_mech_0_ok w Hv Hnd)
+        | exact (wf_mech_1_ok w Hv Hnd)
+        | exact (wf_mech_2_ok w Hv Hnd)
+        | exact (wf_mech_3_ok w Hv Hnd)
+        | exact (wf_mech_4_ok w Hv Hnd)
+        | exact (wf_mech_5_ok w Hv Hnd)
+        | exact (wf_mech_6_ok w Hv Hnd)
+        | exact (wf_mech_7_ok w Hv Hnd)
+        | exact (wf_mech_8_ok w Hv Hnd)
+        | exact (wf_mech_9_ok w Hv Hnd)
+        | exact (wf_mech_10_ok w Hv Hnd)
+        | exact (wf_mech_11_ok w Hv Hnd)
+        | exact (wf_mech_12_ok w Hv Hnd)
+        | exact (wf_mech_13_ok w Hv Hnd)
+        | exact (wf_mech_14_ok w Hv Hnd)
+        | exact (wf_mech_15_ok w Hv Hnd)
+        | exact (wf_minit_0_ok w Hv Hnd)
+        | exact (wf_shape_0_ok w Hv Hnd) ].
+  Qed.
+
+  (** The open residue: the facts whose two sides are distinct
+      derivations of one value. *)
+  Lemma open_witness_facts (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) nt_open.
+  Proof.
+    unfold nt_open.
+    repeat apply facts_app_intro.
+    - exact (OrchardWitnessBitsColumn.orchardwitnessbitscolumn_ok w Hv Hnd).
+    - exact (OrchardWitnessChainOutputs.orchardwitnesschainoutputs_ok w Hv Hnd).
+    - exact (OrchardWitnessSliceBounds.orchardwitnessslicebounds_ok w Hv Hnd).
+    - exact (OrchardWitnessFixedLegs.orchardwitnessfixedlegs_ok w Hv Hnd).
+    - exact (OrchardWitnessVarBase.orchardwitnessvarbase_ok w Hv Hnd).
+  Qed.
+
   Lemma nontrivial_witness_facts :
     forall w : HonestInput,
       valid w -> nondegenerate w ->
@@ -1843,7 +3934,23 @@ Module OrchardForwardLookupsWitness.
         List.In fact (Complete.witness_facts facts) ->
         fact_trivial fact = false ->
         interpret_fact (Γw w) fact.
-  Admitted.
+  Proof.
+    intros w Hv Hnd fact Hin Htriv.
+    assert (Hsplit : List.In fact (nt_closed ++ nt_open)).
+    { apply in_of_beq.
+      apply (proj1 (List.forallb_forall
+        (fun f => List.existsb (fact_beq f) (nt_closed ++ nt_open))
+        (List.filter (fun f => negb (fact_trivial f))
+          (Complete.witness_facts facts))) nt_cover).
+      apply List.filter_In.
+      split; [exact Hin | rewrite Htriv; reflexivity]. }
+    apply List.in_app_or in Hsplit.
+    destruct Hsplit as [Hc | Ho].
+    - exact (interpret_facts_In (Γw w) fact nt_closed
+        (nt_closed_ok w Hv Hnd) Hc).
+    - exact (interpret_facts_In (Γw w) fact nt_open
+        (open_witness_facts w Hv Hnd) Ho).
+  Qed.
 
   (** ** The witness-fact obligation *)
 
