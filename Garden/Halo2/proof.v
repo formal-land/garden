@@ -364,11 +364,15 @@ Section Semantics.
         eval_cell assignment cell =
           assignment.(Assignment.instance_) instance row
     | Fact.LookupTableLoaded column values default_value =>
-        (* Only non-negative rows are pinned: the serializer writes table
-           rows from [0] and fills past the end, so no replay of its events
-           determines a negative row. *)
+        (* Only the assigned rows [0 .. length values) are pinned: the
+           serializer assigns those rows and, keygen-faithfully, fills the
+           default value only up to the usable rows, leaving the [l_last] and
+           blinding tail at [0].  Past [length values] the table column is no
+           longer program-determined (the default band and the zero tail are
+           captured operationally by the fill-replay lemmas, not by this
+           relational fact). *)
         forall row,
-          0 <= row ->
+          0 <= row < Z.of_nat (List.length values) ->
           assignment.(Assignment.lookup) column row =
             value_at_row row values default_value
     | Fact.CellIsConstant cell value =>

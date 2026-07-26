@@ -64,11 +64,12 @@ Definition event_write (event : Raw.Event.t) : option EventWrite.t :=
   | Raw.Event.AssignFixed column row _ value =>
       Some (EventWrite.Fixed
         {| Write.column := column; Write.row := row; Write.value := value |})
-  | Raw.Event.FillFromRow column from_row value =>
+  | Raw.Event.FillFromRow column from_row to_row value =>
       Some (EventWrite.Fill
         {|
           Fill.column := column;
           Fill.from_row := from_row;
+          Fill.to_row := to_row;
           Fill.value := value;
         |})
   end.
@@ -112,9 +113,12 @@ Definition writes_conflict (later earlier : EventWrite.t) : bool :=
   | EventWrite.Fill _, EventWrite.Selector _ => false
   | EventWrite.Fill later, EventWrite.Fixed earlier =>
       fill_conflicts_write
-        later.(Fill.column) later.(Fill.from_row) later.(Fill.value) earlier
+        later.(Fill.column) later.(Fill.from_row) later.(Fill.to_row)
+        later.(Fill.value) earlier
   | EventWrite.Fill later, EventWrite.Fill earlier =>
-      fill_conflicts_fill later.(Fill.column) later.(Fill.value) earlier
+      fill_conflicts_fill
+        later.(Fill.column) later.(Fill.from_row) later.(Fill.to_row)
+        later.(Fill.value) earlier
   end.
 
 (** ** Conflict freedom
@@ -273,10 +277,13 @@ Definition write_ok_against_log (write : EventWrite.t) (log : Log.t) : bool :=
         (orb
           (List.existsb
             (fill_conflicts_write
-              fill.(Fill.column) fill.(Fill.from_row) fill.(Fill.value))
+              fill.(Fill.column) fill.(Fill.from_row) fill.(Fill.to_row)
+              fill.(Fill.value))
             log.(Log.fixeds))
           (List.existsb
-            (fill_conflicts_fill fill.(Fill.column) fill.(Fill.value))
+            (fill_conflicts_fill
+              fill.(Fill.column) fill.(Fill.from_row) fill.(Fill.to_row)
+              fill.(Fill.value))
             log.(Log.fills)))
   end.
 
@@ -328,7 +335,7 @@ Proof.
   destruct event as
     [name | name | name | name | column row annotation
     | column row annotation value | left_cell right_cell
-    | column from_row value]; cbn; try apply IH;
+    | column from_row to_row value]; cbn; try apply IH;
     rewrite writes_replay_ok_cons.
   - (* EnableSelector *)
     cbn [write_ok_against_log log_add Write.column Write.row Write.value].
@@ -343,10 +350,11 @@ Proof.
         state.(ReplayState.log).(Log.fills)); try reflexivity.
     apply IH.
   - (* FillFromRow *)
-    cbn [write_ok_against_log log_add Fill.column Fill.from_row Fill.value].
-    destruct (List.existsb (fill_conflicts_write column from_row value)
+    cbn [write_ok_against_log log_add
+      Fill.column Fill.from_row Fill.to_row Fill.value].
+    destruct (List.existsb (fill_conflicts_write column from_row to_row value)
         state.(ReplayState.log).(Log.fixeds)),
-      (List.existsb (fill_conflicts_fill column value)
+      (List.existsb (fill_conflicts_fill column from_row to_row value)
         state.(ReplayState.log).(Log.fills)); try reflexivity.
     apply IH.
 Qed.
@@ -538,6 +546,7 @@ Definition shift_write (delta : Z) (write : EventWrite.t) : EventWrite.t :=
       EventWrite.Fill {|
         Fill.column := fill.(Fill.column);
         Fill.from_row := delta + fill.(Fill.from_row);
+        Fill.to_row := delta + fill.(Fill.to_row);
         Fill.value := fill.(Fill.value);
       |}
   end.
@@ -556,6 +565,21 @@ Proof.
   - apply Z.leb_gt; apply Z.leb_gt in Hab; lia.
 Qed.
 
+Lemma Z_ltb_shift (delta a b : Z) : (delta + a <? delta + b) = (a <? b).
+Proof.
+  destruct (a <? b) eqn:Hab.
+  - apply Z.ltb_lt; apply Z.ltb_lt in Hab; lia.
+  - apply Z.ltb_ge; apply Z.ltb_ge in Hab; lia.
+Qed.
+
+Lemma Z_max_shift (delta a b : Z) :
+  Z.max (delta + a) (delta + b) = delta + Z.max a b.
+Proof. lia. Qed.
+
+Lemma Z_min_shift (delta a b : Z) :
+  Z.min (delta + a) (delta + b) = delta + Z.min a b.
+Proof. lia. Qed.
+
 (** Conflicts are invariant under a common shift: every row comparison the
     checks make is between two shifted rows. *)
 Lemma writes_conflict_shift (delta : Z) (later earlier : EventWrite.t) :
@@ -566,7 +590,9 @@ Proof.
     try reflexivity;
     unfold write_conflicts_write, write_conflicts_fill,
       fill_conflicts_write, fill_conflicts_fill; cbn;
-    rewrite ?Z_eqb_shift, ?Z_leb_shift; reflexivity.
+    rewrite ?Z_eqb_shift, ?Z_leb_shift,
+      ?Z_max_shift, ?Z_min_shift, ?Z_ltb_shift;
+    reflexivity.
 Qed.
 
 Lemma write_slot_shift (delta : Z) (write : EventWrite.t) :
@@ -912,28 +938,30 @@ Qed.
 
 Fixpoint layouter_blocks {columns : Columns.t} {RegionId : Set} {A : Set}
     (indices : Indices.t columns)
+    (usable_rows : Z)
     (program : 𝓛 columns RegionId A) {struct program}
     : list (Block.t RegionId) :=
   match program with
   | 𝓛.Ret _ => []
   | 𝓛.Bind first second =>
-      layouter_blocks indices first ++
-      layouter_blocks indices (second (layouter_value first))
+      layouter_blocks indices usable_rows first ++
+      layouter_blocks indices usable_rows (second (layouter_value first))
   | 𝓛.AddRegion region _ region_program =>
       [Block.Region region (region_writes indices (region_program region))]
   | 𝓛.ConstrainInstance _ _ _ => []
   | 𝓛.InitLookupTables name entries =>
       [Block.Global
-        (event_writes (V1.init_lookup_table_events indices name entries))]
-  | 𝓛.InNamespace _ nested => layouter_blocks indices nested
+        (event_writes
+          (V1.init_lookup_table_events indices usable_rows name entries))]
+  | 𝓛.InNamespace _ nested => layouter_blocks indices usable_rows nested
   end.
 
 Lemma eval_layouter_event_writes {columns : Columns.t} {RegionId : Set}
     {A : Set} (indices : Indices.t columns) (region_start : RegionId -> Z)
-    (program : 𝓛 columns RegionId A) :
-  event_writes (snd (V1.eval_layouter indices region_start program)) =
+    (usable_rows : Z) (program : 𝓛 columns RegionId A) :
+  event_writes (snd (V1.eval_layouter indices region_start usable_rows program)) =
     List.flat_map (block_writes region_start)
-      (layouter_blocks indices program).
+      (layouter_blocks indices usable_rows program).
 Proof.
   induction program as
     [A value | A B first IHfirst second IHsecond
@@ -941,11 +969,12 @@ Proof.
     | name entries | A name nested IHnested];
     cbn [V1.eval_layouter layouter_blocks]; try reflexivity.
   - (* Bind *)
-    rewrite (layouter_value_agrees indices region_start first).
-    destruct (V1.eval_layouter indices region_start first)
+    rewrite (layouter_value_agrees indices region_start usable_rows first).
+    destruct (V1.eval_layouter indices region_start usable_rows first)
       as [value_first events_first] eqn:Hfirst.
     cbn [fst].
-    destruct (V1.eval_layouter indices region_start (second value_first))
+    destruct
+      (V1.eval_layouter indices region_start usable_rows (second value_first))
       as [value_second events_second] eqn:Hsecond.
     cbn [snd].
     rewrite event_writes_app, List.flat_map_app.
@@ -971,7 +1000,7 @@ Proof.
     rewrite List.app_nil_r.
     reflexivity.
   - (* InNamespace *)
-    destruct (V1.eval_layouter indices region_start nested)
+    destruct (V1.eval_layouter indices region_start usable_rows nested)
       as [value events] eqn:Hnested.
     cbn [snd].
     rewrite !event_writes_app.
@@ -989,11 +1018,12 @@ Qed.
     hence replay success from every initial grid. *)
 Theorem layouter_conflict_free {columns : Columns.t} {RegionId : Set}
     {A : Set} (indices : Indices.t columns) (region_start : RegionId -> Z)
-    (program : 𝓛 columns RegionId A) :
-  List.forallb block_ok (layouter_blocks indices program) = true ->
-  blocks_compatible_all region_start (layouter_blocks indices program) =
-    true ->
-  conflict_free (snd (V1.eval_layouter indices region_start program)) = true.
+    (usable_rows : Z) (program : 𝓛 columns RegionId A) :
+  List.forallb block_ok (layouter_blocks indices usable_rows program) = true ->
+  blocks_compatible_all region_start
+    (layouter_blocks indices usable_rows program) = true ->
+  conflict_free
+    (snd (V1.eval_layouter indices region_start usable_rows program)) = true.
 Proof.
   intros Hok Hcompat.
   unfold conflict_free.
@@ -1003,13 +1033,14 @@ Qed.
 
 Theorem layouter_replay_succeeds {columns : Columns.t} {RegionId : Set}
     {A : Set} (indices : Indices.t columns) (region_start : RegionId -> Z)
-    (program : 𝓛 columns RegionId A) :
-  List.forallb block_ok (layouter_blocks indices program) = true ->
-  blocks_compatible_all region_start (layouter_blocks indices program) =
-    true ->
+    (usable_rows : Z) (program : 𝓛 columns RegionId A) :
+  List.forallb block_ok (layouter_blocks indices usable_rows program) = true ->
+  blocks_compatible_all region_start
+    (layouter_blocks indices usable_rows program) = true ->
   forall grid : RawGrid.t,
   exists grid',
-    apply_events (snd (V1.eval_layouter indices region_start program)) grid =
+    apply_events
+      (snd (V1.eval_layouter indices region_start usable_rows program)) grid =
       Some grid'.
 Proof.
   intros Hok Hcompat.
@@ -1024,19 +1055,19 @@ Qed.
     checked by the same block conditions. *)
 Theorem layouter_with_tail_replay_succeeds {columns : Columns.t}
     {RegionId : Set} {A : Set} (indices : Indices.t columns)
-    (region_start : RegionId -> Z) (program : 𝓛 columns RegionId A)
-    (tail : list Raw.Event.t) :
+    (region_start : RegionId -> Z) (usable_rows : Z)
+    (program : 𝓛 columns RegionId A) (tail : list Raw.Event.t) :
   List.forallb block_ok
-    (layouter_blocks indices program ++
+    (layouter_blocks indices usable_rows program ++
       [Block.Global (event_writes tail)]) = true ->
   blocks_compatible_all region_start
-    (layouter_blocks indices program ++
+    (layouter_blocks indices usable_rows program ++
       [Block.Global (event_writes tail)]) = true ->
   forall grid : RawGrid.t,
   exists grid',
     apply_events
-      (snd (V1.eval_layouter indices region_start program) ++ tail) grid =
-      Some grid'.
+      (snd (V1.eval_layouter indices region_start usable_rows program) ++ tail)
+        grid = Some grid'.
 Proof.
   intros Hok Hcompat grid.
   apply conflict_free_apply_events.

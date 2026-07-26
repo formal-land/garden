@@ -1217,6 +1217,15 @@ Definition synthesize
   do🞵 synthesize_orchard_gate v_old v_new magnitude sign root in
   return🞵 tt.
 
+(** The usable-row bound of the Orchard proving system: [n - (blinding_factors
+    + 1)] for [n = 2^k = 2048] ([k = 11]) and [blinding_factors = 5], so the
+    lookup-table default fill stops at row [2042], leaving the [l_last] row and
+    the five blinding rows at [0] — matching the keygen-stored fixed column.
+    The domain lives downstream ([Domain.usable_rows] in [circuit_compiled.v]),
+    so the literal is introduced here and tied to the domain by a parity fact at
+    that layer. *)
+Definition orchard_usable_rows : Z := 2042.
+
 Definition synthesize_events
     (indices : Garden.Halo2.serialize.Indices.t columns)
     : list Garden.Halo2.serialize.Raw.Event.t :=
@@ -1224,5 +1233,6 @@ Definition synthesize_events
     Garden.Halo2.serialize.V1.run_with_region_start
       indices
       Garden.Orchard.circuit_synthesis_layout.region_start_of
+      orchard_usable_rows
       synthesize in
   events ++ Garden.Orchard.circuit_synthesis_constants.events.

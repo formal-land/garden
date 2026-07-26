@@ -667,7 +667,7 @@ Section OperationalBridge.
   (** A [Fact.CellsEqual] of a layouter program appears in its event stream
       as a [Raw.Event.Copy]. *)
   Lemma layouter_cells_equal_event
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (left_cell right_cell : Garden.Halo2.Synthesis.Cell.t columns RegionId) :
     List.In (Fact.CellsEqual left_cell right_cell) (layouter_facts program) ->
@@ -675,7 +675,7 @@ Section OperationalBridge.
       (Raw.Event.Copy
         (Cell.to_raw idx rs left_cell)
         (Cell.to_raw idx rs right_cell))
-      (snd (V1.eval_layouter idx rs program)).
+      (snd (V1.eval_layouter idx rs usable_rows program)).
   Proof.
     induction program as
       [A value | A B first IHfirst second IHsecond
@@ -683,11 +683,11 @@ Section OperationalBridge.
       | name entries | A name nested IHnested];
       cbn [layouter_facts V1.eval_layouter].
     - intros [].
-    - rewrite (layouter_value_agrees idx rs first).
-      destruct (V1.eval_layouter idx rs first)
+    - rewrite (layouter_value_agrees idx rs usable_rows first).
+      destruct (V1.eval_layouter idx rs usable_rows first)
         as [value_first events_first] eqn:Hfirst.
       cbn [fst].
-      destruct (V1.eval_layouter idx rs (second value_first))
+      destruct (V1.eval_layouter idx rs usable_rows (second value_first))
         as [value_second events_second] eqn:Hsecond.
       cbn [snd].
       intros Hin.
@@ -717,7 +717,7 @@ Section OperationalBridge.
       apply List.in_map_iff in Hin.
       destruct Hin as (entry & Heq & _).
       discriminate Heq.
-    - destruct (V1.eval_layouter idx rs nested)
+    - destruct (V1.eval_layouter idx rs usable_rows nested)
         as [value events] eqn:Hnested.
       cbn [snd].
       intros Hin.
@@ -730,7 +730,7 @@ Section OperationalBridge.
   (** A [Fact.InstanceIs] of a layouter program appears in its event stream
       as the [Raw.Event.Copy] against the raw instance cell. *)
   Lemma layouter_instance_is_event
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (cell : Garden.Halo2.Synthesis.Cell.t columns RegionId)
       (instance : columns.(Columns.Instance_)) (row : Z) :
@@ -739,7 +739,7 @@ Section OperationalBridge.
       (Raw.Event.Copy
         (Cell.to_raw idx rs cell)
         (Cell.instance_raw idx instance row))
-      (snd (V1.eval_layouter idx rs program)).
+      (snd (V1.eval_layouter idx rs usable_rows program)).
   Proof.
     induction program as
       [A value | A B first IHfirst second IHsecond
@@ -747,11 +747,11 @@ Section OperationalBridge.
       | name entries | A name nested IHnested];
       cbn [layouter_facts V1.eval_layouter].
     - intros [].
-    - rewrite (layouter_value_agrees idx rs first).
-      destruct (V1.eval_layouter idx rs first)
+    - rewrite (layouter_value_agrees idx rs usable_rows first).
+      destruct (V1.eval_layouter idx rs usable_rows first)
         as [value_first events_first] eqn:Hfirst.
       cbn [fst].
-      destruct (V1.eval_layouter idx rs (second value_first))
+      destruct (V1.eval_layouter idx rs usable_rows (second value_first))
         as [value_second events_second] eqn:Hsecond.
       cbn [snd].
       intros Hin.
@@ -776,7 +776,7 @@ Section OperationalBridge.
       apply List.in_map_iff in Hin.
       destruct Hin as (entry & Heq & _).
       discriminate Heq.
-    - destruct (V1.eval_layouter idx rs nested)
+    - destruct (V1.eval_layouter idx rs usable_rows nested)
         as [value events] eqn:Hnested.
       cbn [snd].
       intros Hin.
@@ -839,11 +839,11 @@ Section OperationalBridge.
   Qed.
 
   Lemma fill_lookup_entries_no_copy
-      (idx : Indices.t columns)
+      (idx : Indices.t columns) (usable_rows : Z)
       (entries : list (LookupTableColumn.t columns))
       (left right : Raw.Cell.t) :
     ~ List.In (Raw.Event.Copy left right)
-        (V1.fill_lookup_entries idx entries).
+        (V1.fill_lookup_entries idx usable_rows entries).
   Proof.
     induction entries as [| entry entries IH]; cbn [V1.fill_lookup_entries].
     - intros [].
@@ -853,11 +853,11 @@ Section OperationalBridge.
   Qed.
 
   Lemma init_lookup_table_events_no_copy
-      (idx : Indices.t columns) (name : string)
+      (idx : Indices.t columns) (usable_rows : Z) (name : string)
       (entries : list (LookupTableColumn.t columns))
       (left right : Raw.Cell.t) :
     ~ List.In (Raw.Event.Copy left right)
-        (V1.init_lookup_table_events idx name entries).
+        (V1.init_lookup_table_events idx usable_rows name entries).
   Proof.
     unfold V1.init_lookup_table_events.
     intros Hin.
@@ -867,7 +867,7 @@ Section OperationalBridge.
     destruct Hin as [Hin | Hin].
     - exact (assign_lookup_rows_no_copy idx _ _ entries left right Hin).
     - destruct Hin as [Heq | Hin]; [discriminate Heq |].
-      exact (fill_lookup_entries_no_copy idx entries left right Hin).
+      exact (fill_lookup_entries_no_copy idx usable_rows entries left right Hin).
   Qed.
 
   (** Every [Raw.Event.Copy] of a region stream is the lowering of a
@@ -935,11 +935,11 @@ Section OperationalBridge.
   (** Every [Raw.Event.Copy] of a layouter stream is the lowering of a
       [Fact.CellsEqual] or of a [Fact.InstanceIs]. *)
   Lemma layouter_copy_event_fact
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (left right : Raw.Cell.t) :
     List.In (Raw.Event.Copy left right)
-      (snd (V1.eval_layouter idx rs program)) ->
+      (snd (V1.eval_layouter idx rs usable_rows program)) ->
     (exists left_cell right_cell,
       left = Cell.to_raw idx rs left_cell /\
       right = Cell.to_raw idx rs right_cell /\
@@ -956,11 +956,11 @@ Section OperationalBridge.
       | name entries | A name nested IHnested];
       cbn [layouter_facts V1.eval_layouter].
     - intros [].
-    - rewrite (layouter_value_agrees idx rs first).
-      destruct (V1.eval_layouter idx rs first)
+    - rewrite (layouter_value_agrees idx rs usable_rows first).
+      destruct (V1.eval_layouter idx rs usable_rows first)
         as [value_first events_first] eqn:Hfirst.
       cbn [fst].
-      destruct (V1.eval_layouter idx rs (second value_first))
+      destruct (V1.eval_layouter idx rs usable_rows (second value_first))
         as [value_second events_second] eqn:Hsecond.
       cbn [snd].
       intros Hin.
@@ -1024,9 +1024,9 @@ Section OperationalBridge.
       reflexivity.
     - intros Hin.
       exfalso.
-      exact (init_lookup_table_events_no_copy idx name entries
+      exact (init_lookup_table_events_no_copy idx usable_rows name entries
         left right Hin).
-    - destruct (V1.eval_layouter idx rs nested)
+    - destruct (V1.eval_layouter idx rs usable_rows nested)
         as [value events] eqn:Hnested.
       cbn [snd List.app].
       intros Hin.
@@ -1084,23 +1084,21 @@ Section OperationalBridge.
   (** The program-determined facts hold after any successful replay of a
       stream extending the program's events. *)
   Lemma determined_facts_hold_incl
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (events_all : list Raw.Event.t)
       (initial final : RawGrid.t) :
     apply_events events_all initial = Some final ->
-    List.incl (snd (V1.eval_layouter idx rs program)) events_all ->
+    List.incl (snd (V1.eval_layouter idx rs usable_rows program)) events_all ->
     interpret_facts (realize idx rs final)
       (determined_facts (layouter_facts program)).
   Proof.
     intros Hreplay Hincl.
-    apply (layouter_determined_facts final events_all).
+    eapply (layouter_determined_facts final events_all).
     - intros column row annotation Hin.
       exact (replay_selector_pinned _ _ _ _ _ _ Hreplay Hin).
     - intros column row annotation value Hin.
       exact (replay_fixed_pinned _ _ _ _ _ _ _ Hreplay Hin).
-    - intros column from_row value row Hin Hle.
-      exact (replay_fill_pinned _ _ _ _ _ _ _ Hreplay Hin Hle).
     - exact Hincl.
   Qed.
 
@@ -1110,11 +1108,11 @@ Section OperationalBridge.
       obligations of the stream, and the pinning of fixed writes.  The last
       two are exactly what [mock_prover_accepts] and replay success provide. *)
   Lemma circuit_facts_hold
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       {A : Set} (program : 𝓛 columns RegionId A)
       (grid : RawGrid.t)
       (events_all : list Raw.Event.t) :
-    List.incl (snd (V1.eval_layouter idx rs program)) events_all ->
+    List.incl (snd (V1.eval_layouter idx rs usable_rows program)) events_all ->
     constants_materialized idx rs (layouter_facts program) events_all ->
     interpret_facts (realize idx rs grid)
       (determined_facts (layouter_facts program)) ->
@@ -1146,13 +1144,14 @@ Section OperationalBridge.
       rewrite !realize_eval_cell.
       apply Hcopy.
       apply Hincl.
-      exact (layouter_cells_equal_event idx rs program
+      exact (layouter_cells_equal_event idx rs usable_rows program
         left_cell right_cell Hin).
     - (* InstanceIs: a copy obligation against the raw instance cell *)
       cbn [interpret_fact].
       rewrite realize_eval_cell.
       rewrite (Hcopy _ _ (Hincl _
-        (layouter_instance_is_event idx rs program cell instance row Hin))).
+        (layouter_instance_is_event idx rs usable_rows program cell instance row
+          Hin))).
       reflexivity.
     - (* LookupTableLoaded: program-determined *)
       apply (interpret_facts_In _ _ _ Hdetermined).
@@ -1181,13 +1180,13 @@ Section OperationalBridge.
       package [circuit_holds]. *)
   Theorem operational_sound
       {A : Set} (program : 𝓛 columns RegionId A)
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       (system : ConstraintSystem.t columns)
       (advice instance_ : Z -> Z -> Z) (g : RawGrid.t)
       (constants_events : list Raw.Event.t) :
     instance_free system ->
     flattening_ok system ->
-    let '(v_op, evts) := V1.eval_layouter idx rs program in
+    let '(v_op, evts) := V1.eval_layouter idx rs usable_rows program in
     constants_materialized idx rs (layouter_facts program)
       (evts ++ constants_events) ->
     apply_events (evts ++ constants_events) (initial_grid advice instance_) =
@@ -1200,25 +1199,25 @@ Section OperationalBridge.
       circuit_holds Γ program system).
   Proof.
     intros Hinstance_free Hflattening_ok.
-    destruct (V1.eval_layouter idx rs program) as [v_op evts] eqn:Heval.
+    destruct (V1.eval_layouter idx rs usable_rows program) as [v_op evts] eqn:Heval.
     intros Hconstants Hreplay.
     cbv zeta.
-    assert (Hevents : snd (V1.eval_layouter idx rs program) = evts)
+    assert (Hevents : snd (V1.eval_layouter idx rs usable_rows program) = evts)
       by (rewrite Heval; reflexivity).
     assert (Hincl :
-      List.incl (snd (V1.eval_layouter idx rs program))
+      List.incl (snd (V1.eval_layouter idx rs usable_rows program))
         (evts ++ constants_events)).
     { rewrite Hevents.
       apply List.incl_appl, List.incl_refl. }
     assert (Hdetermined :
       interpret_facts (realize idx rs g)
         (determined_facts (layouter_facts program))).
-    { exact (determined_facts_hold_incl idx rs program
+    { exact (determined_facts_hold_incl idx rs usable_rows program
         (evts ++ constants_events) (initial_grid advice instance_) g
         Hreplay Hincl). }
     split; [| split].
     - (* 1. results agree *)
-      rewrite (operational_sound_value idx rs program), Heval.
+      rewrite (operational_sound_value idx rs usable_rows program), Heval.
       reflexivity.
     - (* 2. program-determined facts hold outright *)
       exact Hdetermined.
@@ -1226,7 +1225,7 @@ Section OperationalBridge.
       intros Hmock.
       destruct Hmock as (Hgates & Hlookups & Hcopies).
       split.
-      + apply (circuit_facts_hold idx rs program g
+      + apply (circuit_facts_hold idx rs usable_rows program g
           (evts ++ constants_events)).
         * exact Hincl.
         * exact Hconstants.
@@ -1246,12 +1245,12 @@ Section OperationalBridge.
       synthesis makes [constants_materialized] vacuous. *)
   Corollary operational_sound_no_tail
       {A : Set} (program : 𝓛 columns RegionId A)
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       (system : ConstraintSystem.t columns)
       (advice instance_ : Z -> Z -> Z) (g : RawGrid.t) :
     instance_free system ->
     flattening_ok system ->
-    let '(v_op, evts) := V1.eval_layouter idx rs program in
+    let '(v_op, evts) := V1.eval_layouter idx rs usable_rows program in
     constants_materialized idx rs (layouter_facts program) evts ->
     apply_events evts (initial_grid advice instance_) = Some g ->
     let Γ := realize idx rs g in
@@ -1262,9 +1261,9 @@ Section OperationalBridge.
       circuit_holds Γ program system).
   Proof.
     intros Hinstance_free Hflattening_ok.
-    pose proof (operational_sound program idx rs system advice instance_ g []
-      Hinstance_free Hflattening_ok) as Hsound.
-    destruct (V1.eval_layouter idx rs program) as [v_op evts].
+    pose proof (operational_sound program idx rs usable_rows system advice
+      instance_ g [] Hinstance_free Hflattening_ok) as Hsound.
+    destruct (V1.eval_layouter idx rs usable_rows program) as [v_op evts].
     rewrite List.app_nil_r in Hsound.
     exact Hsound.
   Qed.
@@ -1277,20 +1276,20 @@ Section OperationalBridge.
       [Fact.InstanceIs] the fact list interprets. *)
   Theorem operational_complete
       {A : Set} (program : 𝓛 columns RegionId A)
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       (system : ConstraintSystem.t columns)
       (advice instance_ : Z -> Z -> Z) (g : RawGrid.t)
       (region0 : RegionId) :
     instance_free system ->
     flattening_ok system ->
-    let '(v_op, evts) := V1.eval_layouter idx rs program in
+    let '(v_op, evts) := V1.eval_layouter idx rs usable_rows program in
     apply_events evts (initial_grid advice instance_) = Some g ->
     circuit_holds (realize idx rs g) program system ->
     mock_prover_accepts (Configure.to_indexed idx system) evts g
       (layouter_table_rows program).
   Proof.
     intros Hinstance_free Hflattening_ok.
-    destruct (V1.eval_layouter idx rs program) as [v_op evts] eqn:Heval.
+    destruct (V1.eval_layouter idx rs usable_rows program) as [v_op evts] eqn:Heval.
     intros _ Hholds.
     destruct Hholds as (Hfacts & Hgates & Hlookups).
     split; [| split].
@@ -1301,9 +1300,10 @@ Section OperationalBridge.
     - intros left right Hin.
       assert (Hin' :
         List.In (Raw.Event.Copy left right)
-          (snd (V1.eval_layouter idx rs program)))
+          (snd (V1.eval_layouter idx rs usable_rows program)))
         by (rewrite Heval; exact Hin).
-      destruct (layouter_copy_event_fact idx rs program left right Hin') as
+      destruct (layouter_copy_event_fact idx rs usable_rows program left right
+        Hin') as
         [ (left_cell & right_cell & Hleft & Hright & Hfact)
         | (cell & instance & row & Hleft & Hright & Hfact) ].
       + subst left right.
