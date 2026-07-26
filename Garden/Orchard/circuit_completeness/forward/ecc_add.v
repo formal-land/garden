@@ -935,6 +935,22 @@ Module OrchardCompletenessForwardEccAdd.
       rewrite IH. reflexivity.
   Qed.
 
+  (** Every point-addition coordinate is a chord over [BinOp.div], and
+      [BinOp.div] runs [mod_inverse] (the extended-Euclid loop at the concrete
+      [mod_inv_fuel pallas_p ~ 512] fuel) — so any conversion that reaches an
+      addition coordinate on symbolic points unfolds that loop into a giant
+      term (tens of seconds at the tactic AND again at [Qed]).  From here the
+      field division is opaque to the conversion oracle, so the equal chord
+      spellings of [hash_go]/[point_add]/[point_add_incomplete] match as stuck
+      atoms instead of being reduced (docs/compile-performance.md).  A
+      persistent [Strategy] (not [with_strategy]) is required so the kernel
+      [Qed] re-check is cheap too; the ring operators [BinOp.add/sub/mul] stay
+      transparent so [mod_ring_solve]/[field_solve] still normalize.
+      [CompleteAddition.output] (the complete-addition chord, over the same
+      [BinOp.div]) is opaque for the same reason — its case split otherwise
+      forces the nested leg-point coordinates. *)
+  Strategy opaque [BinOp.div mod_inverse CompleteAddition.output].
+
   (** ** [hash_data_of] against the specification fold *)
 
   Lemma hash_go_snd (ws : list Z) :
@@ -1207,11 +1223,21 @@ Module OrchardCompletenessForwardEccAdd.
       CommitIvkRWindowSignCert.root_table (hi_rivk w).
   Proof. reflexivity. Qed.
 
+  (** The nullifier leg's shape.  The right-hand side keeps the deep scalar
+      as the [t_nullifier_scalar] projection while the left-hand side inlines
+      it; a bare [reflexivity] makes the tactic unifier reduce across that
+      mismatch and normalise the Poseidon round chain (the [3^36] trap, see
+      [docs/compile-performance.md]).  Reduce only the record builder and its
+      two projections — leaving [leg_of], [List.nth] and [pose_states_of]
+      folded — so both sides become the identical stuck term. *)
   Lemma t_nk_leg_shape (w : HonestInput) :
     t_nk_leg (tables_of w) =
     leg_of OrchardAdvicePoseidonNullifier.nk_table
       NullifierKWindowSignCert.root_table (t_nullifier_scalar (tables_of w)).
-  Proof. reflexivity. Qed.
+  Proof.
+    cbn [tables_of t_nk_leg t_nullifier_scalar].
+    reflexivity.
+  Qed.
 
   Lemma t_sa_comm_eq (w : HonestInput) :
     t_sa_comm (tables_of w) =
@@ -1268,11 +1294,19 @@ Module OrchardCompletenessForwardEccAdd.
         (note_commit_old_words w)).
   Proof. reflexivity. Qed.
 
+  (** The right-hand side keeps the old-note hash as the [t_nc_old_hash]
+      projection while the left-hand side inlines the Sinsemilla fold; a bare
+      [reflexivity] makes the unifier unfold [point_add] over that fold (see
+      [docs/compile-performance.md]).  Reduce only the record builder and its
+      projections so both sides become the identical stuck term. *)
   Lemma t_cm_old_eq (w : HonestInput) :
     t_cm_old (tables_of w) =
     EccSpec.point_add (hd_out (t_nc_old_hash (tables_of w)))
       (OrchardProtocolSpec.mul_note_commit_r (hi_rcm_old w)).
-  Proof. reflexivity. Qed.
+  Proof.
+    cbn [tables_of t_cm_old t_nc_old_hash].
+    reflexivity.
+  Qed.
 
   Lemma t_civk_hash_eq (w : HonestInput) :
     t_civk_hash (tables_of w) =
@@ -1288,24 +1322,41 @@ Module OrchardCompletenessForwardEccAdd.
       EccSpec.extract_x
         (EccSpec.point_add (hd_out (t_civk_hash (tables_of w)))
           (OrchardProtocolSpec.mul_commit_ivk_r (hi_rivk w))))
-      by reflexivity.
+      by (cbn [tables_of t_ivk t_civk_hash]; reflexivity).
     rewrite Hshape, t_civk_hash_eq, hd_out_hash_data.
     unfold commit_ivk_words.
     rewrite commit_ivk_words_concat.
+    (* Align the Sinsemilla domain-point spelling on both sides before
+       [reflexivity]: comparing two [sinsemilla_hash_to_point] applications
+       whose [Q] arguments differ syntactically forces the 109-step fold
+       (see [docs/compile-performance.md]).  [commit_ivk_Q] is definitionally
+       [commit_ivk_q orchard_circuit_params], the spelling [ivk] uses. *)
+    unfold ivk, OrchardProtocolSpec.commit_ivk,
+      OrchardAdviceMerkleSinsemilla.commit_ivk_Q.
     reflexivity.
   Qed.
 
+  (** Both variable-base read-offs keep the [Commit^ivk] scalar as the [t_ivk]
+      projection over a Sinsemilla-derived value; reduce the record builder
+      and its projections so the enclosing [Pallas.mul] / [vb_columns] stays
+      folded and both sides coincide syntactically. *)
   Lemma t_vb_result_eq (w : HonestInput) :
     t_vb_result (tables_of w) =
     PallasModel.repr
       (Pallas.mul (t_ivk (tables_of w))
         (PallasModel.unrepr (hi_g_d_old w))).
-  Proof. reflexivity. Qed.
+  Proof.
+    cbn [tables_of t_vb_result t_ivk].
+    reflexivity.
+  Qed.
 
   Lemma t_vb_eq (w : HonestInput) :
     t_vb (tables_of w) =
     OrchardVarBaseTables.vb_columns (t_ivk (tables_of w)) (hi_g_d_old w).
-  Proof. reflexivity. Qed.
+  Proof.
+    cbn [tables_of t_vb t_ivk].
+    reflexivity.
+  Qed.
 
   (** ** The fixed-base leg: structure of [leg_of]
 
@@ -1505,8 +1556,10 @@ Module OrchardCompletenessForwardEccAdd.
         (Pallas.mul (window_scalar n wi (EccSpec.window_digit k wi)) G).
     Proof using All.
       rewrite leg_pt_nth, (leg_pts_nth tbl roots k wi ltac:(lia)).
-      rewrite (List.nth_indep tbl OrchardAdviceEccMuls.dummy_window
-        OrchardActionFixedBase.fixed_window_default ltac:(lia)).
+      assert (Hnth : List.nth wi tbl OrchardAdviceEccMuls.dummy_window =
+        List.nth wi tbl OrchardActionFixedBase.fixed_window_default)
+        by (apply List.nth_indep; lia).
+      rewrite Hnth.
       pose proof (window_digit_bound k wi) as Hd.
       apply point_eq.
       - apply Hx_bridge; [exact Hwi | exact Hd].
@@ -1618,8 +1671,13 @@ Module OrchardCompletenessForwardEccAdd.
           (pallas_mul_on_curve _ G HGoc) (pallas_mul_on_curve _ G HGoc)).
         rewrite <- (pallas_mul_add _ _ G HGred HGoc).
         apply (f_equal PallasModel.repr), mul_scalar_eq.
-        rewrite cumulative_scalar_succ_gen.
-        lia.
+        (* Expand the accumulator on the right ([S (S j)]) — the unqualified
+           [rewrite] would hit the [S j] occurrence on the left and leave an
+           unprovable goal.  The result is [c + w = c + w], closed by [ring]
+           (which ignores the [mod Pallas.pallas_q] hypotheses that make [lia]
+           diverge here). *)
+        rewrite (cumulative_scalar_succ_gen n k (S j)).
+        ring.
     Qed.
 
     Lemma ladder_chord (j : nat)
@@ -2069,6 +2127,26 @@ Module OrchardCompletenessForwardEccAdd.
       apply IH.
   Qed.
 
+  (** Route the concrete 36-row read-back through [poseidon_state] at an
+      ABSTRACT length: the fold over [List.seq 0 n] is stuck, so the two
+      spellings align structurally.  Converting the two spellings at the
+      concrete count instead normalizes the 36-round chain (the [3^36] trap of
+      docs/compile-performance.md). *)
+  Lemma states_go_poseidon_state (s : State.t) (n : nat) :
+    List.nth n (states_go s 0%nat n) state0 = poseidon_state s n.
+  Proof.
+    rewrite (states_go_last n 0%nat s).
+    unfold poseidon_state.
+    reflexivity.
+  Qed.
+
+  (** The Poseidon schedule iterate is opaque to the kernel from here on, so a
+      conversion between [poseidon_round_state w 36] and
+      [poseidon_state (poseidon_input_state w) 36] matches through the single
+      [poseidon_round_state] delta rather than reducing either 36-round chain
+      (docs/compile-performance.md). *)
+  #[local] Opaque poseidon_state.
+
   Lemma t_hash2_eq (w : HonestInput) :
     t_hash2 (tables_of w) =
     Poseidon.poseidon_hash2 (hi_nk w) (hi_rho_old w).
@@ -2077,9 +2155,19 @@ Module OrchardCompletenessForwardEccAdd.
       State.x0 (List.nth 36 (pose_states_of w) state0)) by reflexivity.
     rewrite Hshape.
     unfold pose_states_of.
-    rewrite (states_go_last 36%nat 0%nat (poseidon_input_state w)).
+    rewrite (states_go_poseidon_state (poseidon_input_state w) 36%nat).
     exact (poseidon_round_state_hash2 w).
   Qed.
+
+  (** The Poseidon read-back chain is opaque to the conversion oracle from
+      here on: every later comparison of a [t_nullifier_scalar]/[t_nk_leg]
+      spelling against a hoisted projection would otherwise force
+      [List.nth 36 (pose_states_of w) state0] — the 36-round chain — through
+      the [State.x0] projection (docs/compile-performance.md).  The lemmas
+      above are the only ones that unfold these.  [poseidon_hash2] joins them:
+      two identical [poseidon_hash2 (hi_nk w) (hi_rho_old w)] spellings would
+      otherwise be compared by normalizing [Poseidon.permute]. *)
+  #[local] Opaque pose_states_of states_go Poseidon.poseidon_hash2.
 
   Lemma t_nullifier_scalar_eq (w : HonestInput) :
     t_nullifier_scalar (tables_of w) = nullifier_scalar w.
@@ -2095,6 +2183,12 @@ Module OrchardCompletenessForwardEccAdd.
     rewrite t_cm_old_eq, t_nc_old_hash_eq, hd_out_hash_data.
     unfold note_commit_old_words.
     rewrite note_commit_words_concat.
+    (* Align the Sinsemilla domain-point spelling on both sides before
+       [reflexivity]: [note_commit_Q] is definitionally
+       [note_commit_q orchard_circuit_params], the spelling [cm_old] uses
+       (see [docs/compile-performance.md]). *)
+    unfold cm_old, OrchardProtocolSpec.note_commit,
+      OrchardAdviceMerkleSinsemilla.note_commit_Q.
     reflexivity.
   Qed.
 
@@ -2105,12 +2199,17 @@ Module OrchardCompletenessForwardEccAdd.
         (EccSpec.point_add
           (OrchardProtocolSpec.mul_nullifier_k
             (t_nullifier_scalar (tables_of w)))
-          (t_cm_old (tables_of w)))) by reflexivity.
+          (t_cm_old (tables_of w))))
+      by (cbn [tables_of t_nf_spec t_nullifier_scalar t_cm_old]; reflexivity).
     rewrite Hshape, t_nullifier_scalar_eq, t_cm_old_spec.
     unfold rho_new, nf_old, OrchardProtocolSpec.nullifier, nullifier_scalar.
     reflexivity.
   Qed.
 
+  (** The right-hand side keeps [ρ_new] as the [t_nf_spec] projection while
+      the left-hand side inlines the nullifier chain; reduce the record
+      builder and its projections so the enclosing [hash_data_of] stays folded
+      and both sides coincide syntactically. *)
   Lemma t_nc_new_hash_eq (w : HonestInput) :
     t_nc_new_hash (tables_of w) =
     hash_data_of OrchardAdviceMerkleSinsemilla.note_commit_Q
@@ -2118,7 +2217,10 @@ Module OrchardCompletenessForwardEccAdd.
         OrchardAdviceMerkleSinsemilla.note_commit_lens
         (OrchardSpec.note_commit_message (hi_g_d_new w) (hi_pk_d_new w)
           (hi_v_new w) (t_nf_spec (tables_of w)) (hi_psi_new w))).
-  Proof. reflexivity. Qed.
+  Proof.
+    cbn [tables_of t_nc_new_hash t_nf_spec].
+    reflexivity.
+  Qed.
 
   (** ** The [ivk] range
 
@@ -2380,7 +2482,10 @@ Module OrchardCompletenessForwardEccAdd.
   Proof.
     induction count as [| c IH]; intros i Hci Hi Hlo Hnds.
     - cbn [OrchardVarBaseTables.ladder_go snd].
-      f_equal. lia.
+      (* [S i - 0] is convertible to [S i], so [f_equal] closes the goal on
+         its own; keep [lia] chained for the residual [nat] equality if the
+         reduction ever leaves one. *)
+      f_equal; lia.
     - cbn [OrchardVarBaseTables.ladder_go].
       destruct (OrchardVarBaseTables.ladder_step (hi_g_d_old w)
         (scalar_bit (mul_scalar w) i) (mul_acc w (S i)))
@@ -2399,7 +2504,9 @@ Module OrchardCompletenessForwardEccAdd.
         (mul_scalar w) acc' (Nat.pred i) c) as [rows out] eqn:Hgo.
       cbn [snd] in IHi |- *.
       rewrite IHi.
-      f_equal. lia.
+      (* [f_equal] may discharge the convertible [nat] index directly; chain
+         [lia] for the residual equality if one remains. *)
+      f_equal; lia.
   Qed.
 
   Lemma mul_acc_255_eq (w : HonestInput) (HB : point_ok (hi_g_d_old w))
@@ -2407,7 +2514,10 @@ Module OrchardCompletenessForwardEccAdd.
     mul_acc w 255%nat = EccSpec.point_add (hi_g_d_old w) (hi_g_d_old w).
   Proof.
     pose proof HB as (HBred & HBoc & _).
-    unfold mul_acc.
+    (* Expose [mul_base w = unrepr (hi_g_d_old w)] up front: [pallas_mul_2]
+       instantiates its base from [HBred : reduced (unrepr (hi_g_d_old w))],
+       so the [Pallas.mul 2 _] occurrence must already carry that spelling. *)
+    unfold mul_acc, mul_base.
     assert (Hm : mul_multiple w 255%nat = 2).
     { unfold mul_multiple, bit_running_sum.
       rewrite Z.div_small by (change (Z.of_nat 255) with 255; lia).
@@ -2415,7 +2525,6 @@ Module OrchardCompletenessForwardEccAdd.
     rewrite Hm.
     rewrite (pallas_mul_2 _ HBred HBoc).
     rewrite (pallas_repr_add _ _ HBred HBred HBoc HBoc).
-    unfold mul_base.
     rewrite PallasModel.repr_unrepr.
     reflexivity.
   Qed.
@@ -2511,6 +2620,9 @@ Module OrchardCompletenessForwardEccAdd.
         (ivk w + Primes.t_q)
         (EccSpec.point_add (hi_g_d_old w) (hi_g_d_old w)) 254 125)
         as [hi acc130] eqn:H1.
+      (* Reduce [snd (hi, acc130)] to [acc130] so the second [destruct]'s
+         pattern matches the right-hand occurrence too. *)
+      cbn [snd].
       destruct (OrchardVarBaseTables.ladder_go (hi_g_d_old w)
         (ivk w + Primes.t_q) acc130 129 126) as [lo acc4] eqn:H2.
       reflexivity. }
@@ -2615,12 +2727,16 @@ Module OrchardCompletenessForwardEccAdd.
     assert (Hpred : (Z.to_nat row - 1)%nat = Nat.pred (Z.to_nat row)) by lia.
     apply (incomplete_eval Γ region row (leg_pt l (Z.to_nat row))
       (leg_acc l (Nat.pred (Z.to_nat row)))); try assumption.
-    - rewrite HA0. reflexivity.
-    - rewrite HA1. reflexivity.
-    - rewrite HA2, Hpred. reflexivity.
-    - rewrite HA3, Hpred. reflexivity.
-    - rewrite HA2', Hidx, <- Hchain. reflexivity.
-    - rewrite HA3', Hidx, <- Hchain. reflexivity.
+    (* [try assumption] discharges whichever cell equalities are already
+       convertible (the [A0]/[A1] window cells); handle every remaining cell
+       uniformly so the proof does not depend on which ones it absorbed. *)
+    all: first
+      [ rewrite HA0; reflexivity
+      | rewrite HA1; reflexivity
+      | rewrite HA2, Hpred; reflexivity
+      | rewrite HA3, Hpred; reflexivity
+      | rewrite HA2', Hidx, <- Hchain; reflexivity
+      | rewrite HA3', Hidx, <- Hchain; reflexivity ].
   Qed.
 
   (** The sign-adjusted value-commitment point stays a good curve point. *)
@@ -2634,6 +2750,14 @@ Module OrchardCompletenessForwardEccAdd.
   Qed.
 
   (** ** The ecc-add gate obligations *)
+
+  (** The variable-base ladder record is opaque to the conversion oracle in
+      the gate proof: the cell-value [reflexivity] obligations compare a
+      [vb_acc4]/[vb_p3] projection of [t_vb (tables_of w)] against the same
+      projection, and unfolding [vb_columns] to reach it would run the
+      130-step ladder fold (docs/compile-performance.md).  The lemmas above
+      are the only ones that unfold it. *)
+  #[local] Opaque OrchardVarBaseTables.vb_columns.
 
   Theorem ecc_add_gates_forward : ecc_selector_gates_ok.
   Proof.

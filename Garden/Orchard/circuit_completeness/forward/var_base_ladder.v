@@ -75,6 +75,7 @@ Require Import Garden.Orchard.circuit_completeness.instance_defs.
 Require Import Garden.Orchard.circuit_completeness.tables.
 Require Import Garden.Orchard.circuit_completeness.tables_vb.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
+Require Garden.Orchard.circuit_completeness.forward.ecc_add.
 Require Garden.Orchard.circuit.
 (* [Garden.Plonky3.M] is deliberately Require'd but NOT Imported: its
    notations break nested or-intropatterns ([var_base_incomplete.v]);
@@ -90,6 +91,18 @@ Require Import Stdlib.Lists.List.
 Require Import Stdlib.micromega.Lia.
 
 Import ListNotations.
+
+(* [Garden.Plonky3.M] is Require'd but not Imported (its notations break the
+   nested or-intropatterns above), so alias the one module whose name the
+   gate-evaluation goals mention unqualified, matching [Halo2/realize/
+   constraints.v]. *)
+Module IsBool := Garden.Plonky3.M.IsBool.
+
+(* [forward/ecc_add.v] leaves [BinOp.div], [mod_inverse] and
+   [CompleteAddition.output] opaque to the conversion oracle; the proofs below
+   the ladder-row section unfold them explicitly, so the reduction levels are
+   restored here and re-applied around the row section. *)
+Strategy transparent [BinOp.div mod_inverse CompleteAddition.output].
 
 #[local] Existing Instance Primes.PallasPIsPrime.
 
@@ -619,6 +632,15 @@ Module OrchardVarBaseForward.
   Module OCT := OrchardCompletenessTables.
   Module OAMS := OrchardAdviceMerkleSinsemilla.
 
+  (* The step equality below is structural once the [mod p] arithmetic of one
+     Sinsemilla round is not normalized; making the field operations opaque
+     to the conversion oracle keeps both the tactic and the [Qed] kernel cast
+     cheap.  The scope is closed again immediately after the lemma so the
+     surrounding [unfold]-based tactics are unaffected.  A VM cast is not an
+     option here: it would force [generator wd] and the whole S-table. *)
+  Strategy opaque
+    [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from UnOp.opp mod_inverse].
+
   Lemma hash_go_snd (ws : list Z) :
     forall acc : Point.t,
       snd (OCT.hash_go acc ws) =
@@ -633,6 +655,9 @@ Module OrchardVarBaseForward.
       rewrite IH.
       reflexivity.
   Qed.
+
+  Strategy transparent
+    [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from UnOp.opp mod_inverse].
 
   Lemma hd_out_hash_data_of (Q : Point.t) (pieces : list (list Z)) :
     OCT.hd_out (OCT.hash_data_of Q pieces) =
@@ -797,7 +822,13 @@ Module OrchardVarBaseForward.
   (** ** The [ladder_go] fold: shape and specification chain *)
 
   (** One [ladder_step] is the two spec-level incomplete additions of the
-      signed base point. *)
+      signed base point.  The definitional equality is structural once the
+      chord [mod p] arithmetic is not normalized, so the field operations are
+      made opaque to the conversion oracle for both the tactic and the [Qed]
+      kernel cast, and restored immediately afterwards. *)
+  Strategy opaque
+    [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from UnOp.opp mod_inverse].
+
   Lemma ladder_step_shape (B acc : Point.t) (bit : Z) :
     OrchardVarBaseTables.ladder_step B bit acc =
     (let P := {| Point.x := Point.x B;
@@ -815,6 +846,9 @@ Module OrchardVarBaseForward.
   Proof.
     reflexivity.
   Qed.
+
+  Strategy transparent
+    [BinOp.add BinOp.sub BinOp.mul BinOp.div UnOp.from UnOp.opp mod_inverse].
 
   Lemma mstep_coords (alpha : Z) (B : Point.t) (m : nat) :
     mstep alpha B m =
@@ -945,11 +979,11 @@ Module OrchardVarBaseForward.
         destruct Hbit01 as [Hb | Hb];
           unfold yp in Hs1;
           rewrite Hb in Hs1 |- *;
-          cbn [Z.eqb] in Hs1;
+          cbn [Z.eqb Pos.eqb] in Hs1;
           rewrite Hs1;
           mod_ring_zero.
       - exact Hxan.
-      - rewrite Hya in Hg2. exact Hg2. }
+      - exact Hg2. }
     rewrite Hstep_group.
     unfold macc.
     f_equal.
@@ -1035,7 +1069,6 @@ Module OrchardVarBaseForward.
       split.
       + rewrite IHacc.
         f_equal.
-        lia.
       + intros j Hj.
         destruct j as [| j'].
         * cbn [List.nth].
@@ -1044,6 +1077,30 @@ Module OrchardVarBaseForward.
         * cbn [List.nth].
           replace (S i' - S j')%nat with (i' - j')%nat by lia.
           exact (IHrows j' ltac:(lia)).
+  Qed.
+
+  (** The ladder's initial accumulator: at bit boundary 255 the [macc]
+      multiple is [[2] B], the complete-addition double of the base
+      ([mk alpha / 2 ^ 255 = 0] since [mk alpha < 2 ^ 255]). *)
+  Lemma macc_255 (alpha : Z) (B : Point.t) (HB : point_ok B)
+      (Hk : 0 <= mk alpha < 2 ^ 255) :
+    macc alpha B (S 254) = EccSpec.point_add B B.
+  Proof.
+    destruct HB as (Hred & Hoc & _).
+    unfold macc.
+    assert (Hsc : 2 ^ (255 - Z.of_nat (S 254))
+        + 2 * (mk alpha / 2 ^ Z.of_nat (S 254)) + 1 = 2).
+    { replace (Z.of_nat (S 254)) with 255 by reflexivity.
+      rewrite (Z.div_small (mk alpha) (2 ^ 255) Hk).
+      reflexivity. }
+    rewrite Hsc.
+    rewrite (VarBaseDefs.pallas_mul_2 (PallasModel.unrepr B) Hred Hoc).
+    change (Pallas.add (PallasModel.unrepr B) (PallasModel.unrepr B))
+      with (PallasModel.wadd (PallasModel.unrepr B) (PallasModel.unrepr B)).
+    rewrite (PallasModel.repr_add (PallasModel.unrepr B) (PallasModel.unrepr B)
+      Hred Hred Hoc Hoc).
+    rewrite (PallasModel.repr_unrepr B).
+    reflexivity.
   Qed.
 
   (** ** The chain at the tables record
@@ -1120,8 +1177,13 @@ Module OrchardVarBaseForward.
         fst (OrchardVarBaseTables.ladder_step B
           (scalar_bit (mk alpha) (254 - j)) (macc alpha B (S (254 - j))))).
     Proof.
+      (* The two side conditions are closed [nat] facts; prove them by
+         boolean reflection rather than [lia], whose [zify] would preprocess
+         the section's [Hk : 0 <= mk alpha < 2 ^ 255] and diverge on the
+         concrete power (the "scope lia with clear -" pitfall). *)
       pose proof (ladder_go_chain alpha B HB Hlad 125 254
-        ltac:(lia) ltac:(lia)) as (Hacc & Hrows).
+        ltac:(apply (proj1 (Nat.leb_le _ _)); reflexivity)
+        ltac:(apply (proj1 (Nat.ltb_lt _ _)); reflexivity)) as (Hacc & Hrows).
       rewrite (macc_255 alpha B HB Hk) in Hacc, Hrows.
       change (S 254 - 125)%nat with 130%nat in Hacc.
       split.
@@ -1141,7 +1203,8 @@ Module OrchardVarBaseForward.
           (scalar_bit (mk alpha) (129 - j)) (macc alpha B (S (129 - j))))).
     Proof.
       pose proof (ladder_go_chain alpha B HB Hlad 126 129
-        ltac:(lia) ltac:(lia)) as (Hacc & Hrows).
+        ltac:(apply (proj1 (Nat.leb_le _ _)); reflexivity)
+        ltac:(apply (proj1 (Nat.ltb_lt _ _)); reflexivity)) as (Hacc & Hrows).
       change (S 129 - 126)%nat with 4%nat in Hacc.
       pose proof (proj1 hi_chain) as Hacc130.
       rewrite vb_acc130_unfold in Hacc130.
@@ -1748,6 +1811,14 @@ Module OrchardVarBaseForward.
     reflexivity.
   Qed.
 
+  (** [scalar_bit] as its raw running-sum expression, over variable [k] so
+      the equation carries no [ivk] fold.  Rewriting with this (rather than a
+      [change] at the concrete [mk (ivk w)]) folds the bit expression without
+      the conversion oracle whnf-normalizing the [commit_ivk] hash. *)
+  Lemma scalar_bit_def (k : Z) (m : nat) :
+    (k / 2 ^ Z.of_nat m) mod 2 = scalar_bit k m.
+  Proof. reflexivity. Qed.
+
   (** ** Site: the scalar-decomposition gate of the complete rounds *)
 
   Lemma decompose_core (w : HonestInput) (row e f : Z) (i : nat)
@@ -1786,12 +1857,11 @@ Module OrchardVarBaseForward.
       rewrite Hzp, Hzn, Hby, Hyp.
       rewrite (bit_eval_pair (mk (ivk w)) e f He Hf).
       subst e.
-      change ((mk (ivk w) / 2 ^ Z.of_nat i) mod 2)
-        with (scalar_bit (mk (ivk w)) i).
+      rewrite (scalar_bit_def (mk (ivk w)) i).
       destruct (scalar_bit_01 (mk (ivk w)) i) as [Hb | Hb];
         rewrite Hb;
         unfold OrchardVarBaseTables.signed_pt;
-        cbn [Z.eqb];
+        cbn [Z.eqb Pos.eqb];
         [ unfold point_neg; cbn [Point.x Point.y] | ];
         mod_ring_zero.
   Qed.
@@ -1887,7 +1957,7 @@ Module OrchardVarBaseForward.
       destruct (scalar_bit_01 (mk (ivk w)) 0) as [Hb | Hb];
         rewrite Hb;
         unfold OrchardVarBaseTables.lsb_pt;
-        cbn [Z.eqb];
+        cbn [Z.eqb Pos.eqb];
         [ unfold point_neg; cbn [Point.x Point.y] | cbn [Point.x Point.y] ];
         mod_ring_zero.
     - (* lsb_y *)
@@ -1898,7 +1968,7 @@ Module OrchardVarBaseForward.
       destruct (scalar_bit_01 (mk (ivk w)) 0) as [Hb | Hb];
         rewrite Hb;
         unfold OrchardVarBaseTables.lsb_pt;
-        cbn [Z.eqb];
+        cbn [Z.eqb Pos.eqb];
         [ unfold point_neg; cbn [Point.x Point.y] | cbn [Point.x Point.y] ];
         mod_ring_zero.
   Qed.
@@ -1959,7 +2029,9 @@ Module OrchardVarBaseForward.
     rewrite Hk1.
     assert (Hmod : (a + 1 * 2 ^ 130) mod Primes.pallas_p =
         a + 2 ^ 130 - Primes.pallas_p).
-    { apply (Z.mod_unique _ _ 1).
+    { (* [Z.mod_unique] concludes [r = a mod b], so orient the goal to match. *)
+      symmetry.
+      apply (Z.mod_unique _ _ 1).
       - left.
         unfold mk in Hb.
         unfold Primes.pallas_p, Primes.t_p in *.
@@ -2026,7 +2098,7 @@ Module OrchardVarBaseForward.
     rewrite (Z.mul_comm (mk a / 2 ^ 130)
       (mod_inverse (mk a / 2 ^ 130) Primes.pallas_p)).
     rewrite Hinv.
-    symmetry.
+    (* The goal is already [1 mod p = 1], the exact shape of [Z.mod_1_l]. *)
     apply Z.mod_1_l.
     pose proof pallas_p_pos as Hp.
     clear -Hp.
@@ -2086,15 +2158,17 @@ Module OrchardVarBaseForward.
     - (* s_check *)
       gate_cbn.
       rewrite Hs, Halpha, Hk254.
-      assert (Hc : UnOp.from (2 ^ 124) *F UnOp.from (2 ^ 6) =
-          UnOp.from (2 ^ 130))
-        by (vm_compute; reflexivity).
-      rewrite Hc.
+      (* The gate spells [2^130] as the product [2^124 * 2^6]; align [Hs]'s
+         raw [2^130] with it so the atoms match under [mod_ring_solve]. *)
+      replace (2 ^ 130) with (2 ^ 124 * 2 ^ 6) by (vm_compute; reflexivity).
       mod_ring_solve.
     - (* recovery *)
       gate_cbn.
       rewrite Hz0, Halpha.
       unfold Garden.Halo2.halo2_gadgets.ecc.chip.constants.t_q, mk.
+      (* Abstract the [ivk] point so [mod_ring_solve]'s reification does not
+         traverse the [commit_ivk] hash term. *)
+      generalize (ivk w); intro x.
       mod_ring_solve.
     - (* lo_zero *)
       gate_cbn.
@@ -2104,7 +2178,7 @@ Module OrchardVarBaseForward.
         rewrite H0.
         exact from_zero.
       + right.
-        rewrite (overflow_z130_k1 (ivk w) Hival H1), H1.
+        rewrite (overflow_z130_k1 (ivk w) Hival H1).
         reflexivity.
     - (* s_minus_lo_130_check *)
       gate_cbn.
@@ -2179,6 +2253,14 @@ Module OrchardVarBaseForward.
 
   (** ** Site: the range-check lookup rows of the overflow block *)
 
+  (* The lookup-satisfaction goal routes through the honest layouter [facts]
+     stream and the hoisted [tables_of] record; every step below keeps them
+     folded (via [ovl_memb], [table_value_id], the cell equalities), so making
+     them opaque to the conversion oracle stops the [Qed] cast from evaluating
+     either heavy constant.  Restored after the lemma. *)
+  Strategy opaque
+    [OrchardHonestAssignment.facts OrchardCompletenessTables.tables_of].
+
   Lemma site_ovl_lookup (w : HonestInput) (r : Z)
       (H0 : 0 <= r) (H12 : r <= 12) :
     eval_lookup_argument (OrchardHonestAssignment.honest_assignment w)
@@ -2207,12 +2289,19 @@ Module OrchardVarBaseForward.
         by (symmetry; apply Bool.andb_true_iff;
             split; apply Z.leb_le; lia).
       rewrite Z.div_div
-        by (try apply Z.pow_pos_nonneg; clear; lia).
+        by (clear -H0;
+            assert (0 < 2 ^ (10 * r)) by (apply Z.pow_pos_nonneg; lia);
+            lia).
+      (* Express the [1024] divisor as [2 ^ 10] so the two powers combine. *)
+      change 1024 with (2 ^ 10).
       rewrite <- Z.pow_add_r by (clear -H0; lia).
       replace (10 * r + 10) with (10 * (r + 1)) by ring.
       reflexivity. }
     set (zc := OrchardVarBaseTables.vb_s (OCT.t_vb (OCT.tables_of w))
       / 2 ^ (10 * r)) in *.
+    (* Discard [zc]'s body so [ring]/[setoid_rewrite] treat it as an atom
+       rather than reifying the [tables_of w] record it abbreviates. *)
+    clearbody zc.
     pose proof (Z.mod_pos_bound zc 1024 ltac:(lia)) as Hw.
     cbn [eval_lookup_argument range_arg LookupArgument.pairs].
     exists (zc mod 1024).
@@ -2231,7 +2320,8 @@ Module OrchardVarBaseForward.
     pose proof pallas_p_pos as Hp.
     unfold BinOp.mul, BinOp.add, BinOp.sub, UnOp.from.
     transitivity ((zc mod 1024) mod Primes.pallas_p);
-      [| apply Z.mod_small; clear -Hw Hp; lia].
+      [| apply Z.mod_small; clear -Hw;
+         unfold Primes.pallas_p, Primes.t_p; lia].
     lazymatch goal with
     | |- ?x mod ?q = ?y mod ?q => change (Zdiv.eqm q x y)
     end.
@@ -2241,4 +2331,942 @@ Module OrchardVarBaseForward.
     f_equal.
     ring.
   Qed.
+
+  Strategy transparent
+    [OrchardHonestAssignment.facts OrchardCompletenessTables.tables_of].
+  (** ** The incomplete double-and-add ladder rows
+
+      The 253 [QMulIncomplete{Hi,Lo}{1,2,3}] points of the region: the hi
+      half absorbs bits 254..130 on [z = A9], [x_a = A3], [λ₁ = A4],
+      [λ₂ = A5], the lo half bits 129..4 on [z = A6], [x_a = A7],
+      [λ₁ = A8], [λ₂ = A2], both reading the base on [A0]/[A1].  The step
+      values are the [ladder_step] rows of the hoisted record, and their
+      chord algebra is [ladder_core]; the gate bodies are discharged over
+      abstract row values so no ring step ever reifies a [tables_of]
+      projection. *)
+
+  Module VBT := OrchardVarBaseTables.
+
+  Definition vstep (alpha : Z) (B : Point.t) (m : nat) : VBT.step_row :=
+    fst (VBT.ladder_step B (scalar_bit (mk alpha) m) (macc alpha B (S m))).
+
+  Lemma step_alg (alpha : Z) (B : Point.t) (m : nat)
+      (HB : point_ok B) (Hm : (m < 255)%nat) (Hstep : step_ok alpha B m) :
+    VBT.sr_xa (vstep alpha B m) = Point.x (macc alpha B (S m)) /\
+    y_a (Point.x (macc alpha B (S m))) (Point.x B)
+      (VBT.sr_l1 (vstep alpha B m)) (VBT.sr_l2 (vstep alpha B m)) =
+      Point.y (macc alpha B (S m)) /\
+    VBT.sr_l1 (vstep alpha B m) *F (Point.x (macc alpha B (S m)) -F Point.x B) =
+      Point.y (macc alpha B (S m)) -F Point.y (mstep alpha B m) /\
+    Point.x (macc alpha B m) =
+      next_x_a (Point.x (macc alpha B (S m))) (Point.x B)
+        (VBT.sr_l1 (vstep alpha B m)) (VBT.sr_l2 (vstep alpha B m)) /\
+    Point.y (macc alpha B m) =
+      VBT.sr_l2 (vstep alpha B m) *F
+        (Point.x (macc alpha B (S m)) -F Point.x (macc alpha B m)) -F
+        Point.y (macc alpha B (S m)).
+  Proof.
+    pose proof (ladder_step_macc alpha B m HB Hm Hstep) as Hnext.
+    destruct Hstep as (Hx0 & Hxb & Hmid).
+    pose proof (point_ok_affine B HB) as (Haff & Hbx & Hby).
+    pose proof (macc_reduced alpha B HB (S m)) as (Hxar & Hyar).
+    rewrite (mstep_coords alpha B m) in Hmid.
+    unfold vstep in *.
+    rewrite (mstep_y alpha B m).
+    set (acc := macc alpha B (S m)) in *.
+    set (bit := scalar_bit (mk alpha) m) in *.
+    set (yp := if bit =? 1 then Point.y B else 0 -F Point.y B) in *.
+    set (xa := Point.x acc) in *.
+    set (ya := Point.y acc) in *.
+    set (L1 := BinOp.div (ya -F yp) (xa -F Point.x B)).
+    set (XR := L1 *F L1 -F xa -F Point.x B).
+    set (YR := L1 *F (xa -F XR) -F ya).
+    set (L2 := BinOp.div (ya -F YR) (xa -F XR)).
+    set (XAN := L2 *F L2 -F xa -F XR).
+    set (YAN := L2 *F (xa -F XAN) -F ya).
+    assert (HXRred : UnOp.from XR = XR)
+      by (unfold XR; apply from_sub_reduced).
+    assert (HmidX : Point.x (EccSpec.point_add_incomplete acc
+        {| Point.x := Point.x B; Point.y := yp |}) = XR)
+      by reflexivity.
+    rewrite HmidX in Hmid.
+    assert (Hd1 : UnOp.from (xa -F Point.x B) <> 0).
+    { intro Hz.
+      rewrite from_sub_reduced in Hz.
+      apply (proj1 (sub_zero_equiv xa (Point.x B))) in Hz.
+      rewrite Hxar, Hbx in Hz.
+      exact (Hxb Hz). }
+    assert (Hd2 : UnOp.from (xa -F XR) <> 0).
+    { intro Hz.
+      rewrite from_sub_reduced in Hz.
+      apply (proj1 (sub_zero_equiv xa XR)) in Hz.
+      rewrite Hxar, HXRred in Hz.
+      exact (Hmid (eq_sym Hz)). }
+    pose proof (ladder_core xa ya (Point.x B) yp Hxar Hyar Hd1 Hd2) as Hcore.
+    cbv zeta in Hcore.
+    fold L1 in Hcore. fold XR in Hcore. fold YR in Hcore.
+    fold L2 in Hcore. fold XAN in Hcore. fold YAN in Hcore.
+    destruct Hcore as (Hya & Hs1 & Hxan & Hg2).
+    assert (Hfs : fst (VBT.ladder_step B bit acc) =
+      {| VBT.sr_xa := xa; VBT.sr_l1 := L1; VBT.sr_l2 := L2 |}) by reflexivity.
+    assert (Hsn : snd (VBT.ladder_step B bit acc) =
+      {| Point.x := XAN; Point.y := YAN |}) by reflexivity.
+    rewrite Hsn in Hnext.
+    rewrite Hfs.
+    cbn [VBT.sr_xa VBT.sr_l1 VBT.sr_l2].
+    rewrite <- Hnext.
+    cbn [Point.x Point.y].
+    split; [reflexivity |].
+    split; [exact Hya |].
+    split; [exact Hs1 |].
+    split; [exact Hxan |].
+    unfold YAN; reflexivity.
+  Qed.
+
+  Lemma bit_eval_pair' (k e f : Z) (He : 0 <= e) (Hf : f = e + 1) :
+    UnOp.from (k / 2 ^ e) -F UnOp.from (k / 2 ^ f) *F UnOp.from 2 =
+    (k / 2 ^ e) mod 2.
+  Proof.
+    rewrite <- (bit_eval_pair k e f He Hf).
+    f_equal.
+    unfold BinOp.mul.
+    f_equal.
+    ring.
+  Qed.
+
+  Lemma from_sr_l1 (alpha : Z) (B : Point.t) (m : nat) :
+    UnOp.from (VBT.sr_l1 (vstep alpha B m)) = VBT.sr_l1 (vstep alpha B m).
+  Proof.
+    unfold vstep, VBT.ladder_step.
+    cbv zeta.
+    cbn [fst VBT.sr_l1].
+    apply from_div_reduced.
+  Qed.
+
+  Lemma from_sr_l2 (alpha : Z) (B : Point.t) (m : nat) :
+    UnOp.from (VBT.sr_l2 (vstep alpha B m)) = VBT.sr_l2 (vstep alpha B m).
+  Proof.
+    unfold vstep, VBT.ladder_step.
+    cbv zeta.
+    cbn [fst VBT.sr_l2].
+    apply from_div_reduced.
+  Qed.
+
+  Lemma y_a_def (xa bx l1 l2 : Z) :
+    y_a xa bx l1 l2 =
+    (l1 +F l2) *F (xa -F (l1 *F l1 -F xa -F bx)) *F
+      UnOp.from two_inv.
+  Proof.
+    unfold y_a, x_r, square.
+    reflexivity.
+  Qed.
+
+  Lemma next_x_a_def (xa bx l1 l2 : Z) :
+    next_x_a xa bx l1 l2 = l2 *F l2 -F (l1 *F l1 -F xa -F bx) -F xa.
+  Proof.
+    unfold next_x_a, x_r, square.
+    reflexivity.
+  Qed.
+
+
+  (** ** The incomplete-ladder gates over abstract row values *)
+
+  Local Notation Gadv w := (OrchardHonestAssignment.honest_assignment w)
+    .(Assignment.advice) (only parsing).
+
+  Lemma q_mul_1_gate
+      (w : HonestInput) (region : RegionId.t) (row : Z) (sel : Selector.t)
+      (cxa cxp cl1 cl2 : Advice.t)
+      (xn bx l1' l2' ya : Z)
+      (Hcur : UnOp.from (Gadv w cl1 region row) = ya)
+      (Hxa' : UnOp.from (Gadv w cxa region (row + 1)) = xn)
+      (Hxp' : UnOp.from (Gadv w cxp region (row + 1)) = bx)
+      (Hl1' : UnOp.from (Gadv w cl1 region (row + 1)) = l1')
+      (Hl2' : UnOp.from (Gadv w cl2 region (row + 1)) = l2')
+      (Hyan : y_a xn bx l1' l2' = ya)
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_1_checks_gate
+          sel cxa cxp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (region, row) body.
+  Proof.
+    cbn in Hbody.
+    destruct Hbody as [H | []]; subst body.
+    gate_cbn_sym.
+    rewrite ?rot_cur, ?rot_next.
+    rewrite Hcur, Hxa', Hxp', Hl1', Hl2'.
+    rewrite <- y_a_def.
+    exact (eq_sym Hyan).
+  Qed.
+
+  Lemma q_mul_2_gate
+      (w : HonestInput) (region : RegionId.t) (row : Z) (sel : Selector.t)
+      (cz cxa cxp cyp cl1 cl2 : Advice.t)
+      (xa ya bx byp xn yn l1 l2 l1' l2' bit : Z)
+      (Hbit : UnOp.from (Gadv w cz region row) -F
+        UnOp.from (Gadv w cz region (row - 1)) *F UnOp.from 2 = bit)
+      (Hbit01 : bit = 0 \/ bit = 1)
+      (Hxa : UnOp.from (Gadv w cxa region row) = xa)
+      (Hxp : UnOp.from (Gadv w cxp region row) = bx)
+      (Hyp : UnOp.from (Gadv w cyp region row) = byp)
+      (Hl1 : UnOp.from (Gadv w cl1 region row) = l1)
+      (Hl2 : UnOp.from (Gadv w cl2 region row) = l2)
+      (Hxa' : UnOp.from (Gadv w cxa region (row + 1)) = xn)
+      (Hxp' : UnOp.from (Gadv w cxp region (row + 1)) = bx)
+      (Hyp' : UnOp.from (Gadv w cyp region (row + 1)) = byp)
+      (Hl1' : UnOp.from (Gadv w cl1 region (row + 1)) = l1')
+      (Hl2' : UnOp.from (Gadv w cl2 region (row + 1)) = l2')
+      (Hya : y_a xa bx l1 l2 = ya)
+      (Hg1 : l1 *F (xa -F bx) =
+        ya -F (if bit =? 1 then byp else 0 -F byp))
+      (Hxn : xn = next_x_a xa bx l1 l2)
+      (Hyan : y_a xn bx l1' l2' = yn)
+      (Hyn : yn = l2 *F (xa -F xn) -F ya)
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_2_checks_gate
+          sel cz cxa cxp cyp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (region, row) body.
+  Proof.
+    cbn in Hbody.
+    destruct Hbody as [H | [H | [H | [H | [H | [H | []]]]]]]; subst body;
+      gate_cbn_sym; rewrite ?rot_prev, ?rot_cur, ?rot_next.
+    - (* x_p_check *)
+      rewrite Hxp, Hxp'; reflexivity.
+    - (* y_p_check *)
+      rewrite Hyp, Hyp'; reflexivity.
+    - (* bool_check *)
+      rewrite Hbit.
+      destruct Hbit01 as [-> | ->]; cbn; reflexivity.
+    - (* gradient_1 *)
+      rewrite Hbit, Hxa, Hxp, Hyp, Hl1, Hl2.
+      rewrite <- y_a_def.
+      rewrite Hya, Hg1.
+      destruct Hbit01 as [-> | ->]; cbn [Z.eqb Pos.eqb]; mod_ring_zero.
+    - (* secant_line *)
+      rewrite Hxa, Hxp, Hxa', Hl1, Hl2.
+      rewrite Hxn, next_x_a_def.
+      mod_ring_zero.
+    - (* gradient_2 *)
+      rewrite Hxa, Hxp, Hxa', Hxp', Hl1, Hl2, Hl1', Hl2'.
+      rewrite <- !y_a_def.
+      rewrite Hya, Hyan, Hyn.
+      mod_ring_zero.
+  Qed.
+
+  Lemma q_mul_3_gate
+      (w : HonestInput) (region : RegionId.t) (row : Z) (sel : Selector.t)
+      (cz cxa cxp cyp cl1 cl2 : Advice.t)
+      (xa ya bx byp xn yn l1 l2 bit : Z)
+      (Hbit : UnOp.from (Gadv w cz region row) -F
+        UnOp.from (Gadv w cz region (row - 1)) *F UnOp.from 2 = bit)
+      (Hbit01 : bit = 0 \/ bit = 1)
+      (Hxa : UnOp.from (Gadv w cxa region row) = xa)
+      (Hxp : UnOp.from (Gadv w cxp region row) = bx)
+      (Hyp : UnOp.from (Gadv w cyp region row) = byp)
+      (Hl1 : UnOp.from (Gadv w cl1 region row) = l1)
+      (Hl2 : UnOp.from (Gadv w cl2 region row) = l2)
+      (Hxa' : UnOp.from (Gadv w cxa region (row + 1)) = xn)
+      (Hl1' : UnOp.from (Gadv w cl1 region (row + 1)) = yn)
+      (Hya : y_a xa bx l1 l2 = ya)
+      (Hg1 : l1 *F (xa -F bx) =
+        ya -F (if bit =? 1 then byp else 0 -F byp))
+      (Hxn : xn = next_x_a xa bx l1 l2)
+      (Hyn : yn = l2 *F (xa -F xn) -F ya)
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_3_checks_gate
+          sel cz cxa cxp cyp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (region, row) body.
+  Proof.
+    cbn in Hbody.
+    destruct Hbody as [H | [H | [H | [H | []]]]]; subst body;
+      gate_cbn_sym; rewrite ?rot_prev, ?rot_cur, ?rot_next.
+    - (* bool_check *)
+      rewrite Hbit.
+      destruct Hbit01 as [-> | ->]; cbn; reflexivity.
+    - (* gradient_1 *)
+      rewrite Hbit, Hxa, Hxp, Hyp, Hl1, Hl2.
+      rewrite <- y_a_def.
+      rewrite Hya, Hg1.
+      destruct Hbit01 as [-> | ->]; cbn [Z.eqb Pos.eqb]; mod_ring_zero.
+    - (* secant_line *)
+      rewrite Hxa, Hxp, Hxa', Hl1, Hl2.
+      rewrite Hxn, next_x_a_def.
+      mod_ring_zero.
+    - (* gradient_2 *)
+      rewrite Hxa, Hxa', Hxp, Hl1, Hl2, Hl1'.
+      rewrite <- y_a_def.
+      rewrite Hya, Hyn.
+      mod_ring_zero.
+  Qed.
+
+  (** ** Cell readers of the ladder region *)
+
+  Ltac vbcell col :=
+    lazymatch goal with
+    | |- (OrchardHonestAssignment.honest_assignment ?w).(Assignment.advice)
+           _ vb_region ?r = _ =>
+        transitivity (VBT.vb_region_advice (hi_g_d_old w)
+          (OCT.t_vb (OCT.tables_of w)) col r); [reflexivity |]
+    end;
+    cbn [VBT.vb_region_advice].
+
+  Ltac guard_eq_false r n :=
+    replace (r =? n) with false by (symmetry; apply Z.eqb_neq; lia).
+  Ltac guard_range_true lo r hi :=
+    replace ((lo <=? r) && (r <=? hi))%bool with true
+      by (symmetry; apply Bool.andb_true_iff; split; apply Z.leb_le; lia).
+
+  Lemma cell_x_p (w : HonestInput) (r : Z) (H2 : 2 <= r) (H127 : r <= 127) :
+    Gadv w A0 vb_region r = Point.x (hi_g_d_old w).
+  Proof.
+    vbcell A0.
+    guard_range_true 2 r 127.
+    rewrite Bool.orb_true_r, ?Bool.orb_true_l.
+    reflexivity.
+  Qed.
+
+  Lemma cell_y_p (w : HonestInput) (r : Z) (H2 : 2 <= r) (H127 : r <= 127) :
+    Gadv w A1 vb_region r = Point.y (hi_g_d_old w).
+  Proof.
+    vbcell A1.
+    guard_range_true 2 r 127.
+    rewrite Bool.orb_true_r, ?Bool.orb_true_l.
+    reflexivity.
+  Qed.
+
+  Lemma cell_hi_xa (w : HonestInput) (r : Z) (H2 : 2 <= r) (H126 : r <= 126) :
+    Gadv w A3 vb_region r =
+    VBT.sr_xa (VBT.hi_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A3.
+    guard_eq_false r 0.
+    guard_eq_false r 1.
+    guard_range_true 2 r 126.
+    reflexivity.
+  Qed.
+
+  Lemma cell_hi_l1 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H126 : r <= 126) :
+    Gadv w A4 vb_region r =
+    VBT.sr_l1 (VBT.hi_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A4.
+    guard_eq_false r 1.
+    guard_range_true 2 r 126.
+    reflexivity.
+  Qed.
+
+  Lemma cell_hi_l2 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H126 : r <= 126) :
+    Gadv w A5 vb_region r =
+    VBT.sr_l2 (VBT.hi_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A5.
+    guard_range_true 2 r 126.
+    reflexivity.
+  Qed.
+
+  Lemma cell_hi_z (w : HonestInput) (r : Z) (H1 : 1 <= r) (H126 : r <= 126) :
+    Gadv w A9 vb_region r = mk (ivk w) / 2 ^ (256 - r).
+  Proof.
+    vbcell A9.
+    guard_range_true 1 r 126.
+    rewrite t_vb_ivk, vb_scalar_e.
+    reflexivity.
+  Qed.
+
+  Lemma cell_lo_xa (w : HonestInput) (r : Z) (H2 : 2 <= r) (H127 : r <= 127) :
+    Gadv w A7 vb_region r =
+    VBT.sr_xa (VBT.lo_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A7.
+    guard_range_true 2 r 127.
+    reflexivity.
+  Qed.
+
+  Lemma cell_lo_l1 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H127 : r <= 127) :
+    Gadv w A8 vb_region r =
+    VBT.sr_l1 (VBT.lo_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A8.
+    guard_eq_false r 1.
+    guard_range_true 2 r 127.
+    reflexivity.
+  Qed.
+
+  Lemma cell_lo_l2 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H127 : r <= 127) :
+    Gadv w A2 vb_region r =
+    VBT.sr_l2 (VBT.lo_at (OCT.t_vb (OCT.tables_of w)) r).
+  Proof.
+    vbcell A2.
+    guard_eq_false r 0.
+    guard_eq_false r 1.
+    guard_range_true 2 r 127.
+    reflexivity.
+  Qed.
+
+  Lemma cell_lo_z (w : HonestInput) (r : Z) (H1 : 1 <= r) (H127 : r <= 127) :
+    Gadv w A6 vb_region r = mk (ivk w) / 2 ^ (131 - r).
+  Proof.
+    vbcell A6.
+    guard_range_true 1 r 127.
+    rewrite t_vb_ivk, vb_scalar_e.
+    reflexivity.
+  Qed.
+
+  (** ** The step rows of the two halves *)
+
+  Lemma hi_row (w : HonestInput) (m : nat) (r : Z)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (Hm : (130 <= m <= 254)%nat)
+      (Hr : r = 256 - Z.of_nat m) :
+    VBT.hi_at (OCT.t_vb (OCT.tables_of w)) r =
+    vstep (ivk w) (hi_g_d_old w) m.
+  Proof.
+    subst r.
+    rewrite t_vb_ivk.
+    unfold VBT.hi_at.
+    replace (Z.to_nat (256 - Z.of_nat m - 2)) with (254 - m)%nat
+      by (clear -Hm; lia).
+    rewrite (proj2 (hi_chain (ivk w) (hi_g_d_old w) HB Hlad (mk_ivk_range w))
+      (254 - m)%nat ltac:(clear -Hm; lia)).
+    unfold vstep.
+    replace (254 - (254 - m))%nat with m by (clear -Hm; lia).
+    reflexivity.
+  Qed.
+
+  Lemma lo_row (w : HonestInput) (m : nat) (r : Z)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (Hm : (4 <= m <= 129)%nat)
+      (Hr : r = 131 - Z.of_nat m) :
+    VBT.lo_at (OCT.t_vb (OCT.tables_of w)) r =
+    vstep (ivk w) (hi_g_d_old w) m.
+  Proof.
+    subst r.
+    rewrite t_vb_ivk.
+    unfold VBT.lo_at.
+    replace (Z.to_nat (131 - Z.of_nat m - 2)) with (129 - m)%nat
+      by (clear -Hm; lia).
+    rewrite (proj2 (lo_chain (ivk w) (hi_g_d_old w) HB Hlad (mk_ivk_range w))
+      (129 - m)%nat ltac:(clear -Hm; lia)).
+    unfold vstep.
+    replace (129 - (129 - m))%nat with m by (clear -Hm; lia).
+    reflexivity.
+  Qed.
+  (** ** Generic step sites over the ladder region *)
+
+  Lemma site_step2 (w : HonestInput) (row prow nrow : Z) (m : nat)
+      (sel : Selector.t) (cz cxa cxp cyp cl1 cl2 : Advice.t)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (Hm : (5 <= m < 255)%nat)
+      (Hprow : prow = row - 1) (Hnrow : nrow = row + 1)
+      (Hzc : Gadv w cz vb_region row = mk (ivk w) / 2 ^ Z.of_nat m)
+      (Hzp : Gadv w cz vb_region prow = mk (ivk w) / 2 ^ (Z.of_nat m + 1))
+      (Hxa : Gadv w cxa vb_region row =
+        VBT.sr_xa (vstep (ivk w) (hi_g_d_old w) m))
+      (Hxp : Gadv w cxp vb_region row = Point.x (hi_g_d_old w))
+      (Hyp : Gadv w cyp vb_region row = Point.y (hi_g_d_old w))
+      (Hl1 : Gadv w cl1 vb_region row =
+        VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (Hl2 : Gadv w cl2 vb_region row =
+        VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (Hxa' : Gadv w cxa vb_region nrow =
+        VBT.sr_xa (vstep (ivk w) (hi_g_d_old w) (m - 1)))
+      (Hxp' : Gadv w cxp vb_region nrow = Point.x (hi_g_d_old w))
+      (Hyp' : Gadv w cyp vb_region nrow = Point.y (hi_g_d_old w))
+      (Hl1' : Gadv w cl1 vb_region nrow =
+        VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) (m - 1)))
+      (Hl2' : Gadv w cl2 vb_region nrow =
+        VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) (m - 1)))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_2_checks_gate
+          sel cz cxa cxp cyp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, row) body.
+  Proof.
+    subst prow nrow.
+    pose proof (step_alg (ivk w) (hi_g_d_old w) m HB
+      ltac:(clear -Hm; lia) (Hlad m ltac:(clear -Hm; lia)))
+      as (Hsxa & Hsya & Hsg1 & Hsxn & Hsyn).
+    pose proof (step_alg (ivk w) (hi_g_d_old w) (m - 1) HB
+      ltac:(clear -Hm; lia) (Hlad (m - 1)%nat ltac:(clear -Hm; lia)))
+      as (Hsxa2 & Hsya2 & Hsg12 & Hsxn2 & Hsyn2).
+    replace (S (m - 1))%nat with m in Hsxa2, Hsya2 by (clear -Hm; lia).
+    pose proof (macc_reduced (ivk w) (hi_g_d_old w) HB (S m)) as (Hmx & Hmy).
+    pose proof (macc_reduced (ivk w) (hi_g_d_old w) HB m) as (Hmx2 & Hmy2).
+    pose proof (point_ok_affine (hi_g_d_old w) HB) as (Haf & Hbx & Hby).
+    refine (q_mul_2_gate w vb_region row sel cz cxa cxp cyp cl1 cl2
+      (Point.x (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Point.y (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Point.x (hi_g_d_old w)) (Point.y (hi_g_d_old w))
+      (Point.x (macc (ivk w) (hi_g_d_old w) m))
+      (Point.y (macc (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) (m - 1)))
+      (VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) (m - 1)))
+      (scalar_bit (mk (ivk w)) m)
+      _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite Hzc, Hzp.
+      rewrite (bit_eval_pair' (mk (ivk w)) (Z.of_nat m) (Z.of_nat m + 1)
+        ltac:(clear; lia) eq_refl).
+      apply scalar_bit_def.
+    - apply scalar_bit_01.
+    - rewrite Hxa, Hsxa; exact Hmx.
+    - rewrite Hxp; exact Hbx.
+    - rewrite Hyp; exact Hby.
+    - rewrite Hl1; apply from_sr_l1.
+    - rewrite Hl2; apply from_sr_l2.
+    - rewrite Hxa', Hsxa2; exact Hmx2.
+    - rewrite Hxp'; exact Hbx.
+    - rewrite Hyp'; exact Hby.
+    - rewrite Hl1'; apply from_sr_l1.
+    - rewrite Hl2'; apply from_sr_l2.
+    - exact Hsya.
+    - rewrite Hsg1, (mstep_y (ivk w) (hi_g_d_old w) m); reflexivity.
+    - exact Hsxn.
+    - exact Hsya2.
+    - exact Hsyn.
+  Qed.
+
+  Lemma site_step3 (w : HonestInput) (row prow nrow : Z) (m : nat)
+      (sel : Selector.t) (cz cxa cxp cyp cl1 cl2 : Advice.t)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (Hm : (4 <= m < 255)%nat)
+      (Hprow : prow = row - 1) (Hnrow : nrow = row + 1)
+      (Hzc : Gadv w cz vb_region row = mk (ivk w) / 2 ^ Z.of_nat m)
+      (Hzp : Gadv w cz vb_region prow = mk (ivk w) / 2 ^ (Z.of_nat m + 1))
+      (Hxa : Gadv w cxa vb_region row =
+        VBT.sr_xa (vstep (ivk w) (hi_g_d_old w) m))
+      (Hxp : Gadv w cxp vb_region row = Point.x (hi_g_d_old w))
+      (Hyp : Gadv w cyp vb_region row = Point.y (hi_g_d_old w))
+      (Hl1 : Gadv w cl1 vb_region row =
+        VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (Hl2 : Gadv w cl2 vb_region row =
+        VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (Hxa' : Gadv w cxa vb_region nrow =
+        Point.x (macc (ivk w) (hi_g_d_old w) m))
+      (Hl1' : Gadv w cl1 vb_region nrow =
+        Point.y (macc (ivk w) (hi_g_d_old w) m))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_3_checks_gate
+          sel cz cxa cxp cyp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, row) body.
+  Proof.
+    subst prow nrow.
+    pose proof (step_alg (ivk w) (hi_g_d_old w) m HB
+      ltac:(clear -Hm; lia) (Hlad m ltac:(clear -Hm; lia)))
+      as (Hsxa & Hsya & Hsg1 & Hsxn & Hsyn).
+    pose proof (macc_reduced (ivk w) (hi_g_d_old w) HB (S m)) as (Hmx & Hmy).
+    pose proof (macc_reduced (ivk w) (hi_g_d_old w) HB m) as (Hmx2 & Hmy2).
+    pose proof (point_ok_affine (hi_g_d_old w) HB) as (Haf & Hbx & Hby).
+    refine (q_mul_3_gate w vb_region row sel cz cxa cxp cyp cl1 cl2
+      (Point.x (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Point.y (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Point.x (hi_g_d_old w)) (Point.y (hi_g_d_old w))
+      (Point.x (macc (ivk w) (hi_g_d_old w) m))
+      (Point.y (macc (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (scalar_bit (mk (ivk w)) m)
+      _ _ _ _ _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite Hzc, Hzp.
+      rewrite (bit_eval_pair' (mk (ivk w)) (Z.of_nat m) (Z.of_nat m + 1)
+        ltac:(clear; lia) eq_refl).
+      apply scalar_bit_def.
+    - apply scalar_bit_01.
+    - rewrite Hxa, Hsxa; exact Hmx.
+    - rewrite Hxp; exact Hbx.
+    - rewrite Hyp; exact Hby.
+    - rewrite Hl1; apply from_sr_l1.
+    - rewrite Hl2; apply from_sr_l2.
+    - rewrite Hxa'; exact Hmx2.
+    - rewrite Hl1'; exact Hmy2.
+    - exact Hsya.
+    - rewrite Hsg1, (mstep_y (ivk w) (hi_g_d_old w) m); reflexivity.
+    - exact Hsxn.
+    - exact Hsyn.
+  Qed.
+
+  Lemma site_step1 (w : HonestInput) (row nrow : Z) (m : nat)
+      (sel : Selector.t) (cxa cxp cl1 cl2 : Advice.t)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (Hm : (4 <= m < 255)%nat)
+      (Hnrow : nrow = row + 1)
+      (Hcur : Gadv w cl1 vb_region row =
+        Point.y (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Hxa' : Gadv w cxa vb_region nrow =
+        VBT.sr_xa (vstep (ivk w) (hi_g_d_old w) m))
+      (Hxp' : Gadv w cxp vb_region nrow = Point.x (hi_g_d_old w))
+      (Hl1' : Gadv w cl1 vb_region nrow =
+        VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (Hl2' : Gadv w cl2 vb_region nrow =
+        VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (gate_raw_bodies
+        (Garden.Halo2.halo2_gadgets.ecc.chip.mul.incomplete.q_mul_1_checks_gate
+          sel cxa cxp cl1 cl2))) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, row) body.
+  Proof.
+    subst nrow.
+    pose proof (step_alg (ivk w) (hi_g_d_old w) m HB
+      ltac:(clear -Hm; lia) (Hlad m ltac:(clear -Hm; lia)))
+      as (Hsxa & Hsya & Hsg1 & Hsxn & Hsyn).
+    pose proof (macc_reduced (ivk w) (hi_g_d_old w) HB (S m)) as (Hmx & Hmy).
+    pose proof (point_ok_affine (hi_g_d_old w) HB) as (Haf & Hbx & Hby).
+    refine (q_mul_1_gate w vb_region row sel cxa cxp cl1 cl2
+      (Point.x (macc (ivk w) (hi_g_d_old w) (S m)))
+      (Point.x (hi_g_d_old w))
+      (VBT.sr_l1 (vstep (ivk w) (hi_g_d_old w) m))
+      (VBT.sr_l2 (vstep (ivk w) (hi_g_d_old w) m))
+      (Point.y (macc (ivk w) (hi_g_d_old w) (S m)))
+      _ _ _ _ _ _ body Hbody).
+    - rewrite Hcur; exact Hmy.
+    - rewrite Hxa', Hsxa; exact Hmx.
+    - rewrite Hxp'; exact Hbx.
+    - rewrite Hl1'; apply from_sr_l1.
+    - rewrite Hl2'; apply from_sr_l2.
+    - exact Hsya.
+  Qed.
+
+  (** ** Domain facts of the completeness hypotheses *)
+
+  Lemma gd_point_ok (w : HonestInput) (Hval : valid w) :
+    point_ok (hi_g_d_old w).
+  Proof.
+    destruct Hval as (Hty & _ & _ & _).
+    unfold well_typed in Hty.
+    destruct Hty as
+      (_ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & _ & Hgd & _).
+    exact Hgd.
+  Qed.
+
+  Lemma acc130_eq (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w)) :
+    VBT.vb_acc130 (OCT.t_vb (OCT.tables_of w)) =
+    macc (ivk w) (hi_g_d_old w) 130.
+  Proof.
+    rewrite t_vb_ivk.
+    exact (proj1 (hi_chain (ivk w) (hi_g_d_old w) HB Hlad (mk_ivk_range w))).
+  Qed.
+
+  Lemma acc4_eq (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w)) :
+    VBT.vb_acc4 (OCT.t_vb (OCT.tables_of w)) =
+    macc (ivk w) (hi_g_d_old w) 4.
+  Proof.
+    rewrite t_vb_ivk.
+    exact (proj1 (lo_chain (ivk w) (hi_g_d_old w) HB Hlad (mk_ivk_range w))).
+  Qed.
+
+  Lemma vb_d_macc (w : HonestInput) (HB : point_ok (hi_g_d_old w)) :
+    VBT.vb_d (OCT.t_vb (OCT.tables_of w)) =
+    macc (ivk w) (hi_g_d_old w) 255.
+  Proof.
+    rewrite t_vb_ivk, vb_d_e.
+    exact (eq_sym (macc_255 (ivk w) (hi_g_d_old w) HB (mk_ivk_range w))).
+  Qed.
+
+  (** ** The per-selector sites of the two incomplete halves *)
+
+  Lemma site_hi1 (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteHi1)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, 1) body.
+  Proof.
+    rewrite bodies_hi1 in Hbody.
+    pose proof (hi_row w 254%nat 2 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity)) as Hrow.
+    refine (site_step1 w 1 2 254%nat Selector.QMulIncompleteHi1 A3 A0 A4 A5
+      HB Hlad ltac:(clear; lia) ltac:(clear; reflexivity)
+      _ _ _ _ _ body Hbody).
+    - transitivity (Point.y (VBT.vb_d (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (vb_d_macc w HB).
+      reflexivity.
+    - rewrite (cell_hi_xa w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w 2 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_l1 w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_hi_l2 w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+  Qed.
+
+  Lemma site_hi2 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H125 : r <= 125)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteHi2)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, r) body.
+  Proof.
+    rewrite bodies_hi2 in Hbody.
+    pose (m := Z.to_nat (256 - r)).
+    assert (Hmz : Z.of_nat m = 256 - r) by (unfold m; clear -H2 H125; lia).
+    assert (Hm : (5 <= m < 255)%nat) by (clear -Hmz H2 H125; lia).
+    clearbody m.
+    pose proof (hi_row w m r HB Hlad ltac:(clear -Hmz H2 H125; lia)
+      ltac:(clear -Hmz; lia)) as Hrow.
+    pose proof (hi_row w (m - 1)%nat (r + 1) HB Hlad
+      ltac:(clear -Hmz Hm H2 H125; lia) ltac:(clear -Hmz Hm; lia)) as Hrow'.
+    refine (site_step2 w r (r - 1) (r + 1) m Selector.QMulIncompleteHi2
+      A9 A3 A0 A1 A4 A5 HB Hlad Hm ltac:(clear; reflexivity)
+      ltac:(clear; reflexivity) _ _ _ _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite (cell_hi_z w r ltac:(lia) ltac:(lia)), Hmz. reflexivity.
+    - rewrite (cell_hi_z w (r - 1) ltac:(lia) ltac:(lia)).
+      replace (256 - (r - 1)) with (Z.of_nat m + 1) by (clear -Hmz; lia).
+      reflexivity.
+    - rewrite (cell_hi_xa w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w r ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w r ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_l1 w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_hi_l2 w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_hi_xa w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+    - rewrite (cell_x_p w (r + 1) ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w (r + 1) ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_l1 w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+    - rewrite (cell_hi_l2 w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+  Qed.
+
+  Lemma site_hi3 (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteHi3)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, 126) body.
+  Proof.
+    rewrite bodies_hi3 in Hbody.
+    pose proof (hi_row w 130%nat 126 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity)) as Hrow.
+    refine (site_step3 w 126 125 127 130%nat Selector.QMulIncompleteHi3
+      A9 A3 A0 A1 A4 A5 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity) ltac:(clear; reflexivity)
+      _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite (cell_hi_z w 126 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_z w 125 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_xa w 126 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w 126 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w 126 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_hi_l1 w 126 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_hi_l2 w 126 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - transitivity (Point.x (VBT.vb_acc130 (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (acc130_eq w HB Hlad). reflexivity.
+    - transitivity (Point.y (VBT.vb_acc130 (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (acc130_eq w HB Hlad). reflexivity.
+  Qed.
+
+  Lemma site_lo1 (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteLo1)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, 1) body.
+  Proof.
+    rewrite bodies_lo1 in Hbody.
+    pose proof (lo_row w 129%nat 2 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity)) as Hrow.
+    refine (site_step1 w 1 2 129%nat Selector.QMulIncompleteLo1 A7 A0 A8 A2
+      HB Hlad ltac:(clear; lia) ltac:(clear; reflexivity)
+      _ _ _ _ _ body Hbody).
+    - transitivity (Point.y (VBT.vb_acc130 (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (acc130_eq w HB Hlad). reflexivity.
+    - rewrite (cell_lo_xa w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w 2 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_l1 w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_lo_l2 w 2 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+  Qed.
+
+  Lemma site_lo2 (w : HonestInput) (r : Z) (H2 : 2 <= r) (H126 : r <= 126)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteLo2)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, r) body.
+  Proof.
+    rewrite bodies_lo2 in Hbody.
+    pose (m := Z.to_nat (131 - r)).
+    assert (Hmz : Z.of_nat m = 131 - r) by (unfold m; clear -H2 H126; lia).
+    assert (Hm : (5 <= m < 255)%nat) by (clear -Hmz H2 H126; lia).
+    clearbody m.
+    pose proof (lo_row w m r HB Hlad ltac:(clear -Hmz H2 H126; lia)
+      ltac:(clear -Hmz; lia)) as Hrow.
+    pose proof (lo_row w (m - 1)%nat (r + 1) HB Hlad
+      ltac:(clear -Hmz Hm H2 H126; lia) ltac:(clear -Hmz Hm; lia)) as Hrow'.
+    refine (site_step2 w r (r - 1) (r + 1) m Selector.QMulIncompleteLo2
+      A6 A7 A0 A1 A8 A2 HB Hlad Hm ltac:(clear; reflexivity)
+      ltac:(clear; reflexivity) _ _ _ _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite (cell_lo_z w r ltac:(lia) ltac:(lia)), Hmz. reflexivity.
+    - rewrite (cell_lo_z w (r - 1) ltac:(lia) ltac:(lia)).
+      replace (131 - (r - 1)) with (Z.of_nat m + 1) by (clear -Hmz; lia).
+      reflexivity.
+    - rewrite (cell_lo_xa w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w r ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w r ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_l1 w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_lo_l2 w r ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_lo_xa w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+    - rewrite (cell_x_p w (r + 1) ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w (r + 1) ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_l1 w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+    - rewrite (cell_lo_l2 w (r + 1) ltac:(lia) ltac:(lia)), Hrow'.
+      reflexivity.
+  Qed.
+
+  Lemma site_lo3 (w : HonestInput)
+      (HB : point_ok (hi_g_d_old w))
+      (Hlad : ladder_ok (ivk w) (hi_g_d_old w))
+      (body : Constraint.t columns)
+      (Hbody : List.In body (guarded_bodies Selector.QMulIncompleteLo3)) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (vb_region, 127) body.
+  Proof.
+    rewrite bodies_lo3 in Hbody.
+    pose proof (lo_row w 4%nat 127 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity)) as Hrow.
+    refine (site_step3 w 127 126 128 4%nat Selector.QMulIncompleteLo3
+      A6 A7 A0 A1 A8 A2 HB Hlad ltac:(clear; lia)
+      ltac:(clear; reflexivity) ltac:(clear; reflexivity)
+      _ _ _ _ _ _ _ _ _ body Hbody).
+    - rewrite (cell_lo_z w 127 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_z w 126 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_xa w 127 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_x_p w 127 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_y_p w 127 ltac:(lia) ltac:(lia)). reflexivity.
+    - rewrite (cell_lo_l1 w 127 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - rewrite (cell_lo_l2 w 127 ltac:(lia) ltac:(lia)), Hrow. reflexivity.
+    - transitivity (Point.x (VBT.vb_acc4 (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (acc4_eq w HB Hlad). reflexivity.
+    - transitivity (Point.y (VBT.vb_acc4 (OCT.t_vb (OCT.tables_of w))));
+        [reflexivity |].
+      rewrite (acc4_eq w HB Hlad). reflexivity.
+  Qed.
+
+  (** ** The family obligations *)
+
+  Module ECC := Garden.Orchard.circuit_completeness.forward.ecc_add
+    .OrchardCompletenessForwardEccAdd.
+
+  Lemma family_37_addr (region : RegionId.t) (Hf : family_index region = 37) :
+    exists a : RegionId.AddressIntegrity.t,
+      region = RegionId.AddressIntegrity a.
+  Proof.
+    destruct region as
+      [wi | layer mr | pr | vr | nr | sr | ar | cr | wh ncr
+      | | | | | | gr];
+      cbn in Hf; try discriminate.
+    - destruct layer; cbn in Hf; discriminate.
+    - exists ar; reflexivity.
+    - destruct wh; cbn in Hf; discriminate.
+  Qed.
+
+  Ltac row_eq H := apply Z.eqb_eq in H; subst.
+  Ltac row_range H :=
+    let Ha := fresh "Hlo" in
+    let Hb := fresh "Hhi" in
+    apply Bool.andb_true_iff in H; destruct H as (Ha & Hb);
+    apply Z.leb_le in Ha; apply Z.leb_le in Hb.
+
+  Theorem var_base_gates_ok :
+    OrchardCompletenessForward.family_gates_ok [37].
+  Proof.
+    intros w Hvalid Hnondeg sel region row Hin Hfam gate Hgate name body Hbody.
+    pose proof (pt37_shape_of sel region row Hin) as Hpt.
+    pose proof (guarded_bodies_complete sel gate name body Hgate Hbody) as Hb.
+    destruct Hfam as [Hfam | []].
+    destruct (family_37_addr region (eq_sym Hfam)) as (a & Ha).
+    subst region.
+    pose proof (gd_point_ok w Hvalid) as HB.
+    pose proof (ladder_ok_of_nondegenerate w Hnondeg) as Hlad.
+    destruct a as [sub | | ];
+      [destruct sub | | ];
+      cbn in Hpt;
+      destruct sel; try discriminate Hpt.
+    (* [VariableBase]: the complete additions of the ladder's tail. *)
+    - exact (ECC.ecc_add_gates_forward w Hvalid Hnondeg Selector.QEccAdd
+        vb_region row Hin eq_refl gate Hgate name body Hbody).
+    - row_eq Hpt. exact (site_hi1 w HB Hlad body Hb).
+    - row_range Hpt. exact (site_hi2 w row Hlo Hhi HB Hlad body Hb).
+    - row_eq Hpt. exact (site_hi3 w HB Hlad body Hb).
+    - row_eq Hpt. exact (site_lo1 w HB Hlad body Hb).
+    - row_range Hpt. exact (site_lo2 w row Hlo Hhi HB Hlad body Hb).
+    - row_eq Hpt. exact (site_lo3 w HB Hlad body Hb).
+    - apply Bool.orb_true_iff in Hpt.
+      destruct Hpt as [Hpt | Hpt];
+        [apply Bool.orb_true_iff in Hpt; destruct Hpt as [Hpt | Hpt] |];
+        apply Z.eqb_eq in Hpt; subst row.
+      + exact (site_decompose w 130 (or_introl eq_refl) body Hb).
+      + exact (site_decompose w 132 (or_intror (or_introl eq_refl)) body Hb).
+      + exact (site_decompose w 134
+          (or_intror (or_intror eq_refl)) body Hb).
+    - row_eq Hpt. exact (site_lsb w body Hb).
+    (* [OverflowLookup]: the range-check selectors guard no gate. *)
+    - rewrite bodies_qlookup in Hb. destruct Hb.
+    - rewrite bodies_qrunning in Hb. destruct Hb.
+    (* [OverflowCheck]: the canonicity gate row. *)
+    - row_eq Hpt. exact (site_overflow w body Hb).
+    (* [WitnessPkD]: the witnessed [pk_d_old] point. *)
+    - row_eq Hpt. exact (site_wpkd w Hvalid body Hb).
+  Qed.
+
+  Theorem var_base_lookups_ok :
+    OrchardCompletenessForward.family_lookups_ok [37].
+  Proof.
+    intros w Hvalid Hnondeg sel region row Hin Hfam arg Harg Hmention.
+    pose proof (pt37_shape_of sel region row Hin) as Hpt.
+    destruct Hfam as [Hfam | []].
+    destruct (family_37_addr region (eq_sym Hfam)) as (a & Ha).
+    subst region.
+    destruct a as [sub | | ];
+      [destruct sub | | ];
+      cbn in Hpt;
+      destruct sel; try discriminate Hpt;
+      try (exfalso;
+        pose proof (proj1 (List.forallb_forall _ _) vb_mentions_cert arg Harg)
+          as Hno;
+        cbn beta in Hno;
+        repeat (apply Bool.andb_true_iff in Hno; destruct Hno as (Hno & ?));
+        repeat match goal with
+        | H : negb _ = true |- _ => apply Bool.negb_true_iff in H
+        end;
+        congruence).
+    (* [OverflowLookup]: the 13 running-sum rows of the overflow block. *)
+    - row_range Hpt.
+      rewrite (range_arg_only arg Harg (or_introl Hmention)).
+      exact (site_ovl_lookup w row Hlo Hhi).
+    - row_range Hpt.
+      rewrite (range_arg_only arg Harg (or_intror Hmention)).
+      exact (site_ovl_lookup w row Hlo Hhi).
+  Qed.
+
 End OrchardVarBaseForward.
+
+(* Restore the reduction levels [forward/ecc_add.v] sets, so a consumer of
+   this file sees the same conversion oracle as a consumer of that one. *)
+Strategy opaque [BinOp.div mod_inverse CompleteAddition.output].

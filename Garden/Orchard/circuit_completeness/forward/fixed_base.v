@@ -678,17 +678,35 @@ Module OrchardForwardFixedBase.
 
   (** ** Table projections and plane readers (definitional) *)
 
+  (** The cell-shape discharge for the fixed-base plane readers: reduce the
+      advice dispatch and the hoisted-record projections to one spelling on
+      both sides, then compare syntactically.  A bare [reflexivity] diverges
+      here — with the head constants differing, unification's alternating
+      unfolding forces [t_nullifier_scalar (tables_of w)] past the projection
+      and normalizes the symbolic Poseidon round chain (see
+      [docs/compile-performance.md]).  [cbn] restricted to the region names,
+      the advice/table dispatch and the leg/scalar projections leaves the
+      Poseidon and leg folds stuck, so both sides become the same term. *)
+  Ltac cell_refl :=
+    cbn [R_sa R_vcr R_civk R_nco R_ncn R_vcv R_nk R_msb R_canon
+         OrchardHonestAssignment.honest_assignment
+         OCT.advice_t OCT.advice_ecc_t OCT.advice_nullifier_t OCT.tables_of
+         OCT.t_sa_leg OCT.t_vcr_leg OCT.t_civkr_leg OCT.t_nco_leg
+         OCT.t_ncn_leg OCT.t_vcv_leg OCT.t_nk_leg OCT.t_nullifier_scalar
+         OCT.t_hash2 OCT.t_vcv_mul OCT.vcv_y_var_t];
+    reflexivity.
+
   Lemma nscalar_eq (w : HonestInput) :
     OCT.t_nullifier_scalar (OCT.tables_of w) =
     BinOp.add (OCT.t_hash2 (OCT.tables_of w)) (hi_psi_old w).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma nk_leg_eq (w : HonestInput) :
     OCT.t_nk_leg (OCT.tables_of w) =
     OCT.leg_of OrchardAdvicePoseidonNullifier.nk_table
       NullifierKWindowSignCert.root_table
       (OCT.t_nullifier_scalar (OCT.tables_of w)).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma sa_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -697,7 +715,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of OrchardAdviceEccMuls.tbl_spend_auth
         SpendAuthGWindowSignCert.root_table (hi_alpha w))
       (hi_alpha w) 85 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma vcr_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -706,7 +724,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of OrchardAdviceEccMuls.tbl_value_commit_r
         ValueCommitRWindowSignCert.root_table (hi_rcv w))
       (hi_rcv w) 85 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma civk_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -715,7 +733,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of (OrchardCircuitSpec.commit_ivk_r orchard_internal_params)
         CommitIvkRWindowSignCert.root_table (hi_rivk w))
       (hi_rivk w) 85 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma nco_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -724,7 +742,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of OrchardAdviceEccMuls.tbl_note_commit_r
         NoteCommitRWindowSignCert.root_table (hi_rcm_old w))
       (hi_rcm_old w) 85 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma ncn_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -733,7 +751,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of OrchardAdviceEccMuls.tbl_note_commit_r
         NoteCommitRWindowSignCert.root_table (hi_rcm_new w))
       (hi_rcm_new w) 85 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma vcv_adv (w : HonestInput) (col : Advice.t) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -742,7 +760,7 @@ Module OrchardForwardFixedBase.
       (OCT.leg_of OrchardAdviceEccMuls.tbl_value_commit_v
         ValueCommitVWindowSignCert.root_table (magnitude w))
       (magnitude w) 22 col off.
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   (** The NullifierK base-field leg cells, in the reader's guarded form. *)
   Lemma nk_cell_A0 (w : HonestInput) (off : Z) :
@@ -752,7 +770,7 @@ Module OrchardForwardFixedBase.
      then List.nth (Z.to_nat off)
        (OCT.lg_px (OCT.t_nk_leg (OCT.tables_of w))) 0
      else 0).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma nk_cell_A1 (w : HonestInput) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -761,7 +779,7 @@ Module OrchardForwardFixedBase.
      then List.nth (Z.to_nat off)
        (OCT.lg_py (OCT.t_nk_leg (OCT.tables_of w))) 0
      else 0).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma nk_cell_A5 (w : HonestInput) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -770,7 +788,7 @@ Module OrchardForwardFixedBase.
      then List.nth (Z.to_nat off)
        (OCT.lg_us (OCT.t_nk_leg (OCT.tables_of w))) 0
      else 0).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   Lemma nk_cell_A4 (w : HonestInput) (off : Z) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -779,7 +797,7 @@ Module OrchardForwardFixedBase.
      then running_sum_at (OCT.t_nullifier_scalar (OCT.tables_of w))
        (Z.to_nat off)
      else 0).
-  Proof. reflexivity. Qed.
+  Proof. cell_refl. Qed.
 
   (** The [value_commit_v] MSB row cells. *)
   Lemma msb_cells (w : HonestInput) :
@@ -794,7 +812,7 @@ Module OrchardForwardFixedBase.
       Advice.A4 R_msb 1 = sign w /\
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
       Advice.A5 R_msb 1 = magnitude w / 8 ^ 21.
-  Proof. repeat split; reflexivity. Qed.
+  Proof. repeat split; cell_refl. Qed.
 
   (** The nullifier canonicity rows. *)
   Lemma canon_cells (w : HonestInput) :
@@ -819,7 +837,7 @@ Module OrchardForwardFixedBase.
       Advice.A7 R_canon 2 = N / 8 ^ 44 /\
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
       Advice.A8 R_canon 2 = N / 8 ^ 43.
-  Proof. repeat split; reflexivity. Qed.
+  Proof. repeat split; cell_refl. Qed.
 
   (** ** Gate-body evaluation cores *)
 
@@ -852,13 +870,17 @@ Module OrchardForwardFixedBase.
     eval_constraint (OrchardHonestAssignment.honest_assignment w)
       (region, row) (check_x_body w_full_e).
   Proof.
-    unfold check_x_body, w_full_e, x_p_e,
-      Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.interpolated_x,
-      Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.lagrange_coeffs.
-    cbn [Garden.Halo2.halo2_gadgets.ecc.chip.constants.h_nat
-      List.seq List.combine List.fold_left
-      Garden.Halo2.halo2_gadgets.utilities.pow_expr].
-    cbn [eval_constraint eval_expression].
+    unfold check_x_body, w_full_e, x_p_e.
+    cbn [eval_constraint].
+    (* The interpolation window is a pure [Expression.t] fold over the eight
+       Lagrange coefficients; reduce it in isolation ([vm_compute] on the
+       symbolic expression, [honest_assignment] never forced) since [cbn] /
+       [cbv] leave the tail-recursive [List.fold_left] of [interpolated_x]
+       stuck. *)
+    match goal with |- eval_expression _ _ ?e = _ => set (E := e) end.
+    vm_compute in E.
+    subst E.
+    cbn [eval_expression].
     rewrite !rot_cur.
     rewrite HA0, HA4, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7.
     cbn [EccSpec.fixed_interp].
@@ -896,13 +918,14 @@ Module OrchardForwardFixedBase.
     eval_constraint (OrchardHonestAssignment.honest_assignment w)
       (region, row) (check_x_body w_rs_e).
   Proof.
-    unfold check_x_body, w_rs_e, x_p_e,
-      Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.interpolated_x,
-      Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.lagrange_coeffs.
-    cbn [Garden.Halo2.halo2_gadgets.ecc.chip.constants.h_nat
-      List.seq List.combine List.fold_left
-      Garden.Halo2.halo2_gadgets.utilities.pow_expr].
-    cbn [eval_constraint eval_expression].
+    unfold check_x_body, w_rs_e, x_p_e.
+    cbn [eval_constraint].
+    (* Reduce the pure interpolation-window fold in isolation; see
+       [check_x_full_eval]. *)
+    match goal with |- eval_expression _ _ ?e = _ => set (E := e) end.
+    vm_compute in E.
+    subst E.
+    cbn [eval_expression].
     rewrite !rot_cur, !rot_next.
     rewrite HA0, HA4c, HA4n, Hf0, Hf1, Hf2, Hf3, Hf4, Hf5, Hf6, Hf7.
     cbn [EccSpec.fixed_interp].
@@ -1033,21 +1056,21 @@ Module OrchardForwardFixedBase.
     assert (HA0 : (OrchardHonestAssignment.honest_assignment w)
         .(Assignment.advice) Advice.A0 region row =
       List.nth (Z.to_nat row) (OCT.lg_px (OCT.leg_of tbl roots scalar)) 0).
-    { rewrite Hadv. cbn [OCT.fb_full_advice_t].
+    { rewrite Hadv. unfold OCT.fb_full_advice_t.
       rewrite guard2_true by lia. reflexivity. }
     assert (HA1 : (OrchardHonestAssignment.honest_assignment w)
         .(Assignment.advice) Advice.A1 region row =
       List.nth (Z.to_nat row) (OCT.lg_py (OCT.leg_of tbl roots scalar)) 0).
-    { rewrite Hadv. cbn [OCT.fb_full_advice_t].
+    { rewrite Hadv. unfold OCT.fb_full_advice_t.
       rewrite guard2_true by lia. reflexivity. }
     assert (HA5 : (OrchardHonestAssignment.honest_assignment w)
         .(Assignment.advice) Advice.A5 region row =
       List.nth (Z.to_nat row) (OCT.lg_us (OCT.leg_of tbl roots scalar)) 0).
-    { rewrite Hadv. cbn [OCT.fb_full_advice_t].
+    { rewrite Hadv. unfold OCT.fb_full_advice_t.
       rewrite guard2_true by lia. reflexivity. }
     assert (HA4 : (OrchardHonestAssignment.honest_assignment w)
         .(Assignment.advice) Advice.A4 region row = d).
-    { rewrite Hadv. cbn [OCT.fb_full_advice_t].
+    { rewrite Hadv. unfold OCT.fb_full_advice_t.
       rewrite guard2_true by lia. reflexivity. }
     rewrite HPx in HA0. rewrite HPy in HA1. rewrite HPu in HA5.
     (* Fixed cells. *)
@@ -1201,7 +1224,7 @@ Module OrchardForwardFixedBase.
       cbn [eval_constraint eval_expression].
       rewrite rot_cur1, HA1, HA3, HA4.
       destruct Hsgn as [Hs | Hs]; rewrite Hs.
-      + cbn [Z.eqb]. mod_ring_solve.
+      + cbn [Z.eqb Pos.eqb]. mod_ring_solve.
       + assert (Hne : (Primes.pallas_p - 1 =? 1) = false) by reflexivity.
         rewrite Hne.
         apply neg_one_mul.
@@ -1292,7 +1315,11 @@ Module OrchardForwardFixedBase.
       cbn [eval_constraint eval_expression].
       rewrite rot_prev1, rot_cur1, HA6_0, HA8_0, HA6_1.
       mod_ring_solve. }
-    (* The conditional clauses: cases on the top window. *)
+    (* The conditional clauses: cases on the top window.  Unfold the four
+       [Constraint.Either] bodies so [cbn [eval_constraint]] exposes the
+       disjunction; [canon_5..8] stay folded for the [assumption] discharge
+       of [E5..E8]. *)
+    unfold canon_1_body, canon_2_body, canon_3_body, canon_4_body.
     destruct (Z_lt_ge_dec N (2 ^ 254)) as [Hlt | Hge].
     - (* MSB clear: the guard [alpha_2 = 0] holds. *)
       assert (Hz3 : z < 4) by (apply Z.div_lt_upper_bound; lia).
@@ -1304,7 +1331,11 @@ Module OrchardForwardFixedBase.
         cbn [eval_constraint eval_expression].
         rewrite rot_cur1, HA8_1, Ha2.
         exact from_0. }
-      repeat apply conj; try assumption;
+      (* Split syntactically ([apply conj] would break [canon_5]'s [Range]
+         into its two inequalities up to conversion); the four conditional
+         clauses take the guard, [E5..E8] discharge the rest. *)
+      refine (conj _ (conj _ (conj _ (conj _
+        (conj E5 (conj E6 (conj E7 E8)))))));
         cbn [eval_constraint]; left; exact Eguard.
     - (* MSB set: the reduced scalar pins every clause. *)
       assert (Hr : 0 <= N - 2 ^ 254 < Primes.t_p) by lia.
@@ -1323,7 +1354,10 @@ Module OrchardForwardFixedBase.
         replace (N - 4 * 2 ^ 252 + 2 ^ 130 - Primes.t_p)
           with (N - 2 ^ 254 + 2 ^ 130 - Primes.t_p) by lia.
         apply Z.mod_small. lia. }
-      repeat apply conj; try assumption.
+      (* Syntactic split (see the MSB-clear branch); the four conditional
+         clauses take the second [Either] alternative. *)
+      refine (conj _ (conj _ (conj _ (conj _
+        (conj E5 (conj E6 (conj E7 E8))))))).
       + (* alpha_1 = 0 *)
         cbn [eval_constraint]. right.
         unfold a1_e.
@@ -1436,31 +1470,31 @@ Module OrchardForwardFixedBase.
         List.nth (Z.to_nat row)
           (OCT.lg_px (OCT.leg_of OrchardAdviceEccMuls.tbl_value_commit_v
             ValueCommitVWindowSignCert.root_table (magnitude w))) 0).
-      { rewrite vcv_adv. cbn [OCT.fb_short_advice_t].
+      { rewrite vcv_adv. unfold OCT.fb_short_advice_t.
         rewrite guard2_true by lia. reflexivity. }
       assert (HA1 : (OrchardHonestAssignment.honest_assignment w)
           .(Assignment.advice) Advice.A1 R_vcv row =
         List.nth (Z.to_nat row)
           (OCT.lg_py (OCT.leg_of OrchardAdviceEccMuls.tbl_value_commit_v
             ValueCommitVWindowSignCert.root_table (magnitude w))) 0).
-      { rewrite vcv_adv. cbn [OCT.fb_short_advice_t].
+      { rewrite vcv_adv. unfold OCT.fb_short_advice_t.
         rewrite guard2_true by lia. reflexivity. }
       assert (HA5 : (OrchardHonestAssignment.honest_assignment w)
           .(Assignment.advice) Advice.A5 R_vcv row =
         List.nth (Z.to_nat row)
           (OCT.lg_us (OCT.leg_of OrchardAdviceEccMuls.tbl_value_commit_v
             ValueCommitVWindowSignCert.root_table (magnitude w))) 0).
-      { rewrite vcv_adv. cbn [OCT.fb_short_advice_t].
+      { rewrite vcv_adv. unfold OCT.fb_short_advice_t.
         rewrite guard2_true by lia. reflexivity. }
       assert (HA4c : (OrchardHonestAssignment.honest_assignment w)
           .(Assignment.advice) Advice.A4 R_vcv row =
         magnitude w / 8 ^ row).
-      { rewrite vcv_adv. cbn [OCT.fb_short_advice_t].
+      { rewrite vcv_adv. unfold OCT.fb_short_advice_t.
         rewrite guard2le_true by lia. reflexivity. }
       assert (HA4n : (OrchardHonestAssignment.honest_assignment w)
           .(Assignment.advice) Advice.A4 R_vcv (row + 1) =
         magnitude w / 8 ^ (row + 1)).
-      { rewrite vcv_adv. cbn [OCT.fb_short_advice_t].
+      { rewrite vcv_adv. unfold OCT.fb_short_advice_t.
         rewrite guard2le_true by lia. reflexivity. }
       destruct (rs_region_eval w R_vcv
         OrchardAdviceEccMuls.tbl_value_commit_v
