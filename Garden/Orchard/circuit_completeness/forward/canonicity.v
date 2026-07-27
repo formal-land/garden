@@ -49,7 +49,7 @@ Require Garden.Halo2.halo2_gadgets.poseidon.pow5_proof.
 Require Garden.Halo2.halo2_gadgets.utilities.lookup_range_check.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.Pallas.Generators.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
@@ -91,7 +91,7 @@ Module OrchardCanonicityForward.
   (** ** Power-of-two slice arithmetic *)
 
   Lemma pow2_nz (a : Z) : 0 <= a -> 2 ^ a <> 0.
-  Proof. intros Ha. pose proof (OrchardForwardArith.pow2_pos a Ha). lia. Qed.
+  Proof. intros Ha. pose proof (pow2_pos a Ha). lia. Qed.
 
   Lemma mod_mod_low (x a b : Z) : 0 <= a <= b ->
     (x mod 2 ^ b) mod 2 ^ a = x mod 2 ^ a.
@@ -99,7 +99,7 @@ Module OrchardCanonicityForward.
     intros [Ha Hab].
     apply Z.mod_mod_divide.
     exists (2 ^ (b - a)).
-    rewrite <- OrchardForwardArith.pow2_split by lia.
+    rewrite <- pow2_split by lia.
     f_equal; lia.
   Qed.
 
@@ -115,17 +115,17 @@ Module OrchardCanonicityForward.
     (x mod 2 ^ b) / 2 ^ a = x / 2 ^ a mod 2 ^ (b - a).
   Proof.
     intros [Ha Hab].
-    pose proof (OrchardForwardArith.pow2_pos a Ha).
-    pose proof (OrchardForwardArith.pow2_pos (b - a) ltac:(lia)).
-    pose proof (OrchardForwardArith.pow2_pos b ltac:(lia)).
+    pose proof (pow2_pos a Ha).
+    pose proof (pow2_pos (b - a) ltac:(lia)).
+    pose proof (pow2_pos b ltac:(lia)).
     rewrite (Z.mod_eq x (2 ^ b)) by lia.
     replace (x - 2 ^ b * (x / 2 ^ b))
       with (x + - (x / 2 ^ b) * 2 ^ (b - a) * 2 ^ a)
-      by (rewrite <- Z.mul_assoc, <- OrchardForwardArith.pow2_split by lia;
+      by (rewrite <- Z.mul_assoc, <- pow2_split by lia;
           replace (b - a + a) with b by lia; ring).
     rewrite Z.div_add by lia.
     rewrite (Z.mod_eq (x / 2 ^ a) (2 ^ (b - a))) by lia.
-    rewrite OrchardForwardArith.div_div_pow by lia.
+    rewrite div_div_pow by lia.
     replace (a + (b - a)) with b by lia.
     ring.
   Qed.
@@ -135,10 +135,10 @@ Module OrchardCanonicityForward.
     (C + K * 2 ^ n) / 2 ^ j mod 2 ^ m = C / 2 ^ j mod 2 ^ m.
   Proof.
     intros Hj Hm Hjm.
-    pose proof (OrchardForwardArith.pow2_pos j Hj).
-    pose proof (OrchardForwardArith.pow2_pos m Hm).
+    pose proof (pow2_pos j Hj).
+    pose proof (pow2_pos m Hm).
     assert (Hn : 2 ^ n = 2 ^ (n - j - m) * 2 ^ m * 2 ^ j)
-      by (rewrite <- !OrchardForwardArith.pow2_split by lia; f_equal; lia).
+      by (rewrite <- !pow2_split by lia; f_equal; lia).
     replace (K * 2 ^ n) with (K * 2 ^ (n - j - m) * 2 ^ m * 2 ^ j)
       by (rewrite Hn; ring).
     rewrite Z.div_add by lia.
@@ -170,7 +170,7 @@ Module OrchardCanonicityForward.
     (LOW + M * 2 ^ b) / 2 ^ b = M.
   Proof.
     intros Hb HL.
-    pose proof (OrchardForwardArith.pow2_pos b Hb).
+    pose proof (pow2_pos b Hb).
     rewrite Z.div_add by lia.
     rewrite Z.div_small by lia.
     apply Z.add_0_l.
@@ -180,7 +180,7 @@ Module OrchardCanonicityForward.
     x = x mod 2 ^ a + x / 2 ^ a * 2 ^ a.
   Proof.
     intros Ha.
-    pose proof (OrchardForwardArith.pow2_pos a Ha).
+    pose proof (pow2_pos a Ha).
     pose proof (Z.div_mod x (2 ^ a) ltac:(lia)).
     lia.
   Qed.
@@ -196,7 +196,7 @@ Module OrchardCanonicityForward.
   Qed.
 
   Lemma mod_bound (x m : Z) : 0 <= m -> 0 <= x mod 2 ^ m < 2 ^ m.
-  Proof. intros Hm. apply Z.mod_pos_bound, OrchardForwardArith.pow2_pos, Hm. Qed.
+  Proof. intros Hm. apply Z.mod_pos_bound, pow2_pos, Hm. Qed.
 
   Lemma mod2_cases (x : Z) : x mod 2 = 0 \/ x mod 2 = 1.
   Proof. pose proof (Z.mod_pos_bound x 2 ltac:(lia)). lia. Qed.
@@ -302,7 +302,7 @@ Module OrchardCanonicityForward.
     nc_packed gd pkd v rho psi / 2 ^ 576 = rho + psi * 2 ^ 255.
   Proof.
     transitivity (nc_packed gd pkd v rho psi / 2 ^ 512 / 2 ^ 64);
-      [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+      [ rewrite div_div_pow by lia; reflexivity |].
     rewrite nc_view_512 by assumption.
     apply view_shift; [lia | exact Hv].
   Qed.
@@ -315,7 +315,7 @@ Module OrchardCanonicityForward.
     nc_packed gd pkd v rho psi / 2 ^ 831 = psi.
   Proof.
     transitivity (nc_packed gd pkd v rho psi / 2 ^ 576 / 2 ^ 255);
-      [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+      [ rewrite div_div_pow by lia; reflexivity |].
     rewrite nc_view_576 by assumption.
     apply view_shift; [lia | exact Hrho].
   Qed.
@@ -351,7 +351,7 @@ Module OrchardCanonicityForward.
       unfold nc_b1, nc_b.
       rewrite div_of_mod by lia.
       rewrite mod_mod_two by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (250 + 4) with 254 by lia.
       rewrite nc_view_0.
       apply slice_of_view_two; lia.
@@ -361,7 +361,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_b3, nc_b.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (250 + 6) with 256 by lia.
       replace (10 - 6) with 4 by lia.
       rewrite (nc_view_256 gd pkd v rho psi Hxg).
@@ -372,7 +372,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_c.
       transitivity (P / 2 ^ 256 / 2 ^ 4 mod 2 ^ 250);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_256 gd pkd v rho psi Hxg).
       apply slice_of_view; lia.
     Qed.
@@ -382,7 +382,7 @@ Module OrchardCanonicityForward.
       unfold nc_d0, nc_d.
       rewrite mod_mod_two by lia.
       transitivity (P / 2 ^ 256 / 2 ^ 254 mod 2);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_256 gd pkd v rho psi Hxg).
       apply slice_of_view_two; lia.
     Qed.
@@ -393,7 +393,7 @@ Module OrchardCanonicityForward.
       unfold nc_d2, nc_d.
       rewrite div_of_mod by lia.
       rewrite mod_mod_low by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (510 + 2) with 512 by lia.
       rewrite (nc_view_512 gd pkd v rho psi Hxg Hxp).
       apply mod_of_view; lia.
@@ -404,11 +404,11 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_d3, nc_d.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (510 + 10) with 520 by lia.
       replace (60 - 10) with 50 by lia.
       transitivity (P / 2 ^ 512 / 2 ^ 8 mod 2 ^ 50);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_512 gd pkd v rho psi Hxg Hxp).
       apply slice_of_view; lia.
     Qed.
@@ -419,7 +419,7 @@ Module OrchardCanonicityForward.
       unfold nc_e0, nc_e.
       rewrite mod_mod_low by lia.
       transitivity (P / 2 ^ 512 / 2 ^ 58 mod 2 ^ 6);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_512 gd pkd v rho psi Hxg Hxp).
       apply slice_of_view; lia.
     Qed.
@@ -430,7 +430,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_e1, nc_e.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (570 + 6) with 576 by lia.
       replace (10 - 6) with 4 by lia.
       rewrite (nc_view_576 gd pkd v rho psi Hxg Hxp Hv).
@@ -443,7 +443,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_f.
       transitivity (P / 2 ^ 576 / 2 ^ 4 mod 2 ^ 250);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_576 gd pkd v rho psi Hxg Hxp Hv).
       apply slice_of_view; lia.
     Qed.
@@ -455,7 +455,7 @@ Module OrchardCanonicityForward.
       unfold nc_g0, nc_g.
       rewrite mod_mod_two by lia.
       transitivity (P / 2 ^ 576 / 2 ^ 254 mod 2);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_576 gd pkd v rho psi Hxg Hxp Hv).
       apply slice_of_view_two; lia.
     Qed.
@@ -471,7 +471,7 @@ Module OrchardCanonicityForward.
         [ reflexivity |].
       rewrite div_of_mod by lia.
       rewrite mod_mod_low by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (830 + 1) with 831 by lia.
       rewrite (nc_view_831 gd pkd v rho psi Hxg Hxp Hv Hrho).
       reflexivity.
@@ -483,11 +483,11 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_g2, nc_g.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (830 + 10) with 840 by lia.
       replace (250 - 10) with 240 by lia.
       transitivity (P / 2 ^ 831 / 2 ^ 9 mod 2 ^ 240);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_831 gd pkd v rho psi Hxg Hxp Hv Hrho).
       reflexivity.
     Qed.
@@ -499,7 +499,7 @@ Module OrchardCanonicityForward.
       unfold nc_h0, nc_h.
       rewrite mod_mod_low by lia.
       transitivity (P / 2 ^ 831 / 2 ^ 249 mod 2 ^ 5);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_831 gd pkd v rho psi Hxg Hxp Hv Hrho).
       reflexivity.
     Qed.
@@ -510,11 +510,11 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_h1, nc_h.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (1080 + 5) with 1085 by lia.
       replace (10 - 5) with 5 by lia.
       transitivity (P / 2 ^ 831 / 2 ^ 254 mod 2 ^ 5);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_831 gd pkd v rho psi Hxg Hxp Hv Hrho).
       reflexivity.
     Qed.
@@ -527,20 +527,20 @@ Module OrchardCanonicityForward.
     Proof.
       unfold nc_g.
       transitivity (P / 2 ^ 576 / 2 ^ 254 mod 2 ^ 250);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (nc_view_576 gd pkd v rho psi Hxg Hxp Hv).
       replace (rho + psi * 2 ^ 255) with (rho + psi * 2 * 2 ^ 254) by ring.
-      rewrite Z.div_add by (pose proof (OrchardForwardArith.pow2_pos 254 ltac:(lia)); lia).
+      rewrite Z.div_add by (pose proof (pow2_pos 254 ltac:(lia)); lia).
       assert (Hbit : 0 <= rho / 2 ^ 254 < 2)
         by (split;
-            [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
+            [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
             | (apply Z.div_lt_upper_bound;
-               [apply OrchardForwardArith.pow2_pos; lia | lia]) ]).
+               [apply pow2_pos; lia | lia]) ]).
       pose proof (split_lohi psi 249 ltac:(lia)) as Hpsi.
       replace (rho / 2 ^ 254 + psi * 2)
         with (rho / 2 ^ 254 + psi mod 2 ^ 249 * 2 + psi / 2 ^ 249 * 2 ^ 250)
         by lia.
-      rewrite Z.mod_add by (pose proof (OrchardForwardArith.pow2_pos 250 ltac:(lia)); lia).
+      rewrite Z.mod_add by (pose proof (pow2_pos 250 ltac:(lia)); lia).
       apply Z.mod_small.
       pose proof (mod_bound psi 249 ltac:(lia)).
       lia.
@@ -571,7 +571,7 @@ Module OrchardCanonicityForward.
       unfold civk_b1, civk_b, civk_packed.
       rewrite div_of_mod by lia.
       rewrite mod_mod_two by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (250 + 4) with 254 by lia.
       apply slice_of_view_two; lia.
     Qed.
@@ -581,7 +581,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold civk_b2, civk_b.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (250 + 5) with 255 by lia.
       replace (10 - 5) with 5 by lia.
       rewrite (civk_view_255 akx nk Hakx).
@@ -593,7 +593,7 @@ Module OrchardCanonicityForward.
     Proof.
       unfold civk_c.
       transitivity (Q / 2 ^ 255 / 2 ^ 5 mod 2 ^ 240);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (civk_view_255 akx nk Hakx).
       reflexivity.
     Qed.
@@ -604,7 +604,7 @@ Module OrchardCanonicityForward.
       unfold civk_d0, civk_d.
       rewrite mod_mod_low by lia.
       transitivity (Q / 2 ^ 255 / 2 ^ 245 mod 2 ^ 9);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (civk_view_255 akx nk Hakx).
       reflexivity.
     Qed.
@@ -614,12 +614,12 @@ Module OrchardCanonicityForward.
     Proof.
       unfold civk_d1, civk_d.
       rewrite div_of_mod by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       replace (500 + 9) with 509 by lia.
       replace (10 - 9) with 1 by lia.
       change (2 ^ 1) with 2.
       transitivity (Q / 2 ^ 255 / 2 ^ 254 mod 2);
-        [ rewrite OrchardForwardArith.div_div_pow by lia; reflexivity |].
+        [ rewrite div_div_pow by lia; reflexivity |].
       rewrite (civk_view_255 akx nk Hakx).
       reflexivity.
     Qed.
@@ -692,8 +692,8 @@ Module OrchardCanonicityForward.
     assert (Hq : x / 2 ^ 254 mod 2 = x / 2 ^ 254).
     { apply Z.mod_small.
       split;
-        [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
-        | (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]) ]. }
+        [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
+        | (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]) ]. }
     lia.
   Qed.
 
@@ -707,8 +707,8 @@ Module OrchardCanonicityForward.
     assert (Hq : x / 2 ^ 254 mod 2 = x / 2 ^ 254).
     { apply Z.mod_small.
       split;
-        [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
-        | (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]) ]. }
+        [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
+        | (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]) ]. }
     lia.
   Qed.
 
@@ -722,8 +722,8 @@ Module OrchardCanonicityForward.
     assert (Hq : x / 2 ^ 58 mod 2 ^ 6 = x / 2 ^ 58).
     { apply Z.mod_small.
       split;
-        [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
-        | (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]) ]. }
+        [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
+        | (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]) ]. }
     lia.
   Qed.
 
@@ -739,8 +739,8 @@ Module OrchardCanonicityForward.
     assert (Hq : x / 2 ^ 254 mod 2 = x / 2 ^ 254).
     { apply Z.mod_small.
       split;
-        [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
-        | (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]) ]. }
+        [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
+        | (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]) ]. }
     lia.
   Qed.
 
@@ -756,8 +756,8 @@ Module OrchardCanonicityForward.
     assert (Hq : x / 2 ^ 254 mod 2 = x / 2 ^ 254).
     { apply Z.mod_small.
       split;
-        [ (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia])
-        | (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]) ]. }
+        [ (apply Z.div_pos; [lia | apply pow2_pos; lia])
+        | (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]) ]. }
     lia.
   Qed.
 
@@ -796,9 +796,9 @@ Module OrchardCanonicityForward.
     assert (Hlt : x < 2 ^ 255) by lia.
     assert (Hq : x / 2 ^ 254 = 1).
     { assert (H0 : 0 <= x / 2 ^ 254)
-        by (apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia]).
+        by (apply Z.div_pos; [lia | apply pow2_pos; lia]).
       assert (H2 : x / 2 ^ 254 < 2)
-        by (apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]).
+        by (apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]).
       rewrite Z.mod_small in Htop by lia.
       exact Htop. }
     pose proof (split_lohi x 254 ltac:(lia)).
@@ -1754,8 +1754,8 @@ Module OrchardCanonicityForward.
         pose proof (Hwin Htop) as Hlow.
         assert (HM0 : 0 <= M < Primes.t_p).
         { pose proof (mod_bound X 4 ltac:(lia)).
-          pose proof (OrchardForwardArith.pow2_pos 4 ltac:(lia)).
-          assert (0 <= M) by (subst M; apply Z.mod_pos_bound, OrchardForwardArith.pow2_pos; lia).
+          pose proof (pow2_pos 4 ltac:(lia)).
+          assert (0 <= M) by (subst M; apply Z.mod_pos_bound, pow2_pos; lia).
           subst L. lia. }
         exact (div_small_tp M 130 ltac:(lia) HM0).
     - destruct Hcases as [HT0 | Htop].
@@ -1877,8 +1877,8 @@ Module OrchardCanonicityForward.
     pose proof (p_lt_2_255 Y HY) as HY255.
     assert (Hk3 : 0 <= Y / 2 ^ 254 < 2).
     { split.
-      - apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia].
-      - apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia]. }
+      - apply Z.div_pos; [lia | apply pow2_pos; lia].
+      - apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia]. }
     assert (Hcases : Y / 2 ^ 254 = 0 \/ Y / 2 ^ 254 mod 2 = 1).
     { destruct (Z.eq_dec (Y / 2 ^ 254) 0) as [H | H]; [now left |].
       right. replace (Y / 2 ^ 254) with 1 by lia. reflexivity. }
@@ -2012,7 +2012,7 @@ Module OrchardCanonicityForward.
         pose proof (Hnlow Htop) as Hlow.
         assert (HC0 : 0 <= C < Primes.t_p).
         { assert (0 <= B2) by (subst B2; apply Z.mod_pos_bound; lia).
-          assert (0 <= C) by (subst C; apply Z.mod_pos_bound, OrchardForwardArith.pow2_pos;
+          assert (0 <= C) by (subst C; apply Z.mod_pos_bound, pow2_pos;
             lia).
           lia. }
         exact (div_small_tp C 130 ltac:(lia) HC0).
@@ -2119,8 +2119,8 @@ Module OrchardCanonicityForward.
   Proof.
     pose proof (p_lt_2_255 x Hx).
     split.
-    - apply Z.div_pos; [lia | apply OrchardForwardArith.pow2_pos; lia].
-    - apply Z.div_lt_upper_bound; [apply OrchardForwardArith.pow2_pos; lia | lia].
+    - apply Z.div_pos; [lia | apply pow2_pos; lia].
+    - apply Z.div_lt_upper_bound; [apply pow2_pos; lia | lia].
   Qed.
 
   (** ** The generator's slices are the canonical slices *)

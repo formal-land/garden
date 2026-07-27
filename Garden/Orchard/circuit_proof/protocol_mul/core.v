@@ -45,6 +45,7 @@
     [circuit_proof/protocol_mul/<base>.v]. *)
 
 Require Import Garden.Field.Field.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Field.Lemmas.
 Require Import Garden.Field.Sqrt.
 Require Import Garden.EllipticCurve.Weierstrass.
@@ -89,11 +90,6 @@ Module ProtocolMulCore.
       which separates it from [0], [pallas_q] and [−pallas_q] in the
       divisibility check [mul_window_scalar_ne_identity] below. *)
 
-  Lemma pow8_nat_pos (m : nat) : 0 < 8 ^ Z.of_nat m.
-  Proof.
-    apply Z.pow_pos_nonneg; [lia | apply Nat2Z.is_nonneg].
-  Qed.
-
   (** The one-step unfolding of the offset sum (definitional). *)
   Lemma window_offset_sum_succ (m : nat) :
     FixedBaseTableDefs.window_offset_sum (S m) =
@@ -108,7 +104,7 @@ Module ProtocolMulCore.
       change (Z.of_nat 0) with 0. rewrite Z.pow_0_r. lia.
     - rewrite window_offset_sum_succ.
       rewrite Nat2Z.inj_succ, Z.pow_succ_r by apply Nat2Z.is_nonneg.
-      pose proof (pow8_nat_pos m). lia.
+      pose proof (pow8_pos m). lia.
   Qed.
 
   Lemma pow8_nat_mod8 (m : nat) :
@@ -187,7 +183,7 @@ Module ProtocolMulCore.
     rewrite Nat2Z.inj_succ, Z.pow_succ_r by apply Nat2Z.is_nonneg.
     replace (8 * 8 ^ Z.of_nat m) with (8 ^ Z.of_nat m * 8) by ring.
     apply Z.rem_mul_r.
-    - pose proof (pow8_nat_pos m). lia.
+    - pose proof (pow8_pos m). lia.
     - lia.
   Qed.
 
@@ -378,7 +374,7 @@ Module ProtocolMulCore.
       destruct (Nat.lt_ge_cases w m) as [Hwm | Hwm].
       - (* Non-last window: [0 < (d+2)·8^w < q]. *)
         rewrite (window_scalar_nonlast_gen (S m) w d ltac:(lia)) in Hdiv.
-        assert (HP0 : 0 < 8 ^ Z.of_nat w) by apply pow8_nat_pos.
+        assert (HP0 : 0 < 8 ^ Z.of_nat w) by apply pow8_pos.
         assert (HPQ : 8 ^ Z.of_nat w <= 8 ^ 83).
         { change 83 with (Z.of_nat 83). apply Z.pow_le_mono_r; lia. }
         assert (Hs_pos : 0 < (d + 2) * 8 ^ Z.of_nat w)
@@ -395,7 +391,7 @@ Module ProtocolMulCore.
         destruct Hdiv as [t Ht].
         pose proof (window_offset_sum_bound m) as Hoff.
         pose proof (window_scalar_last_mod8 m d Hm_ge1 Hd) as Hs8.
-        assert (HP0 : 0 < 8 ^ Z.of_nat m) by apply pow8_nat_pos.
+        assert (HP0 : 0 < 8 ^ Z.of_nat m) by apply pow8_pos.
         assert (HP84 : 8 ^ Z.of_nat m <= 8 ^ 84).
         { change 84 with (Z.of_nat 84). apply Z.pow_le_mono_r; lia. }
         assert (Hpow84 : 8 ^ 84 = 8 * 8 ^ 83)
