@@ -8,7 +8,7 @@
 Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.complete.
 Require Import Garden.Orchard.columns.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.Bool.Bool.
 
 Global Open Scope Z_scope.

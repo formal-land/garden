@@ -1,7 +1,7 @@
 (** * E1a: operational completeness at the concrete C1 witness
 
     The completeness mirror of [Orchard/circuit_operational.v]: the honest
-    Orchard witness of the C1 instance ([circuit_completeness/instance_cert.v])
+    Orchard witness of the C1 instance ([circuit_completeness/instance/cert.v])
     is accepted by the ideal checker [mock_prover_accepts] that mirrors Rust
     Halo2's [MockProver] over the serialized 19,617-event stream.  This is the
     operational non-vacuity certificate of the whole soundness surface: the
@@ -48,10 +48,10 @@ Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_synthesis_layout.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
-Require Import Garden.Orchard.circuit_completeness.instance_cert.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
+Require Import Garden.Orchard.circuit_completeness.instance.cert.
 Require Import Garden.Orchard.circuit_operational.
 Require Garden.Orchard.circuit_synthesis_constants.
 Require Garden.Orchard.circuit.
@@ -904,21 +904,6 @@ Section ReplayPlanes.
     exact (apply_events_log_selector_source events _ state column row Hreplay).
   Qed.
 
-  (** A successful replay of a concatenation replays its prefix. *)
-  Lemma apply_events_log_app (events1 events2 : list Raw.Event.t)
-      (state state' : ReplayState.t) :
-    apply_events_log (events1 ++ events2) state = Some state' ->
-    exists state1, apply_events_log events1 state = Some state1.
-  Proof.
-    revert state.
-    induction events1 as [| event events1 IH]; intros state Happly;
-      cbn [List.app apply_events_log] in Happly |- *.
-    - exists state.
-      reflexivity.
-    - destruct (apply_event state event) as [state1 |] eqn:Hevent;
-        [| discriminate Happly].
-      exact (IH state1 Happly).
-  Qed.
 End ReplayPlanes.
 
 (** ** A small positive trie

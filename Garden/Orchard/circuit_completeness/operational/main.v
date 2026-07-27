@@ -76,10 +76,10 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
 Require Garden.Orchard.circuit_synthesis_constants.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Import Garden.Orchard.circuit_completeness.forward.lookups_witness.
 Require Import Garden.Orchard.circuit_completeness.forward.assembly.
@@ -244,14 +244,6 @@ Module OrchardOperationalAgreement.
     grid.(RawGrid.sel) (Index.selector sel) (region_start_of region + offset).
   Proof. reflexivity. Qed.
 
-  Lemma realize_fixed_read (grid : RawGrid.t) (column : Fixed.t)
-      (region : RegionId.t) (offset : Z) :
-    (realize Index.indices region_start_of grid)
-      .(Assignment.fixed) column region offset =
-    grid.(RawGrid.cell) Raw.ColumnKind.Fixed (Index.fixed column)
-      (region_start_of region + offset).
-  Proof. reflexivity. Qed.
-
   Lemma realize_advice_read (grid : RawGrid.t) (column : Advice.t)
       (region : RegionId.t) (offset : Z) :
     (realize Index.indices region_start_of grid)
@@ -265,12 +257,6 @@ Module OrchardOperationalAgreement.
     (realize Index.indices region_start_of grid)
       .(Assignment.instance_) column row =
     grid.(RawGrid.cell) Raw.ColumnKind.Instance_ (Index.instance_ column) row.
-  Proof. reflexivity. Qed.
-
-  Lemma realize_lookup_read (grid : RawGrid.t) (column : Lookup.t) (row : Z) :
-    (realize Index.indices region_start_of grid).(Assignment.lookup)
-      column row =
-    grid.(RawGrid.cell) Raw.ColumnKind.Fixed (Index.lookup column) row.
   Proof. reflexivity. Qed.
 
   Lemma initial_advice_read (advice instance_ : Z -> Z -> Z)

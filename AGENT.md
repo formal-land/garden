@@ -19,27 +19,29 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   the whole-circuit Orchard instantiation with its `vm_compute` certificates
   (`circuit_operational.v`), and the assurance upgrade this delivers for the
   Action-statement surface.
-- `docs/circuit-completeness.md`: the completeness direction of `circuit_holds`
-  (honest witnesses are accepted) — the generic gluing intro lemma
-  `Complete.circuit_holds_intro`, the add-chip completeness theorem, the
-  Orchard witness generator (`decidable_eq.v`, `circuit_completeness/`), and the
-  constructive whole-circuit C1 instance `orchard_completeness_instance`
-  (`Qed`, clean audit — every enabled point and witness fact machine-verified),
-  the C2 forward API (`circuit_completeness/forward/`) with its per-family gate
-  and lookup obligations, the universal C2 theorem `orchard_completeness`
-  (`Qed`, unconditional — clean assumption audit), and the operational rung
-  (`circuit_completeness/operational/`) carrying it across the replay bridge to
-  the ideal `mock_prover_accepts` checker (`orchard_operational_complete`),
-  with the assumption audit.
 - `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with
   its validation gates.
+- `docs/realize-overfill-fix.md`: record of the lookup-table fill gap — the
+  unbounded table default fill against keygen's `usable_rows` cap, why the
+  divergent `l_last` and blinding rows were invisible to every constraint
+  theorem, the reference `fill_from_row` as ground truth, and the fix
+  (half-open `FillFromRow` extent, the matching `LookupTableLoaded`
+  tightening) with its validation.
 - `docs/orchard-soundness-proof.md`: the Orchard Action-statement theorem
   — the exact `action_statement`/`satisfies_specification`/`deterministic`
   statements, each hypothesis and its motivation (including the
   witness-honesty side conditions), what the conclusion does and does not
   ensure, the inherited model caveats, and the assumption audit.
+- `docs/orchard-completeness-proof.md`: the companion theorem in the other
+  direction — honest witnesses are accepted (`orchard_completeness`), the
+  `valid`/`nondegenerate` domain, the generic gluing lemma
+  `Complete.circuit_holds_intro` and the `honest_planes` selector condition,
+  the Orchard witness generator and its concrete instance, the per-family
+  forward obligations of `circuit_completeness/forward/`, and the operational
+  layer carrying the result to the ideal `mock_prover_accepts` checker
+  (`orchard_operational_complete`) via the placed re-derivation.
 - `docs/orchard-balance-proof.md`: the transaction-level balance theorems
   built on the Action statement — `balanced_or_dlog` and `no_inflation`,
   the Pedersen-binding-as-reduction design (with the explicit computable

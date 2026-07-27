@@ -5,7 +5,7 @@
     hoisted table record is forced once, and the ≈ 2 000 points read it by
     lookups.  Leaf file per the certificate cost discipline. *)
 
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
 Require Import Stdlib.Lists.List.

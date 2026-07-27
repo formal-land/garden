@@ -41,11 +41,11 @@ Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_poseidon_nullifier.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.

@@ -9,8 +9,8 @@
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.ZArith.ZArith.
 
 Global Open Scope Z_scope.

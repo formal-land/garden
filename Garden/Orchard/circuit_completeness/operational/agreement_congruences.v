@@ -243,18 +243,6 @@ Section Agreement.
     exact (eq_sym Hcell).
   Qed.
 
-  Lemma lookup_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (nb_table_rows : Z)
-      (cols : list columns.(Columns.Lookup)) :
-    lookup_agree Γ1 Γ2 nb_table_rows cols ->
-    lookup_agree Γ2 Γ1 nb_table_rows cols.
-  Proof.
-    apply List.Forall_impl.
-    intros column Hcolumn table_row Hbound.
-    exact (eq_sym (Hcolumn table_row Hbound)).
-  Qed.
-
   (** ** Expression congruence *)
 
   Definition expr_agree
@@ -265,21 +253,6 @@ Section Agreement.
     fixed_agree Γ1 Γ2 region row (fixed_queries e) /\
     advice_agree Γ1 Γ2 region row (advice_queries e) /\
     instance_agree Γ1 Γ2 row (instance_queries e).
-
-  Lemma expr_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (e : Expression.t columns) :
-    expr_agree Γ1 Γ2 region row e ->
-    expr_agree Γ2 Γ1 region row e.
-  Proof.
-    intros [Hsel [Hfix [Hadv Hinst] ] ].
-    repeat apply conj.
-    - exact (selector_agree_sym Γ1 Γ2 region row _ Hsel).
-    - exact (fixed_agree_sym Γ1 Γ2 region row _ Hfix).
-    - exact (advice_agree_sym Γ1 Γ2 region row _ Hadv).
-    - exact (instance_agree_sym Γ1 Γ2 row _ Hinst).
-  Qed.
 
   Lemma eval_selector_agree
       (Γ1 Γ2 : Assignment.t columns RegionId)
@@ -428,45 +401,6 @@ Section Agreement.
     fixed_agree Γ1 Γ2 region row (constraint_fixed_queries c) /\
     advice_agree Γ1 Γ2 region row (constraint_advice_queries c) /\
     instance_agree Γ1 Γ2 row (constraint_instance_queries c).
-
-  Lemma constraint_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (c : Constraint.t columns) :
-    constraint_agree Γ1 Γ2 region row c ->
-    constraint_agree Γ2 Γ1 region row c.
-  Proof.
-    intros [Hsel [Hfix [Hadv Hinst] ] ].
-    repeat apply conj.
-    - exact (selector_agree_sym Γ1 Γ2 region row _ Hsel).
-    - exact (fixed_agree_sym Γ1 Γ2 region row _ Hfix).
-    - exact (advice_agree_sym Γ1 Γ2 region row _ Hadv).
-    - exact (instance_agree_sym Γ1 Γ2 row _ Hinst).
-  Qed.
-
-  (** A guarded constraint queries its own guard selector: [eval_constraint]
-      reads the selector plane at [(region, row)] to decide whether the body
-      binds.  At an enabled point both planes hold [1], so the extra
-      conjunct is discharged by the two enabling facts. *)
-  Lemma constraint_agree_select
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (selector : columns.(Columns.Selector))
-      (c : Constraint.t columns) :
-    Γ1.(Assignment.selector) selector region row =
-    Γ2.(Assignment.selector) selector region row ->
-    constraint_agree Γ1 Γ2 region row c ->
-    constraint_agree Γ1 Γ2 region row (Constraint.Select selector c).
-  Proof.
-    intros Hplane [Hsel [Hfix [Hadv Hinst] ] ].
-    repeat apply conj.
-    - unfold selector_agree in Hsel |- *.
-      cbn [constraint_selector_queries].
-      exact (List.Forall_cons _ Hplane Hsel).
-    - exact Hfix.
-    - exact Hadv.
-    - exact Hinst.
-  Qed.
 
   Lemma eval_constraint_agree
       (Γ1 Γ2 : Assignment.t columns RegionId)
@@ -698,31 +632,6 @@ Section Agreement.
     advice_agree Γ1 Γ2 region row (gates_advice_queries gates) /\
     instance_agree Γ1 Γ2 row (gates_instance_queries gates).
 
-  Lemma gate_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (gate : Gate.t columns) :
-    gate_agree Γ1 Γ2 region row gate ->
-    gate_agree Γ2 Γ1 region row gate.
-  Proof.
-    exact (constraints_agree_sym Γ1 Γ2 region row gate.(Gate.constraints)).
-  Qed.
-
-  Lemma gates_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (gates : list (Gate.t columns)) :
-    gates_agree Γ1 Γ2 region row gates ->
-    gates_agree Γ2 Γ1 region row gates.
-  Proof.
-    intros [Hsel [Hfix [Hadv Hinst] ] ].
-    repeat apply conj.
-    - exact (selector_agree_sym Γ1 Γ2 region row _ Hsel).
-    - exact (fixed_agree_sym Γ1 Γ2 region row _ Hfix).
-    - exact (advice_agree_sym Γ1 Γ2 region row _ Hadv).
-    - exact (instance_agree_sym Γ1 Γ2 row _ Hinst).
-  Qed.
-
   Lemma gates_agree_In
       (Γ1 Γ2 : Assignment.t columns RegionId)
       (region : RegionId) (row : Z)
@@ -742,23 +651,6 @@ Section Agreement.
     - exact (Forall_flat_map_In _ _ _ _ Hin Hfix).
     - exact (Forall_flat_map_In _ _ _ _ Hin Hadv).
     - exact (Forall_flat_map_In _ _ _ _ Hin Hinst).
-  Qed.
-
-  Lemma eval_gates_agree
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (gates : list (Gate.t columns)) :
-    gates_agree Γ1 Γ2 region row gates ->
-    eval_gates Γ1 (region, row) gates ->
-    eval_gates Γ2 (region, row) gates.
-  Proof.
-    intros Hagree Heval.
-    apply eval_gates_forall.
-    intros gate Hin.
-    rewrite eval_gates_forall in Heval.
-    exact (eval_gate_agree Γ1 Γ2 region row gate
-      (gates_agree_In Γ1 Γ2 region row gates gate Hin Hagree)
-      (Heval gate Hin)).
   Qed.
 
   (** ** Lookup arguments *)
@@ -799,21 +691,6 @@ Section Agreement.
     fixed_agree Γ1 Γ2 region row (arg_fixed_queries arg) /\
     advice_agree Γ1 Γ2 region row (arg_advice_queries arg) /\
     instance_agree Γ1 Γ2 row (arg_instance_queries arg).
-
-  Lemma arg_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (region : RegionId) (row : Z)
-      (arg : LookupArgument.t columns) :
-    arg_agree Γ1 Γ2 region row arg ->
-    arg_agree Γ2 Γ1 region row arg.
-  Proof.
-    intros [Hsel [Hfix [Hadv Hinst] ] ].
-    repeat apply conj.
-    - exact (selector_agree_sym Γ1 Γ2 region row _ Hsel).
-    - exact (fixed_agree_sym Γ1 Γ2 region row _ Hfix).
-    - exact (advice_agree_sym Γ1 Γ2 region row _ Hadv).
-    - exact (instance_agree_sym Γ1 Γ2 row _ Hinst).
-  Qed.
 
   Lemma arg_agree_pair
       (Γ1 Γ2 : Assignment.t columns RegionId)
@@ -952,35 +829,6 @@ Section Agreement.
       intros Hcell; exact (eq_sym Hcell).
   Qed.
 
-  Lemma fact_agree_sym
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (fact : Fact.t columns RegionId) :
-    fact_agree Γ1 Γ2 fact ->
-    fact_agree Γ2 Γ1 fact.
-  Proof.
-    destruct fact as
-      [ selector region offset
-      | column region offset value
-      | left_cell right_cell
-      | cell instance row
-      | column values default_value
-      | cell value ];
-      cbn [fact_agree].
-    - intros Hplane.
-      exact (eq_sym Hplane).
-    - intros Hplane.
-      exact (eq_sym Hplane).
-    - intros [Hleft Hright].
-      exact (conj (cell_agree_sym Γ1 Γ2 left_cell Hleft)
-        (cell_agree_sym Γ1 Γ2 right_cell Hright)).
-    - intros [Hcell Hplane].
-      exact (conj (cell_agree_sym Γ1 Γ2 cell Hcell) (eq_sym Hplane)).
-    - intros Hplane row Hrow.
-      exact (eq_sym (Hplane row Hrow)).
-    - intros Hcell.
-      exact (cell_agree_sym Γ1 Γ2 cell Hcell).
-  Qed.
-
   Lemma interpret_fact_agree
       (Γ1 Γ2 : Assignment.t columns RegionId)
       (fact : Fact.t columns RegionId) :
@@ -1022,24 +870,6 @@ Section Agreement.
       intros Hcell Hfact.
       rewrite <- (eval_cell_agree Γ1 Γ2 cell Hcell).
       exact Hfact.
-  Qed.
-
-  Lemma interpret_facts_agree
-      (Γ1 Γ2 : Assignment.t columns RegionId)
-      (facts : list (Fact.t columns RegionId)) :
-    List.Forall (fact_agree Γ1 Γ2) facts ->
-    interpret_facts Γ1 facts ->
-    interpret_facts Γ2 facts.
-  Proof.
-    induction facts as [| fact facts IH]; cbn [interpret_facts].
-    - intros _ _.
-      exact I.
-    - intros Hagree [Hfact Hfacts].
-      pose proof (List.Forall_inv Hagree) as Hfact_agree.
-      pose proof (List.Forall_inv_tail Hagree) as Hfacts_agree.
-      split.
-      + exact (interpret_fact_agree Γ1 Γ2 fact Hfact_agree Hfact).
-      + exact (IH Hfacts_agree Hfacts).
   Qed.
 
   (** ** The row shift of a realized assignment
@@ -1183,25 +1013,6 @@ Section Agreement.
     intros Hfree Hrow Heval.
     exact (realize_eval_constraints_shift idx rs grid
       region1 row1 region2 row2 gate.(Gate.constraints) Hfree Hrow Heval).
-  Qed.
-
-  Lemma realize_eval_gates_shift
-      (idx : Indices.t columns) (rs : RegionId -> Z) (grid : RawGrid.t)
-      (region1 : RegionId) (row1 : Z)
-      (region2 : RegionId) (row2 : Z)
-      (gates : list (Gate.t columns)) :
-    List.forallb gate_instance_free gates = true ->
-    rs region1 + row1 = rs region2 + row2 ->
-    eval_gates (realize idx rs grid) (region1, row1) gates ->
-    eval_gates (realize idx rs grid) (region2, row2) gates.
-  Proof.
-    intros Hfree Hrow Heval.
-    apply eval_gates_forall.
-    intros gate Hin.
-    rewrite eval_gates_forall in Heval.
-    rewrite List.forallb_forall in Hfree.
-    exact (realize_eval_gate_shift idx rs grid region1 row1 region2 row2
-      gate (Hfree gate Hin) Hrow (Heval gate Hin)).
   Qed.
 
   Lemma realize_eval_lookup_argument_shift

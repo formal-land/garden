@@ -64,16 +64,16 @@ Require Import Garden.Orchard.circuit_proof.value_commit_v.sign_cert.
 Require Import Garden.Orchard.circuit_proof.nullifier_k.sign_cert.
 Require Import Garden.Orchard.circuit_proof.note_commit_r.sign_cert.
 Require Import Garden.Orchard.circuit_proof.commit_ivk_r.sign_cert.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_poseidon_nullifier.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Import Garden.Orchard.circuit_completeness.forward.ecc_add.
 Require Import Garden.Field.Div.
@@ -550,15 +550,6 @@ Module OrchardWitnessFixedLegs.
       PallasGenerators.nullifier_k_on_curve).
   Qed.
 
-  Lemma sa_comm_wgood (w : HonestInput) (Hty : well_typed w) :
-    wgood (t_sa_comm (tables_of w)).
-  Proof.
-    rewrite (sa_comm_repr w Hty).
-    unfold OrchardProtocolSpec.mul_spend_auth_g.
-    exact (mul_wgood _ _ PallasGenerators.spend_auth_g_reduced
-      PallasGenerators.spend_auth_g_on_curve).
-  Qed.
-
   (** ** Shapes of the derived record fields
 
       Each equation reduces only the record builder and the projections it
@@ -699,7 +690,6 @@ Module OrchardWitnessFixedLegs.
     rewrite nk_tbl_len.
     apply Nat.lt_0_succ.
   Qed.
-
 
   (** ** The fact literals
 

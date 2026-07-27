@@ -33,12 +33,20 @@ rocq compile -vok -impredicative-set -R . Garden -w -stdlib-vector \
   Orchard/circuit_proof/ladder/main.v   # checks THIS file vs .vos deps
 ```
 
+**Adding, moving or renaming a `.v` file rebuilds the whole tree.** `Garden/`'s
+top-level `Makefile` computes `VFILES` by `find`, regenerates `CoqMakefile`
+whenever that set changes, and declares `%.vo: CoqMakefile %.v` — so every
+`.vo` in the project is older than the regenerated makefile and is rebuilt,
+including the multi-hour certificate leaves. Deleting `CoqMakefile` by hand
+has the same effect. Batch file moves into a single change and budget a full
+rebuild for it; editing a file *in place* costs only its own dependents.
+
 **Honesty constraint.** `.vos`/`-vok`-against-`.vos` trusts the skipped
 dependency proofs. It is a development accelerator only. Any "closed /
 axiom-free" claim, and every `Print Assumptions` audit, must run on a full
 `.vo` build (`make all`) that actually executes the certificate
 `vm_compute`s. Treat `-vos` as "compiles and type-checks", not "verified".
-Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`/E2
+Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
 building on such not-yet-checked `Qed`s is allowed — but they must stay
@@ -271,7 +279,7 @@ the whole hash/generator/table chain) stalls compilation for *minutes* in
 end-of-file processing — under `-vos` and `-time`, every sentence logs
 `0. secs` and the stall appears after the last sentence, the same deceptive
 symptom as the match-scrutinee pitfall.  Measured on
-`circuit_completeness/instance_defs.v` (2026-07-15): a 32-iteration Merkle
+`circuit_completeness/instance/defs.v` (2026-07-15): a 32-iteration Merkle
 fixpoint referencing `merkle_layer` directly cost ≈ 8 min of end-of-file
 CPU; the identical logic as a *higher-order* fixpoint over abstract
 `step`/`check` function parameters, instantiated by a plain `Definition`
@@ -286,7 +294,7 @@ function parameter and instantiate outside the fixpoint.
 an `Assignment.t` whose advice plane recomputes region-level derivations at
 every cell read makes whole-circuit `vm_compute` certificates infeasible.
 Measured on the completeness instance
-(`Orchard/circuit_completeness/instance_cert.v`, 2026-07-14), with the raw
+(`Orchard/circuit_completeness/instance/cert.v`, 2026-07-14), with the raw
 VM cost constants — one 255-bit modular multiplication ≈ 7 ms (Z is the
 binary inductive, so a multiply is ~65 k constructor operations), one
 incomplete point addition (one egcd inversion + a few multiplies) ≈ 48 ms,
@@ -303,7 +311,8 @@ Summed over the 4 858 enabled selector points × their gate reads this is
 days of VM time.
 
 The implemented architecture
-(`Orchard/circuit_completeness/tables.v`, 2026-07-15): every region-level
+(`Orchard/circuit_completeness/generator/tables.v`, 2026-07-15): every
+region-level
 derivation is hoisted into one record (`OrchardCompletenessTables.t`) built
 by `tables_of w` — the per-layer Sinsemilla accumulator rows built linearly
 (two field inversions per round, mirroring `IncompleteAddition.output`'s
@@ -467,7 +476,7 @@ hypothesis* (never in a goal that contains the pow term) followed by
 ### The completeness `forward/` gate-obligation files: reducing spec terms
 
 `Orchard/circuit_completeness/forward/{ecc_add,fixed_base,canonicity,
-sinsemilla,var_base_ladder}.v` (the C2 per-family gate obligations) were
+sinsemilla,var_base_ladder}.v` (the per-family gate obligations) were
 written by an interrupted run and initially blacklisted as "not yet
 kernel-checked" — four hung, one errored (measured 2026-07-24 against a full
 `.vo` tree).  They now kernel-check clean (0 Admitted, baseline
@@ -498,8 +507,9 @@ file pays only the re-run of one order-insensitive `existsb` scan.
 certificate — like the rest of the directory they contain no
 input-dependent `vm_compute`.
 
-Auditing the whole C2 surface is a *load* cost, not a proof cost: a scratch
-file that `Require`s the thirteen `forward/` modules plus `instance_cert.v`
+Auditing the whole completeness surface is a *load* cost, not a proof cost:
+a scratch
+file that `Require`s the thirteen `forward/` modules plus `instance/cert.v`
 and runs the ~37 `Print Assumptions` takes 56 s against a full `.vo` tree
 (2026-07-26), essentially all of it loading the closure. Batch the audit into
 one file rather than one `coqc` run per theorem. `Print Assumptions` prints
@@ -844,32 +854,34 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   field inversions per bit; every run pays the ≈ 4 min record build once,
   then per-cell lookups; the eleven leaves are mutually independent and
   compile fully parallel, ≈ 30 min wall on a free machine):
-  `instance_shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
+  `instance/shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
   layer families, one `vm_compute`) 8:32 / 1.0 GB;
-  `instance_shards_misc.v` (witness-input, Poseidon, gadget-local,
+  `instance/shards_misc.v` (witness-input, Poseidon, gadget-local,
   Orchard-checks + the value-commitment, nullifier and spend-authority
   families, two `vm_compute`s sharing the record build) 6:55;
-  `instance_shards_blocked.v` (the variable-base ladder, overflow,
+  `instance/shards_blocked.v` (the variable-base ladder, overflow,
   `NoteCommit` and `Commit^ivk` decomposition/canonicity families 37–40,
   four `vm_compute`s sharing the record build) 7:49 / 0.95 GB;
-  `instance_witness.v` (all 2 964 copy/constant witness facts, one
+  `instance/witness.v` (all 2 964 copy/constant witness facts, one
   `vm_compute`) 5:40 / 0.8 GB;
-  `instance_read.v` (`read_action_inputs_ok`; the specification side
+  `instance/read.v` (`read_action_inputs_ok`; the specification side
   recomputes `anchor_root` and the commitment values) 15:56 / 0.8 GB;
-  `instance_domain.v` (`valid_b` plus the linear Merkle/Sinsemilla
+  `instance/domain.v` (`valid_b` plus the linear Merkle/Sinsemilla
   nondegeneracy clauses) 8:32; the four variable-base nondegeneracy ranges
-  (`instance_mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index —
+  (`instance/mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index —
   the cost falls with the index, so the ranges are sized against it)
-  ≈ 31 / 24 / 20 / 15 min; `instance_defs.v` / `tables.v` / `tables_vb.v` /
-  `tables_nc.v` / `honest_assignment.v` (definitions only) ≈ 1 s each.
-- The operational-completeness (E1) leaves
+  ≈ 31 / 24 / 20 / 15 min; `instance/defs.v`, `generator/tables.v`,
+  `generator/tables_vb.v`, `generator/tables_nc.v` and
+  `generator/honest_assignment.v` (definitions only) ≈ 1 s each.
+- The operational-completeness leaves
   (`Orchard/circuit_completeness/operational/`, measured 2026-07-27 on a
   shared 32-core host, full `.vo`): `certs.v` 70 s — nine
   `vm_cast_no_check` certificates, all input-independent, of which the
   restricted region-uniqueness scan is 32 s, the gate-queried fixed-cell
   scan 19 s, the 155,861-cell advice inversion 7 s, the enable-placement
   scan 5 s and the lookup-queried fixed-cell scan 5 s (the rest
-  sub-second); `concrete.v` (the self-contained E1a rung, its own copy of
+  sub-second); `concrete.v` (the self-contained concrete instance, with its
+  own copy of
   the certificate layer) 53 s / 1.3 GB; `main.v` 5 s (no certificate — the
   join is projections and hand-lemma rewrites, plus the two
   `conflict_free` term compositions); and the three generic layers
@@ -878,7 +890,7 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   this cost map and iterating on them is free). The certificate layer is
   input-independent by construction, so the concrete and universal rungs
   share it and neither pays a `tables_of` record build.
-- `Orchard/circuit_completeness/certificates.v`: ≈ 8.7 s total — three
+- `Orchard/circuit_completeness/generator/certificates.v`: ≈ 8.7 s total — three
   `vm_cast_no_check` certificates over `layouter_facts circuit.synthesize`
   (14,773 facts, built by the VM in ≈ 0.07 s). The
   `no_conflicting_writes` certificate dominates at ≈ 7.9 s: a first-match

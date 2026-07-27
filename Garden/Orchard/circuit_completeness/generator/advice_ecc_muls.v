@@ -8,7 +8,7 @@ Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Div.
 Require Import Garden.Plonky3.M.
@@ -248,9 +248,6 @@ Module OrchardAdviceEccMuls.
   (** [[alpha] SpendAuthG]. *)
   Definition sa_commitment (w : HonestInput) : Point.t :=
     EccSpec.point_add (sa_window_last w) (sa_acc_last w).
-  (** [rk = ak + [alpha] SpendAuthG]. *)
-  Definition rk_point (w : HonestInput) : Point.t :=
-    EccSpec.point_add (sa_commitment w) (hi_ak w).
 
   Definition vcr_scalar (w : HonestInput) : Z := hi_rcv w.
   Definition vcr_us (w : HonestInput) : list Z := us_rcv w.
@@ -282,9 +279,6 @@ Module OrchardAdviceEccMuls.
     Point.x := Point.x (vcv_magnitude_mul w);
     Point.y := vcv_y_var w;
   |}.
-  (** [cv_net = [v_net] ValueCommitV + [rcv] ValueCommitR]. *)
-  Definition cv_point (w : HonestInput) : Point.t :=
-    EccSpec.point_add (vcv_point w) (vcr_point w).
 
   (** ** The variable-base ladder
 
@@ -622,50 +616,5 @@ Module OrchardAdviceEccMuls.
        regions (which enable a selector but write no advice). *)
     | _ => 0
     end.
-
-  (** ** Small agreement lemmas
-
-      The running-sum column of the short leg telescopes by a factor of 8, and
-      the full-width digit column reads back the leg's base-8 digits — the two
-      identities the running-sum coordinate gate and the reader
-      [read_scalar_from_windows] pin. *)
-  Lemma fb_short_A4_step
-      (tbl : EccSpec.fixed_table) (scalar : Z) (us : unit -> list Z)
-      (count offset : Z)
-      (Hlo : 0 <= offset)
-      (Hhi : offset < count) :
-    fb_short_advice tbl scalar us count A4 offset =
-      EccSpec.window_digit scalar (Z.to_nat offset) +
-        8 * fb_short_advice tbl scalar us count A4 (offset + 1).
-  Proof.
-    unfold fb_short_advice.
-    assert (H0 : (0 <=? offset) = true) by (apply Z.leb_le; lia).
-    assert (H1 : (offset <=? count) = true) by (apply Z.leb_le; lia).
-    assert (H2 : (0 <=? offset + 1) = true) by (apply Z.leb_le; lia).
-    assert (H3 : (offset + 1 <=? count) = true) by (apply Z.leb_le; lia).
-    rewrite H0, H1, H2, H3. cbn [andb].
-    (* [scalar / 8^offset = digit + 8 * (scalar / 8^(offset+1))]. *)
-    unfold EccSpec.window_digit.
-    rewrite (Z2Nat.id offset) by lia.
-    replace (8 ^ (offset + 1)) with (8 ^ offset * 8).
-    2:{ rewrite Z.pow_add_r by lia. rewrite Z.pow_1_r. reflexivity. }
-    rewrite <- Z.div_div by lia.
-    pose proof (Z.div_mod (scalar / 8 ^ offset) 8 ltac:(lia)) as Hdm.
-    clear -Hdm. lia.
-  Qed.
-
-  Lemma fb_full_digit_read
-      (tbl : EccSpec.fixed_table) (scalar : Z) (us : unit -> list Z)
-      (count offset : Z)
-      (Hlo : 0 <= offset)
-      (Hhi : offset < count) :
-    fb_full_advice tbl scalar us count A4 offset =
-      EccSpec.window_digit scalar (Z.to_nat offset).
-  Proof.
-    unfold fb_full_advice.
-    assert (H0 : (0 <=? offset) = true) by (apply Z.leb_le; lia).
-    assert (H1 : (offset <? count) = true) by (apply Z.ltb_lt; lia).
-    rewrite H0, H1. cbn [andb]. reflexivity.
-  Qed.
 
 End OrchardAdviceEccMuls.

@@ -52,12 +52,12 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.add_incomplete_proof.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.pow5_proof.
@@ -574,17 +574,6 @@ Module OrchardForwardSinsemilla.
     List.length (OrchardSpec.note_commit_message g_d pk_d v rho psi) = 109%nat.
   Proof. apply words_le_length. Qed.
 
-  Lemma note_commit_message_concat (g_d pk_d : Point.t) (v rho psi : Z) :
-    Stdlib.Lists.List.concat
-      (split_pieces note_commit_lens
-        (OrchardSpec.note_commit_message g_d pk_d v rho psi)) =
-    OrchardSpec.note_commit_message g_d pk_d v rho psi.
-  Proof.
-    apply concat_split_pieces.
-    rewrite note_commit_message_length.
-    reflexivity.
-  Qed.
-
   Lemma commit_ivk_words_length (w : HonestInput) :
     List.length (commit_ivk_words w) = 51%nat.
   Proof. apply words_le_length. Qed.
@@ -954,15 +943,6 @@ Module OrchardForwardSinsemilla.
     exact Hh.
   Qed.
 
-  Lemma t_hash2_of (w : HonestInput) :
-    t_hash2 (tables_of w) =
-      Poseidon.poseidon_hash2 (hi_nk w) (hi_rho_old w).
-  Proof.
-    change (t_hash2 (tables_of w)) with
-      (State.x0 (List.nth 36 (pose_states_of w) state0)).
-    exact (pose_hash2_expand w).
-  Qed.
-
   (** The zeta expansion of the record's nullifier field is the
       specification nullifier. *)
   Lemma nf_expand_eq (w : HonestInput) :
@@ -1181,22 +1161,6 @@ Module OrchardForwardSinsemilla.
     reflexivity.
   Qed.
 
-  Lemma eqm_lin2 (q X Y A1 B1 A2 B2 c1 c2 : Z) :
-    Zdiv.eqm q A1 B1 ->
-    Zdiv.eqm q A2 B2 ->
-    X - Y = c1 * (A1 - B1) + c2 * (A2 - B2) ->
-    Zdiv.eqm q X Y.
-  Proof.
-    intros H1 H2 Hpoly.
-    unfold Zdiv.eqm.
-    replace X with (Y + c1 * (A1 - B1) + c2 * (A2 - B2)) by lia.
-    rewrite Zdiv.Zplus_mod, (Zdiv.Zmult_mod c2), (eqm_diff_zero q A2 B2 H2),
-      Z.mul_0_r, Zdiv.Zmod_0_l, Z.add_0_r, Zdiv.Zmod_mod.
-    rewrite Zdiv.Zplus_mod, (Zdiv.Zmult_mod c1), (eqm_diff_zero q A1 B1 H1),
-      Z.mul_0_r, Zdiv.Zmod_0_l, Z.add_0_r, Zdiv.Zmod_mod.
-    reflexivity.
-  Qed.
-
   Lemma eqm_of_ring (q X Y : Z) : X - Y = 0 -> Zdiv.eqm q X Y.
   Proof.
     intros Hpoly.
@@ -1243,20 +1207,6 @@ Module OrchardForwardSinsemilla.
       coordinates through the inverse — quadratically expensive.  With the two
       constants opaque the equal spellings match as stuck atoms. *)
   #[local] Opaque rr_mid mod_inverse.
-
-  Lemma nxt_x_eqm (A G : Point.t) :
-    Zdiv.eqm Primes.pallas_p
-      (Point.x (rr_next A G))
-      (rr_l2 A G * rr_l2 A G - Point.x (rr_mid A G) - Point.x A).
-  Proof.
-    unfold rr_next.
-    rewrite (padd_x (rr_mid A G) A).
-    change (rr_l1 (rr_mid A G) A) with (rr_l2 A G).
-    generalize (rr_l2 A G); intro l2.
-    generalize (Point.x (rr_mid A G)); intro xm.
-    repeat (setoid_rewrite binop_mul_eqm || setoid_rewrite binop_sub_eqm).
-    reflexivity.
-  Qed.
 
   Lemma nxt_y_eqm (A G : Point.t) :
     Zdiv.eqm Primes.pallas_p
@@ -1318,40 +1268,11 @@ Module OrchardForwardSinsemilla.
         (Point.x G).
   Proof. with_strategy transparent [rr_mid] (unfold rr_mid). apply padd_x. Qed.
 
-  Lemma mid_y_def (A G : Point.t) :
-    Point.y (rr_mid A G) =
-      BinOp.sub
-        (BinOp.mul (rr_l1 A G) (BinOp.sub (Point.x A) (Point.x (rr_mid A G))))
-        (Point.y A).
-  Proof. with_strategy transparent [rr_mid] (unfold rr_mid). apply padd_y. Qed.
-
   Lemma nxt_x_def (A G : Point.t) :
     Point.x (rr_next A G) =
       BinOp.sub (BinOp.sub (BinOp.mul (rr_l2 A G) (rr_l2 A G))
         (Point.x (rr_mid A G))) (Point.x A).
   Proof. unfold rr_next. apply (padd_x (rr_mid A G) A). Qed.
-
-  Lemma nxt_y_def (A G : Point.t) :
-    Point.y (rr_next A G) =
-      BinOp.sub
-        (BinOp.mul (rr_l2 A G)
-          (BinOp.sub (Point.x (rr_mid A G)) (Point.x (rr_next A G))))
-        (Point.y (rr_mid A G)).
-  Proof. unfold rr_next. apply (padd_y (rr_mid A G) A). Qed.
-
-  (** The second chord's exactness in reduced form. *)
-  Lemma chord2_def (A G : Point.t)
-      (Hnd : BinOp.sub (Point.x (rr_mid A G)) (Point.x A) <> 0) :
-    BinOp.mul (rr_l2 A G)
-      (BinOp.sub (Point.x (rr_mid A G)) (Point.x A)) =
-    BinOp.sub (Point.y (rr_mid A G)) (Point.y A).
-  Proof.
-    unfold rr_l2.
-    rewrite div_mul.
-    - apply FieldRewrite.from_sub.
-    - unfold Primes.pallas_p, Primes.t_p; lia.
-    - unfold BinOp.sub; rewrite Zdiv.Zmod_mod; exact Hnd.
-  Qed.
 
   (** The two gradients and the field division are opaque to the kernel from
       here on: the mod-stripping [setoid_rewrite] of [mod_ring_solve] matches

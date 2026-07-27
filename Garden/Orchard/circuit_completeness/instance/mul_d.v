@@ -5,7 +5,7 @@
     index); the four ranges compile in parallel and are joined by
     [OrchardCompletenessInstanceDefs.mul_ranges_sound]. *)
 
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
 Require Import Stdlib.Lists.List.

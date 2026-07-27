@@ -53,15 +53,15 @@ Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.ownership.var_base_defs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Import Garden.Orchard.circuit_completeness.forward.sinsemilla.
 Require Import Garden.Orchard.circuit_completeness.forward.var_base_ladder.
@@ -140,9 +140,6 @@ Module OrchardWitnessVarBase.
   Lemma pallas_mul_zero (P : Pallas.point) : Pallas.mul 0 P = Pallas.identity.
   Proof. reflexivity. Qed.
   Strategy opaque [Pallas.mul Weierstrass.mul].
-
-  Lemma mrep_zero (B : Point.t) : mrep B 0 = EccSpec.identity.
-  Proof. unfold mrep. rewrite pallas_mul_zero. reflexivity. Qed.
 
   (** The signed base of a bit: [[2k − 1] B]. *)
   Lemma mrep_signed (B : Point.t) (HB : point_ok B) (bit : Z)

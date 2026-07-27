@@ -57,6 +57,7 @@ Require Import Garden.Field.Lemmas.
 Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
+Require Import Garden.Orchard.circuit_completeness.forward.arith.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
@@ -91,17 +92,17 @@ Require Import Garden.Orchard.circuit_proof.ladder.value_commit_r.
 Require Import Garden.Orchard.circuit_proof.ladder.value_commit_v.
 Require Import Garden.Orchard.circuit_proof.ladder.nullifier_k.
 Require Import Garden.Orchard.circuit_proof.ladder.note_commit_r.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_witness_io.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_witness_io.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_poseidon_nullifier.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
@@ -396,13 +397,6 @@ Module OrchardCompletenessForwardEccAdd.
     0 <= Point.y P < Primes.pallas_p /\
     CompleteAdditionCompleteness.on_curve_or_identity (Point.x P) (Point.y P).
 
-  Lemma from_minus_self (a : Z) : UnOp.from a -F a = 0.
-  Proof.
-    unfold UnOp.from, BinOp.sub.
-    rewrite Zminus_mod_idemp_l, Z.sub_diag.
-    apply Zmod_0_l.
-  Qed.
-
   (** The twelve complete-addition constraint bodies, at the honest cells of
       operands [p], [q] and output [EccSpec.point_add p q]. *)
   Lemma cadd_eval (Γ : Assignment.t columns RegionId.t)
@@ -633,13 +627,10 @@ Module OrchardCompletenessForwardEccAdd.
     UnOp.from (Point.x P) = Point.x P /\
     UnOp.from (Point.y P) = Point.y P.
 
-  Lemma pallas_p_pos : 0 < Primes.pallas_p.
-  Proof. unfold Primes.pallas_p, Primes.t_p; lia. Qed.
-
   Lemma reduced_bounds (x : Z) :
     UnOp.from x = x -> 0 <= x < Primes.pallas_p.
   Proof.
-    intro H. rewrite <- H. apply Z.mod_pos_bound. exact pallas_p_pos.
+    intro H. rewrite <- H. apply Z.mod_pos_bound. exact OrchardForwardArith.pallas_p_pos.
   Qed.
 
   Lemma wgood_cadd_input (P : Point.t) : wgood P -> cadd_input_ok P.
@@ -650,7 +641,7 @@ Module OrchardCompletenessForwardEccAdd.
       change (PallasModel.repr Weierstrass.Infinity) with
         {| Point.x := 0; Point.y := 0 |}.
       cbn [Point.x Point.y].
-      pose proof pallas_p_pos as Hp.
+      pose proof OrchardForwardArith.pallas_p_pos as Hp.
       refine (conj _ (conj _ _)).
       + lia.
       + lia.
@@ -717,7 +708,7 @@ Module OrchardCompletenessForwardEccAdd.
     set (B := x *F x *F x) in *.
     clearbody A B.
     unfold BinOp.add, BinOp.sub, UnOp.from in *.
-    pose proof pallas_p_pos as Hp.
+    pose proof OrchardForwardArith.pallas_p_pos as Hp.
     pose proof (Z.mod_pos_bound (A - B) Primes.pallas_p Hp).
     pose proof (Z.mod_pos_bound A Primes.pallas_p Hp).
     pose proof (Z.mod_pos_bound B Primes.pallas_p Hp).
@@ -807,12 +798,6 @@ Module OrchardCompletenessForwardEccAdd.
     cbn beta in H.
     rewrite Z2Nat.id in H by lia.
     exact H.
-  Qed.
-
-  Lemma merkle_Q_affine : pt_affine_ok merkle_Q.
-  Proof.
-    apply pt_affine_b_ok.
-    vm_cast_no_check (@eq_refl bool true).
   Qed.
 
   Lemma note_commit_q_affine :
@@ -1182,11 +1167,6 @@ Module OrchardCompletenessForwardEccAdd.
       [w]; the equations below are definitional and pin the spellings the
       region branches rewrite with. *)
 
-  Lemma advice_read (w : HonestInput) :
-    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice) =
-    advice_t w (tables_of w).
-  Proof. reflexivity. Qed.
-
   Lemma t_sa_leg_eq (w : HonestInput) :
     t_sa_leg (tables_of w) =
     leg_of OrchardAdviceEccMuls.tbl_spend_auth
@@ -1279,11 +1259,6 @@ Module OrchardCompletenessForwardEccAdd.
     t_ncn_pt (tables_of w) =
     EccSpec.point_add (leg_pt (t_ncn_leg (tables_of w)) 84%nat)
       (leg_acc (t_ncn_leg (tables_of w)) 83%nat).
-  Proof. reflexivity. Qed.
-
-  Lemma t_rk_pt_eq (w : HonestInput) :
-    t_rk_pt (tables_of w) =
-    EccSpec.point_add (t_sa_comm (tables_of w)) (hi_ak w).
   Proof. reflexivity. Qed.
 
   Lemma t_nc_old_hash_eq (w : HonestInput) :

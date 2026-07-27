@@ -70,7 +70,7 @@ not symmetric in the stream they cover: `operational_sound` takes the
 constants block as an extra event input (below), while
 `operational_complete` is stated at the synthesis stream alone, so a circuit
 whose checked stream carries a constants tail discharges that tail's copy
-obligations separately (`circuit-completeness.md`, "Which bridge theorem
+obligations separately (`orchard-completeness-proof.md`, "Which bridge theorem
 applies"). Three
 supporting layers carry the proof: value agreement of the two interpreters
 (`realize/value.v`), the program-determined facts pinned by the replay
@@ -177,7 +177,7 @@ to a deployed prover is recorded, not hidden:
   things: soundness says acceptance implies the theorems, completeness says
   the honest witness is accepted. Completeness is a non-vacuity result — it
   does not constrain what else the checker accepts. See
-  [`circuit-completeness.md`](circuit-completeness.md).
+  [`orchard-completeness-proof.md`](orchard-completeness-proof.md).
 - No cryptography is verified here: connecting mock acceptance to real
   proof verification — selector compression, the permutation argument's
   grand products, polynomial commitments, Fiat–Shamir — is the verified
@@ -197,4 +197,4 @@ to a deployed prover is recorded, not hidden:
 | `Halo2/realize/disjoint.v` | `replay_is_ok_conflict_free`, `layouter_replay_succeeds` |
 | `Halo2/realize/smoke.v` | add-chip replay instance |
 | `Orchard/circuit_operational.v` | `orchard_replay_ok`, `orchard_operational_sound`, `orchard_action_statement_operational` |
-| `Orchard/circuit_completeness/operational/` | the completeness mirror: `orchard_grid_identification`, `orchard_operational_complete` (see `circuit-completeness.md`) |
+| `Orchard/circuit_completeness/operational/` | the completeness mirror: `orchard_grid_identification`, `orchard_operational_complete` (see `orchard-completeness-proof.md`) |
