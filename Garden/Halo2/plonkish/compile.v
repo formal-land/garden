@@ -67,25 +67,6 @@ Import Plonkish.
     the qualified [List.fold_left]; the alias pins the standard one. *)
 Module StdList := Stdlib.Lists.List.
 
-(** ** The replacement map of a compiled system
-
-    The selector-to-expression substitution [Compile.compile] applies,
-    read off the per-selector assignments of the compiled output. *)
-
-Definition assignment_replacement
-    (assignments : list SelectorAssignment.t)
-    (s : Z)
-    : option (Expression.t Configure.indexed_columns) :=
-  match
-    List.find
-      (fun assignment =>
-        assignment.(SelectorAssignment.selector) =? s)
-      assignments
-  with
-  | Some assignment => Some assignment.(SelectorAssignment.expression)
-  | None => None
-  end.
-
 (** The compiled gates are exactly the flattened gate polynomials with the
     assignment replacement substituted in. *)
 Lemma compile_gates_substituted
@@ -98,12 +79,12 @@ Lemma compile_gates_substituted
     constants).(CompiledSystem.gates) =
   List.map
     (substitute_selectors
-      (assignment_replacement
+      (Compile.assignment_replacement
         (Compile.compile system infos num_fixed_columns permutation_columns
           constants).(CompiledSystem.selector_assignments)))
     (gate_polys system).
 Proof.
-  unfold Compile.compile, assignment_replacement.
+  unfold Compile.compile, Compile.assignment_replacement.
   cbv zeta.
   destruct (Compress.process _ _ _) as [combinations assignments].
   reflexivity.
@@ -205,7 +186,7 @@ Definition gates_substitution_ok_b
     (system : ConstraintSystem.t Configure.indexed_columns)
     : bool :=
   List.forallb
-    (substitution_multiplicative_b (assignment_replacement assignments))
+    (substitution_multiplicative_b (Compile.assignment_replacement assignments))
     (gate_polys system).
 
 (** ** Flattened systems
@@ -1048,14 +1029,14 @@ Section WithPrime.
         grid.(RawGrid.sel) s row =
         (if List.nth (Z.to_nat row) (activations s) false then 1 else 0)) :
     forall (s : Z) (e : Expression.t Configure.indexed_columns),
-      assignment_replacement assignments s = Some e ->
+      Compile.assignment_replacement assignments s = Some e ->
       (eval_selector (grid_assignment grid) (tt, row) s = 0 /\
         eval_expression (grid_assignment grid) (tt, row) e = 0) \/
       (eval_selector (grid_assignment grid) (tt, row) s = 1 /\
         eval_expression (grid_assignment grid) (tt, row) e <> 0).
   Proof.
     intros s e Hrepl.
-    unfold assignment_replacement in Hrepl.
+    unfold Compile.assignment_replacement in Hrepl.
     destruct (List.find _ assignments) as [assignment |] eqn:Hfind;
       [| discriminate].
     injection Hrepl as <-.
@@ -1407,7 +1388,7 @@ Section WithPrime.
     assert (Hval_row : forall row : Z,
       0 <= row < Domain.n domain ->
       forall (s : Z) (e : Expression.t Configure.indexed_columns),
-        assignment_replacement
+        Compile.assignment_replacement
           compiled.(CompiledSystem.selector_assignments) s = Some e ->
         (eval_selector (grid_assignment grid) (tt, row) s = 0 /\
           eval_expression (grid_assignment grid) (tt, row) e = 0) \/
@@ -1428,7 +1409,7 @@ Section WithPrime.
         List.In poly (gate_polys system) ->
         (eval_expression (grid_assignment grid) (tt, row)
           (substitute_selectors
-            (assignment_replacement
+            (Compile.assignment_replacement
               compiled.(CompiledSystem.selector_assignments))
             poly) = 0 <->
         eval_expression (grid_assignment grid) (tt, row) poly = 0)).

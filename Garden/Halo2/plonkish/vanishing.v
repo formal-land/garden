@@ -100,31 +100,6 @@ Section WithPrime.
     apply Poly.coef_ge. exact Hi.
   Qed.
 
-  Lemma NoDup_map_of_nat (l : list nat) :
-    List.NoDup l -> List.NoDup (List.map Z.of_nat l).
-  Proof.
-    induction 1 as [| a l' Hnotin Hnd IH]; [constructor |].
-    cbn [List.map]. constructor; [| exact IH].
-    intros Hin.
-    apply List.in_map_iff in Hin.
-    destruct Hin as [b [Hb Hbin]].
-    apply Nat2Z.inj in Hb. subst b. exact (Hnotin Hbin).
-  Qed.
-
-  (** The first [m] naturals are pairwise distinct mod [p] as soon as
-      [m <= p]: the challenge instantiation points of the Vandermonde
-      step. *)
-  Lemma NoDupP_of_nat_seq (m : nat) :
-    Z.of_nat m <= p -> NoDupP (List.map Z.of_nat (List.seq 0 m)).
-  Proof.
-    intros Hm. unfold Poly.NoDupP.
-    rewrite List.map_map.
-    rewrite (List.map_ext_in _ Z.of_nat).
-    - apply NoDup_map_of_nat. apply List.seq_NoDup.
-    - intros a Ha. apply List.in_seq in Ha.
-      apply Z.mod_small. lia.
-  Qed.
-
   (** ** The Vandermonde step
 
       A combination vanishing at [x] for every challenge [y] forces every
@@ -144,7 +119,7 @@ Section WithPrime.
     assert (Hnil : norm A = []).
     { apply (Poly.zero_of_roots (p := p) A
                (List.map Z.of_nat (List.seq 0 (List.length Es)))).
-      - apply NoDupP_of_nat_seq. exact Hm.
+      - apply (Poly.NoDupP_of_nat_seq (p := p)). exact Hm.
       - rewrite List.Forall_forall. intros y _. apply HA.
       - rewrite List.length_map, List.length_seq.
         eapply Nat.le_trans; [apply pdeg_le_length |].

@@ -489,27 +489,6 @@ Section WithPrime.
 
   (** ** Repetition-free lists of canonical residues *)
 
-  Lemma In_firstn {A : Set} (n : nat) (l : list A) (a : A) :
-    List.In a (List.firstn n l) -> List.In a l.
-  Proof.
-    revert n; induction l as [| b l IH]; intros n Hin;
-      destruct n; simpl in Hin; try contradiction.
-    destruct Hin as [-> | Hin];
-      [left; reflexivity | right; exact (IH n Hin)].
-  Qed.
-
-  Lemma NoDup_firstn {A : Set} (n : nat) (l : list A) :
-    List.NoDup l -> List.NoDup (List.firstn n l).
-  Proof.
-    revert n; induction l as [| a l IH]; intros n Hnd.
-    - destruct n; simpl; constructor.
-    - destruct n; simpl; [constructor |].
-      inversion Hnd as [| ? ? Hnotin Hnd']; subst.
-      constructor.
-      + intros Hin. exact (Hnotin (In_firstn n l a Hin)).
-      + exact (IH n Hnd').
-  Qed.
-
   Lemma NoDup_map_inj {A B : Set} (f : A -> B) (l : list A) :
     (forall a b, f a = f b -> a = b) ->
     List.NoDup l -> List.NoDup (List.map f l).
@@ -1616,24 +1595,31 @@ Section WithPrime.
       + intros Hc. apply Hnz. apply mul_mod_zero_r. exact Hc.
   Qed.
 
-  (** ** The per-θ multiset step
+  (** ** The per-θ multiset step, from bounded challenge pools
 
-      At a fixed [θ] with committed [A'], [S']: the rules at every regular
-      [(β, γ)] identify the [A']-factor polynomial with the input-factor
-      polynomial and the [S']-factor polynomial with the table-factor
-      polynomial (via the root bound over one more point than the degree),
-      and the permuted-column chain then carries every usable-row combined
-      input value into the combined table values. *)
-  Lemma per_theta_membership (domain : Domain.t)
+      The pool-indexed form of [per_theta_membership]: with the permuted
+      columns [A'], [S'] fixed, an accepting [(β, γ)] grid drawn from two
+      pools of [2·u + 1] residues that are pairwise distinct mod [p]
+      already identifies the factor polynomials and carries every combined
+      input value into the combined table values.  Only the pool sizes
+      matter, so the counting layer can supply explicit finite pools while
+      [per_theta_membership] instantiates both with [0 .. 2·u]. *)
+  Lemma per_theta_membership_of_pools (domain : Domain.t)
       (pairs : list ((Z -> Z) * (Z -> Z))) (theta : Z)
       (Hbf : 0 <= domain.(Domain.blinding_factors))
       (Hu : 0 <= Domain.usable_rows domain)
-      (Hp_pts :
-        Z.of_nat (2 * Z.to_nat (Domain.usable_rows domain) + 2) <= p)
       (A' S' : Z -> Z)
+      (betas gammas : list Z)
+      (Hnb : Poly.NoDupP (p := p) betas)
+      (Hlb : (2 * Z.to_nat (Domain.usable_rows domain) + 1 <=
+              List.length betas)%nat)
+      (Hng : Poly.NoDupP (p := p) gammas)
+      (Hlg : (2 * Z.to_nat (Domain.usable_rows domain) + 1 <=
+              List.length gammas)%nat)
       (Hbg : forall beta gamma : Z,
+        List.In beta betas -> List.In gamma gammas ->
         lookup_challenge_regular domain pairs theta beta gamma ->
-        exists Zp,
+        exists Zp : Z -> Z,
           lookup_rules_hold domain pairs theta beta gamma A' S' Zp) :
     forall j0 : nat, Z.of_nat j0 < Domain.usable_rows domain ->
     exists t : nat, (t < Z.to_nat (Domain.usable_rows domain))%nat /\
@@ -1696,22 +1682,16 @@ Section WithPrime.
         apply (Hg0 _ Hin_s).
         rewrite <- Hrow_eq in Hc.
         rewrite <- Hc. mod_ring_solve. }
-    (* the fixed regular γ0 *)
-    assert (Hpick_g : Z.of_nat (List.length Ns + 1) <= p)
-      by (rewrite HNs_len; lia).
-    destruct (pick_good_points Ns 1 Hpick_g)
-      as (g0l & Hg0_len & _ & _ & Hg0_avoid).
-    destruct g0l as [| gamma0 g0rest]; [cbn in Hg0_len; discriminate |].
-    assert (Hg0 : forall r, List.In r Ns -> (gamma0 - r) mod p <> 0)
-      by (intros r Hr; exact (Hg0_avoid gamma0 r (or_introl eq_refl) Hr)).
-    (* the β point family *)
-    assert (Hpick_x : Z.of_nat (List.length Na + S un) <= p)
-      by (rewrite HNa_len; lia).
-    destruct (pick_good_points Na (S un) Hpick_x)
-      as (xs & Hxs_len & Hxs_nd & Hxs_range & Hxs_avoid).
-    assert (Hxs_ndp : Poly.NoDupP (p := p) xs).
-    { apply NoDupP_of_canonical; [| exact Hxs_nd].
-      intros x Hx. apply Z.mod_small. exact (Hxs_range x Hx). }
+    (* the fixed regular γ0, drawn from the γ pool *)
+    assert (Hg0pick : exists gamma0, List.In gamma0 gammas /\
+      forall r, List.In r Ns -> (gamma0 - r) mod p <> 0).
+    { apply Poly.pool_avoid_pick; [exact Hng |].
+      rewrite HNs_len. lia. }
+    destruct Hg0pick as (gamma0 & Hg0_in & Hg0).
+    (* the β point family, drawn from the β pool *)
+    destruct (Poly.pool_avoid_sublist Na betas (S un) Hnb
+      ltac:(rewrite HNa_len; lia))
+      as (xs & Hxs_len & Hxs_ndp & Hxs_sub & Hxs_avoid).
     assert (Hxs_ne : exists x0, List.In x0 xs).
     { destruct xs as [| x0 rest]; [cbn in Hxs_len; discriminate |].
       exists x0. left. reflexivity. }
@@ -1720,7 +1700,7 @@ Section WithPrime.
     assert (Hper_x : forall x, List.In x xs ->
       exists Zp, lookup_rules_hold domain pairs theta x gamma0 A' S' Zp).
     { intros x Hx.
-      apply Hbg.
+      apply (Hbg x gamma0 (Hxs_sub x Hx) Hg0_in).
       apply Hreg_mk; [intros r Hr; exact (Hxs_avoid x r Hx Hr)
                      | exact Hg0]. }
     set (cS' := prodl (List.map (fun j => S' (Z.of_nat j) + gamma0)
@@ -1734,8 +1714,8 @@ Section WithPrime.
       (cs * Poly.eval (p := p) (Poly.prod_lin (p := p) Na) x) mod p).
     { intros x Hx.
       destruct (Hper_x x Hx) as (Zp & Hrules).
-      destruct (lookup_rules_consequences domain pairs theta x gamma0
-        A' S' Zp Hbf Hu
+      destruct (lookup_rules_consequences
+        domain pairs theta x gamma0 A' S' Zp Hbf Hu
         (Hreg_mk x gamma0 (fun r Hr => Hxs_avoid x r Hx Hr) Hg0)
         Hrules) as [Hprod _].
       fold u in Hprod. fold un in Hprod.
@@ -1754,7 +1734,8 @@ Section WithPrime.
       assert (HevA' :
         prodl (List.map (fun k => A' (Z.of_nat k) + x) (List.seq 0 un)) =
         Poly.eval (p := p) (Poly.prod_lin (p := p) NA') x)
-        by (exact (prodl_shift_eval (fun k => A' (Z.of_nat k)) un x)).
+        by (exact (prodl_shift_eval
+          (fun k => A' (Z.of_nat k)) un x)).
       assert (HevA :
         prodl (List.map
           (fun k => comb_input pairs theta (Z.of_nat k) + x)
@@ -1768,8 +1749,8 @@ Section WithPrime.
       exact Hprod. }
     (* the x0-instance factor facts *)
     destruct (Hper_x x0 Hx0_in) as (Zp0 & Hrules0).
-    destruct (lookup_rules_consequences domain pairs theta x0 gamma0
-      A' S' Zp0 Hbf Hu
+    destruct (lookup_rules_consequences
+      domain pairs theta x0 gamma0 A' S' Zp0 Hbf Hu
       (Hreg_mk x0 gamma0 (fun r Hr => Hxs_avoid x0 r Hx0_in Hr) Hg0)
       Hrules0) as [_ Hfac].
     assert (HcS'_nz : cS' <> 0).
@@ -1784,63 +1765,63 @@ Section WithPrime.
       by (rewrite HNA'_len, HNa_len; reflexivity).
     assert (Hxs_len' : List.length xs = S (List.length NA'))
       by (rewrite HNA'_len; exact Hxs_len).
-    destruct (prod_lin_scaled_agreement NA' Na xs cS' cs
-      Hwl_len Hxs_ndp Hxs_len'
-      (prodl_canonical _) (prodl_canonical _) HcS'_nz
+    destruct (prod_lin_scaled_agreement
+      NA' Na xs cS' cs Hwl_len Hxs_ndp Hxs_len'
+      (prodl_canonical _)
+      (prodl_canonical _) HcS'_nz
       Hpointwise) as [_ HpeqA].
     (* the γ point family, at the designated regular β = x0 *)
-    assert (Hpick_g2 : Z.of_nat (List.length Ns + S un) <= p)
-      by (rewrite HNs_len; lia).
-    destruct (pick_good_points Ns (S un) Hpick_g2)
-      as (gs & Hgs_len & Hgs_nd & Hgs_range & Hgs_avoid).
-    assert (Hgs_ndp : Poly.NoDupP (p := p) gs).
-    { apply NoDupP_of_canonical; [| exact Hgs_nd].
-      intros g Hg. apply Z.mod_small. exact (Hgs_range g Hg). }
+    destruct (Poly.pool_avoid_sublist Ns gammas (S un) Hng
+      ltac:(rewrite HNs_len; lia))
+      as (gs & Hgs_len & Hgs_ndp & Hgs_sub & Hgs_avoid).
     set (dA' := prodl (List.map (fun j => A' (Z.of_nat j) + x0)
       (List.seq 0 un))).
     set (da := prodl (List.map
       (fun j => comb_input pairs theta (Z.of_nat j) + x0)
       (List.seq 0 un))).
-    assert (Hpointwise_g : forall g, List.In g gs ->
-      (dA' * Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g) mod p =
-      (da * Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g) mod p).
-    { intros g Hg.
-      assert (Hreg_g : lookup_challenge_regular domain pairs theta x0 g).
+    assert (Hpointwise_g : forall g0, List.In g0 gs ->
+      (dA' * Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0) mod p =
+      (da * Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g0) mod p).
+    { intros g0 Hg.
+      assert (Hreg_g : lookup_challenge_regular domain pairs theta x0 g0).
       { apply Hreg_mk;
           [intros r Hr; exact (Hxs_avoid x0 r Hx0_in Hr)
-          | intros r Hr; exact (Hgs_avoid g r Hg Hr)]. }
-      destruct (Hbg x0 g Hreg_g) as (Zpg & Hrulesg).
-      destruct (lookup_rules_consequences domain pairs theta x0 g
-        A' S' Zpg Hbf Hu Hreg_g Hrulesg) as [Hprod _].
+          | intros r Hr; exact (Hgs_avoid g0 r Hg Hr)]. }
+      destruct (Hbg x0 g0 (Hxs_sub x0 Hx0_in) (Hgs_sub g0 Hg) Hreg_g)
+        as (Zpg & Hrulesg).
+      destruct (lookup_rules_consequences
+        domain pairs theta x0 g0 A' S' Zpg Hbf Hu Hreg_g Hrulesg)
+        as [Hprod _].
       fold u in Hprod. fold un in Hprod.
       rewrite (prodl_split
         (fun k => ((A' (Z.of_nat k) + x0) *
-                   (S' (Z.of_nat k) + g)) mod p)
+                   (S' (Z.of_nat k) + g0)) mod p)
         (fun k => A' (Z.of_nat k) + x0)
-        (fun k => S' (Z.of_nat k) + g)
+        (fun k => S' (Z.of_nat k) + g0)
         (List.seq 0 un)) in Hprod by (intros; reflexivity).
       rewrite (prodl_split
         (fun k => ((comb_input pairs theta (Z.of_nat k) + x0) *
-                   (comb_table pairs theta (Z.of_nat k) + g)) mod p)
+                   (comb_table pairs theta (Z.of_nat k) + g0)) mod p)
         (fun k => comb_input pairs theta (Z.of_nat k) + x0)
-        (fun k => comb_table pairs theta (Z.of_nat k) + g)
+        (fun k => comb_table pairs theta (Z.of_nat k) + g0)
         (List.seq 0 un)) in Hprod by (intros; reflexivity).
       assert (HevS' :
-        prodl (List.map (fun k => S' (Z.of_nat k) + g) (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g)
-        by (exact (prodl_shift_eval (fun k => S' (Z.of_nat k)) un g)).
+        prodl (List.map (fun k => S' (Z.of_nat k) + g0) (List.seq 0 un)) =
+        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0)
+        by (exact (prodl_shift_eval
+          (fun k => S' (Z.of_nat k)) un g0)).
       assert (HevS :
         prodl (List.map
-          (fun k => comb_table pairs theta (Z.of_nat k) + g)
+          (fun k => comb_table pairs theta (Z.of_nat k) + g0)
           (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g)
+        Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g0)
         by (exact (prodl_shift_eval
-          (fun k => comb_table pairs theta (Z.of_nat k)) un g)).
+          (fun k => comb_table pairs theta (Z.of_nat k)) un g0)).
       rewrite HevS', HevS in Hprod.
       fold dA' in Hprod. fold da in Hprod.
       transitivity ((prodl (List.map (fun j => A' (Z.of_nat j) + x0)
           (List.seq 0 un)) *
-        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g) mod p);
+        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0) mod p);
         [reflexivity |].
       exact Hprod. }
     assert (HdA'_nz : dA' <> 0).
@@ -1854,9 +1835,10 @@ Section WithPrime.
       by (rewrite HNS'_len, HNs_len; reflexivity).
     assert (Hgs_len' : List.length gs = S (List.length NS'))
       by (rewrite HNS'_len; exact Hgs_len).
-    destruct (prod_lin_scaled_agreement NS' Ns gs dA' da
-      Hwl_len2 Hgs_ndp Hgs_len'
-      (prodl_canonical _) (prodl_canonical _) HdA'_nz
+    destruct (prod_lin_scaled_agreement
+      NS' Ns gs dA' da Hwl_len2 Hgs_ndp Hgs_len'
+      (prodl_canonical _)
+      (prodl_canonical _) HdA'_nz
       Hpointwise_g) as [_ HpeqS].
     (* membership extraction *)
     set (v := comb_input pairs theta (Z.of_nat j0)).
@@ -1874,7 +1856,8 @@ Section WithPrime.
       Poly.eval (p := p) (Poly.prod_lin (p := p) NA') ((- v) mod p) = 0).
     { rewrite (Poly.eval_peq (p := p) _ _ ((- v) mod p) HpeqA).
       exact Hroot_a. }
-    destruct (eval_prod_lin_zero_inv NA' ((- v) mod p) Hroot_A')
+    destruct (eval_prod_lin_zero_inv
+      NA' ((- v) mod p) Hroot_A')
       as (r & Hr_in & Hr_zero).
     unfold NA' in Hr_in.
     apply List.in_map_iff in Hr_in.
@@ -1884,7 +1867,8 @@ Section WithPrime.
     assert (HvA : A' (Z.of_nat j1) mod p = v mod p).
     { apply sub_mod_zero_iff in Hr_zero.
       rewrite !Zmod_mod in Hr_zero.
-      rewrite <- (opp_mod_opp (A' (Z.of_nat j1))).
+      rewrite <- (opp_mod_opp
+        (A' (Z.of_nat j1))).
       rewrite <- Hr_zero.
       apply opp_mod_opp. }
     (* the chain into the S' values *)
@@ -1892,7 +1876,8 @@ Section WithPrime.
       by (clear -Hun Hj1; rewrite <- Hun; apply Nat2Z.inj_lt; lia).
     assert (Hj1u' : Z.of_nat j1 < Domain.usable_rows domain)
       by (exact Hj1u).
-    destruct (permuted_chain domain pairs theta x0 gamma0 A' S' Zp0
+    destruct (permuted_chain
+      domain pairs theta x0 gamma0 A' S' Zp0
       Hbf Hu Hrules0 j1 Hj1u') as (j' & Hj'le & HAS).
     assert (HvS : S' (Z.of_nat j') mod p = v mod p)
       by (rewrite <- HAS; exact HvA).
@@ -1911,7 +1896,8 @@ Section WithPrime.
       Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) ((- v) mod p) = 0).
     { rewrite <- (Poly.eval_peq (p := p) _ _ ((- v) mod p) HpeqS).
       exact Hroot_S'. }
-    destruct (eval_prod_lin_zero_inv Ns ((- v) mod p) Hroot_s)
+    destruct (eval_prod_lin_zero_inv
+      Ns ((- v) mod p) Hroot_s)
       as (r2 & Hr2_in & Hr2_zero).
     unfold Ns in Hr2_in.
     apply List.in_map_iff in Hr2_in.
@@ -1923,13 +1909,50 @@ Section WithPrime.
     assert (Hct : comb_table pairs theta (Z.of_nat t) mod p = v mod p).
     { apply sub_mod_zero_iff in Hr2_zero.
       rewrite !Zmod_mod in Hr2_zero.
-      rewrite <- (opp_mod_opp (comb_table pairs theta (Z.of_nat t))).
+      rewrite <- (opp_mod_opp
+        (comb_table pairs theta (Z.of_nat t))).
       rewrite <- Hr2_zero.
       apply opp_mod_opp. }
     unfold v in Hct.
-    unfold comb_input, comb_table in Hct |- *.
+    unfold comb_input, comb_table
+      in Hct |- *.
     rewrite !comb_canonical in Hct.
     symmetry. exact Hct.
+  Qed.
+
+  (** ** The per-θ multiset step
+
+      At a fixed [θ] with committed [A'], [S']: the rules at every regular
+      [(β, γ)] identify the [A']-factor polynomial with the input-factor
+      polynomial and the [S']-factor polynomial with the table-factor
+      polynomial (via the root bound over one more point than the degree),
+      and the permuted-column chain then carries every usable-row combined
+      input value into the combined table values. *)
+  Lemma per_theta_membership (domain : Domain.t)
+      (pairs : list ((Z -> Z) * (Z -> Z))) (theta : Z)
+      (Hbf : 0 <= domain.(Domain.blinding_factors))
+      (Hu : 0 <= Domain.usable_rows domain)
+      (Hp_pts :
+        Z.of_nat (2 * Z.to_nat (Domain.usable_rows domain) + 2) <= p)
+      (A' S' : Z -> Z)
+      (Hbg : forall beta gamma : Z,
+        lookup_challenge_regular domain pairs theta beta gamma ->
+        exists Zp,
+          lookup_rules_hold domain pairs theta beta gamma A' S' Zp) :
+    forall j0 : nat, Z.of_nat j0 < Domain.usable_rows domain ->
+    exists t : nat, (t < Z.to_nat (Domain.usable_rows domain))%nat /\
+      comb_input pairs theta (Z.of_nat j0) =
+      comb_table pairs theta (Z.of_nat t).
+  Proof.
+    set (un := Z.to_nat (Domain.usable_rows domain)) in *.
+    set (pool := List.map Z.of_nat (List.seq 0 (2 * un + 1))).
+    assert (Hnd : Poly.NoDupP (p := p) pool).
+    { apply Poly.NoDupP_of_nat_seq. lia. }
+    assert (Hlen : (2 * un + 1 <= List.length pool)%nat).
+    { unfold pool. rewrite List.length_map, List.length_seq. lia. }
+    apply (per_theta_membership_of_pools domain pairs theta Hbf Hu A' S'
+             pool pool Hnd Hlen Hnd Hlen).
+    intros beta gamma _ _ Hreg. exact (Hbg beta gamma Hreg).
   Qed.
 
   (** ** Soundness: the five rules force membership

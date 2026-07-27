@@ -260,39 +260,6 @@ Proof.
     intros x y Hx Hy. apply Hinj; right; assumption.
 Qed.
 
-Lemma NoDup_map_of_nat (l : list nat) :
-  NoDup l -> NoDup (List.map Z.of_nat l).
-Proof.
-  induction 1 as [| a l' Hnotin Hnd IH]; [constructor |].
-  cbn [List.map]. constructor; [| exact IH].
-  intro Hin. apply in_map_iff in Hin. destruct Hin as [b [Hb Hbin]].
-  apply Nat2Z.inj in Hb. subst b. exact (Hnotin Hbin).
-Qed.
-
-Lemma filter_split_length {A : Type} (f : A -> bool) (l : list A) :
-  List.length l
-    = (List.length (List.filter f l)
-       + List.length (List.filter (fun x => negb (f x)) l))%nat.
-Proof.
-  induction l as [| a l IH]; cbn; [reflexivity |].
-  destruct (f a); cbn; lia.
-Qed.
-
-Lemma NoDup_map_filter {A B : Type} (h : A -> B) (q : A -> bool)
-    (l : list A) :
-  NoDup (List.map h l) -> NoDup (List.map h (List.filter q l)).
-Proof.
-  induction l as [| x l' IH]; cbn; intro Hnd; [constructor |].
-  inversion Hnd as [| ? ? Hnotin Hnd']; subst.
-  destruct (q x); cbn.
-  - constructor; [| exact (IH Hnd')].
-    intro Hin. apply Hnotin.
-    apply in_map_iff in Hin. destruct Hin as [y [Hy Hyin]].
-    apply filter_In in Hyin. destruct Hyin as [Hyin _].
-    rewrite <- Hy. apply in_map. exact Hyin.
-  - exact (IH Hnd').
-Qed.
-
 Section WithPrime.
   Context {p : Z} `{Prime p}.
 
@@ -452,39 +419,6 @@ Section WithPrime.
     rewrite (map_ext_in (fun x : nat => Z.of_nat x mod p) Z.of_nat).
     - apply NoDup_map_of_nat. apply seq_NoDup.
     - intros a Ha. apply in_seq in Ha. apply Z.mod_small. lia.
-  Qed.
-
-  (** In a pool of distinct residues, at most [length bad] elements are
-      congruent to a member of [bad]: the avoiding filter keeps at least
-      [length pool - length bad] elements. *)
-  Lemma filter_avoid_length (bad pool : list Z) :
-    NoDup (List.map (fun x => x mod p) pool) ->
-    (List.length pool - List.length bad
-      <= List.length
-           (List.filter
-             (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
-             pool))%nat.
-  Proof.
-    intro Hnd.
-    set (f := fun x => negb (List.existsb (fun r => (x - r) mod p =? 0) bad)).
-    assert (Hbound :
-      (List.length (List.filter (fun x => negb (f x)) pool)
-        <= List.length bad)%nat).
-    { rewrite <- (length_map (fun x => x mod p)
-        (List.filter (fun x => negb (f x)) pool)).
-      rewrite <- (length_map (fun x => x mod p) bad).
-      apply NoDup_incl_length.
-      - apply NoDup_map_filter. exact Hnd.
-      - intros v Hv. apply in_map_iff in Hv. destruct Hv as [y [Hy Hyin]].
-        apply filter_In in Hyin. destruct Hyin as [Hyin Hyf].
-        unfold f in Hyf. rewrite negb_involutive in Hyf.
-        apply existsb_exists in Hyf. destruct Hyf as [r [Hr Hyr]].
-        apply Z.eqb_eq in Hyr.
-        change ((y - r) mod p) with (BinOp.sub (p := p) y r) in Hyr.
-        apply sub_zero_equiv in Hyr. unfold UnOp.from in Hyr.
-        rewrite <- Hy, Hyr.
-        exact (in_map (fun x => x mod p) bad r Hr). }
-    pose proof (filter_split_length f pool). lia.
   Qed.
 
   (** Evaluating a product of monic linear factors is the field product of
@@ -1067,6 +1001,101 @@ Section WithPrime.
         roots of the identity-side product — at least [N + 1] of the
         [2N + 1] pool points — so it is the zero polynomial. *)
 
+    (** ** The product identity from a bounded challenge pool
+
+        The pool-indexed form of [products_eq_all] at a fixed [β]: a
+        [γ]-pool of [2·N + 1] residues that are pairwise distinct mod [p]
+        already forces [iprod β = sprod β] everywhere, since more than [N]
+        of its members avoid the [N] roots of the input factor. *)
+    (** At a fixed [β], the total-product disjunction on a [γ] pool of
+        [2·N + 1] distinct residues forces the total identity at every
+        [γ] — the generalized [products_eq_all]: at least
+        [N + 1] pool points avoid the [N] roots of the identity-side
+        product, and the difference of the two monic products (degree
+        [N + 1]) vanishes on all of them. *)
+    Lemma products_eq_of_pool (beta : Z) (gammas : list Z)
+        (Hnd : Poly.NoDupP (p := p) gammas)
+        (Hlen : (2 * List.length all_cells + 1 <= List.length gammas)%nat)
+        (Hor : forall gamma, List.In gamma gammas ->
+          iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
+      forall gamma : Z, iprod beta gamma = sprod beta gamma.
+    Proof.
+      intros gamma.
+      set (good := List.filter
+        (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z)
+          (iroots beta)))
+        gammas).
+      assert (Hgood :
+        (List.length all_cells + 1 <= List.length good)%nat).
+      { pose proof (Poly.filter_avoid_length (p := p)
+          (iroots beta) gammas Hnd) as Hfl.
+        unfold good.
+        rewrite (iroots_length beta) in Hfl.
+        lia. }
+      assert (Hroots : forall x, List.In x good ->
+        Poly.eval (p := p)
+          (Poly.psub (p := p) (Poly.prod_lin (p := p) (iroots beta))
+            (Poly.prod_lin (p := p) (sroots beta))) x = 0).
+      { intros x Hx.
+        apply List.filter_In in Hx.
+        destruct Hx as [Hxin Hav].
+        assert (HPD : Poly.eval (p := p)
+          (Poly.prod_lin (p := p) (iroots beta)) x <> 0).
+        { intro Hz.
+          apply prod_lin_root_of_zero in Hz.
+          destruct Hz as [r [Hr Hxr]].
+          assert (Hex : List.existsb (fun r0 => ((x - r0) mod p =? 0)%Z)
+            (iroots beta) = true).
+          { apply List.existsb_exists.
+            exists r.
+            split; [exact Hr | apply Z.eqb_eq; exact Hxr]. }
+          rewrite Hex in Hav.
+          discriminate. }
+        destruct (Hor x Hxin) as [H0 | Heqx].
+        - exfalso.
+          apply HPD.
+          rewrite <- (iprod_eval beta x).
+          exact H0.
+        - rewrite Poly.eval_psub.
+          rewrite <- (iprod_eval beta x).
+          rewrite <- (sprod_eval beta x).
+          rewrite Heqx, Z.sub_diag.
+          apply Zmod_0_l. }
+      assert (Hzero : Poly.norm (p := p)
+        (Poly.psub (p := p) (Poly.prod_lin (p := p) (iroots beta))
+          (Poly.prod_lin (p := p) (sroots beta))) = []).
+      { apply (Poly.zero_of_roots (p := p) _ good).
+        - unfold Poly.NoDupP, good.
+          apply NoDup_map_filter.
+          exact Hnd.
+        - rewrite List.Forall_forall. exact Hroots.
+        - pose proof (Poly.pdeg_psub_le (p := p)
+            (Poly.prod_lin (p := p) (iroots beta))
+            (Poly.prod_lin (p := p) (sroots beta))) as Hle.
+          pose proof (proj2 (Poly.prod_lin_monic (p := p) (iroots beta)))
+            as Hd1.
+          pose proof (proj2 (Poly.prod_lin_monic (p := p) (sroots beta)))
+            as Hd2.
+          rewrite (iroots_length beta) in Hd1.
+          rewrite (sroots_length beta) in Hd2.
+          lia. }
+      rewrite (iprod_eval beta gamma).
+      rewrite (sprod_eval beta gamma).
+      pose proof (Poly.eval_norm_nil (p := p) _ gamma Hzero) as He0.
+      rewrite Poly.eval_psub in He0.
+      change ((Poly.eval (p := p) (Poly.prod_lin (p := p) (iroots beta)) gamma
+        - Poly.eval (p := p) (Poly.prod_lin (p := p) (sroots beta)) gamma)
+          mod p)
+        with (BinOp.sub (p := p)
+          (Poly.eval (p := p) (Poly.prod_lin (p := p) (iroots beta)) gamma)
+          (Poly.eval (p := p) (Poly.prod_lin (p := p) (sroots beta)) gamma))
+        in He0.
+      apply sub_zero_equiv in He0.
+      unfold UnOp.from in He0.
+      rewrite !Poly.eval_canonical in He0.
+      exact He0.
+    Qed.
+
     Lemma products_eq_all
         (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
         (Hor : forall beta gamma,
@@ -1074,59 +1103,10 @@ Section WithPrime.
       forall beta gamma, iprod beta gamma = sprod beta gamma.
     Proof.
       intros beta gamma.
-      pose proof (prime_range (p := p)) as Hp1.
-      set (good := List.filter
-        (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z)
-          (iroots beta)))
-        (zpool (2 * List.length all_cells + 1))).
-      assert (Hgood : (List.length all_cells + 1 <= List.length good)%nat).
-      { pose proof (filter_avoid_length (iroots beta)
-          (zpool (2 * List.length all_cells + 1))
-          (zpool_NoDup_mod (2 * List.length all_cells + 1) ltac:(lia)))
-          as Hfl.
-        unfold good.
-        rewrite zpool_length, iroots_length in Hfl. lia. }
-      assert (Hroots : forall x, In x good ->
-        peval (psub (prod_lin (iroots beta)) (prod_lin (sroots beta))) x = 0).
-      { intros x Hx.
-        apply filter_In in Hx. destruct Hx as [_ Hav].
-        assert (HPD : peval (prod_lin (iroots beta)) x <> 0).
-        { intro Hz. apply prod_lin_root_of_zero in Hz.
-          destruct Hz as [r [Hr Hxr]].
-          assert (Hex : List.existsb (fun r0 => ((x - r0) mod p =? 0)%Z)
-            (iroots beta) = true).
-          { apply existsb_exists. exists r.
-            split; [exact Hr | apply Z.eqb_eq; exact Hxr]. }
-          rewrite Hex in Hav. discriminate. }
-        destruct (Hor beta x) as [H0 | Heqx].
-        - exfalso. apply HPD. rewrite <- iprod_eval. exact H0.
-        - rewrite Poly.eval_psub.
-          rewrite <- iprod_eval, <- sprod_eval, Heqx, Z.sub_diag.
-          apply Zmod_0_l. }
-      assert (Hzero : pnorm
-        (psub (prod_lin (iroots beta)) (prod_lin (sroots beta))) = []).
-      { apply (Poly.zero_of_roots _ good).
-        - unfold Poly.NoDupP, good. apply NoDup_map_filter.
-          apply zpool_NoDup_mod. lia.
-        - rewrite Forall_forall. exact Hroots.
-        - pose proof (Poly.pdeg_psub_le (p := p)
-            (prod_lin (iroots beta)) (prod_lin (sroots beta))) as Hle.
-          pose proof (proj2 (Poly.prod_lin_monic (p := p) (iroots beta)))
-            as Hd1.
-          pose proof (proj2 (Poly.prod_lin_monic (p := p) (sroots beta)))
-            as Hd2.
-          rewrite iroots_length in Hd1. rewrite sroots_length in Hd2.
-          lia. }
-      rewrite iprod_eval, sprod_eval.
-      pose proof (Poly.eval_norm_nil (p := p) _ gamma Hzero) as He0.
-      rewrite Poly.eval_psub in He0.
-      change ((peval (prod_lin (iroots beta)) gamma
-        - peval (prod_lin (sroots beta)) gamma) mod p)
-        with (BinOp.sub (p := p)
-          (peval (prod_lin (iroots beta)) gamma)
-          (peval (prod_lin (sroots beta)) gamma)) in He0.
-      apply sub_zero_equiv in He0. unfold UnOp.from in He0.
-      rewrite !Poly.eval_canonical in He0. exact He0.
+      apply (products_eq_of_pool beta (zpool (2 * List.length all_cells + 1))).
+      - unfold Poly.NoDupP. apply zpool_NoDup_mod. lia.
+      - rewrite zpool_length. lia.
+      - intros gamma0 _. apply Hor.
     Qed.
 
     (** ** Matching each σ-side factor to an identity-side factor
@@ -1139,60 +1119,84 @@ Section WithPrime.
         pool of [N + 1] challenges contains a β avoiding all of them; at
         that β the matching cell agrees with [c] in both components. *)
 
-    Lemma match_cell
-        (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
-        (Hor : forall beta gamma,
-          iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
-      forall c, In c all_cells ->
-      exists d, In d all_cells /\
+    (** ** The cell match from bounded challenge pools
+
+        The pool-indexed form of [match_cell]: a [β]-pool of [N + 1]
+        residues, each carrying a [γ]-pool that forces the product
+        identity, already matches every cell.  Only the pool sizes matter,
+        so the counting layer supplies explicit finite pools while
+        [match_cell] instantiates them with [zpool]. *)
+    (** The generalized [match_cell]: a [β] pool of
+        [N + 1] residues, each member with an accepting [γ] pool, matches
+        every enumerated cell to a cell agreeing in value and σ-label —
+        some pool [β] avoids the [≤ N] residues that could make a
+        spurious identity factor vanish. *)
+    Lemma match_cell_of_pools (betas : list Z)
+        (Hnb : Poly.NoDupP (p := p) betas)
+        (Hlb : (List.length all_cells + 1 <= List.length betas)%nat)
+        (Hslice : forall beta, List.In beta betas ->
+          exists gammas : list Z,
+            Poly.NoDupP (p := p) gammas /\
+            (2 * List.length all_cells + 1 <= List.length gammas)%nat /\
+            forall gamma, List.In gamma gammas ->
+              iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
+      forall c, List.In c all_cells ->
+      exists d, List.In d all_cells /\
         g d mod p = g c mod p /\ lbl d mod p = lbl (sigma c) mod p.
     Proof.
       intros c Hc.
-      pose proof (prime_range (p := p)) as Hp1.
-      pose proof (products_eq_all Hbig Hor) as Heq.
+      pose proof (prime_range) as Hp1.
+      assert (Heq : forall beta, List.In beta betas ->
+        forall gamma, iprod beta gamma = sprod beta gamma).
+      { intros beta Hbin gamma0.
+        destruct (Hslice beta Hbin) as (gammas & Hndg & Hleng & Hor).
+        exact (products_eq_of_pool beta gammas Hndg Hleng Hor gamma0). }
       set (bad := List.map
         (fun d => (- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)
         all_cells).
-      assert (Hpick : exists bstar,
-        List.existsb (fun r => ((bstar - r) mod p =? 0)%Z) bad = false).
-      { pose proof (filter_avoid_length bad
-          (zpool (List.length all_cells + 1))
-          (zpool_NoDup_mod (List.length all_cells + 1) ltac:(lia))) as Hfl.
-        assert (Hlb : List.length bad = List.length all_cells)
-          by (unfold bad; apply length_map).
-        rewrite zpool_length in Hfl.
-        destruct (List.filter
-          (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
-          (zpool (List.length all_cells + 1)))
-          as [| bstar rest] eqn:Egood.
-        - cbn in Hfl. lia.
-        - assert (Hin : In bstar (List.filter
-            (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
-            (zpool (List.length all_cells + 1))))
-            by (rewrite Egood; left; reflexivity).
-          apply filter_In in Hin. destruct Hin as [_ Hq].
-          apply negb_true_iff in Hq. exists bstar. exact Hq. }
-      destruct Hpick as [bstar Havoid].
-      assert (Hsfac0 : sfac bstar (- (g c + bstar * lbl (sigma c))) c = 0).
+      assert (Hpick : exists bstar, List.In bstar betas /\
+        forall r, List.In r bad -> (bstar - r) mod p <> 0).
+      { apply Poly.pool_avoid_pick; [exact Hnb |].
+        unfold bad.
+        rewrite List.length_map.
+        lia. }
+      destruct Hpick as (bstar & Hbin & Havoid).
+      assert (Hsfac0 : sfac bstar
+        (- (g c + bstar * lbl (sigma c))) c = 0).
       { unfold sfac.
         replace (g c + bstar * lbl (sigma c)
           + - (g c + bstar * lbl (sigma c))) with 0 by ring.
         apply Zmod_0_l. }
       assert (Hip0 : iprod bstar (- (g c + bstar * lbl (sigma c))) = 0).
-      { rewrite Heq. unfold sprod. apply fprod_zero_iff.
-        exists (sfac bstar (- (g c + bstar * lbl (sigma c))) c). split.
-        - apply in_map. exact Hc.
+      { rewrite (Heq bstar Hbin).
+        unfold sprod.
+        apply fprod_zero_iff.
+        exists (sfac bstar
+          (- (g c + bstar * lbl (sigma c))) c).
+        split.
+        - apply List.in_map. exact Hc.
         - rewrite Hsfac0. apply Zmod_0_l. }
-      unfold iprod in Hip0. apply fprod_zero_iff in Hip0.
+      unfold iprod in Hip0.
+      apply fprod_zero_iff in Hip0.
       destruct Hip0 as [v [Hvin Hvm]].
-      apply in_map_iff in Hvin. destruct Hvin as [d [Hvd Hdin]]. subst v.
-      assert (Hifac0 : ifac bstar (- (g c + bstar * lbl (sigma c))) d = 0).
-      { unfold ifac in *. rewrite Zmod_mod in Hvm. exact Hvm. }
+      apply List.in_map_iff in Hvin.
+      destruct Hvin as [d [Hvd Hdin]].
+      subst v.
+      assert (Hifac0 : ifac bstar
+        (- (g c + bstar * lbl (sigma c))) d = 0).
+      { unfold ifac in *.
+        rewrite Zmod_mod in Hvm.
+        exact Hvm. }
       assert (Hkey : ((g d - g c)
         + bstar * (lbl d - lbl (sigma c))) mod p = 0).
-      { rewrite <- Hifac0. unfold ifac. f_equal. ring. }
+      { rewrite <- Hifac0.
+        unfold ifac.
+        f_equal.
+        ring. }
       destruct (Z.eq_dec ((lbl d - lbl (sigma c)) mod p) 0) as [Hld | Hld].
-      - exists d. split; [exact Hdin |]. split.
+      - exists d.
+        split; [exact Hdin |].
+        split.
         + assert (Hgd : (g d - g c) mod p = 0).
           { replace (g d - g c)
               with (((g d - g c) + bstar * (lbl d - lbl (sigma c)))
@@ -1200,15 +1204,20 @@ Section WithPrime.
             rewrite Zminus_mod, Hkey.
             assert (Hmx : (bstar * (lbl d - lbl (sigma c))) mod p = 0)
               by (rewrite Zmult_mod, Hld, Z.mul_0_r; reflexivity).
-            rewrite Hmx. reflexivity. }
+            rewrite Hmx.
+            reflexivity. }
           change ((g d - g c) mod p)
             with (BinOp.sub (p := p) (g d) (g c)) in Hgd.
-          apply sub_zero_equiv in Hgd. unfold UnOp.from in Hgd. exact Hgd.
+          apply sub_zero_equiv in Hgd.
+          unfold UnOp.from in Hgd.
+          exact Hgd.
         + change ((lbl d - lbl (sigma c)) mod p)
             with (BinOp.sub (p := p) (lbl d) (lbl (sigma c))) in Hld.
-          apply sub_zero_equiv in Hld. unfold UnOp.from in Hld. exact Hld.
+          apply sub_zero_equiv in Hld.
+          unfold UnOp.from in Hld.
+          exact Hld.
       - exfalso.
-        pose proof (mod_inverse_mul_prime (p := p)
+        pose proof (mod_inverse_mul_prime
           (lbl d - lbl (sigma c)) Hld) as Hinv.
         unfold BinOp.mul in Hinv.
         assert (Hby : (bstar * (lbl d - lbl (sigma c))) mod p
@@ -1220,14 +1229,16 @@ Section WithPrime.
           rewrite Zminus_mod, Hkey, (Zminus_mod 0 (g d - g c)), Zmod_0_l.
           reflexivity. }
         assert (Hbstar : bstar mod p
-          = ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p) mod p).
+          = ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)
+              mod p).
         { transitivity ((bstar * (mod_inverse (lbl d - lbl (sigma c)) p
             * (lbl d - lbl (sigma c)))) mod p).
           - symmetry.
             rewrite <- (Zmult_mod_idemp_r
               (mod_inverse (lbl d - lbl (sigma c)) p
                 * (lbl d - lbl (sigma c))) bstar).
-            rewrite Hinv, Z.mul_1_r. reflexivity.
+            rewrite Hinv, Z.mul_1_r.
+            reflexivity.
           - replace (bstar * (mod_inverse (lbl d - lbl (sigma c)) p
               * (lbl d - lbl (sigma c))))
               with ((bstar * (lbl d - lbl (sigma c)))
@@ -1236,17 +1247,32 @@ Section WithPrime.
               (bstar * (lbl d - lbl (sigma c)))
               (mod_inverse (lbl d - lbl (sigma c)) p)).
             rewrite Hby.
-            rewrite Zmult_mod_idemp_l. reflexivity. }
-        assert (Hex : List.existsb (fun r => ((bstar - r) mod p =? 0)%Z) bad
-          = true).
-        { apply existsb_exists.
-          exists ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p).
-          split.
-          - unfold bad.
-            exact (in_map _ all_cells d Hdin).
-          - apply Z.eqb_eq.
-            rewrite Zminus_mod, Hbstar, Z.sub_diag. apply Zmod_0_l. }
-        rewrite Hex in Havoid. discriminate.
+            rewrite Zmult_mod_idemp_l.
+            reflexivity. }
+        apply (Havoid
+          ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)).
+        + unfold bad.
+          exact (List.in_map _ all_cells d Hdin).
+        + rewrite Zminus_mod, Hbstar, Z.sub_diag.
+          apply Zmod_0_l.
+    Qed.
+
+    Lemma match_cell
+        (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
+        (Hor : forall beta gamma,
+          iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
+      forall c, In c all_cells ->
+      exists d, In d all_cells /\
+        g d mod p = g c mod p /\ lbl d mod p = lbl (sigma c) mod p.
+    Proof.
+      apply (match_cell_of_pools (zpool (List.length all_cells + 1))).
+      - unfold Poly.NoDupP. apply zpool_NoDup_mod. lia.
+      - rewrite zpool_length. lia.
+      - intros beta _.
+        exists (zpool (2 * List.length all_cells + 1)).
+        split; [unfold Poly.NoDupP; apply zpool_NoDup_mod; lia |].
+        split; [rewrite zpool_length; lia |].
+        intros gamma _. apply Hor.
     Qed.
 
     (** ** Soundness: the all-challenge rules force σ-invariance

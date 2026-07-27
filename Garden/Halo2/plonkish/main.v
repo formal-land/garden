@@ -691,6 +691,22 @@ Module Compile.
         |})
       (enumerate infos).
 
+  (** The selector-to-expression substitution read off a compiled
+      output's per-selector assignments. *)
+  Definition assignment_replacement
+      (assignments : list SelectorAssignment.t)
+      (s : Z)
+      : option (Expression.t Configure.indexed_columns) :=
+    match
+      List.find
+        (fun assignment =>
+          assignment.(SelectorAssignment.selector) =? s)
+        assignments
+    with
+    | Some assignment => Some assignment.(SelectorAssignment.expression)
+    | None => None
+    end.
+
   (** The compilation proper: compute the per-selector degrees, run the
       packing at the system degree, and substitute the assignment
       expressions into every gate polynomial and lookup input.  The
@@ -709,16 +725,7 @@ Module Compile.
     let max_degree := system_degree system in
     let '(combinations, assignments) :=
       Compress.process descriptions max_degree num_fixed_columns in
-    let replacement := fun s =>
-      match
-        List.find
-          (fun assignment =>
-            assignment.(SelectorAssignment.selector) =? s)
-          assignments
-      with
-      | Some assignment => Some assignment.(SelectorAssignment.expression)
-      | None => None
-      end in
+    let replacement := assignment_replacement assignments in
     let gates :=
       List.map (substitute_selectors replacement) (gate_polys system) in
     let lookups :=

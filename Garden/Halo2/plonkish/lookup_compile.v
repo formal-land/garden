@@ -93,12 +93,12 @@ Lemma compile_lookups_substituted
     constants).(CompiledSystem.lookups) =
   List.map
     (substitute_lookup
-      (PlonkishCompile.assignment_replacement
+      (Compile.assignment_replacement
         (Compile.compile system infos num_fixed_columns permutation_columns
           constants).(CompiledSystem.selector_assignments)))
     system.(ConstraintSystem.lookups).
 Proof.
-  unfold Compile.compile, PlonkishCompile.assignment_replacement,
+  unfold Compile.compile, Compile.assignment_replacement,
     substitute_lookup.
   cbv zeta.
   destruct (Compress.process _ _ _) as [combinations assignments].
@@ -248,7 +248,7 @@ Section WithPrime.
       : bool :=
     List.forallb
       (fun s =>
-        match PlonkishCompile.assignment_replacement assignments s with
+        match Compile.assignment_replacement assignments s with
         | Some e =>
             List.forallb
               (fun row =>
@@ -469,7 +469,7 @@ Section WithPrime.
         (e : Expression.t Configure.indexed_columns)
         (Hs : List.In s (lookup_selectors system))
         (Hrepl :
-          PlonkishCompile.assignment_replacement assignments s = Some e) :
+          Compile.assignment_replacement assignments s = Some e) :
       eval_expression (grid_assignment cgrid) (tt, row) e =
       eval_selector (grid_assignment grid) (tt, row) s.
     Proof.
@@ -621,7 +621,7 @@ Section WithPrime.
           permutation_columns constants) as Hlookups.
       rewrite <- Hcompiled in Hlookups.
       set (replacement :=
-        PlonkishCompile.assignment_replacement
+        Compile.assignment_replacement
           compiled.(CompiledSystem.selector_assignments)) in *.
       assert (Hrow' : 0 <= row < Z.of_nat (Z.to_nat (Domain.n domain))).
       { rewrite Z2Nat.id by lia.

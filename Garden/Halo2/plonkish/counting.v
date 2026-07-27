@@ -208,64 +208,6 @@ Section WithPrime.
       any repetition-free pool with room beyond the avoided list yields a
       repetition-free selection of the requested size. *)
 
-  Lemma pool_avoid_sublist (bad pool : list Z) (k : nat)
-      (Hnd : Poly.NoDupP (p := p) pool)
-      (Hroom : (List.length bad + k <= List.length pool)%nat) :
-    exists xs : list Z,
-      List.length xs = k /\
-      Poly.NoDupP (p := p) xs /\
-      (forall x, List.In x xs -> List.In x pool) /\
-      (forall x r, List.In x xs -> List.In r bad -> (x - r) mod p <> 0).
-  Proof.
-    set (filt := List.filter
-      (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
-      pool).
-    assert (Hfl : (k <= List.length filt)%nat).
-    { pose proof (PermutationPoly.filter_avoid_length (p := p) bad pool Hnd)
-        as Havoid.
-      unfold filt. lia. }
-    exists (List.firstn k filt).
-    split; [apply List.firstn_length_le; exact Hfl |].
-    split; [| split].
-    - unfold Poly.NoDupP.
-      rewrite <- List.firstn_map.
-      apply PlonkishLookupPoly.NoDup_firstn.
-      unfold filt.
-      apply PermutationPoly.NoDup_map_filter.
-      exact Hnd.
-    - intros x Hx.
-      pose proof (PlonkishLookupPoly.In_firstn k filt x Hx) as Hxf.
-      apply List.filter_In in Hxf.
-      exact (proj1 Hxf).
-    - intros x r Hx Hr Hzero.
-      pose proof (PlonkishLookupPoly.In_firstn k filt x Hx) as Hxf.
-      apply List.filter_In in Hxf.
-      destruct Hxf as [_ Hgood].
-      apply Bool.negb_true_iff in Hgood.
-      assert (Hex : List.existsb (fun r' => ((x - r') mod p =? 0)%Z) bad
-        = true).
-      { apply List.existsb_exists.
-        exists r.
-        split; [exact Hr | apply Z.eqb_eq; exact Hzero]. }
-      congruence.
-  Qed.
-
-  Lemma pool_avoid_pick (bad pool : list Z)
-      (Hnd : Poly.NoDupP (p := p) pool)
-      (Hroom : (List.length bad < List.length pool)%nat) :
-    exists x : Z,
-      List.In x pool /\
-      forall r, List.In r bad -> (x - r) mod p <> 0.
-  Proof.
-    destruct (pool_avoid_sublist bad pool 1 Hnd ltac:(lia))
-      as (xs & Hlen & _ & Hsub & Havoid).
-    destruct xs as [| x rest]; [cbn in Hlen; discriminate |].
-    exists x.
-    split; [apply Hsub; left; reflexivity |].
-    intros r Hr.
-    exact (Havoid x r (or_introl eq_refl) Hr).
-  Qed.
-
   (** ** The vanishing family
 
       [vanishing_accepts_at Es y] is the single-challenge quotient
@@ -481,234 +423,6 @@ Section WithPrime.
         exact (Hinv (i, j) (conj Hi Hj)).
     Qed.
 
-    (** At a fixed [β], the total-product disjunction on a [γ] pool of
-        [2·N + 1] distinct residues forces the total identity at every
-        [γ] — the generalized [PermutationPoly.products_eq_all]: at least
-        [N + 1] pool points avoid the [N] roots of the identity-side
-        product, and the difference of the two monic products (degree
-        [N + 1]) vanishes on all of them. *)
-    Lemma products_eq_of_pool (beta : Z) (gammas : list Z)
-        (Hnd : Poly.NoDupP (p := p) gammas)
-        (Hlen : (2 * List.length all_cells + 1 <= List.length gammas)%nat)
-        (Hor : forall gamma, List.In gamma gammas ->
-          iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
-      forall gamma : Z, iprod beta gamma = sprod beta gamma.
-    Proof.
-      intros gamma.
-      set (good := List.filter
-        (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z)
-          (iroots beta)))
-        gammas).
-      assert (Hgood :
-        (List.length all_cells + 1 <= List.length good)%nat).
-      { pose proof (PermutationPoly.filter_avoid_length (p := p)
-          (iroots beta) gammas Hnd) as Hfl.
-        unfold good.
-        rewrite (PermutationPoly.iroots_length
-          domain ncols chunk_len g lbl beta) in Hfl.
-        lia. }
-      assert (Hroots : forall x, List.In x good ->
-        Poly.eval (p := p)
-          (Poly.psub (p := p) (Poly.prod_lin (p := p) (iroots beta))
-            (Poly.prod_lin (p := p) (sroots beta))) x = 0).
-      { intros x Hx.
-        apply List.filter_In in Hx.
-        destruct Hx as [Hxin Hav].
-        assert (HPD : Poly.eval (p := p)
-          (Poly.prod_lin (p := p) (iroots beta)) x <> 0).
-        { intro Hz.
-          apply PermutationPoly.prod_lin_root_of_zero in Hz.
-          destruct Hz as [r [Hr Hxr]].
-          assert (Hex : List.existsb (fun r0 => ((x - r0) mod p =? 0)%Z)
-            (iroots beta) = true).
-          { apply List.existsb_exists.
-            exists r.
-            split; [exact Hr | apply Z.eqb_eq; exact Hxr]. }
-          rewrite Hex in Hav.
-          discriminate. }
-        destruct (Hor x Hxin) as [H0 | Heqx].
-        - exfalso.
-          apply HPD.
-          rewrite <- (PermutationPoly.iprod_eval (p := p)
-            domain ncols chunk_len g lbl beta x).
-          exact H0.
-        - rewrite Poly.eval_psub.
-          rewrite <- (PermutationPoly.iprod_eval (p := p)
-            domain ncols chunk_len g lbl beta x).
-          rewrite <- (PermutationPoly.sprod_eval (p := p)
-            domain ncols chunk_len g lbl sigma beta x).
-          rewrite Heqx, Z.sub_diag.
-          apply Zmod_0_l. }
-      assert (Hzero : Poly.norm (p := p)
-        (Poly.psub (p := p) (Poly.prod_lin (p := p) (iroots beta))
-          (Poly.prod_lin (p := p) (sroots beta))) = []).
-      { apply (Poly.zero_of_roots (p := p) _ good).
-        - unfold Poly.NoDupP, good.
-          apply PermutationPoly.NoDup_map_filter.
-          exact Hnd.
-        - rewrite List.Forall_forall. exact Hroots.
-        - pose proof (Poly.pdeg_psub_le (p := p)
-            (Poly.prod_lin (p := p) (iroots beta))
-            (Poly.prod_lin (p := p) (sroots beta))) as Hle.
-          pose proof (proj2 (Poly.prod_lin_monic (p := p) (iroots beta)))
-            as Hd1.
-          pose proof (proj2 (Poly.prod_lin_monic (p := p) (sroots beta)))
-            as Hd2.
-          rewrite (PermutationPoly.iroots_length
-            domain ncols chunk_len g lbl beta) in Hd1.
-          rewrite (PermutationPoly.sroots_length
-            domain ncols chunk_len g lbl sigma beta) in Hd2.
-          lia. }
-      rewrite (PermutationPoly.iprod_eval (p := p)
-        domain ncols chunk_len g lbl beta gamma).
-      rewrite (PermutationPoly.sprod_eval (p := p)
-        domain ncols chunk_len g lbl sigma beta gamma).
-      pose proof (Poly.eval_norm_nil (p := p) _ gamma Hzero) as He0.
-      rewrite Poly.eval_psub in He0.
-      change ((Poly.eval (p := p) (Poly.prod_lin (p := p) (iroots beta)) gamma
-        - Poly.eval (p := p) (Poly.prod_lin (p := p) (sroots beta)) gamma)
-          mod p)
-        with (BinOp.sub (p := p)
-          (Poly.eval (p := p) (Poly.prod_lin (p := p) (iroots beta)) gamma)
-          (Poly.eval (p := p) (Poly.prod_lin (p := p) (sroots beta)) gamma))
-        in He0.
-      apply sub_zero_equiv in He0.
-      unfold UnOp.from in He0.
-      rewrite !Poly.eval_canonical in He0.
-      exact He0.
-    Qed.
-
-    (** The generalized [PermutationPoly.match_cell]: a [β] pool of
-        [N + 1] residues, each member with an accepting [γ] pool, matches
-        every enumerated cell to a cell agreeing in value and σ-label —
-        some pool [β] avoids the [≤ N] residues that could make a
-        spurious identity factor vanish. *)
-    Lemma match_cell_of_pools (betas : list Z)
-        (Hnb : Poly.NoDupP (p := p) betas)
-        (Hlb : (List.length all_cells + 1 <= List.length betas)%nat)
-        (Hslice : forall beta, List.In beta betas ->
-          exists gammas : list Z,
-            Poly.NoDupP (p := p) gammas /\
-            (2 * List.length all_cells + 1 <= List.length gammas)%nat /\
-            forall gamma, List.In gamma gammas ->
-              iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma) :
-      forall c, List.In c all_cells ->
-      exists d, List.In d all_cells /\
-        g d mod p = g c mod p /\ lbl d mod p = lbl (sigma c) mod p.
-    Proof.
-      intros c Hc.
-      pose proof (prime_range (p := p)) as Hp1.
-      assert (Heq : forall beta, List.In beta betas ->
-        forall gamma, iprod beta gamma = sprod beta gamma).
-      { intros beta Hbin gamma0.
-        destruct (Hslice beta Hbin) as (gammas & Hndg & Hleng & Hor).
-        exact (products_eq_of_pool beta gammas Hndg Hleng Hor gamma0). }
-      set (bad := List.map
-        (fun d => (- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)
-        all_cells).
-      assert (Hpick : exists bstar, List.In bstar betas /\
-        forall r, List.In r bad -> (bstar - r) mod p <> 0).
-      { apply pool_avoid_pick; [exact Hnb |].
-        unfold bad.
-        rewrite List.length_map.
-        lia. }
-      destruct Hpick as (bstar & Hbin & Havoid).
-      assert (Hsfac0 : PermutationPoly.sfac (p := p) g lbl sigma bstar
-        (- (g c + bstar * lbl (sigma c))) c = 0).
-      { unfold PermutationPoly.sfac.
-        replace (g c + bstar * lbl (sigma c)
-          + - (g c + bstar * lbl (sigma c))) with 0 by ring.
-        apply Zmod_0_l. }
-      assert (Hip0 : iprod bstar (- (g c + bstar * lbl (sigma c))) = 0).
-      { rewrite (Heq bstar Hbin).
-        unfold PermutationPoly.sprod.
-        apply PermutationPoly.fprod_zero_iff.
-        exists (PermutationPoly.sfac (p := p) g lbl sigma bstar
-          (- (g c + bstar * lbl (sigma c))) c).
-        split.
-        - apply List.in_map. exact Hc.
-        - rewrite Hsfac0. apply Zmod_0_l. }
-      unfold PermutationPoly.iprod in Hip0.
-      apply PermutationPoly.fprod_zero_iff in Hip0.
-      destruct Hip0 as [v [Hvin Hvm]].
-      apply List.in_map_iff in Hvin.
-      destruct Hvin as [d [Hvd Hdin]].
-      subst v.
-      assert (Hifac0 : PermutationPoly.ifac (p := p) g lbl bstar
-        (- (g c + bstar * lbl (sigma c))) d = 0).
-      { unfold PermutationPoly.ifac in *.
-        rewrite Zmod_mod in Hvm.
-        exact Hvm. }
-      assert (Hkey : ((g d - g c)
-        + bstar * (lbl d - lbl (sigma c))) mod p = 0).
-      { rewrite <- Hifac0.
-        unfold PermutationPoly.ifac.
-        f_equal.
-        ring. }
-      destruct (Z.eq_dec ((lbl d - lbl (sigma c)) mod p) 0) as [Hld | Hld].
-      - exists d.
-        split; [exact Hdin |].
-        split.
-        + assert (Hgd : (g d - g c) mod p = 0).
-          { replace (g d - g c)
-              with (((g d - g c) + bstar * (lbl d - lbl (sigma c)))
-                - bstar * (lbl d - lbl (sigma c))) by ring.
-            rewrite Zminus_mod, Hkey.
-            assert (Hmx : (bstar * (lbl d - lbl (sigma c))) mod p = 0)
-              by (rewrite Zmult_mod, Hld, Z.mul_0_r; reflexivity).
-            rewrite Hmx.
-            reflexivity. }
-          change ((g d - g c) mod p)
-            with (BinOp.sub (p := p) (g d) (g c)) in Hgd.
-          apply sub_zero_equiv in Hgd.
-          unfold UnOp.from in Hgd.
-          exact Hgd.
-        + change ((lbl d - lbl (sigma c)) mod p)
-            with (BinOp.sub (p := p) (lbl d) (lbl (sigma c))) in Hld.
-          apply sub_zero_equiv in Hld.
-          unfold UnOp.from in Hld.
-          exact Hld.
-      - exfalso.
-        pose proof (mod_inverse_mul_prime (p := p)
-          (lbl d - lbl (sigma c)) Hld) as Hinv.
-        unfold BinOp.mul in Hinv.
-        assert (Hby : (bstar * (lbl d - lbl (sigma c))) mod p
-          = (- (g d - g c)) mod p).
-        { replace (bstar * (lbl d - lbl (sigma c)))
-            with (((g d - g c) + bstar * (lbl d - lbl (sigma c)))
-              - (g d - g c)) by ring.
-          replace (- (g d - g c)) with (0 - (g d - g c)) by ring.
-          rewrite Zminus_mod, Hkey, (Zminus_mod 0 (g d - g c)), Zmod_0_l.
-          reflexivity. }
-        assert (Hbstar : bstar mod p
-          = ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)
-              mod p).
-        { transitivity ((bstar * (mod_inverse (lbl d - lbl (sigma c)) p
-            * (lbl d - lbl (sigma c)))) mod p).
-          - symmetry.
-            rewrite <- (Zmult_mod_idemp_r
-              (mod_inverse (lbl d - lbl (sigma c)) p
-                * (lbl d - lbl (sigma c))) bstar).
-            rewrite Hinv, Z.mul_1_r.
-            reflexivity.
-          - replace (bstar * (mod_inverse (lbl d - lbl (sigma c)) p
-              * (lbl d - lbl (sigma c))))
-              with ((bstar * (lbl d - lbl (sigma c)))
-                * mod_inverse (lbl d - lbl (sigma c)) p) by ring.
-            rewrite <- (Zmult_mod_idemp_l
-              (bstar * (lbl d - lbl (sigma c)))
-              (mod_inverse (lbl d - lbl (sigma c)) p)).
-            rewrite Hby.
-            rewrite Zmult_mod_idemp_l.
-            reflexivity. }
-        apply (Havoid
-          ((- (g d - g c)) * mod_inverse (lbl d - lbl (sigma c)) p)).
-        + unfold bad.
-          exact (List.in_map _ all_cells d Hdin).
-        + rewrite Zminus_mod, Hbstar, Z.sub_diag.
-          apply Zmod_0_l.
-    Qed.
-
     (** The counting theorem: an accepting [(N + 1) × (2·N + 1)] nested
         challenge family forces σ-invariance on the usable cells, under
         the same label-injectivity and range side conditions as
@@ -743,7 +457,8 @@ Section WithPrime.
         intros gamma Hgin.
         exact (PermutationPoly.rules_products domain Hk Hbf Hur
           ncols chunk_len Hchunk g lbl sigma beta gamma (Hacc gamma Hgin)). }
-      destruct (match_cell_of_pools betas Hnb Hlb Hslice' c
+      destruct (PermutationPoly.match_cell_of_pools domain ncols chunk_len
+        Hchunk g lbl sigma betas Hnb Hlb Hslice' c
         (proj2 (PermutationPoly.in_all_cells domain ncols chunk_len Hchunk c)
           Hc)) as (d & Hdin & Hgd & Hld).
       assert (Hd : d = sigma c).
@@ -845,12 +560,10 @@ Section WithPrime.
   (** ** The lookup family
 
       The counting reading of [PlonkishLookupPoly.lookup_sound], split at
-      its two challenge layers.  [per_theta_membership_of_pools]
-      generalizes the per-[θ] multiset step: with the permuted columns
-      [A'], [S'] fixed, an accepting [(β, γ)] grid drawn from two pools of
-      [2·u + 1] distinct residues each identifies the factor polynomials
-      and carries every combined input value into the combined table
-      values.  [lookup_theta_counting] generalizes the [θ]-de-combination
+      its two challenge layers.  The per-[θ] multiset step is
+      [PlonkishLookupPoly.per_theta_membership_of_pools], stated over the
+      bounded challenge pools this layer supplies.
+      [lookup_theta_counting] generalizes the [θ]-de-combination
       pigeonhole: row-wise combined agreement at [u·m + 1] distinct [θ]
       forces tuple membership. *)
 
@@ -862,321 +575,6 @@ Section WithPrime.
   Local Notation lookup_challenge_regular :=
     (@PlonkishLookupPoly.lookup_challenge_regular p).
 
-  Lemma per_theta_membership_of_pools (domain : Domain.t)
-      (pairs : list ((Z -> Z) * (Z -> Z))) (theta : Z)
-      (Hbf : 0 <= domain.(Domain.blinding_factors))
-      (Hu : 0 <= Domain.usable_rows domain)
-      (A' S' : Z -> Z)
-      (betas gammas : list Z)
-      (Hnb : Poly.NoDupP (p := p) betas)
-      (Hlb : (2 * Z.to_nat (Domain.usable_rows domain) + 1 <=
-              List.length betas)%nat)
-      (Hng : Poly.NoDupP (p := p) gammas)
-      (Hlg : (2 * Z.to_nat (Domain.usable_rows domain) + 1 <=
-              List.length gammas)%nat)
-      (Hbg : forall beta gamma : Z,
-        List.In beta betas -> List.In gamma gammas ->
-        lookup_challenge_regular domain pairs theta beta gamma ->
-        exists Zp : Z -> Z,
-          lookup_rules_hold domain pairs theta beta gamma A' S' Zp) :
-    forall j0 : nat, Z.of_nat j0 < Domain.usable_rows domain ->
-    exists t : nat, (t < Z.to_nat (Domain.usable_rows domain))%nat /\
-      comb_input pairs theta (Z.of_nat j0) =
-      comb_table pairs theta (Z.of_nat t).
-  Proof.
-    set (u := Domain.usable_rows domain) in *.
-    set (un := Z.to_nat u) in *.
-    assert (Hun : Z.of_nat un = u) by (exact (Z2Nat.id u Hu)).
-    intros j0 Hj0.
-    set (Na := List.map
-      (fun j => (- comb_input pairs theta (Z.of_nat j)) mod p)
-      (List.seq 0 un)).
-    set (Ns := List.map
-      (fun j => (- comb_table pairs theta (Z.of_nat j)) mod p)
-      (List.seq 0 un)).
-    set (NA' := List.map (fun j => (- A' (Z.of_nat j)) mod p)
-      (List.seq 0 un)).
-    set (NS' := List.map (fun j => (- S' (Z.of_nat j)) mod p)
-      (List.seq 0 un)).
-    assert (HNa_len : List.length Na = un)
-      by (unfold Na; rewrite List.length_map, List.length_seq;
-          reflexivity).
-    assert (HNs_len : List.length Ns = un)
-      by (unfold Ns; rewrite List.length_map, List.length_seq;
-          reflexivity).
-    assert (HNA'_len : List.length NA' = un)
-      by (unfold NA'; rewrite List.length_map, List.length_seq;
-          reflexivity).
-    assert (HNS'_len : List.length NS' = un)
-      by (unfold NS'; rewrite List.length_map, List.length_seq;
-          reflexivity).
-    (* avoiding the two bad-residue lists makes a challenge pair regular *)
-    assert (Hreg_mk : forall x g0,
-      (forall r, List.In r Na -> (x - r) mod p <> 0) ->
-      (forall r, List.In r Ns -> (g0 - r) mod p <> 0) ->
-      lookup_challenge_regular domain pairs theta x g0).
-    { intros x g0 Hx Hg0 row Hrow.
-      set (j := Z.to_nat row).
-      assert (Hjlt : (j < un)%nat) by (unfold j, un; lia).
-      assert (Hrow_eq : Z.of_nat j = row) by (unfold j; lia).
-      assert (Hin_a :
-        List.In ((- comb_input pairs theta (Z.of_nat j)) mod p) Na).
-      { unfold Na.
-        apply (List.in_map
-          (fun j' => (- comb_input pairs theta (Z.of_nat j')) mod p)).
-        apply List.in_seq. clear -Hjlt. lia. }
-      assert (Hin_s :
-        List.In ((- comb_table pairs theta (Z.of_nat j)) mod p) Ns).
-      { unfold Ns.
-        apply (List.in_map
-          (fun j' => (- comb_table pairs theta (Z.of_nat j')) mod p)).
-        apply List.in_seq. clear -Hjlt. lia. }
-      split.
-      - intros Hc.
-        apply (Hx _ Hin_a).
-        rewrite <- Hrow_eq in Hc.
-        rewrite <- Hc. mod_ring_solve.
-      - intros Hc.
-        apply (Hg0 _ Hin_s).
-        rewrite <- Hrow_eq in Hc.
-        rewrite <- Hc. mod_ring_solve. }
-    (* the fixed regular γ0, drawn from the γ pool *)
-    assert (Hg0pick : exists gamma0, List.In gamma0 gammas /\
-      forall r, List.In r Ns -> (gamma0 - r) mod p <> 0).
-    { apply pool_avoid_pick; [exact Hng |].
-      rewrite HNs_len. lia. }
-    destruct Hg0pick as (gamma0 & Hg0_in & Hg0).
-    (* the β point family, drawn from the β pool *)
-    destruct (pool_avoid_sublist Na betas (S un) Hnb
-      ltac:(rewrite HNa_len; lia))
-      as (xs & Hxs_len & Hxs_ndp & Hxs_sub & Hxs_avoid).
-    assert (Hxs_ne : exists x0, List.In x0 xs).
-    { destruct xs as [| x0 rest]; [cbn in Hxs_len; discriminate |].
-      exists x0. left. reflexivity. }
-    destruct Hxs_ne as (x0 & Hx0_in).
-    (* rules instances along the β family *)
-    assert (Hper_x : forall x, List.In x xs ->
-      exists Zp, lookup_rules_hold domain pairs theta x gamma0 A' S' Zp).
-    { intros x Hx.
-      apply (Hbg x gamma0 (Hxs_sub x Hx) Hg0_in).
-      apply Hreg_mk; [intros r Hr; exact (Hxs_avoid x r Hx Hr)
-                     | exact Hg0]. }
-    set (cS' := prodl (List.map (fun j => S' (Z.of_nat j) + gamma0)
-      (List.seq 0 un))).
-    set (cs := prodl (List.map
-      (fun j => comb_table pairs theta (Z.of_nat j) + gamma0)
-      (List.seq 0 un))).
-    (* the pointwise scaled agreement along the β family *)
-    assert (Hpointwise : forall x, List.In x xs ->
-      (cS' * Poly.eval (p := p) (Poly.prod_lin (p := p) NA') x) mod p =
-      (cs * Poly.eval (p := p) (Poly.prod_lin (p := p) Na) x) mod p).
-    { intros x Hx.
-      destruct (Hper_x x Hx) as (Zp & Hrules).
-      destruct (PlonkishLookupPoly.lookup_rules_consequences (p := p)
-        domain pairs theta x gamma0 A' S' Zp Hbf Hu
-        (Hreg_mk x gamma0 (fun r Hr => Hxs_avoid x r Hx Hr) Hg0)
-        Hrules) as [Hprod _].
-      fold u in Hprod. fold un in Hprod.
-      rewrite (PlonkishLookupPoly.prodl_split (p := p)
-        (fun k => ((A' (Z.of_nat k) + x) *
-                   (S' (Z.of_nat k) + gamma0)) mod p)
-        (fun k => A' (Z.of_nat k) + x)
-        (fun k => S' (Z.of_nat k) + gamma0)
-        (List.seq 0 un)) in Hprod by (intros; reflexivity).
-      rewrite (PlonkishLookupPoly.prodl_split (p := p)
-        (fun k => ((comb_input pairs theta (Z.of_nat k) + x) *
-                   (comb_table pairs theta (Z.of_nat k) + gamma0)) mod p)
-        (fun k => comb_input pairs theta (Z.of_nat k) + x)
-        (fun k => comb_table pairs theta (Z.of_nat k) + gamma0)
-        (List.seq 0 un)) in Hprod by (intros; reflexivity).
-      assert (HevA' :
-        prodl (List.map (fun k => A' (Z.of_nat k) + x) (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) NA') x)
-        by (exact (PlonkishLookupPoly.prodl_shift_eval (p := p)
-          (fun k => A' (Z.of_nat k)) un x)).
-      assert (HevA :
-        prodl (List.map
-          (fun k => comb_input pairs theta (Z.of_nat k) + x)
-          (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) Na) x)
-        by (exact (PlonkishLookupPoly.prodl_shift_eval (p := p)
-          (fun k => comb_input pairs theta (Z.of_nat k)) un x)).
-      rewrite HevA', HevA in Hprod.
-      fold cS' in Hprod. fold cs in Hprod.
-      rewrite (Z.mul_comm cS'), (Z.mul_comm cs).
-      exact Hprod. }
-    (* the x0-instance factor facts *)
-    destruct (Hper_x x0 Hx0_in) as (Zp0 & Hrules0).
-    destruct (PlonkishLookupPoly.lookup_rules_consequences (p := p)
-      domain pairs theta x0 gamma0 A' S' Zp0 Hbf Hu
-      (Hreg_mk x0 gamma0 (fun r Hr => Hxs_avoid x0 r Hx0_in Hr) Hg0)
-      Hrules0) as [_ Hfac].
-    assert (HcS'_nz : cS' <> 0).
-    { unfold cS'. apply PlonkishLookupPoly.prodl_nonzero.
-      intros v Hv. apply List.in_map_iff in Hv.
-      destruct Hv as (k & <- & Hk). apply List.in_seq in Hk.
-      assert (Hk' : (k < Z.to_nat (Domain.usable_rows domain))%nat)
-        by (exact (proj2 Hk)).
-      exact (proj2 (Hfac k Hk')). }
-    (* the A'-side polynomial identity *)
-    assert (Hwl_len : List.length NA' = List.length Na)
-      by (rewrite HNA'_len, HNa_len; reflexivity).
-    assert (Hxs_len' : List.length xs = S (List.length NA'))
-      by (rewrite HNA'_len; exact Hxs_len).
-    destruct (PlonkishLookupPoly.prod_lin_scaled_agreement (p := p)
-      NA' Na xs cS' cs Hwl_len Hxs_ndp Hxs_len'
-      (PlonkishLookupPoly.prodl_canonical (p := p) _)
-      (PlonkishLookupPoly.prodl_canonical (p := p) _) HcS'_nz
-      Hpointwise) as [_ HpeqA].
-    (* the γ point family, at the designated regular β = x0 *)
-    destruct (pool_avoid_sublist Ns gammas (S un) Hng
-      ltac:(rewrite HNs_len; lia))
-      as (gs & Hgs_len & Hgs_ndp & Hgs_sub & Hgs_avoid).
-    set (dA' := prodl (List.map (fun j => A' (Z.of_nat j) + x0)
-      (List.seq 0 un))).
-    set (da := prodl (List.map
-      (fun j => comb_input pairs theta (Z.of_nat j) + x0)
-      (List.seq 0 un))).
-    assert (Hpointwise_g : forall g0, List.In g0 gs ->
-      (dA' * Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0) mod p =
-      (da * Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g0) mod p).
-    { intros g0 Hg.
-      assert (Hreg_g : lookup_challenge_regular domain pairs theta x0 g0).
-      { apply Hreg_mk;
-          [intros r Hr; exact (Hxs_avoid x0 r Hx0_in Hr)
-          | intros r Hr; exact (Hgs_avoid g0 r Hg Hr)]. }
-      destruct (Hbg x0 g0 (Hxs_sub x0 Hx0_in) (Hgs_sub g0 Hg) Hreg_g)
-        as (Zpg & Hrulesg).
-      destruct (PlonkishLookupPoly.lookup_rules_consequences (p := p)
-        domain pairs theta x0 g0 A' S' Zpg Hbf Hu Hreg_g Hrulesg)
-        as [Hprod _].
-      fold u in Hprod. fold un in Hprod.
-      rewrite (PlonkishLookupPoly.prodl_split (p := p)
-        (fun k => ((A' (Z.of_nat k) + x0) *
-                   (S' (Z.of_nat k) + g0)) mod p)
-        (fun k => A' (Z.of_nat k) + x0)
-        (fun k => S' (Z.of_nat k) + g0)
-        (List.seq 0 un)) in Hprod by (intros; reflexivity).
-      rewrite (PlonkishLookupPoly.prodl_split (p := p)
-        (fun k => ((comb_input pairs theta (Z.of_nat k) + x0) *
-                   (comb_table pairs theta (Z.of_nat k) + g0)) mod p)
-        (fun k => comb_input pairs theta (Z.of_nat k) + x0)
-        (fun k => comb_table pairs theta (Z.of_nat k) + g0)
-        (List.seq 0 un)) in Hprod by (intros; reflexivity).
-      assert (HevS' :
-        prodl (List.map (fun k => S' (Z.of_nat k) + g0) (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0)
-        by (exact (PlonkishLookupPoly.prodl_shift_eval (p := p)
-          (fun k => S' (Z.of_nat k)) un g0)).
-      assert (HevS :
-        prodl (List.map
-          (fun k => comb_table pairs theta (Z.of_nat k) + g0)
-          (List.seq 0 un)) =
-        Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) g0)
-        by (exact (PlonkishLookupPoly.prodl_shift_eval (p := p)
-          (fun k => comb_table pairs theta (Z.of_nat k)) un g0)).
-      rewrite HevS', HevS in Hprod.
-      fold dA' in Hprod. fold da in Hprod.
-      transitivity ((prodl (List.map (fun j => A' (Z.of_nat j) + x0)
-          (List.seq 0 un)) *
-        Poly.eval (p := p) (Poly.prod_lin (p := p) NS') g0) mod p);
-        [reflexivity |].
-      exact Hprod. }
-    assert (HdA'_nz : dA' <> 0).
-    { unfold dA'. apply PlonkishLookupPoly.prodl_nonzero.
-      intros v Hv. apply List.in_map_iff in Hv.
-      destruct Hv as (k & <- & Hk). apply List.in_seq in Hk.
-      assert (Hk' : (k < Z.to_nat (Domain.usable_rows domain))%nat)
-        by (exact (proj2 Hk)).
-      exact (proj1 (Hfac k Hk')). }
-    assert (Hwl_len2 : List.length NS' = List.length Ns)
-      by (rewrite HNS'_len, HNs_len; reflexivity).
-    assert (Hgs_len' : List.length gs = S (List.length NS'))
-      by (rewrite HNS'_len; exact Hgs_len).
-    destruct (PlonkishLookupPoly.prod_lin_scaled_agreement (p := p)
-      NS' Ns gs dA' da Hwl_len2 Hgs_ndp Hgs_len'
-      (PlonkishLookupPoly.prodl_canonical (p := p) _)
-      (PlonkishLookupPoly.prodl_canonical (p := p) _) HdA'_nz
-      Hpointwise_g) as [_ HpeqS].
-    (* membership extraction *)
-    set (v := comb_input pairs theta (Z.of_nat j0)).
-    assert (Hj0un : (j0 < un)%nat) by (clear -Hj0 Hu; unfold un; lia).
-    assert (Hroot_a :
-      Poly.eval (p := p) (Poly.prod_lin (p := p) Na) ((- v) mod p) = 0).
-    { apply (Poly.eval_prod_lin_zero (p := p) Na ((- v) mod p)
-        ((- v) mod p)).
-      - unfold Na, v.
-        apply (List.in_map
-          (fun j => (- comb_input pairs theta (Z.of_nat j)) mod p)).
-        apply List.in_seq. clear -Hj0un. lia.
-      - rewrite Z.sub_diag. apply Zmod_0_l. }
-    assert (Hroot_A' :
-      Poly.eval (p := p) (Poly.prod_lin (p := p) NA') ((- v) mod p) = 0).
-    { rewrite (Poly.eval_peq (p := p) _ _ ((- v) mod p) HpeqA).
-      exact Hroot_a. }
-    destruct (PlonkishLookupPoly.eval_prod_lin_zero_inv (p := p)
-      NA' ((- v) mod p) Hroot_A')
-      as (r & Hr_in & Hr_zero).
-    unfold NA' in Hr_in.
-    apply List.in_map_iff in Hr_in.
-    destruct Hr_in as (j1 & Hr_eq & Hj1).
-    apply List.in_seq in Hj1.
-    subst r.
-    assert (HvA : A' (Z.of_nat j1) mod p = v mod p).
-    { apply PlonkishLookupPoly.sub_mod_zero_iff in Hr_zero.
-      rewrite !Zmod_mod in Hr_zero.
-      rewrite <- (PlonkishLookupPoly.opp_mod_opp (p := p)
-        (A' (Z.of_nat j1))).
-      rewrite <- Hr_zero.
-      apply PlonkishLookupPoly.opp_mod_opp. }
-    (* the chain into the S' values *)
-    assert (Hj1u : Z.of_nat j1 < u)
-      by (clear -Hun Hj1; rewrite <- Hun; apply Nat2Z.inj_lt; lia).
-    assert (Hj1u' : Z.of_nat j1 < Domain.usable_rows domain)
-      by (exact Hj1u).
-    destruct (PlonkishLookupPoly.permuted_chain (p := p)
-      domain pairs theta x0 gamma0 A' S' Zp0
-      Hbf Hu Hrules0 j1 Hj1u') as (j' & Hj'le & HAS).
-    assert (HvS : S' (Z.of_nat j') mod p = v mod p)
-      by (rewrite <- HAS; exact HvA).
-    assert (Hroot_S' :
-      Poly.eval (p := p) (Poly.prod_lin (p := p) NS') ((- v) mod p) = 0).
-    { apply (Poly.eval_prod_lin_zero (p := p) NS' ((- v) mod p)
-        ((- S' (Z.of_nat j')) mod p)).
-      - unfold NS'.
-        apply (List.in_map (fun j => (- S' (Z.of_nat j)) mod p)).
-        apply List.in_seq. clear -Hj'le Hj1. lia.
-      - apply PlonkishLookupPoly.sub_mod_zero_iff.
-        rewrite !Zmod_mod.
-        apply PlonkishLookupPoly.opp_mod_congr.
-        symmetry. exact HvS. }
-    assert (Hroot_s :
-      Poly.eval (p := p) (Poly.prod_lin (p := p) Ns) ((- v) mod p) = 0).
-    { rewrite <- (Poly.eval_peq (p := p) _ _ ((- v) mod p) HpeqS).
-      exact Hroot_S'. }
-    destruct (PlonkishLookupPoly.eval_prod_lin_zero_inv (p := p)
-      Ns ((- v) mod p) Hroot_s)
-      as (r2 & Hr2_in & Hr2_zero).
-    unfold Ns in Hr2_in.
-    apply List.in_map_iff in Hr2_in.
-    destruct Hr2_in as (t & Hr2_eq & Ht).
-    apply List.in_seq in Ht.
-    subst r2.
-    exists t.
-    split; [exact (proj2 Ht) |].
-    assert (Hct : comb_table pairs theta (Z.of_nat t) mod p = v mod p).
-    { apply PlonkishLookupPoly.sub_mod_zero_iff in Hr2_zero.
-      rewrite !Zmod_mod in Hr2_zero.
-      rewrite <- (PlonkishLookupPoly.opp_mod_opp (p := p)
-        (comb_table pairs theta (Z.of_nat t))).
-      rewrite <- Hr2_zero.
-      apply PlonkishLookupPoly.opp_mod_opp. }
-    unfold v in Hct.
-    unfold PlonkishLookupPoly.comb_input, PlonkishLookupPoly.comb_table
-      in Hct |- *.
-    rewrite !PlonkishLookupPoly.comb_canonical in Hct.
-    symmetry. exact Hct.
-  Qed.
 
   (** Row-wise combined agreement at one [θ] — the property the per-[θ]
       step yields and the [θ]-pigeonhole consumes. *)
@@ -1291,22 +689,22 @@ Section WithPrime.
     assert (Hth_in_pool : forall th, List.In th ths -> List.In th thetas).
     { intros th Hth.
       unfold ths in Hth.
-      apply PlonkishLookupPoly.In_firstn in Hth.
+      apply In_firstn in Hth.
       unfold fiber in Hth.
       apply List.filter_In in Hth. exact (proj1 Hth). }
     assert (Hths_ndp : Poly.NoDupP (p := p) ths).
     { unfold Poly.NoDupP, ths.
       rewrite <- List.firstn_map.
-      apply PlonkishLookupPoly.NoDup_firstn.
+      apply NoDup_firstn.
       unfold fiber.
-      apply PermutationPoly.NoDup_map_filter.
+      apply NoDup_map_filter.
       exact Hth_ndp. }
     assert (Hth_agree : forall th, List.In th ths ->
       comb_input pairs th row = comb_table pairs th (Z.of_nat t)).
     { intros th Hth.
       assert (Hth' : List.In th fiber)
         by (unfold ths in Hth;
-            exact (PlonkishLookupPoly.In_firstn m fiber th Hth)).
+            exact (In_firstn m fiber th Hth)).
       unfold fiber in Hth'.
       apply List.filter_In in Hth'.
       destruct Hth' as [Hthin Hpickt].
@@ -1446,7 +844,7 @@ Section WithPrime.
       as (A' & S' & betas & gammas & Hnb & Hlb & Hng & Hlg & Hbg).
     assert (Hj0 : Z.of_nat (Z.to_nat row) < Domain.usable_rows domain)
       by lia.
-    destruct (per_theta_membership_of_pools domain pairs theta Hbf Hu
+    destruct (PlonkishLookupPoly.per_theta_membership_of_pools domain pairs theta Hbf Hu
       A' S' betas gammas Hnb Hlb Hng Hlg Hbg (Z.to_nat row) Hj0)
       as (t & Ht & Heq).
     exists t.
@@ -1532,7 +930,7 @@ Section WithPrime.
     intros row Hrow.
     assert (Hj0 : Z.of_nat (Z.to_nat row) < Domain.usable_rows domain)
       by lia.
-    destruct (per_theta_membership_of_pools domain pairs theta Hbf Hu
+    destruct (PlonkishLookupPoly.per_theta_membership_of_pools domain pairs theta Hbf Hu
       A' S' betas gammas Hnb ltac:(lia) Hng ltac:(lia) Hbg
       (Z.to_nat row) Hj0) as (t & Ht & Heq).
     exists t.

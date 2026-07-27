@@ -27,6 +27,70 @@ Require Import Stdlib.Sorting.Permutation.
 Import List.ListNotations.
 Global Open Scope Z_scope.
 
+(** Injectivity of [Z.of_nat] transports repetition-freeness from a list of
+    naturals to its integer image. *)
+Lemma NoDup_map_of_nat (l : list nat) :
+  List.NoDup l -> List.NoDup (List.map Z.of_nat l).
+Proof.
+  induction 1 as [| a l' Hnotin Hnd IH]; [constructor |].
+  cbn [List.map]. constructor; [| exact IH].
+  intros Hin.
+  apply List.in_map_iff in Hin.
+  destruct Hin as [b [Hb Hbin]].
+  apply Nat2Z.inj in Hb. subst b. exact (Hnotin Hbin).
+Qed.
+
+
+(** ** Repetition-free lists: generic list utilities
+
+    Shared by the pool-avoidance selection below and by the
+    permutation / lookup identity families. *)
+
+Lemma filter_split_length {A : Type} (f : A -> bool) (l : list A) :
+  List.length l
+    = (List.length (List.filter f l)
+       + List.length (List.filter (fun x => negb (f x)) l))%nat.
+Proof.
+  induction l as [| a l IH]; cbn; [reflexivity |].
+  destruct (f a); cbn; lia.
+Qed.
+
+Lemma NoDup_map_filter {A B : Type} (h : A -> B) (q : A -> bool)
+    (l : list A) :
+  List.NoDup (List.map h l) -> List.NoDup (List.map h (List.filter q l)).
+Proof.
+  induction l as [| x l' IH]; cbn; intro Hnd; [constructor |].
+  inversion Hnd as [| ? ? Hnotin Hnd']; subst.
+  destruct (q x); cbn.
+  - constructor; [| exact (IH Hnd')].
+    intro Hin. apply Hnotin.
+    apply List.in_map_iff in Hin. destruct Hin as [y [Hy Hyin]].
+    apply List.filter_In in Hyin. destruct Hyin as [Hyin _].
+    rewrite <- Hy. apply List.in_map. exact Hyin.
+  - exact (IH Hnd').
+Qed.
+
+Lemma In_firstn {A : Set} (n : nat) (l : list A) (a : A) :
+  List.In a (List.firstn n l) -> List.In a l.
+Proof.
+  revert n; induction l as [| b l IH]; intros n Hin;
+    destruct n; simpl in Hin; try contradiction.
+  destruct Hin as [-> | Hin];
+    [left; reflexivity | right; exact (IH n Hin)].
+Qed.
+
+Lemma NoDup_firstn {A : Set} (n : nat) (l : list A) :
+  List.NoDup l -> List.NoDup (List.firstn n l).
+Proof.
+  revert n; induction l as [| a l IH]; intros n Hnd.
+  - destruct n; simpl; constructor.
+  - destruct n; simpl; [constructor |].
+    inversion Hnd as [| ? ? Hnotin Hnd']; subst.
+    constructor.
+    + intros Hin. exact (Hnotin (In_firstn n l a Hin)).
+    + exact (IH n Hnd').
+Qed.
+
 Module Poly.
 Section WithPrime.
   Context {p : Z} `{Prime p}.
@@ -1031,6 +1095,120 @@ Section WithPrime.
   (** Repetition-free point lists: pairwise distinct mod [p]. *)
   Definition NoDupP (l : list Z) : Prop :=
     List.NoDup (List.map (fun x => x mod p) l).
+
+  (** The first [m] naturals are pairwise distinct mod [p] as soon as
+      [m <= p]: the standard supply of repetition-free challenge points. *)
+  Lemma NoDupP_of_nat_seq (m : nat) :
+    Z.of_nat m <= p -> NoDupP (List.map Z.of_nat (List.seq 0 m)).
+  Proof.
+    intros Hm. unfold NoDupP.
+    rewrite List.map_map.
+    rewrite (List.map_ext_in _ Z.of_nat).
+    - apply NoDup_map_of_nat. apply List.seq_NoDup.
+    - intros a Ha. apply List.in_seq in Ha.
+      apply Z.mod_small. lia.
+  Qed.
+
+  (** ** Selection from repetition-free pools, avoiding a residue list
+
+      Any pool that is repetition-free mod [p] and has room beyond the
+      avoided list yields a repetition-free selection of the requested
+      size, none of whose members is congruent to an avoided residue.
+      This is the shared generalization of the canonical pools of the
+      identity families ([PermutationPoly.zpool],
+      [PlonkishLookupPoly.pick_good_points]) and of the bounded
+      challenge pools the counting layer draws from. *)
+
+  (** In a pool of distinct residues, at most [length bad] elements are
+      congruent to a member of [bad]: the avoiding filter keeps at least
+      [length pool - length bad] elements. *)
+  Lemma filter_avoid_length (bad pool : list Z) :
+    List.NoDup (List.map (fun x => x mod p) pool) ->
+    (List.length pool - List.length bad
+      <= List.length
+           (List.filter
+             (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
+             pool))%nat.
+  Proof.
+    intro Hnd.
+    set (f := fun x => negb (List.existsb (fun r => (x - r) mod p =? 0) bad)).
+    assert (Hbound :
+      (List.length (List.filter (fun x => negb (f x)) pool)
+        <= List.length bad)%nat).
+    { rewrite <- (List.length_map (fun x => x mod p)
+        (List.filter (fun x => negb (f x)) pool)).
+      rewrite <- (List.length_map (fun x => x mod p) bad).
+      apply List.NoDup_incl_length.
+      - apply NoDup_map_filter. exact Hnd.
+      - intros v Hv. apply List.in_map_iff in Hv. destruct Hv as [y [Hy Hyin]].
+        apply List.filter_In in Hyin. destruct Hyin as [Hyin Hyf].
+        unfold f in Hyf. rewrite Bool.negb_involutive in Hyf.
+        apply List.existsb_exists in Hyf. destruct Hyf as [r [Hr Hyr]].
+        apply Z.eqb_eq in Hyr.
+        change ((y - r) mod p) with (BinOp.sub y r) in Hyr.
+        apply sub_zero_equiv in Hyr. unfold UnOp.from in Hyr.
+        rewrite <- Hy, Hyr.
+        exact (List.in_map (fun x => x mod p) bad r Hr). }
+    pose proof (filter_split_length f pool). lia.
+  Qed.
+
+  Lemma pool_avoid_sublist (bad pool : list Z) (k : nat)
+      (Hnd : NoDupP pool)
+      (Hroom : (List.length bad + k <= List.length pool)%nat) :
+    exists xs : list Z,
+      List.length xs = k /\
+      NoDupP xs /\
+      (forall x, List.In x xs -> List.In x pool) /\
+      (forall x r, List.In x xs -> List.In r bad -> (x - r) mod p <> 0).
+  Proof.
+    set (filt := List.filter
+      (fun x => negb (List.existsb (fun r => ((x - r) mod p =? 0)%Z) bad))
+      pool).
+    assert (Hfl : (k <= List.length filt)%nat).
+    { pose proof (filter_avoid_length bad pool Hnd)
+        as Havoid.
+      unfold filt. lia. }
+    exists (List.firstn k filt).
+    split; [apply List.firstn_length_le; exact Hfl |].
+    split; [| split].
+    - unfold NoDupP.
+      rewrite <- List.firstn_map.
+      apply NoDup_firstn.
+      unfold filt.
+      apply NoDup_map_filter.
+      exact Hnd.
+    - intros x Hx.
+      pose proof (In_firstn k filt x Hx) as Hxf.
+      apply List.filter_In in Hxf.
+      exact (proj1 Hxf).
+    - intros x r Hx Hr Hzero.
+      pose proof (In_firstn k filt x Hx) as Hxf.
+      apply List.filter_In in Hxf.
+      destruct Hxf as [_ Hgood].
+      apply Bool.negb_true_iff in Hgood.
+      assert (Hex : List.existsb (fun r' => ((x - r') mod p =? 0)%Z) bad
+        = true).
+      { apply List.existsb_exists.
+        exists r.
+        split; [exact Hr | apply Z.eqb_eq; exact Hzero]. }
+      congruence.
+  Qed.
+
+  Lemma pool_avoid_pick (bad pool : list Z)
+      (Hnd : NoDupP pool)
+      (Hroom : (List.length bad < List.length pool)%nat) :
+    exists x : Z,
+      List.In x pool /\
+      forall r, List.In r bad -> (x - r) mod p <> 0.
+  Proof.
+    destruct (pool_avoid_sublist bad pool 1 Hnd ltac:(lia))
+      as (xs & Hlen & _ & Hsub & Havoid).
+    destruct xs as [| x rest]; [cbn in Hlen; discriminate |].
+    exists x.
+    split; [apply Hsub; left; reflexivity |].
+    intros r Hr.
+    exact (Havoid x r (or_introl eq_refl) Hr).
+  Qed.
 
   (** A nonzero polynomial has fewer roots than significant coefficients:
       at most [pdeg f - 1 = degree] pairwise-distinct roots. *)
