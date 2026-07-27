@@ -11,9 +11,7 @@ export default defineConfig({
     },
   },
   build: {
-    outDir: fileURLToPath(
-      new URL("../../docs/orchard-verification", import.meta.url),
-    ),
+    outDir: fileURLToPath(new URL("dist", import.meta.url)),
     emptyOutDir: true,
     rollupOptions: {
       input: {

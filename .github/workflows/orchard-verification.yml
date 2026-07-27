@@ -1,11 +1,12 @@
 name: Orchard Verification Visualization
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
     paths:
       - "web/orchard-verification/**"
-      - "docs/orchard-verification/**"
+      - "garden.svg"
       - "Garden/Halo2/high_level_trace*.v"
       - "Garden/Makefile"
       - "Garden/Orchard/Snapshots/circuit_configure_generated_from_*.json"
@@ -26,7 +27,7 @@ on:
     branches: [ "main" ]
     paths:
       - "web/orchard-verification/**"
-      - "docs/orchard-verification/**"
+      - "garden.svg"
       - "Garden/Halo2/high_level_trace*.v"
       - "Garden/Makefile"
       - "Garden/Orchard/Snapshots/circuit_configure_generated_from_*.json"
@@ -79,15 +80,44 @@ jobs:
       - name: Type-check and run component tests
         run: npm run check
 
-      - name: Build committed static bundle
+      - name: Build static bundle
         run: npm run build
-
-      - name: Check generated bundle is current
-        working-directory: .
-        run: git diff --exit-code -- docs/orchard-verification
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
       - name: Run browser tests
         run: npm run test:e2e
+
+      - name: Check that validation left tracked files unchanged
+        working-directory: .
+        run: git diff --exit-code
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: web/orchard-verification/dist
+
+  deploy:
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: check
+    runs-on: ubuntu-latest
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

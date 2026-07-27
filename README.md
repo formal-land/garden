@@ -38,19 +38,20 @@ from the captured Halo 2 configuration and synthesis through the gadget,
 Action-statement, transaction-balance, and operational-soundness proofs.
 Explore the work through four complementary views:
 
-- [Orchard Verification Journey](docs/orchard-verification/index.html), an
+- [Orchard Verification Journey](https://formal-land.github.io/garden/), an
   animated, guided account of how the proof developed;
-- [Orchard Verification Atlas](docs/orchard-verification/proof-map.html), an
+- [Orchard Verification Atlas](https://formal-land.github.io/garden/proof-map.html), an
   interactive map of the proof dependencies, evidence, assumptions, and
   remaining boundaries;
-- [Orchard Circuit Explorer](docs/orchard-verification/circuit.html), a
+- [Orchard Circuit Explorer](https://formal-land.github.io/garden/circuit.html), a
   generated, interactive view of the high-level Rocq circuit, from functional
   components down to free-monad regions, gates, and source definitions;
-- [Orchard Circuit Grid](docs/orchard-verification/circuit-grid.html), a
+- [Orchard Circuit Grid](https://formal-land.github.io/garden/circuit-grid.html), a
   parity-backed, row-and-column view of the V1 circuit placement before
   selector compression.
 
-The pages are self-contained and committed with the documentation. See
+The pages are built and deployed to GitHub Pages from the source in this
+repository. See
 [BUILD.md](docs/BUILD.md#orchard-verification-visualization) for local viewing,
 development, and verification commands.
 

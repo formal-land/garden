@@ -38,21 +38,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   (checker-lemma shape, leaf closures, table literals, memory limits), the
   `-vos`/`-vok` fast dev loop, and the current cost map of the certificate
   leaves.
-- `docs/orchard-verification/index.html`: the generated Orchard Verification
-  Journey, a guided animated account of the verification effort.
-- `docs/orchard-verification/proof-map.html`: the generated Orchard
-  Verification Atlas, an engineer-facing map of proofs, evidence, assumptions,
-  and remaining boundaries.
-- `docs/orchard-verification/circuit.html`: the generated Orchard Circuit
-  Explorer, a layered view of the high-level Rocq configure, namespace, region,
-  gate, and source structure. Its React/TypeScript source, generated data, and
-  the other visualization sources live in `web/orchard-verification/`; build
-  and validation commands are documented in `docs/BUILD.md`.
-- `docs/orchard-verification/circuit-grid.html`: the generated Orchard Circuit
-  Grid, a parity-backed view of pre-selector-compression rows, columns,
-  selectors, fixed assignments, copy endpoints, and synthesis regions. Its
-  source and generated data live with the other visualization sources under
-  `web/orchard-verification/`.
+- `web/orchard-verification/`: the Orchard Verification Journey, Atlas,
+  Circuit Explorer, and Circuit Grid source, tests, and versioned circuit data.
+  The ignored `dist/` production bundle is built and deployed to GitHub Pages
+  by `.github/workflows/orchard-verification.yml`; build and validation
+  commands are documented in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.
@@ -69,10 +59,10 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 - Update `docs/halo2-proof.md` whenever proof statements, semantics, tactics,
   or Poseidon proof status changes.
 - Update this map whenever a documentation file is added, renamed, or removed.
-- Treat `docs/orchard-verification/` as generated output: edit the source or
-  evidence model under `web/orchard-verification/`, run its checks and build,
-  and commit the refreshed bundle alongside any source change. Do not hand-edit
-  the generated pages.
+- Treat `web/orchard-verification/dist/` as ephemeral generated output: edit
+  the source or evidence model under `web/orchard-verification/`, run its
+  checks and build, and never commit the generated bundle. GitHub Actions
+  publishes the validated bundle to GitHub Pages after changes reach `main`.
 
 ## Proof iteration workflow
 

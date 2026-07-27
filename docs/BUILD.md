@@ -118,9 +118,9 @@ cd ..
 ## Orchard Verification Visualization
 
 The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and
-Circuit Grid lives in `web/orchard-verification`. Its production bundle is committed in
-`docs/orchard-verification` so the experience can be served as static files
-without Node.js or a runtime network connection.
+Circuit Grid lives in `web/orchard-verification`. The production bundle is
+generated in the ignored `web/orchard-verification/dist` directory. It is
+uploaded directly to GitHub Pages by CI and must not be committed.
 
 Install the pinned dependencies and start the development server from the
 repository root:
@@ -166,26 +166,25 @@ metadata states those coverage limits explicitly.
 The generation step requires the Rocq/OCaml environment described above. It
 does not modify or build the sibling Halo2 and Orchard repositories.
 
-Before committing a change, run the type checks and component tests, rebuild
-the committed bundle, and run the browser tests:
+Before committing a change, run the type checks and component tests, build the
+production bundle, and run the browser tests:
 
 ```sh
 npm run check
 npm run build
 npx playwright install chromium
 npm run test:e2e
-git diff --exit-code -- ../../docs/orchard-verification
 ```
 
-The final command is expected to succeed after the regenerated bundle has been
-staged or committed. In CI, Playwright installs Chromium together with its
-system dependencies.
+In CI, Playwright installs Chromium together with its system dependencies.
+Pull requests run all validation without publishing. A successful build on
+`main` uploads `dist` as a GitHub Pages artifact and deploys it.
 
-To inspect only the committed production files, serve them from the repository
-root:
+To inspect the production bundle locally after `npm run build`, serve it from
+the repository root:
 
 ```sh
-python3 -m http.server 4173 --directory docs/orchard-verification
+python3 -m http.server 4173 --directory web/orchard-verification/dist
 ```
 
 Then open `http://localhost:4173/` for the Journey,
