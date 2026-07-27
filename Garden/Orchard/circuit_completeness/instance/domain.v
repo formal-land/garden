@@ -2,11 +2,10 @@
 
     The [vm_compute] certificates placing [test_input] in the completeness
     domain: the §4.18.4 typing/ownership envelope ([test_input_valid]) and
-    the Sinsemilla clauses of the exceptional-case exclusions (the Merkle
-    chain and the three hash messages, each one linear accumulator pass).
-    The variable-base clause's four index-range certificates live in the
-    parallel [instance_mul_*.v] leaves; [instance/cert.v] assembles
-    [test_input_nondegenerate] from all eight. *)
+    the exceptional-case exclusions — the Merkle chain, the three Sinsemilla
+    hash messages and the variable-base ladder, each one linear accumulator
+    pass.  [instance/cert.v] assembles [test_input_nondegenerate] from the
+    five nondegeneracy certificates. *)
 
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
@@ -48,6 +47,11 @@ Module OrchardCompletenessInstanceDomain.
     sins_nondeg_go
       (OrchardSpec.commit_ivk_q orchard_circuit_params)
       (commit_ivk_words test_input) = true.
+  Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+  (** The variable-base clause: one pass down the 251 incomplete bit
+      indices, two group additions and one incomplete addition per step. *)
+  Lemma mul_chain_cert : mul_chain_b test_input = true.
   Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
 End OrchardCompletenessInstanceDomain.

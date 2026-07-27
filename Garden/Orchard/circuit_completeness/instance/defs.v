@@ -11,10 +11,12 @@
     the instance theorem.
 
     The nondegeneracy checkers are linear: each Sinsemilla clause folds the
-    accumulator through the message once ([sins_nondeg_go]) and the Merkle
+    accumulator through the message once ([sins_nondeg_go]), the Merkle
     clause threads the running node through the 32 layers
-    ([merkle_nondeg_go]), instead of recomputing per-round hash prefixes —
-    the per-read recomputation pitfall of [docs/compile-performance.md]. *)
+    ([merkle_nondeg_go]), and the variable-base clause threads the ladder
+    accumulator through the 251 bit indices ([mul_chain_go]), instead of
+    recomputing per-round hash prefixes or per-index scalar multiples — the
+    per-read recomputation pitfall of [docs/compile-performance.md]. *)
 
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.lemmas.
@@ -35,6 +37,7 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
+Require Import Garden.Orchard.circuit_proof.ownership.var_base_defs.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Import Garden.Orchard.circuit_completeness.generator.certificates.
 Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
@@ -481,69 +484,72 @@ Module OrchardCompletenessInstanceDefs.
 
   (** ** The variable-base mul nondegeneracy checker
 
-      One accumulator multiple per bit index (the [let] binds the point once
-      per step).  The 251 indices are certified in four ranges across
-      parallel leaf files ([instance/mul_*.v]); [mul_ranges_sound] joins
-      them. *)
-  Definition mul_step_b (w : HonestInput) (i : nat) : bool :=
-    let acc := mul_acc w (S i) in
-    negb (Point.x acc =? 0) &&
-    negb (Point.x acc =? Point.x (hi_g_d_old w)) &&
-    negb
-      (Point.x (EccSpec.point_add_incomplete acc (mul_step_point w i)) =?
-       Point.x acc).
+      The accumulators form a chain: [mul_acc w i] is one double-and-add
+      step from [mul_acc w (S i)].  Folding the chain once costs two group
+      additions per bit index, where checking each index on its own costs a
+      [Pallas.mul] over a [256 − i]-bit scalar — the per-read recomputation
+      pitfall of [docs/compile-performance.md], at the range level.
 
-  (** The same step over the derived values rather than the input record.
-
-      [mul_step_b] reaches the ladder scalar through [mul_scalar w], hence
-      through [ivk w], a [Commit^ivk] hash; it does so twice per index (once
-      for the accumulator multiple, once for the bit).  [vm_compute] shares
-      no work between two applications of the same function, so a
-      [w]-indexed range recomputes that hash at every index — the per-read
-      recomputation pitfall of [docs/compile-performance.md].  Taking the
-      scalar and the two base-point spellings as arguments lets the VM build
-      the [forallb] closure once, with the hash already a value. *)
+      The fold runs on the group law ([Pallas.add]), where
+      [VarBaseDefs.double_add_step_multiple] holds with no side condition
+      beyond the base point being reduced and on-curve.  The
+      incomplete-addition nondegeneracy the conjuncts assert is checked at
+      every step, never assumed, so the chain certifies exactly the
+      predicate a per-index scan does. *)
   Definition mul_multiple_at (k : Z) (i : nat) : Z :=
     2 ^ (255 - Z.of_nat i) + 2 * bit_running_sum k i + 1.
 
   Definition mul_step_point_at (k : Z) (B : Point.t) (i : nat) : Point.t :=
     if scalar_bit k i =? 1 then B else point_neg B.
 
-  Definition mul_step_at (k : Z) (B : Point.t) (Bp : Pallas.point) (i : nat)
-      : bool :=
+  Definition mul_step_nondeg_at (k : Z) (B : Point.t) (Bp : Pallas.point)
+      (i : nat) : Prop :=
     let acc := PallasModel.repr (Pallas.mul (mul_multiple_at k (S i)) Bp) in
-    negb (Point.x acc =? 0) &&
-    negb (Point.x acc =? Point.x B) &&
+    Point.x acc <> 0 /\
+    Point.x acc <> Point.x B /\
+    Point.x (EccSpec.point_add_incomplete acc (mul_step_point_at k B i)) <>
+      Point.x acc.
+
+  Definition mul_chain_step (Bp : Pallas.point) (k : Z) (i : nat)
+      (acc : Pallas.point) : Pallas.point :=
+    Pallas.add (Pallas.add acc (VarBaseDefs.signed_base Bp (scalar_bit k i)))
+      acc.
+
+  Definition mul_chain_check (B : Point.t) (k : Z) (i : nat)
+      (acc : Pallas.point) : bool :=
+    let a := PallasModel.repr acc in
+    negb (Point.x a =? 0) &&
+    negb (Point.x a =? Point.x B) &&
     negb
-      (Point.x (EccSpec.point_add_incomplete acc (mul_step_point_at k B i)) =?
-       Point.x acc).
+      (Point.x (EccSpec.point_add_incomplete a (mul_step_point_at k B i)) =?
+       Point.x a).
 
-  (** The partial application the certificates scan: applying it forces the
-      scalar and the base points once, before the range is traversed. *)
-  Definition mul_step_w (w : HonestInput) : nat -> bool :=
-    mul_step_at (mul_scalar w) (hi_g_d_old w) (mul_base w).
+  (** [count] steps from bit index [i] downwards, threading the accumulator.
+      Every constant the body mentions is a parameter, so no spec chain is
+      reachable from the fixpoint. *)
+  Fixpoint mul_chain_go (B : Point.t) (Bp : Pallas.point) (k : Z)
+      (acc : Pallas.point) (i count : nat) : bool :=
+    match count with
+    | O => true
+    | S count' =>
+        mul_chain_check B k i acc &&
+        mul_chain_go B Bp k (mul_chain_step Bp k i acc) (Nat.pred i) count'
+    end.
 
-  (** The two spellings are delta-equal, but conversion must not be allowed
-      to reach [ivk]: the checker is boolean, so whnf of either side forces
-      the guard of [mul_step_point], hence [mul_scalar w], hence [ivk w] —
-      whose body unfolds the whole symbolic [Commit^ivk] chain at a variable
-      input and does not terminate.  With [ivk] opaque both sides get stuck
-      at the same atom and the comparison is structural.  The setting is
-      [Local]: [forward/ecc_add.v] and [forward/var_base_ladder.v] unfold
-      [ivk] and must not inherit it. *)
-  Local Strategy opaque [ivk].
+  (** Bits [254 .. 4], from the initial accumulator [mul_acc w 255]. *)
+  Definition mul_chain_b (w : HonestInput) : bool :=
+    point_ok_b (hi_g_d_old w) &&
+    mul_chain_go (hi_g_d_old w) (mul_base w) (mul_scalar w)
+      (Pallas.mul (mul_multiple_at (mul_scalar w) 255%nat) (mul_base w))
+      254%nat 251%nat.
 
-  Lemma mul_step_w_eq (w : HonestInput) (i : nat) :
-    mul_step_w w i = mul_step_b w i.
-  Proof. reflexivity. Qed.
-
-  Local Strategy transparent [ivk].
-
-  Lemma mul_step_b_sound (w : HonestInput) (i : nat) :
-    mul_step_b w i = true -> mul_step_nondegenerate w i.
+  Lemma mul_chain_check_sound (B : Point.t) (Bp : Pallas.point) (k : Z)
+      (i : nat) :
+    mul_chain_check B k i (Pallas.mul (mul_multiple_at k (S i)) Bp) = true ->
+    mul_step_nondeg_at k B Bp i.
   Proof.
     intros Hcheck.
-    unfold mul_step_b in Hcheck.
+    unfold mul_chain_check in Hcheck.
     cbv beta zeta in Hcheck.
     apply Bool.andb_true_iff in Hcheck.
     destruct Hcheck as [Hcheck Hthird].
@@ -555,32 +561,85 @@ Module OrchardCompletenessInstanceDefs.
     apply Z.eqb_neq in Hfirst.
     apply Z.eqb_neq in Hsecond.
     apply Z.eqb_neq in Hthird.
-    unfold mul_step_nondegenerate.
+    unfold mul_step_nondeg_at.
     cbv zeta.
     exact (conj Hfirst (conj Hsecond Hthird)).
   Qed.
 
-  (** The four ranges are sized by cost, not by index count: the step at
-      index [i] multiplies by a [256 − i]-bit scalar, so the per-index cost
-      falls as the index grows and equal-length ranges would leave the low
-      range setting the wall clock on its own. *)
-  Lemma mul_ranges_sound (w : HonestInput) :
-    List.forallb (mul_step_w w) (List.seq 4 36) = true ->
-    List.forallb (mul_step_w w) (List.seq 40 43) = true ->
-    List.forallb (mul_step_w w) (List.seq 83 56) = true ->
-    List.forallb (mul_step_w w) (List.seq 139 116) = true ->
-    mul_nondegenerate_input w.
+  (** One chain step advances the multiple by one bit: the group-law
+      identity of [VarBaseDefs.double_add_step_multiple] at the
+      [2^(255−i) + 2 z_i + 1] shape. *)
+  Lemma mul_chain_step_multiple (Bp : Pallas.point) (k : Z) (i : nat) :
+    Pallas.reduced Bp -> Pallas.on_curve Bp -> (i < 255)%nat ->
+    mul_chain_step Bp k i (Pallas.mul (mul_multiple_at k (S i)) Bp) =
+    Pallas.mul (mul_multiple_at k i) Bp.
   Proof.
-    intros Ha Hb Hc Hd i Hi.
-    apply mul_step_b_sound.
-    rewrite <- (mul_step_w_eq w i).
-    destruct (Nat.lt_ge_cases i 40) as [H1 | H1];
-      [exact (forallb_seq_sound _ _ _ Ha i ltac:(lia)) |].
-    destruct (Nat.lt_ge_cases i 83) as [H2 | H2];
-      [exact (forallb_seq_sound _ _ _ Hb i ltac:(lia)) |].
-    destruct (Nat.lt_ge_cases i 139) as [H3 | H3];
-      [exact (forallb_seq_sound _ _ _ Hc i ltac:(lia)) |].
-    exact (forallb_seq_sound _ _ _ Hd i ltac:(lia)).
+    intros HrB HoB Hi.
+    assert (Hbit : scalar_bit k i = 0 \/ scalar_bit k i = 1).
+    { unfold scalar_bit.
+      pose proof (Z.mod_pos_bound (k / 2 ^ Z.of_nat i) 2 ltac:(lia)).
+      lia. }
+    unfold mul_chain_step.
+    rewrite (VarBaseDefs.double_add_step_multiple Bp
+      (mul_multiple_at k (S i)) (scalar_bit k i) HrB HoB Hbit).
+    f_equal.
+    unfold mul_multiple_at.
+    rewrite (bit_running_sum_step k i).
+    assert (Hpow : 255 - Z.of_nat i = (255 - Z.of_nat (S i)) + 1) by lia.
+    rewrite Hpow, Z.pow_add_r by lia.
+    rewrite Z.pow_1_r.
+    lia.
+  Qed.
+
+  Lemma mul_chain_go_sound (B : Point.t) (Bp : Pallas.point) (k : Z)
+      (HrB : Pallas.reduced Bp) (HoB : Pallas.on_curve Bp) :
+    forall (count i : nat),
+      (count <= S i)%nat -> (i < 255)%nat ->
+      mul_chain_go B Bp k (Pallas.mul (mul_multiple_at k (S i)) Bp) i count
+        = true ->
+      forall j : nat, (S i - count <= j <= i)%nat ->
+        mul_step_nondeg_at k B Bp j.
+  Proof.
+    induction count as [| c IH]; intros i Hci Hi Hgo j Hj.
+    - lia.
+    - cbn [mul_chain_go] in Hgo.
+      apply Bool.andb_true_iff in Hgo.
+      destruct Hgo as [Hhead Hrest].
+      destruct (Nat.eq_dec i j) as [<- | Hne].
+      + exact (mul_chain_check_sound B Bp k i Hhead).
+      + rewrite (mul_chain_step_multiple Bp k i HrB HoB Hi) in Hrest.
+        assert (Hi1 : (1 <= i)%nat) by lia.
+        replace i with (S (Nat.pred i)) in Hrest at 1 by lia.
+        exact (IH (Nat.pred i) ltac:(lia) ltac:(lia) Hrest j ltac:(lia)).
+  Qed.
+
+  (** Conversion must not be allowed to reach [ivk]: [mul_step_point_at]
+      guards on [scalar_bit (mul_scalar w) i], so whnf of either side forces
+      [ivk w], whose body unfolds the whole symbolic [Commit^ivk] chain at a
+      variable input and does not terminate.  With [ivk] opaque both sides
+      get stuck at the same atom and the comparison is structural.  The
+      setting is [Local]: [forward/ecc_add.v] and
+      [forward/var_base_ladder.v] unfold [ivk] and must not inherit it. *)
+  Local Strategy opaque [ivk].
+
+  Lemma mul_step_nondeg_at_transfer (w : HonestInput) (i : nat) :
+    mul_step_nondeg_at (mul_scalar w) (hi_g_d_old w) (mul_base w) i ->
+    mul_step_nondegenerate w i.
+  Proof. exact (fun H => H). Qed.
+
+  Local Strategy transparent [ivk].
+
+  Lemma mul_chain_sound (w : HonestInput) :
+    mul_chain_b w = true -> mul_nondegenerate_input w.
+  Proof.
+    intros Hchain i Hi.
+    unfold mul_chain_b in Hchain.
+    apply Bool.andb_true_iff in Hchain.
+    destruct Hchain as [Hok Hgo].
+    pose proof (point_ok_b_sound _ Hok) as (HrB & HoB & _).
+    apply (mul_step_nondeg_at_transfer w i).
+    exact (mul_chain_go_sound (hi_g_d_old w) (mul_base w) (mul_scalar w)
+      HrB HoB 251%nat 254%nat ltac:(lia) ltac:(lia) Hgo i ltac:(lia)).
   Qed.
 
   (** ** The nondegeneracy assembly
@@ -599,13 +658,10 @@ Module OrchardCompletenessInstanceDefs.
     sins_nondeg_go
       (OrchardSpec.commit_ivk_q orchard_circuit_params)
       (commit_ivk_words w) = true ->
-    List.forallb (mul_step_w w) (List.seq 4 36) = true ->
-    List.forallb (mul_step_w w) (List.seq 40 43) = true ->
-    List.forallb (mul_step_w w) (List.seq 83 56) = true ->
-    List.forallb (mul_step_w w) (List.seq 139 116) = true ->
+    mul_chain_b w = true ->
     nondegenerate w.
   Proof.
-    intros Hmerkle Hnc_old Hnc_new Hivk Ha Hb Hc Hd.
+    intros Hmerkle Hnc_old Hnc_new Hivk Hchain.
     unfold nondegenerate.
     split.
     { intros i Hi.
@@ -615,7 +671,7 @@ Module OrchardCompletenessInstanceDefs.
     split; [exact (sins_nondeg_sound _ _ Hnc_old) |].
     split; [exact (sins_nondeg_sound _ _ Hnc_new) |].
     split; [exact (sins_nondeg_sound _ _ Hivk) |].
-    exact (mul_ranges_sound w Ha Hb Hc Hd).
+    exact (mul_chain_sound w Hchain).
   Qed.
 
   (** ** The generated assignment and the enabled-point shards *)

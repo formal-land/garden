@@ -335,45 +335,69 @@ certificate `Qed` re-pays the record build), so keep the number of
 heavy-certificate `Qed`s per file small — within one file's compilation the
 VM shares evaluated globals across successive `vm_compute` sentences.
 
-### Per-index checkers must take the derived values, not the witness record
+### Fold a chained quantity once; never certify its members independently
 
-The same sharing rule applies to any range checker, not just to advice
-planes.  Measured on the variable-base nondegeneracy ranges
-(`circuit_completeness/instance/mul_{a..d}.v`, 2026-07-27): `mul_step_b w i`
-reached the ladder scalar through `mul_scalar w`, hence `ivk w`, a
-`Commit^ivk` hash — twice per index, once for the accumulator multiple and
-once for the bit.  One `ivk test_input` costs 28.3 s on its first evaluation
-(bytecode compilation plus global forcing) and **4.9 s marginally**, against
-10.1 s for a whole step at index 250 and 27.2 s at index 10.  So 9.8 s of
-every index was recomputing one scalar: ≈ 41 min of the ≈ 90 min the four
-ranges cost between them.  Taking the scalar and the base points as
-arguments (`mul_step_at k B Bp i`, applied once as `mul_step_w w`) lets the
-VM build the `forallb` closure with the hash already a value, and cut the
-four ranges to 11.4 / 11.2 / 10.9 / 9.4 min.
+The sharing rule applies to range checkers, not just to advice planes, and
+its strongest form is structural: when the quantity a range quantifies over
+satisfies a recurrence, certify the fold, not the members.  Measured on the
+variable-base nondegeneracy range of the completeness instance (2026-07-27,
+`circuit_completeness/instance/`).
 
-Two companions from the same change:
+The clause needs, for each of the 251 incomplete bit indices, three
+non-degeneracy facts about the ladder accumulator `mul_acc w (S i)`.  Spelled
+per index it costs one `Pallas.mul` over a `256 − i`-bit scalar each — four
+sharded leaves, ≈ 90 min of VM time between them.  But `mul_acc w i` is one
+double-and-add step from `mul_acc w (S i)`, so one linear fold
+(`mul_chain_go`: two group additions and one incomplete addition per index)
+computes every accumulator in the chain.  The whole clause became a **49 s**
+`vm_cast_no_check` in `instance/domain.v` and the four leaves were deleted.
 
-- **Size parallel shards by cost, not by index count.**  The step at index
-  `i` multiplies by a `256 − i`-bit scalar, so per-index cost falls roughly
-  linearly with the index, and four equal-length ranges leave the lowest one
-  setting the wall clock by itself (31 min against 15 min for the highest).
-  Fitting `cost(i) ≈ 1.2 + 0.066·(256 − i)` seconds against the two measured
-  ends gives the split `[4,39] / [40,82] / [83,138] / [139,254]`, which
-  measured 9.4–11.4 min across the four.
-- **A delta-identical bridge lemma can still diverge.**  `mul_step_w w i =
-  mul_step_b w i` holds by delta alone, yet `reflexivity` does not terminate
-  (> 10 min at 2.4 GB and climbing): the checker is boolean, so whnf of
-  either side forces the guard of `mul_step_point`, hence `mul_scalar w`,
-  hence `ivk w`, whose body unfolds the whole symbolic `Commit^ivk` chain at
-  a *variable* input.  Prop-level spellings of the same bridge are safe —
-  `Point.x acc <> 0` against its counterpart stays congruent through `eq`,
-  `Point.x`, `repr` and `Pallas.mul`, never reaching a match — but every
-  boolean- or match-headed spelling diverges, including the
-  `mul_step_nondegenerate` conclusion (its `mul_step_point` guard).
+What makes the fold provable without circularity is which addition it runs
+on.  `forward/ecc_add.v`'s `ladder_go_snd` threads the *incomplete* chip
+addition and therefore carries a nondegeneracy hypothesis — the very thing
+being certified.  `VarBaseDefs.double_add_step_multiple` states the same step
+on the **complete group law** `Pallas.add`, where it holds given only
+`Pallas.reduced`/`Pallas.on_curve` of the base point.  So the chain induction
+is unconditional and the incomplete-addition conjuncts are *checked* at each
+step rather than assumed.  Reach for the complete-law lemma whenever a fold
+must be justified before its exceptional cases are known to be excluded.
+
+Two lessons the same change left behind, both general:
+
+- **A per-index checker must take the derived values, not the witness
+  record.**  `vm_compute` shares no work between two applications of the same
+  function, so `mul_step_b w i` — which reaches the scalar through
+  `mul_scalar w`, hence `ivk w`, a `Commit^ivk` hash, twice per index —
+  recomputed that hash at every index.  One `ivk test_input` costs 28.3 s on
+  its first evaluation (bytecode compilation plus global forcing) and **4.9 s
+  marginally**, against 10.1 s for a whole step at index 250 and 27.2 s at
+  index 10: 9.8 s of every index, ≈ 41 min of the ≈ 90 min.  Passing the
+  scalar and base points as arguments so the VM builds the `forallb` closure
+  with the hash already a value cut the four ranges to 11.4 / 11.2 / 10.9 /
+  9.4 min — before the fold removed them entirely.  Where a range genuinely
+  has no recurrence to exploit, this hoisting is the whole remedy.
+- **A delta-identical bridge lemma can still diverge.**  Bridging the
+  record-indexed and value-indexed spellings holds by delta alone, yet
+  `reflexivity` does not terminate (> 10 min at 2.4 GB and climbing): the
+  checker is boolean, so whnf of either side forces the guard of
+  `mul_step_point`, hence `mul_scalar w`, hence `ivk w`, whose body unfolds
+  the whole symbolic `Commit^ivk` chain at a *variable* input.  Prop-level
+  spellings are safe — `Point.x acc <> 0` against its counterpart stays
+  congruent through `eq`, `Point.x`, `repr` and `Pallas.mul`, never reaching
+  a match — but every boolean- or match-headed spelling diverges, including
+  the `mul_step_nondegenerate` conclusion (its `mul_step_point` guard).
   `Strategy opaque [ivk]` makes all of them instant: both sides get stuck at
   the same atom and the comparison is structural.  Keep the setting
-  `Local` — `forward/ecc_add.v` and `forward/var_base_ladder.v` unfold
-  `ivk` and must not inherit it.
+  `Local` — `forward/ecc_add.v` and `forward/var_base_ladder.v` unfold `ivk`
+  and must not inherit it.
+
+Sizing note, still worth having if a range ever needs sharding again: the
+step at index `i` multiplies by a `256 − i`-bit scalar, so per-index cost
+falls roughly linearly with the index and equal-length shards leave the
+lowest one setting the wall clock by itself (31 min against 15 min for the
+highest).  Fitting `cost(i) ≈ 1.2 + 0.066·(256 − i)` seconds against the two
+measured ends balanced the four shards to 9.4–11.4 min.  Size parallel
+shards by cost, never by member count.
 
 ### Pre-reduce both sides before `reflexivity` against the hoisted advice plane
 
@@ -812,12 +836,25 @@ For pure mod-p polynomial identities use `mod_ring_solve`
 (`Garden/Halo2/lemmas.v`), reserving `field_solve` for genuine linear
 arithmetic; see `docs/halo2-proof.md` for the rule and its mechanism.
 
-## Current costs (measured 2026-07-06)
+## Current costs
 
-Full clean build: ≈ 1 570 s CPU over 275 files, ≈ 212 s ideal wall. The wall
-clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
-(18 s) → `hash_to_point_round_proof` (105 s) → `circuit_proof/merkle.v`
-(25 s) — with the fixed-base chain ~60 s shorter. Heavy leaves:
+Full clean build (`make clean`, then `make -j32`, measured 2026-07-27 on an
+otherwise idle 32-core machine): **1 258 s wall, 8 686 s user CPU, 401 files
+compiled**, 9.3 GB peak resident. The wall clock is no longer set by a
+dependency chain but by a single file: `instance/read.v` alone is 972 s, i.e.
+77 % of the build, and everything else fits around it. The next-largest
+independent blocks are the other completeness-instance leaves (6–10 min each,
+fully parallel) and the eight Sinsemilla provenance shards (≈ 247 s each,
+fully parallel).
+
+That figure covers the files present in this worktree. The `Orchard/vk_*`
+leaves the entries below describe — the pinned-vk, transcript-repr, MSM and
+Vesta SRS layers of the circuit-compilation track — are **not** on this
+branch, so they are excluded from it; expect the total to grow once they
+land. The superseded 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
+≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
+`chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
+predates the completeness-instance layer entirely. Heavy leaves:
 
 - `Orchard/circuit_operational.v` (2026-07-14): 17.8 s / 1.66 GB peak —
   dominated by `orchard_replay_ok`, a single `vm_cast_no_check` VM run of
@@ -892,30 +929,36 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   the hoisted `tables.v` record — which now also carries the variable-base
   ladder record of `tables_vb.v`, one linear double-and-add fold with two
   field inversions per bit; every run pays the ≈ 4 min record build once,
-  then per-cell lookups; the eleven leaves are mutually independent and
+  then per-cell lookups; the seven leaves are mutually independent and
   compile fully parallel, ≈ 16 min wall on a free machine, set by
   `instance/read.v`):
+  file totals remeasured 2026-07-27 inside the 32-way parallel clean build,
+  so they run a little above their isolated cost:
+  `instance/read.v` (`read_action_inputs_ok`; the specification side
+  recomputes `anchor_root` and the commitment values) 16:12 — the single
+  most expensive file in the tree, and on its own 77 % of the whole build's
+  wall clock;
+  `instance/domain.v` (`valid_b`, the linear Merkle/Sinsemilla
+  nondegeneracy clauses, and the variable-base ladder chain) 9:30, of which
+  `test_input_valid_b` is 5:30, `mul_chain_cert` 49 s, `merkle_nondeg_cert`
+  47 s and `nc_new_nondeg_cert` 45 s;
   `instance/shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
-  layer families, one `vm_compute`) 8:32 / 1.0 GB;
-  `instance/shards_misc.v` (witness-input, Poseidon, gadget-local,
-  Orchard-checks + the value-commitment, nullifier and spend-authority
-  families, two `vm_compute`s sharing the record build) 6:55;
+  layer families, one `vm_compute`) 9:16 / 1.0 GB;
   `instance/shards_blocked.v` (the variable-base ladder, overflow,
   `NoteCommit` and `Commit^ivk` decomposition/canonicity families 37–40,
-  four `vm_compute`s sharing the record build) 7:49 / 0.95 GB;
+  four `vm_compute`s sharing the record build) 8:32 / 0.95 GB;
+  `instance/shards_misc.v` (witness-input, Poseidon, gadget-local,
+  Orchard-checks + the value-commitment, nullifier and spend-authority
+  families, two `vm_compute`s sharing the record build) 7:36;
   `instance/witness.v` (all 2 964 copy/constant witness facts, one
-  `vm_compute`) 5:40 / 0.8 GB;
-  `instance/read.v` (`read_action_inputs_ok`; the specification side
-  recomputes `anchor_root` and the commitment values) 15:56 / 0.8 GB;
-  `instance/domain.v` (`valid_b` plus the linear Merkle/Sinsemilla
-  nondegeneracy clauses) 8:32; the four variable-base nondegeneracy ranges
-  (`instance/mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index over
-  the hoisted scalar, ranges sized by cost — see the per-index-checker
-  pitfall above) 11.4 / 11.2 / 10.9 / 9.4 min, 0.73 GB peak each
-  (2026-07-27; was 31 / 24 / 20 / 15 min before the scalar was hoisted out
-  of the per-index closure); `instance/defs.v`, `generator/tables.v`,
+  `vm_compute`) 6:16 / 0.8 GB;
+  `instance/cert.v` 1.1 s, and `instance/defs.v`, `generator/tables.v`,
   `generator/tables_vb.v`, `generator/tables_nc.v` and
   `generator/honest_assignment.v` (definitions only) ≈ 1 s each.
+  The variable-base nondegeneracy clause used to be four sharded leaves
+  (`instance/mul_{a..d}.v`, one `Pallas.mul` per bit index, ≈ 90 min of CPU
+  and 31 min of wall between them); it is now the 49 s `mul_chain_cert`
+  above — see the chained-quantity pitfall.
 - The operational-completeness leaves
   (`Orchard/circuit_completeness/operational/`, measured 2026-07-27 on a
   shared 32-core host, full `.vo`): `certs.v` 70 s — nine
