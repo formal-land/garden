@@ -38,7 +38,7 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.add_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
@@ -87,10 +87,10 @@ Module OrchardWitnessBitsColumn.
     (X mod 2 ^ s) / 2 ^ u = (X / 2 ^ u) mod 2 ^ v.
   Proof.
     intros Hu Hv Hs.
-    pose proof (OrchardForwardArith.pow2_pos u Hu) as Hpu.
-    pose proof (OrchardForwardArith.pow2_pos v Hv) as Hpv.
+    pose proof (pow2_pos u Hu) as Hpu.
+    pose proof (pow2_pos v Hv) as Hpv.
     subst s.
-    rewrite OrchardForwardArith.pow2_split by lia.
+    rewrite pow2_split by lia.
     rewrite Z.rem_mul_r by lia.
     rewrite (Z.mul_comm (2 ^ u)).
     rewrite Z.div_add by lia.
@@ -106,7 +106,7 @@ Module OrchardWitnessBitsColumn.
   Proof.
     intros Hd Hu Hv Hs Ha.
     rewrite (mod_div (X / 2 ^ d) u v s Hu Hv Hs).
-    rewrite OrchardForwardArith.div_div_pow by lia.
+    rewrite div_div_pow by lia.
     rewrite <- Ha.
     reflexivity.
   Qed.
@@ -120,9 +120,9 @@ Module OrchardWitnessBitsColumn.
     Y mod 2 ^ u + 2 ^ u * ((Y / 2 ^ u) mod 2 ^ v) = Y mod 2 ^ (u + v).
   Proof.
     intros Hu Hv.
-    pose proof (OrchardForwardArith.pow2_pos u Hu).
-    pose proof (OrchardForwardArith.pow2_pos v Hv).
-    rewrite OrchardForwardArith.pow2_split by lia.
+    pose proof (pow2_pos u Hu).
+    pose proof (pow2_pos v Hv).
+    rewrite pow2_split by lia.
     rewrite Z.rem_mul_r by lia.
     reflexivity.
   Qed.
@@ -147,7 +147,7 @@ Module OrchardWitnessBitsColumn.
     - cbn [SinsemillaSpec.words_le List.nth].
       unfold SinsemillaSpec.sinsemilla_k.
       rewrite (IH j (X / 2 ^ 10) (10 * Z.of_nat j)) by lia.
-      rewrite OrchardForwardArith.div_div_pow by lia.
+      rewrite div_div_pow by lia.
       rewrite Ha, Nat2Z.inj_succ.
       replace (10 + 10 * Z.of_nat j) with (10 * Z.succ (Z.of_nat j)) by lia.
       reflexivity.
@@ -320,7 +320,7 @@ Module OrchardWitnessBitsColumn.
       rewrite Hnb.
       rewrite (words_le_nth n j X a ltac:(lia) Ha).
       rewrite (IH (S j) (a + 10) (b - 10)).
-      + rewrite <- (OrchardForwardArith.div_div_pow X a 10) by lia.
+      + rewrite <- (div_div_pow X a 10) by lia.
         rewrite slice_cons by lia.
         replace (10 + (b - 10)) with b by lia.
         lia.

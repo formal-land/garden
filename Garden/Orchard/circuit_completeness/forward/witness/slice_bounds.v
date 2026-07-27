@@ -35,7 +35,7 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.add_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
@@ -66,7 +66,7 @@ Module OrchardWitnessSliceBounds.
     intros [Ha Hab].
     apply Z.mod_mod_divide.
     exists (2 ^ (b - a)).
-    rewrite <- OrchardForwardArith.pow2_split by lia.
+    rewrite <- pow2_split by lia.
     f_equal; lia.
   Qed.
 
@@ -82,17 +82,17 @@ Module OrchardWitnessSliceBounds.
     (x mod 2 ^ b) / 2 ^ a = x / 2 ^ a mod 2 ^ (b - a).
   Proof.
     intros [Ha Hab].
-    pose proof (OrchardForwardArith.pow2_pos a Ha).
-    pose proof (OrchardForwardArith.pow2_pos (b - a) ltac:(lia)).
-    pose proof (OrchardForwardArith.pow2_pos b ltac:(lia)).
+    pose proof (pow2_pos a Ha).
+    pose proof (pow2_pos (b - a) ltac:(lia)).
+    pose proof (pow2_pos b ltac:(lia)).
     rewrite (Z.mod_eq x (2 ^ b)) by lia.
     replace (x - 2 ^ b * (x / 2 ^ b))
       with (x + - (x / 2 ^ b) * 2 ^ (b - a) * 2 ^ a)
-      by (rewrite <- Z.mul_assoc, <- OrchardForwardArith.pow2_split by lia;
+      by (rewrite <- Z.mul_assoc, <- pow2_split by lia;
           replace (b - a + a) with b by lia; ring).
     rewrite Z.div_add by lia.
     rewrite (Z.mod_eq (x / 2 ^ a) (2 ^ (b - a))) by lia.
-    rewrite OrchardForwardArith.div_div_pow by lia.
+    rewrite div_div_pow by lia.
     replace (a + (b - a)) with b by lia.
     ring.
   Qed.
@@ -101,7 +101,7 @@ Module OrchardWitnessSliceBounds.
     (LOW + M * 2 ^ b) / 2 ^ b = M.
   Proof.
     intros Hb HL.
-    pose proof (OrchardForwardArith.pow2_pos b Hb).
+    pose proof (pow2_pos b Hb).
     rewrite Z.div_add by lia.
     rewrite Z.div_small by lia.
     apply Z.add_0_l.
@@ -118,7 +118,7 @@ Module OrchardWitnessSliceBounds.
     point_ok P ->
     0 <= Point.x P < Primes.pallas_p /\ 0 <= Point.y P < Primes.pallas_p.
   Proof.
-    pose proof OrchardForwardArith.pallas_p_pos as Hp.
+    pose proof Primes.pallas_p_pos as Hp.
     intros (Hred & _ & Hid).
     unfold Pallas.reduced, Weierstrass.reduced, PallasModel.unrepr in Hred.
     destruct ((Point.x P =? 0) && (Point.y P =? 0))%bool eqn:Hz.
@@ -206,7 +206,7 @@ Module OrchardWitnessSliceBounds.
     unfold nc_b2, nc_b.
     rewrite div_of_mod by lia.
     rewrite mod_mod_two by lia.
-    rewrite OrchardForwardArith.div_div_pow by lia.
+    rewrite div_div_pow by lia.
     replace (250 + 5) with 255 by lia.
     rewrite nc_view_0.
     rewrite (view_shift (EccSpec.extract_x gd) _ 255 ltac:(lia) Hxg).
@@ -232,10 +232,10 @@ Module OrchardWitnessSliceBounds.
     rewrite Htwo.
     rewrite div_of_mod by lia.
     rewrite mod_mod_two by lia.
-    rewrite OrchardForwardArith.div_div_pow by lia.
+    rewrite div_div_pow by lia.
     replace (510 + 1) with 511 by lia.
     transitivity (nc_packed gd pkd v rho psi / 2 ^ 256 / 2 ^ 255 mod 2).
-    { rewrite OrchardForwardArith.div_div_pow by lia.
+    { rewrite div_div_pow by lia.
       replace (256 + 255) with 511 by lia.
       reflexivity. }
     rewrite (nc_view_256 gd pkd v rho psi Hxg).
@@ -280,7 +280,7 @@ Module OrchardWitnessSliceBounds.
     change (2 ^ (10 * 25)) with (2 ^ 250).
     apply Z.div_small.
     apply Z.mod_pos_bound.
-    apply OrchardForwardArith.pow2_pos; lia.
+    apply pow2_pos; lia.
   Qed.
 
   Lemma mag_tail (w : HonestInput) (Hv : valid w) : magnitude w / 8 ^ 22 = 0.
@@ -324,7 +324,7 @@ Module OrchardWitnessSliceBounds.
     rewrite nscalar_shape.
     unfold BinOp.add.
     apply Z.mod_pos_bound.
-    exact OrchardForwardArith.pallas_p_pos.
+    exact Primes.pallas_p_pos.
   Qed.
 
   (** The hoisted derivation record stays a stuck atom from here on: no

@@ -73,7 +73,7 @@ Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Import Garden.Orchard.circuit_completeness.generator.certificates.
@@ -561,7 +561,7 @@ Module OrchardForwardLookupsWitness.
     end.
     cbn [OrchardVarBaseTables.vb_s].
     apply Z.mod_pos_bound.
-    exact OrchardForwardArith.pallas_p_pos.
+    exact Primes.pallas_p_pos.
   Qed.
 
   (** ** The running-site values
@@ -664,7 +664,7 @@ Module OrchardForwardLookupsWitness.
       unfold alpha_z0.
       cbv zeta.
       apply Z.mod_pos_bound.
-      exact OrchardForwardArith.pallas_p_pos.
+      exact Primes.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -695,7 +695,7 @@ Module OrchardForwardLookupsWitness.
     - intros w _ _.
       unfold OrchardNoteCommitCells.civk_a_prime, OrchardNoteCommitCells.prime_of.
       apply Z.mod_pos_bound.
-      exact OrchardForwardArith.pallas_p_pos.
+      exact Primes.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -709,7 +709,7 @@ Module OrchardForwardLookupsWitness.
       unfold OrchardNoteCommitCells.civk_b2_c_prime,
         OrchardNoteCommitCells.prime_of.
       apply Z.mod_pos_bound.
-      exact OrchardForwardArith.pallas_p_pos.
+      exact Primes.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -720,7 +720,7 @@ Module OrchardForwardLookupsWitness.
   Proof.
     unfold OrchardNoteCommitCells.prime_of.
     apply Z.mod_pos_bound.
-    exact OrchardForwardArith.pallas_p_pos.
+    exact Primes.pallas_p_pos.
   Qed.
 
   Lemma ycanon_j_range (y : Z) :

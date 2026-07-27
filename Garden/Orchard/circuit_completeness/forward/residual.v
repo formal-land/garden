@@ -45,7 +45,7 @@ Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.EllipticCurve.Pallas.
@@ -587,14 +587,14 @@ Module OrchardForwardResidual.
   (** ** Integer facts about the packing *)
 
   Lemma pow2_nz (k : Z) (Hk : 0 <= k) : 2 ^ k <> 0.
-  Proof. pose proof (OrchardForwardArith.pow2_pos k Hk). lia. Qed.
+  Proof. pose proof (pow2_pos k Hk). lia. Qed.
 
-  Ltac pow_side := first [apply pow2_nz | apply OrchardForwardArith.pow2_pos]; lia.
+  Ltac pow_side := first [apply pow2_nz | apply pow2_pos]; lia.
 
   Lemma div_mod_split (x k : Z) (Hk : 0 <= k) :
     x = x mod 2 ^ k + x / 2 ^ k * 2 ^ k.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos k Hk) as Hp.
+    pose proof (pow2_pos k Hk) as Hp.
     pose proof (Z.div_mod x (2 ^ k) ltac:(lia)) as H.
     clear -H. lia.
   Qed.
@@ -609,7 +609,7 @@ Module OrchardForwardResidual.
   Lemma div_low (u v k : Z) (Hk : 0 <= k) (Hu : 0 <= u < 2 ^ k) :
     (u + v * 2 ^ k) / 2 ^ k = v.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos k Hk) as Hp.
+    pose proof (pow2_pos k Hk) as Hp.
     rewrite Z.div_add by lia.
     rewrite (Z.div_small u (2 ^ k)) by exact Hu.
     lia.
@@ -619,8 +619,8 @@ Module OrchardForwardResidual.
       (Hu : 0 <= u < 2 ^ k) :
     (u + v * 2 ^ k) mod (2 ^ k * 2 ^ m) = u + v mod 2 ^ m * 2 ^ k.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos k Hk) as Hpk.
-    pose proof (OrchardForwardArith.pow2_pos m Hm) as Hpm.
+    pose proof (pow2_pos k Hk) as Hpk.
+    pose proof (pow2_pos m Hm) as Hpm.
     rewrite Z.rem_mul_r by lia.
     rewrite (mod_low u v k Hk Hu).
     rewrite (div_low u v k Hk Hu).
@@ -630,8 +630,8 @@ Module OrchardForwardResidual.
   Lemma div_split2 (x k m : Z) (Hk : 0 <= k) (Hm : 0 <= m) :
     x / (2 ^ k * 2 ^ m) = x / 2 ^ k / 2 ^ m.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos k Hk) as Hpk.
-    pose proof (OrchardForwardArith.pow2_pos m Hm) as Hpm.
+    pose proof (pow2_pos k Hk) as Hpk.
+    pose proof (pow2_pos m Hm) as Hpm.
     rewrite Z.div_div by lia.
     reflexivity.
   Qed.
@@ -662,7 +662,7 @@ Module OrchardForwardResidual.
   Lemma u_range (left : Z) (Hlf : 0 <= left < 2 ^ 255) :
     0 <= left / 2 ^ 250 < 2 ^ 5.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos 250 ltac:(lia)) as Hp.
+    pose proof (pow2_pos 250 ltac:(lia)) as Hp.
     split; [apply Z.div_pos; lia |].
     apply Z.div_lt_upper_bound; [lia |].
     replace (2 ^ 250 * 2 ^ 5) with (2 ^ 255) by reflexivity.
@@ -672,7 +672,7 @@ Module OrchardForwardResidual.
   Lemma v_range (left : Z) (Hlf : 0 <= left < 2 ^ 255) :
     0 <= left / 2 ^ 240 < 2 ^ 15.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos 240 ltac:(lia)) as Hp.
+    pose proof (pow2_pos 240 ltac:(lia)) as Hp.
     split; [apply Z.div_pos; lia |].
     apply Z.div_lt_upper_bound; [lia |].
     replace (2 ^ 240 * 2 ^ 15) with (2 ^ 255) by reflexivity.
@@ -682,7 +682,7 @@ Module OrchardForwardResidual.
   Lemma q_range (right : Z) (Hrt : 0 <= right < 2 ^ 255) :
     0 <= right / 2 ^ 5 < 2 ^ 250.
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos 5 ltac:(lia)) as Hp.
+    pose proof (pow2_pos 5 ltac:(lia)) as Hp.
     split; [apply Z.div_pos; lia |].
     apply Z.div_lt_upper_bound; [lia |].
     replace (2 ^ 5 * 2 ^ 250) with (2 ^ 255) by reflexivity.
@@ -702,8 +702,8 @@ Module OrchardForwardResidual.
   Lemma mb0_val (L left right : Z) (HL : 0 <= L < 2 ^ 10) :
     mnum L left right mod 2 ^ 250 = L + 2 ^ 10 * (left mod 2 ^ 240).
   Proof.
-    pose proof (OrchardForwardArith.pow2_pos 10 ltac:(lia)) as Hp10.
-    pose proof (OrchardForwardArith.pow2_pos 240 ltac:(lia)) as Hp240.
+    pose proof (pow2_pos 10 ltac:(lia)) as Hp10.
+    pose proof (pow2_pos 240 ltac:(lia)) as Hp240.
     replace (2 ^ 250) with (2 ^ 10 * 2 ^ 240) by reflexivity.
     rewrite Z.rem_mul_r by lia.
     rewrite (mnum_mod10 L left right HL), (mb1_val L left right HL).
@@ -720,7 +720,7 @@ Module OrchardForwardResidual.
     rewrite (mnum_div10 L left right HL).
     replace (left + right * 2 ^ 255)
       with (left + right * 2 ^ 15 * 2 ^ 240) by ring.
-    pose proof (OrchardForwardArith.pow2_pos 240 ltac:(lia)) as Hp240.
+    pose proof (pow2_pos 240 ltac:(lia)) as Hp240.
     rewrite Z.div_add by lia.
     replace (2 ^ 20) with (2 ^ 15 * 2 ^ 5) by reflexivity.
     apply split_low; [lia | lia | exact (v_range left Hlf)].
@@ -736,7 +736,7 @@ Module OrchardForwardResidual.
     rewrite (mnum_div10 L left right HL).
     replace (left + right * 2 ^ 255)
       with (left + right * 2 ^ 5 * 2 ^ 250) by ring.
-    pose proof (OrchardForwardArith.pow2_pos 250 ltac:(lia)) as Hp250.
+    pose proof (pow2_pos 250 ltac:(lia)) as Hp250.
     rewrite Z.div_add by lia.
     replace (2 ^ 10) with (2 ^ 5 * 2 ^ 5) by reflexivity.
     apply split_low; [lia | lia | exact (u_range left Hlf)].
@@ -849,8 +849,8 @@ Module OrchardForwardResidual.
       replace (10 * Z.of_nat (S c)) with (10 + 10 * Z.of_nat c) by lia.
       rewrite Z.pow_add_r by lia.
       rewrite Z.rem_mul_r
-        by (pose proof (OrchardForwardArith.pow2_pos 10 ltac:(lia));
-            pose proof (OrchardForwardArith.pow2_pos (10 * Z.of_nat c) ltac:(lia)); lia).
+        by (pose proof (pow2_pos 10 ltac:(lia));
+            pose proof (pow2_pos (10 * Z.of_nat c) ltac:(lia)); lia).
       reflexivity.
   Qed.
 

@@ -37,6 +37,7 @@ Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.complete.
 Require Import Garden.Field.Field.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Plonky3.M.
 Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
@@ -124,9 +125,6 @@ Module OrchardWitnessFixedLegs.
       first [n − 1] windows by [2·8^w] and subtracts the accumulated offset
       on the last window, so the [n] window scalars sum back to the scalar
       whenever it fits in [n] windows. *)
-
-  Lemma pow8_pos (m : nat) : 0 < 8 ^ Z.of_nat m.
-  Proof. apply Z.pow_pos_nonneg; [lia | apply Nat2Z.is_nonneg]. Qed.
 
   Lemma wos_succ (m : nat) :
     window_offset_sum (S m) = 2 * 8 ^ Z.of_nat m + window_offset_sum m.

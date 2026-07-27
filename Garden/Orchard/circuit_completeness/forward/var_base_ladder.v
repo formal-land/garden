@@ -61,7 +61,7 @@ Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.Pallas.Generators.
 Require Import Garden.Orchard.circuit_proof.inputs.
@@ -541,12 +541,12 @@ Module OrchardVarBaseForward.
     assert (Hs1 : L1 *F (xa -F bx) = ya -F yp).
     { unfold L1.
       rewrite div_mul;
-        [| exact OrchardForwardArith.pallas_p_gt_2 | exact Hd1].
+        [| exact Primes.pallas_p_gt_2 | exact Hd1].
       apply from_sub_reduced. }
     assert (Hs2 : L2 *F (xa -F XR) = ya -F YR).
     { unfold L2.
       rewrite div_mul;
-        [| exact OrchardForwardArith.pallas_p_gt_2 | exact Hd2].
+        [| exact Primes.pallas_p_gt_2 | exact Hd2].
       apply from_sub_reduced. }
     assert (Hchord1 : L1 *F (xa -F XR) = YR +F ya).
     { unfold YR. mod_ring_solve. }
@@ -1673,7 +1673,7 @@ Module OrchardVarBaseForward.
     unfold BinOp.sub, BinOp.mul, UnOp.from.
     transitivity (b mod Primes.pallas_p).
     2:{ apply Z.mod_small.
-        pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
+        pose proof Primes.pallas_p_gt_2 as Hp.
         clear -Hb Hp.
         lia. }
     lazymatch goal with
@@ -1702,7 +1702,7 @@ Module OrchardVarBaseForward.
     unfold BinOp.sub, BinOp.mul, UnOp.from.
     transitivity (b mod Primes.pallas_p).
     2:{ apply Z.mod_small.
-        pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
+        pose proof Primes.pallas_p_gt_2 as Hp.
         clear -Hb Hp.
         lia. }
     lazymatch goal with
@@ -2019,7 +2019,7 @@ Module OrchardVarBaseForward.
     rewrite Hinv.
     (* The goal is already [1 mod p = 1], the exact shape of [Z.mod_1_l]. *)
     apply Z.mod_1_l.
-    pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
+    pose proof Primes.pallas_p_gt_2 as Hp.
     clear -Hp.
     lia.
   Qed.
@@ -2236,7 +2236,7 @@ Module OrchardVarBaseForward.
     rewrite table_value_id by (clear -Hw; lia).
     rewrite rot_cur, rot_next.
     rewrite Hc, Hn.
-    pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
+    pose proof Primes.pallas_p_gt_2 as Hp.
     unfold BinOp.mul, BinOp.add, BinOp.sub, UnOp.from.
     transitivity ((zc mod 1024) mod Primes.pallas_p);
       [| apply Z.mod_small; clear -Hw;

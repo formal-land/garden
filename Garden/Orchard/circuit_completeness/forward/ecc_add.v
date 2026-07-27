@@ -57,7 +57,7 @@ Require Import Garden.Field.Lemmas.
 Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.forward.arith.
+Require Import Garden.Field.Pow2.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
@@ -630,7 +630,7 @@ Module OrchardCompletenessForwardEccAdd.
   Lemma reduced_bounds (x : Z) :
     UnOp.from x = x -> 0 <= x < Primes.pallas_p.
   Proof.
-    intro H. rewrite <- H. apply Z.mod_pos_bound. exact OrchardForwardArith.pallas_p_pos.
+    intro H. rewrite <- H. apply Z.mod_pos_bound. exact Primes.pallas_p_pos.
   Qed.
 
   Lemma wgood_cadd_input (P : Point.t) : wgood P -> cadd_input_ok P.
@@ -641,7 +641,7 @@ Module OrchardCompletenessForwardEccAdd.
       change (PallasModel.repr Weierstrass.Infinity) with
         {| Point.x := 0; Point.y := 0 |}.
       cbn [Point.x Point.y].
-      pose proof OrchardForwardArith.pallas_p_pos as Hp.
+      pose proof Primes.pallas_p_pos as Hp.
       refine (conj _ (conj _ _)).
       + lia.
       + lia.
@@ -708,7 +708,7 @@ Module OrchardCompletenessForwardEccAdd.
     set (B := x *F x *F x) in *.
     clearbody A B.
     unfold BinOp.add, BinOp.sub, UnOp.from in *.
-    pose proof OrchardForwardArith.pallas_p_pos as Hp.
+    pose proof Primes.pallas_p_pos as Hp.
     pose proof (Z.mod_pos_bound (A - B) Primes.pallas_p Hp).
     pose proof (Z.mod_pos_bound A Primes.pallas_p Hp).
     pose proof (Z.mod_pos_bound B Primes.pallas_p Hp).

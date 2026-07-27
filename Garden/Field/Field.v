@@ -4,8 +4,8 @@
     [Z] reduced [mod p]: arithmetic ([UnOp]/[BinOp], notations [+F] [-F] [*F],
     [mod_inverse]), the integral-domain lemma ([mul_zero_implies_zero]), and small
     modular-arithmetic helpers. Companion files:
-    [Field.Fermat] (Fermat's little theorem) and [Field.Div] (field
-    division). *)
+    [Field.Fermat] (Fermat's little theorem), [Field.Div] (field division)
+    and [Field.Pow2] (generic [Z] power and division facts, no modulus). *)
 
 Require Export Stdlib.PArith.BinPosDef.
 Require Export Stdlib.Strings.PrimString.
@@ -59,6 +59,16 @@ Module Primes.
   Definition koala_bear : Z := 2 ^ 31 - 2 ^ 24 + 1.
 
   Definition goldilocks : Z := 2 ^ 64 - 2 ^ 32 + 1.
+
+  (* Size bounds on the Pallas base-field modulus.  The two forms are named
+     apart because the callers differ: slice arguments need only positivity,
+     while the ladder needs [2 <] to place a residue strictly inside the
+     field. *)
+  Lemma pallas_p_pos : 0 < pallas_p.
+  Proof. unfold pallas_p, t_p; lia. Qed.
+
+  Lemma pallas_p_gt_2 : 2 < pallas_p.
+  Proof. unfold pallas_p, t_p; lia. Qed.
 
   (* The following six facts are [Znumtheory.prime c] statements for concrete
      constants, discharged by the Coqprime Pocklington certificates of
