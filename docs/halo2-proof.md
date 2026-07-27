@@ -94,7 +94,8 @@ not appear in `Expression.t`; they are consumed by `eval_lookup_argument` and
 `satisfies_lookups`, where a lookup argument holds when the tuple of queried
 expressions equals some table row below the `nb_table_rows` bound, and by
 `Fact.LookupTableLoaded`, which pins `Assignment.lookup` to the loaded table
-values. The generic range-check reading of a lookup is `RangeTable`
+values on non-negative rows (the rows the serializer's events write). The
+generic range-check reading of a lookup is `RangeTable`
 (`halo2_gadgets/utilities/lookup_range_check_proof.v`): `word_sound` bounds
 the running-sum word on a `q_lookup = 1`, `q_running = 1` row into
 `[0, nb_table_rows)`, and `short_word_sound` bounds `z_cur` itself under an
