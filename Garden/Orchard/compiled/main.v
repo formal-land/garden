@@ -373,6 +373,22 @@ Proof.
   reflexivity.
 Qed.
 
+(** ...and conversely: the extraction invents no copies. *)
+Lemma copies_of_events_inv (events : list Raw.Event.t)
+    (left right : Raw.Cell.t) :
+  List.In (left, right) (Sigma.copies_of_events events) ->
+  List.In (Raw.Event.Copy left right) events.
+Proof.
+  intros Hin.
+  apply List.in_flat_map in Hin.
+  destruct Hin as (event & Hevent & Hpair).
+  destruct event; cbn [List.In] in Hpair; try contradiction.
+  destruct Hpair as [Heq | Hfalse]; [| contradiction].
+  injection Heq as Hleft Hright.
+  subst.
+  exact Hevent.
+Qed.
+
 (** ** The selector plane of a replayed stream
 
     The two generic halves of the selector-plane linking: the activation
@@ -977,6 +993,106 @@ Proof.
         orchard_indexed_system orchard_events advice instance_ grid
         orchard_table_rows Hreplay orchard_finite_domain_ok)
       (conj Hgates_domain (conj Hlookups Hcopies))).
+Qed.
+
+(** ** The compiled-to-operational completeness theorem
+
+    The converse of [orchard_compiled_sound], along the same three seams
+    read backwards — each of them an equivalence.
+    [PlonkishMock.plonkish_of_mock_prover] restricts the all-integer-row
+    reading of the ideal checker to the domain rows;
+    [PlonkishCompile.compile_correct_domain] turns the selector-gated
+    original gates back into the compiled ones on the installed grid; and
+    [sigma_correct] closes the copy equalities back into σ invariance. *)
+Theorem orchard_compiled_complete
+    (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t)
+    (Hreplay :
+      apply_events orchard_events (initial_grid advice instance_) =
+        Some grid)
+    (Haccepts :
+      mock_prover_accepts orchard_indexed_system orchard_events grid
+        orchard_table_rows) :
+  orchard_compiled_accepts grid.
+Proof.
+  destruct
+    (proj1
+      (PlonkishMock.plonkish_of_mock_prover orchard_domain
+        orchard_indexed_system orchard_events advice instance_ grid
+        orchard_table_rows Hreplay orchard_finite_domain_ok)
+      Haccepts)
+    as (Hgates_domain & Hlookups & Hcopies).
+  refine (conj _ (conj Hlookups _)).
+  - (* The original gates transfer to the installed grid, where
+       [compile_correct_domain] reads them back as the compiled ones. *)
+    apply
+      (proj2
+        (PlonkishCompile.compile_correct_domain orchard_domain
+          orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
+          OrchardCompiledPinned.permutation_columns
+          OrchardCompiledPinned.constants (orchard_compiled_grid grid)
+          OrchardCompiledCheck.compiled orchard_compiled_eq
+          orchard_blinding_nonneg
+          (orchard_compiled_grid_act advice instance_ grid Hreplay)
+          orchard_activations_within
+          (with_combinations_view OrchardCompiledCheck.compiled grid)
+          orchard_system_flattened orchard_gates_vacuous
+          orchard_substitution_ok orchard_assignments_ok)).
+    unfold orchard_compiled_grid.
+    intros row Hrow.
+    apply
+      (proj2
+        (PlonkishCompile.flattened_gates_iff
+          (grid_assignment
+            (with_combinations OrchardCompiledCheck.compiled grid))
+          (tt, row) orchard_indexed_system orchard_system_flattened)).
+    intros poly Hpoly.
+    rewrite (with_combinations_eval OrchardCompiledCheck.compiled grid row
+      poly
+      (proj1 (List.forallb_forall _ _) orchard_gate_polys_avoid poly Hpoly)).
+    exact
+      (proj1
+        (PlonkishCompile.flattened_gates_iff (grid_assignment grid) (tt, row)
+          orchard_indexed_system orchard_system_flattened)
+        (Hgates_domain row Hrow) poly Hpoly).
+  - (* Every copy obligation holds as a raw cell equality, so σ closes. *)
+    apply
+      (proj2
+        (sigma_correct
+          (permutation_cell_value OrchardCompiledPinned.permutation_columns
+            grid)
+          OrchardCompiledPinned.permutation_columns orchard_n_rows
+          orchard_copies orchard_sigma orchard_sigma_eq)).
+    apply List.Forall_forall.
+    intros pair Hpair.
+    pose proof
+      (proj1 (List.forallb_forall _ _) orchard_copies_resolvable pair Hpair)
+      as Hok.
+    apply Bool.andb_true_iff in Hok.
+    destruct Hok as [Hok_left Hok_right].
+    apply Bool.andb_true_iff in Hok_left.
+    destruct Hok_left as [Hrow_left Hpos_left].
+    apply Bool.andb_true_iff in Hok_right.
+    destruct Hok_right as [Hrow_right Hpos_right].
+    apply Z.leb_le in Hrow_left, Hrow_right.
+    unfold copy_holds, resolve_cell.
+    destruct
+      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+        (fst pair).(Raw.Cell.column))
+      as [position_left |] eqn:Hleft; [| exact I].
+    destruct
+      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+        (snd pair).(Raw.Cell.column))
+      as [position_right |] eqn:Hright; [| exact I].
+    rewrite (permutation_cell_value_read
+      OrchardCompiledPinned.permutation_columns grid (fst pair) position_left
+      Hrow_left Hleft).
+    rewrite (permutation_cell_value_read
+      OrchardCompiledPinned.permutation_columns grid (snd pair)
+      position_right Hrow_right Hright).
+    apply Hcopies.
+    apply copies_of_events_inv.
+    rewrite <- (surjective_pairing pair).
+    exact Hpair.
 Qed.
 
 (** ** Composition down to the Action statement *)

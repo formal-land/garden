@@ -42,6 +42,25 @@
     and with the selector-off lookup defaults
     ([PlonkishMock.lookups_defaults_all]) on the blinding rows.
 
+    [algebraic_complete] is the converse, along the same three seams read
+    backwards: each has a constructive half already
+    ([Vanishing.vanishing_sound_horner] is an equivalence,
+    [PermutationPoly.permutation_complete_grid_invariant] exhibits the
+    running products division-free, and
+    [PlonkishLookupPoly.lookup_arguments_complete] builds the permuted
+    columns and the product column from set membership).  Its conclusion is
+    [algebraic_accepts_regular], which restricts the permutation conjunct
+    to the challenges where no identity-side factor vanishes on a usable
+    cell — at the excluded ones the running-product recurrence divides by
+    zero and no honest prover has a product column either, and the lookup
+    conjunct is already restricted the same way inside
+    [PlonkishLookupPoly.lookup_identities_hold].  Soundness loses nothing
+    there: an irregular challenge sends the identity-side product to [0],
+    the escape branch the counting argument already allows, so
+    [algebraic_sound_regular] concludes from the same predicate.  The two
+    directions therefore meet at [algebraic_accepts_regular], with
+    [algebraic_sound] / [algebraic_accepts] the all-challenge weakenings.
+
     The replay-facing side conditions (canonical table values, the
     tables-as-fixed-prefix coherence) are supplied as decidable booleans
     over the event stream, discharged on a concrete instance by
@@ -396,7 +415,7 @@ Section WithPrime.
 
   (** ** The acceptance statement and its soundness *)
 
-  Section Soundness.
+  Section Acceptance.
     (** The evaluation domain and its primitive [2^s]-th root. *)
     Variable domain : Domain.t.
     Variable w : Z.
@@ -480,6 +499,50 @@ Section WithPrime.
       algebraic_permutation_accept /\
       algebraic_lookups_accept.
 
+    (** *** The regular-challenge reading
+
+        The permutation conjunct above quantifies over every [(β, γ)], but
+        at an irregular challenge — one where an identity-side factor
+        [v + β·lbl(c) + γ] vanishes on a usable cell — the running-product
+        recurrence divides by zero and no honest prover has a product
+        column either.  The completeness direction is therefore stated over
+        the regular challenges, exactly as the lookup conjunct already is
+        ([PlonkishLookupPoly.lookup_challenge_regular] sits inside
+        [lookup_identities_hold]).
+
+        Soundness loses nothing by moving to the same reading: an irregular
+        challenge sends the identity-side product to [0] outright, which is
+        the escape branch the counting argument already allows, so
+        [algebraic_sound_regular] below derives the same conclusion from
+        the weaker hypothesis.  [algebraic_accepts_regular] is thus the
+        predicate where the two directions meet. *)
+
+    Definition permutation_challenge_regular (beta gamma : Z) : Prop :=
+      PermutationPoly.challenge_regular (p := p) domain ncols gperm lbl
+        beta gamma.
+
+    Definition algebraic_permutation_accept_regular : Prop :=
+      forall beta gamma : Z,
+        permutation_challenge_regular beta gamma ->
+        exists zs : list (Z -> Z),
+          PermutationPoly.permutation_rules domain ncols chunk_len gperm lbl
+            (Sigma.perm assembly) beta gamma zs.
+
+    Definition algebraic_accepts_regular : Prop :=
+      gates_agree /\
+      algebraic_gates_accept /\
+      algebraic_permutation_accept_regular /\
+      algebraic_lookups_accept.
+
+    Lemma algebraic_accepts_regular_of_accepts :
+      algebraic_accepts -> algebraic_accepts_regular.
+    Proof.
+      intros (Hagree & Hgates & Hperm & Hlookups).
+      exact (conj Hagree
+        (conj Hgates
+          (conj (fun beta gamma _ => Hperm beta gamma) Hlookups))).
+    Qed.
+
     (** *** The gate conjunct: vanishing quotient to row-wise gate zero *)
 
     Lemma algebraic_gates_sound
@@ -532,7 +595,7 @@ Section WithPrime.
 
     (** *** The permutation conjunct: product rules to grid invariance *)
 
-    Lemma algebraic_permutation_sound
+    Lemma algebraic_permutation_sound_regular
         (Hk : 0 <= domain.(Domain.k))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
         (Hur : 0 <= Domain.usable_rows domain)
@@ -553,10 +616,10 @@ Section WithPrime.
           Sigma.perm assembly c = c)
         (Hred : forall c : Sigma.cell,
           PermutationPoly.usable_cell domain ncols c -> 0 <= gperm c < p)
-        (Haccept : algebraic_permutation_accept) :
+        (Haccept : algebraic_permutation_accept_regular) :
       grid_invariant gperm assembly.
     Proof.
-      exact (PermutationPoly.permutation_sound_grid_invariant domain
+      exact (PermutationPoly.permutation_sound_grid_invariant_regular domain
         Hk Hbf Hur ncols chunk_len Hchunk gperm lbl (Sigma.perm assembly)
         assembly (fun _ => eq_refl) Hbig Hinj Hrange Hfix Hred Haccept).
     Qed.
@@ -683,6 +746,97 @@ Section WithPrime.
         every domain row, and the grid is invariant under the assembly's
         permutation. *)
 
+    Theorem algebraic_sound_regular
+        (Hreplay :
+          apply_events events (initial_grid advice instance_) = Some grid)
+        (Hcompiled :
+          compiled =
+          Compile.compile system infos num_fixed_columns permutation_columns
+            constants)
+        (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
+        (Hk : 0 <= domain.(Domain.k))
+        (Hbf : 0 <= domain.(Domain.blinding_factors))
+        (Hur : 0 <= Domain.usable_rows domain)
+        (Hchunk : (0 < chunk_len)%nat)
+        (Hbig :
+          2 * Z.of_nat
+            (List.length (PermutationPoly.all_cells domain ncols chunk_len)) +
+          1 <= p)
+        (Hinj : forall c d : Sigma.cell,
+          PermutationPoly.space_cell domain ncols c ->
+          PermutationPoly.space_cell domain ncols d ->
+          lbl c mod p = lbl d mod p -> c = d)
+        (Hrange : forall c : Sigma.cell,
+          PermutationPoly.usable_cell domain ncols c ->
+          PermutationPoly.space_cell domain ncols (Sigma.perm assembly c))
+        (Hfix : forall c : Sigma.cell,
+          ~ PermutationPoly.usable_cell domain ncols c ->
+          Sigma.perm assembly c = c)
+        (Hred : forall c : Sigma.cell,
+          PermutationPoly.usable_cell domain ncols c -> 0 <= gperm c < p)
+        (Htr_pos : 0 < table_rows)
+        (Htr_le : table_rows <= Domain.usable_rows domain)
+        (Hp_pts :
+          Z.of_nat (2 * Z.to_nat (Domain.usable_rows domain) + 2) <= p)
+        (Hp_theta :
+          List.Forall
+            (fun arg : LookupArgument.t Configure.indexed_columns =>
+              Z.of_nat
+                (Z.to_nat (Domain.usable_rows domain) *
+                 List.length arg.(LookupArgument.pairs) + 1) <= p)
+            compiled.(CompiledSystem.lookups))
+        (Hcanon_events :
+          event_fixed_values_ok_b
+            (fun value => andb (0 <=? value) (value <? p)) events = true)
+        (Hfill :
+          tables_fill_row0_b events table_rows (Domain.usable_rows domain)
+            compiled.(CompiledSystem.lookups) = true)
+        (Htables_avoid :
+          lookup_tables_avoid_b
+            compiled.(CompiledSystem.combination_columns)
+            compiled.(CompiledSystem.lookups) = true)
+        (Hact : forall s0 row : Z,
+          0 <= row < Domain.n domain ->
+          grid.(RawGrid.sel) s0 row =
+          (if List.nth (Z.to_nat row)
+              (PlonkishCompile.info_activations infos s0) false
+           then 1 else 0))
+        (Hexact :
+          PlonkishLookup.lookup_replacements_exact_b
+            (PlonkishCompile.combination_view compiled)
+            (PlonkishCompile.info_activations infos)
+            (Z.to_nat (Domain.n domain))
+            compiled.(CompiledSystem.selector_assignments)
+            system = true)
+        (Hlookup_avoid :
+          PlonkishLookup.lookup_columns_avoid_b
+            compiled.(CompiledSystem.combination_columns) system = true)
+        (Hwithin :
+          PlonkishMock.selector_rows_within_b (Domain.usable_rows domain)
+            events = true)
+        (Hdefaults :
+          PlonkishMock.lookup_defaults_of_events_b events system table_rows =
+          true)
+        (Haccept : algebraic_accepts_regular) :
+      PlonkishCompile.compiled_gates_hold domain compiled cgrid /\
+      (forall row : Z,
+        0 <= row < Domain.n domain ->
+        List.Forall
+          (eval_lookup_argument (grid_assignment grid) (tt, row) table_rows)
+          system.(ConstraintSystem.lookups)) /\
+      grid_invariant gperm assembly.
+    Proof.
+      destruct Haccept as (Hagree & Hgates & Hperm & Hlookups).
+      split; [| split].
+      - exact (algebraic_gates_sound Hcount Hagree Hgates).
+      - exact (algebraic_lookups_sound Hreplay Hcompiled Hbf Hur Htr_pos
+          Htr_le Hp_pts Hp_theta Hcanon_events Hfill Htables_avoid Hact
+          Hexact Hlookup_avoid Hwithin Hdefaults Hlookups).
+      - exact (algebraic_permutation_sound_regular Hk Hbf Hur Hchunk Hbig
+          Hinj Hrange Hfix Hred Hperm).
+    Qed.
+
+    (** The all-challenge reading, a weakening of the hypothesis. *)
     Theorem algebraic_sound
         (Hreplay :
           apply_events events (initial_grid advice instance_) = Some grid)
@@ -763,17 +917,207 @@ Section WithPrime.
           system.(ConstraintSystem.lookups)) /\
       grid_invariant gperm assembly.
     Proof.
-      destruct Haccept as (Hagree & Hgates & Hperm & Hlookups).
-      split; [| split].
-      - exact (algebraic_gates_sound Hcount Hagree Hgates).
-      - exact (algebraic_lookups_sound Hreplay Hcompiled Hbf Hur Htr_pos
-          Htr_le Hp_pts Hp_theta Hcanon_events Hfill Htables_avoid Hact
-          Hexact Hlookup_avoid Hwithin Hdefaults Hlookups).
-      - exact (algebraic_permutation_sound Hk Hbf Hur Hchunk Hbig Hinj
-          Hrange Hfix Hred Hperm).
+      exact (algebraic_sound_regular Hreplay Hcompiled Hcount Hk Hbf Hur
+        Hchunk Hbig Hinj Hrange Hfix Hred Htr_pos Htr_le Hp_pts Hp_theta
+        Hcanon_events Hfill Htables_avoid Hact Hexact Hlookup_avoid Hwithin
+        Hdefaults (algebraic_accepts_regular_of_accepts Haccept)).
     Qed.
 
-  End Soundness.
+    (** ** Completeness: compiled satisfaction to algebraic acceptance
+
+        The converse of [algebraic_sound_regular], along the same three
+        seams read backwards.  Each has a constructive half already:
+        [Vanishing.vanishing_sound_horner] is an equivalence, so gate
+        polynomials agreeing with a satisfying grid on [H] have a vanishing
+        quotient at every challenge;
+        [PermutationPoly.permutation_complete_grid_invariant] exhibits the
+        running products division-free from σ-invariance; and
+        [PlonkishLookupPoly.lookup_arguments_complete] builds the permuted
+        columns and the product column from set membership, carried to the
+        compiled arguments by the substitution seam
+        ([PlonkishLookup.lookup_compile_correct_installed]) in its other
+        direction. *)
+
+    (** *** The gate conjunct: row-wise gate zero to vanishing quotient *)
+
+    Lemma algebraic_gates_complete
+        (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
+        (Hagree : gates_agree)
+        (Hhold : PlonkishCompile.compiled_gates_hold domain compiled cgrid) :
+      algebraic_gates_accept.
+    Proof.
+      destruct Hagree as [Hlen Hrows].
+      assert (Hcount' : Z.of_nat (List.length Es) <= p)
+        by (rewrite Hlen; exact Hcount).
+      refine (proj2 (Vanishing.vanishing_sound_horner w s Hs Hp2
+        Hw_full Hw_half Es Hcount') _).
+      intros i Hi j Hj.
+      rewrite (Hrows i Hi j Hj).
+      apply (Hhold (Z.of_nat j)).
+      - rewrite Hn. lia.
+      - apply List.nth_In. rewrite <- Hlen. exact Hi.
+    Qed.
+
+    (** *** The permutation conjunct: grid invariance to product rules *)
+
+    Lemma algebraic_permutation_complete
+        (Hk : 0 <= domain.(Domain.k))
+        (Hbf : 0 <= domain.(Domain.blinding_factors))
+        (Hur : 0 <= Domain.usable_rows domain)
+        (Hchunk : (0 < chunk_len)%nat)
+        (Hfix : forall c : Sigma.cell,
+          ~ PermutationPoly.usable_cell domain ncols c ->
+          Sigma.perm assembly c = c)
+        (Hginj : forall c d : Sigma.cell,
+          Sigma.perm assembly c = Sigma.perm assembly d -> c = d)
+        (Hsigma : grid_invariant gperm assembly) :
+      algebraic_permutation_accept_regular.
+    Proof.
+      intros beta gamma Hreg.
+      exact (PermutationPoly.permutation_complete_grid_invariant domain
+        Hk Hbf Hur ncols chunk_len Hchunk gperm lbl (Sigma.perm assembly)
+        assembly (fun _ => eq_refl) Hsigma Hfix Hginj beta gamma Hreg).
+    Qed.
+
+    (** *** The lookup conjunct: membership to the identity package *)
+
+    Lemma algebraic_lookups_complete
+        (Hcompiled :
+          compiled =
+          Compile.compile system infos num_fixed_columns permutation_columns
+            constants)
+        (Hbf : 0 <= domain.(Domain.blinding_factors))
+        (Hur : 0 <= Domain.usable_rows domain)
+        (Htr_le : table_rows <= Domain.usable_rows domain)
+        (Hact : forall s0 row : Z,
+          0 <= row < Domain.n domain ->
+          grid.(RawGrid.sel) s0 row =
+          (if List.nth (Z.to_nat row)
+              (PlonkishCompile.info_activations infos s0) false
+           then 1 else 0))
+        (Hexact :
+          PlonkishLookup.lookup_replacements_exact_b
+            (PlonkishCompile.combination_view compiled)
+            (PlonkishCompile.info_activations infos)
+            (Z.to_nat (Domain.n domain))
+            compiled.(CompiledSystem.selector_assignments)
+            system = true)
+        (Hlookup_avoid :
+          PlonkishLookup.lookup_columns_avoid_b
+            compiled.(CompiledSystem.combination_columns) system = true)
+        (Hhold : forall row : Z,
+          0 <= row < Domain.n domain ->
+          List.Forall
+            (eval_lookup_argument (grid_assignment grid) (tt, row) table_rows)
+            system.(ConstraintSystem.lookups)) :
+      algebraic_lookups_accept.
+    Proof.
+      assert (Hlt : Domain.usable_rows domain < Domain.n domain)
+        by (unfold Domain.usable_rows in *; lia).
+      apply (PlonkishLookupPoly.lookup_arguments_complete domain
+        (grid_assignment cgrid) tt compiled.(CompiledSystem.lookups)
+        table_rows Hbf Hur Htr_le).
+      intros row Hrow.
+      assert (Hrow' : 0 <= row < Domain.n domain) by lia.
+      apply (proj2 (PlonkishLookup.lookup_compile_correct_installed domain
+        system infos num_fixed_columns permutation_columns constants grid
+        compiled table_rows Hcompiled Hact Hexact Hlookup_avoid row Hrow')).
+      exact (Hhold row Hrow').
+    Qed.
+
+    (** *** The bundle: compiled satisfaction to algebraic acceptance
+
+        The hypothesis is exactly the conclusion of
+        [algebraic_sound_regular] — the compiled-plonkish satisfaction
+        triple — plus the two σ side conditions the completeness direction
+        needs (σ fixes the non-usable cells and is injective) and the
+        prover's choice of gate polynomials.  The conclusion is the
+        acceptance predicate soundness consumes, so the two theorems
+        compose in both directions at [algebraic_accepts_regular]. *)
+
+    Theorem algebraic_complete
+        (Hcompiled :
+          compiled =
+          Compile.compile system infos num_fixed_columns permutation_columns
+            constants)
+        (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
+        (Hk : 0 <= domain.(Domain.k))
+        (Hbf : 0 <= domain.(Domain.blinding_factors))
+        (Hur : 0 <= Domain.usable_rows domain)
+        (Hchunk : (0 < chunk_len)%nat)
+        (Htr_le : table_rows <= Domain.usable_rows domain)
+        (Hact : forall s0 row : Z,
+          0 <= row < Domain.n domain ->
+          grid.(RawGrid.sel) s0 row =
+          (if List.nth (Z.to_nat row)
+              (PlonkishCompile.info_activations infos s0) false
+           then 1 else 0))
+        (Hexact :
+          PlonkishLookup.lookup_replacements_exact_b
+            (PlonkishCompile.combination_view compiled)
+            (PlonkishCompile.info_activations infos)
+            (Z.to_nat (Domain.n domain))
+            compiled.(CompiledSystem.selector_assignments)
+            system = true)
+        (Hlookup_avoid :
+          PlonkishLookup.lookup_columns_avoid_b
+            compiled.(CompiledSystem.combination_columns) system = true)
+        (Hfix : forall c : Sigma.cell,
+          ~ PermutationPoly.usable_cell domain ncols c ->
+          Sigma.perm assembly c = c)
+        (Hginj : forall c d : Sigma.cell,
+          Sigma.perm assembly c = Sigma.perm assembly d -> c = d)
+        (Hagree : gates_agree)
+        (Hgates : PlonkishCompile.compiled_gates_hold domain compiled cgrid)
+        (Hlookups : forall row : Z,
+          0 <= row < Domain.n domain ->
+          List.Forall
+            (eval_lookup_argument (grid_assignment grid) (tt, row) table_rows)
+            system.(ConstraintSystem.lookups))
+        (Hsigma : grid_invariant gperm assembly) :
+      algebraic_accepts_regular.
+    Proof.
+      refine (conj Hagree (conj _ (conj _ _))).
+      - exact (algebraic_gates_complete Hcount Hagree Hgates).
+      - exact (algebraic_permutation_complete Hk Hbf Hur Hchunk Hfix Hginj
+          Hsigma).
+      - exact (algebraic_lookups_complete Hcompiled Hbf Hur Htr_le Hact
+          Hexact Hlookup_avoid Hlookups).
+    Qed.
+
+  End Acceptance.
+
+  (** ** Inhabitation of the gate-polynomial witness
+
+      [gates_agree] pins the prover's gate polynomials only on [H], so
+      wherever the compiled gates already vanish there, the zero
+      polynomials satisfy it.  Acceptance is therefore never out of reach
+      for want of an [Es]: on a satisfying grid this witness feeds
+      [algebraic_complete], so [algebraic_accepts_regular] is inhabited
+      rather than merely implied. *)
+
+  Definition zero_gate_polys (compiled : CompiledSystem.t) : list Poly.t :=
+    List.repeat [] (List.length compiled.(CompiledSystem.gates)).
+
+  Lemma gates_agree_zero (domain : Domain.t) (w : Z) (s : nat)
+      (compiled : CompiledSystem.t) (grid : RawGrid.t)
+      (Hn : Domain.n domain = Z.of_nat (2 ^ s))
+      (Hhold :
+        PlonkishCompile.compiled_gates_hold domain compiled
+          (cgrid compiled grid)) :
+    gates_agree w s compiled grid (zero_gate_polys compiled).
+  Proof.
+    unfold zero_gate_polys.
+    split; [apply List.repeat_length |].
+    intros i Hi j Hj.
+    rewrite List.repeat_length in Hi.
+    rewrite List.nth_repeat.
+    cbn [Poly.eval].
+    symmetry.
+    apply (Hhold (Z.of_nat j)); [rewrite Hn; lia |].
+    apply List.nth_In.
+    exact Hi.
+  Qed.
 
 End WithPrime.
 

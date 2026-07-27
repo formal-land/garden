@@ -264,6 +264,13 @@ isolated as the counting lemmas of the R4 package (pending):
   families over a `CompiledSystem`, all challenges quantified, stated over
   column polynomials agreeing with the grid on `H`) and `algebraic_sound`:
   algebraic acceptance implies compiled-plonkish satisfaction.
+  `algebraic_complete` is the converse, over
+  `algebraic_accepts_regular` — the reading whose permutation conjunct is
+  asked only at challenges where no identity-side factor vanishes on a
+  usable cell, matching the restriction the lookup conjunct already
+  carried. `algebraic_sound_regular` concludes from that same predicate,
+  so the two directions meet there; `algebraic_sound` / `algebraic_accepts`
+  are the all-challenge weakenings.
 - `Orchard/compiled/algebraic.v` — the pinned composition:
   `orchard_algebraic_sound` → `orchard_algebraic_mock_accepts` →
   `orchard_algebraic_operational_sound` →
@@ -272,6 +279,15 @@ isolated as the counting lemmas of the R4 package (pending):
   computable side conditions (the σ-mapping scans, the δ-coset labels,
   lookup replacement exactness, tables-as-prefix coherence) discharged as
   `vm_compute` certificates on the concrete instance.
+  `orchard_algebraic_complete` runs the same rung the other way, on the
+  σ injectivity `sigma_of_copies_inj` exports from the assembly invariant.
+
+The completeness direction reaches the same rung: `orchard_compiled_complete`
+(`Orchard/compiled/main.v`) and `circuit_completeness/algebraic.v` carry an
+honest witness from `mock_prover_accepts` to `algebraic_accepts_regular`, and
+`orchard_honest_algebraic_accepts_ex` exhibits the gate-polynomial witness,
+making the L1 soundness surface non-vacuous. See
+[`orchard-completeness-proof.md`](orchard-completeness-proof.md).
 
 Assumption audit on every new theorem: exactly `PrimString.string` +
 impredicative `Set` (several endpoints cleaner — impredicative `Set`
@@ -394,17 +410,18 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/plonkish/main.v` | `Domain`, `CompiledSystem`, `Compile.compile`, `Sigma.sigma_of_copies` |
 | `Halo2/plonkish/compile.v` | `compile_correct`, `compile_correct_domain` |
 | `Halo2/plonkish/orbit.v` | `FiniteOrbit` (generic finite-orbit / two-orbit merge theory) |
-| `Halo2/plonkish/sigma.v` | `sigma_correct`, `sigma_copies_connected` |
+| `Halo2/plonkish/sigma.v` | `sigma_correct`, `sigma_copies_connected`, `sigma_of_copies_dom` / `sigma_of_copies_inj` |
 | `Halo2/plonkish/mock.v` | `plonkish_of_mock_prover` |
 | `Orchard/compiled/pinned.v` / `compiled/check.v` | pinned-vk data + 12 parity certificates |
-| `Orchard/compiled/main.v` | `orchard_compiled_sound`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
+| `Orchard/compiled/main.v` | `orchard_compiled_sound`, `orchard_compiled_complete`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
 | `Halo2/plonkish/poly.v` / `poly_domain.v` | univariate polynomial library; the pinned ω, `H`, `X^n − 1` factorization |
 | `Halo2/plonkish/lookup_compile.v` | `lookup_compile_correct`, `plonkish_accepts_compiled_iff` |
 | `Halo2/plonkish/vanishing.v` | `vanishing_sound` |
-| `Halo2/plonkish/permutation_poly.v` | `permutation_sound`, `permutation_complete` |
+| `Halo2/plonkish/permutation_poly.v` | `permutation_sound` / `permutation_sound_regular`, `permutation_complete`, `challenge_regular` |
 | `Halo2/plonkish/lookup_poly.v` | `lookup_sound`, `lookup_complete` |
-| `Halo2/plonkish/algebraic.v` | `algebraic_accepts`, `algebraic_sound` |
-| `Orchard/compiled/algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_action_statement` |
+| `Halo2/plonkish/algebraic.v` | `algebraic_accepts` / `algebraic_accepts_regular`, `algebraic_sound` / `algebraic_sound_regular`, `algebraic_complete` |
+| `Orchard/compiled/algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_complete`, `orchard_algebraic_action_statement` |
+| `Orchard/circuit_completeness/algebraic.v` | `orchard_honest_algebraic_accepts`, `orchard_honest_algebraic_accepts_ex` (L1 non-vacuity) |
 | `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
 | `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |
 | `Orchard/vk/print.v` / `vk/data.v` / `vk/bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |

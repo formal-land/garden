@@ -45,9 +45,14 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   `valid`/`nondegenerate` domain, the generic gluing lemma
   `Complete.circuit_holds_intro` and the `honest_planes` selector condition,
   the Orchard witness generator and its concrete instance, the per-family
-  forward obligations of `circuit_completeness/forward/`, and the operational
+  forward obligations of `circuit_completeness/forward/`, the operational
   layer carrying the result to the ideal `mock_prover_accepts` checker
-  (`orchard_operational_complete`) via the placed re-derivation.
+  (`orchard_operational_complete`) via the placed re-derivation, and the
+  continuation down the refinement ladder to the compiled plonkish layer
+  (`orchard_compiled_complete`) and the polynomial-identity layer
+  (`orchard_honest_algebraic_accepts`, `circuit_completeness/algebraic.v`),
+  where soundness and completeness meet at the regular-challenge predicate
+  `algebraic_accepts_regular`.
 - `docs/orchard-balance-proof.md`: the transaction-level balance theorems
   built on the Action statement — `balanced_or_dlog` and `no_inflation`,
   the Pedersen-binding-as-reduction design (with the explicit computable

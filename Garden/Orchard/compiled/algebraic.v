@@ -1038,4 +1038,173 @@ Proof.
     Hmerkle_ok Hnote_ok Hold_note_ok Hivk_ok).
 Qed.
 
+(** ** The σ side conditions of the completeness direction
+
+    Soundness needs σ only to land in the cell space and to fix the
+    non-usable cells; completeness additionally needs it to be injective,
+    since the honest running products are built from the σ-side factors
+    being a permutation of the identity-side ones.  That is not a new
+    certificate: [sigma_of_copies_inj] exports it from the assembly
+    invariant the σ construction already maintains. *)
+
+Lemma orchard_permutation_columns_length :
+  List.length OrchardCompiledPinned.permutation_columns = 15%nat.
+Proof.
+  vm_cast_no_check (@eq_refl nat 15%nat).
+Qed.
+
+(** The assembly's cell domain is the permutation cell space. *)
+Lemma orchard_cell_dom_space (c : Sigma.cell) :
+  cell_dom OrchardCompiledPinned.permutation_columns
+    OrchardCompiled.orchard_n_rows c <->
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c.
+Proof.
+  unfold cell_dom, PermutationPoly.space_cell, PermutationPoly.nn,
+    OrchardCompiled.orchard_n_rows.
+  rewrite orchard_permutation_columns_length.
+  reflexivity.
+Qed.
+
+Lemma orchard_sigma_space_dom (c : Sigma.cell) :
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c ->
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15
+    (Sigma.perm OrchardCompiled.orchard_sigma c).
+Proof.
+  intros Hc.
+  exact (proj1 (orchard_cell_dom_space _)
+    (sigma_of_copies_dom OrchardCompiledPinned.permutation_columns
+      OrchardCompiled.orchard_n_rows OrchardCompiled.orchard_copies
+      OrchardCompiled.orchard_sigma OrchardCompiled.orchard_sigma_eq c
+      (proj2 (orchard_cell_dom_space c) Hc))).
+Qed.
+
+Lemma orchard_sigma_space_inj (c d : Sigma.cell) :
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c ->
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 d ->
+  Sigma.perm OrchardCompiled.orchard_sigma c =
+  Sigma.perm OrchardCompiled.orchard_sigma d -> c = d.
+Proof.
+  intros Hc Hd Heq.
+  exact (sigma_of_copies_inj OrchardCompiledPinned.permutation_columns
+    OrchardCompiled.orchard_n_rows OrchardCompiled.orchard_copies
+    OrchardCompiled.orchard_sigma OrchardCompiled.orchard_sigma_eq c d
+    (proj2 (orchard_cell_dom_space c) Hc)
+    (proj2 (orchard_cell_dom_space d) Hd) Heq).
+Qed.
+
+Lemma orchard_space_dec (c : Sigma.cell) :
+  PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c \/
+  ~ PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c.
+Proof.
+  unfold PermutationPoly.space_cell.
+  rewrite orchard_nn.
+  destruct (Nat.ltb_spec (fst c) 15) as [H1 | H1];
+    [destruct (Nat.ltb_spec (snd c) 2048) as [H2 | H2] |].
+  - left. exact (conj H1 H2).
+  - right. intros [_ Hb]. lia.
+  - right. intros [Ha _]. lia.
+Qed.
+
+(** σ is injective on the whole cell type: inside the space it is the
+    assembly's injection, and outside it is the identity (a non-space cell
+    is in particular not usable, so [orchard_sigma_fix] applies), and the
+    space is σ-closed, so the two regimes cannot mix. *)
+Lemma orchard_sigma_ginj (c d : Sigma.cell) :
+  Sigma.perm OrchardCompiled.orchard_sigma c =
+  Sigma.perm OrchardCompiled.orchard_sigma d -> c = d.
+Proof.
+  intros Heq.
+  assert (Hout : forall e : Sigma.cell,
+    ~ PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 e ->
+    Sigma.perm OrchardCompiled.orchard_sigma e = e).
+  { intros e He.
+    apply orchard_sigma_fix.
+    intros [Hu1 Hu2].
+    apply He.
+    split; [exact Hu1 |].
+    rewrite orchard_nn.
+    rewrite orchard_un in Hu2.
+    lia. }
+  destruct (orchard_space_dec c) as [Hc | Hc];
+    destruct (orchard_space_dec d) as [Hd | Hd].
+  - exact (orchard_sigma_space_inj c d Hc Hd Heq).
+  - exfalso.
+    apply Hd.
+    rewrite <- (Hout d Hd), <- Heq.
+    exact (orchard_sigma_space_dom c Hc).
+  - exfalso.
+    apply Hc.
+    rewrite <- (Hout c Hc), Heq.
+    exact (orchard_sigma_space_dom d Hd).
+  - rewrite <- (Hout c Hc), <- (Hout d Hd).
+    exact Heq.
+Qed.
+
+(** ** The headline completeness chain *)
+
+(** The regular-challenge reading of the identity package: the permutation
+    conjunct is asked only at the [(β, γ)] where no identity-side factor
+    vanishes on a usable cell.  This is the predicate
+    [orchard_algebraic_sound] already consumes — [algebraic_accepts_regular]
+    is weaker than [algebraic_accepts] — so it is the meeting point of the
+    two directions at L1. *)
+Definition orchard_algebraic_accepts_regular (grid : RawGrid.t)
+    (Es : list Poly.t) : Prop :=
+  PlonkishAlgebraic.algebraic_accepts_regular (p := Primes.pallas_p)
+    OrchardCompiled.orchard_domain PolyDomain.omega PolyDomain.k
+    OrchardCompiledCheck.compiled grid 15 orchard_chunk_len
+    (orchard_perm_values grid) coset_lbl OrchardCompiled.orchard_sigma Es.
+
+(** The compiled satisfaction triple of the R2 assembly yields algebraic
+    acceptance of the pinned system: the converse of
+    [orchard_algebraic_sound] at the regular challenges. *)
+Theorem orchard_algebraic_complete
+    (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t) (Es : list Poly.t)
+    (Hreplay :
+      apply_events orchard_events (initial_grid advice instance_) =
+        Some grid)
+    (Hagree :
+      PlonkishAlgebraic.gates_agree (p := Primes.pallas_p) PolyDomain.omega
+        PolyDomain.k OrchardCompiledCheck.compiled grid Es)
+    (Haccepts : OrchardCompiled.orchard_compiled_accepts grid) :
+  orchard_algebraic_accepts_regular grid Es.
+Proof.
+  destruct Haccepts as (Hgates & Hlookups & Hsigma).
+  exact (PlonkishAlgebraic.algebraic_complete (p := Primes.pallas_p)
+    OrchardCompiled.orchard_domain PolyDomain.omega PolyDomain.k
+    orchard_k_ge PolyDomain.pallas_p_gt2 PolyDomain.omega_order_full
+    PolyDomain.omega_order_half orchard_n_pow
+    orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
+    OrchardCompiledPinned.permutation_columns OrchardCompiledPinned.constants
+    OrchardCompiledCheck.compiled advice instance_ grid orchard_table_rows
+    15 orchard_chunk_len (orchard_perm_values grid) coset_lbl
+    OrchardCompiled.orchard_sigma Es
+    OrchardCompiled.orchard_compiled_eq orchard_gates_bound orchard_k_nonneg
+    OrchardCompiled.orchard_blinding_nonneg orchard_ur_nonneg
+    orchard_chunk_pos orchard_tr_le
+    (OrchardCompiled.orchard_selector_plane advice instance_ grid Hreplay)
+    orchard_lookup_exact orchard_lookup_avoid orchard_sigma_fix
+    orchard_sigma_ginj Hagree Hgates Hlookups Hsigma).
+Qed.
+
+(** The gate-polynomial witness is never the obstacle: the zero
+    polynomials agree on [H] with a grid whose compiled gates already
+    vanish there, so compiled acceptance gives an *inhabited* algebraic
+    acceptance — the L1 non-vacuity certificate. *)
+Corollary orchard_algebraic_complete_ex
+    (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t)
+    (Hreplay :
+      apply_events orchard_events (initial_grid advice instance_) =
+        Some grid)
+    (Haccepts : OrchardCompiled.orchard_compiled_accepts grid) :
+  exists Es : list Poly.t, orchard_algebraic_accepts_regular grid Es.
+Proof.
+  exists (PlonkishAlgebraic.zero_gate_polys OrchardCompiledCheck.compiled).
+  apply (orchard_algebraic_complete advice instance_ grid _ Hreplay);
+    [| exact Haccepts].
+  exact (PlonkishAlgebraic.gates_agree_zero (p := Primes.pallas_p)
+    OrchardCompiled.orchard_domain PolyDomain.omega PolyDomain.k
+    OrchardCompiledCheck.compiled grid orchard_n_pow (proj1 Haccepts)).
+Qed.
+
 End OrchardCompiledAlgebraic.

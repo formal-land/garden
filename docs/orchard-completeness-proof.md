@@ -331,20 +331,113 @@ stream, the same conclusion — with the tail's 166 `Copy` obligations
 discharged separately. `orchard_operational_complete_sound` is the literal
 instance on the synthesis-only stream.
 
+## The compiled and algebraic layers
+
+The completeness surface continues down the refinement ladder of
+[`operational-soundness.md`](operational-soundness.md), mirroring the soundness
+chain rung for rung. Every rung below `mock_prover_accepts` is either an
+equivalence or already had its constructive half, so the composition
+(`circuit_completeness/algebraic.v`) is assembly, not new theory.
+
+**The compiled rung** (`OrchardCompiled.orchard_compiled_complete`) is the
+converse of `orchard_compiled_sound`, through the same three seams read
+backwards: `plonkish_of_mock_prover` restricts the ideal checker's
+all-integer-row reading to the `2^k` domain rows, `compile_correct_domain`
+turns the selector-gated original gates back into the compiled ones on the
+combination-installed grid, and `sigma_correct` closes the copy equalities back
+into σ invariance. All three are equivalences already.
+
+**The algebraic rung** (`OrchardCompiledAlgebraic.orchard_algebraic_complete`)
+turns that compiled satisfaction triple into the three identity families:
+
+```coq
+Theorem orchard_honest_algebraic_accepts (w : HonestInput) (g : RawGrid.t) :
+  valid w -> nondegenerate w ->
+  apply_events orchard_events
+    (initial_grid (orchard_advice w) (orchard_instance w)) = Some g ->
+  forall Es : list Poly.t,
+    PlonkishAlgebraic.gates_agree PolyDomain.omega PolyDomain.k
+      OrchardCompiledCheck.compiled g Es ->
+    OrchardCompiledAlgebraic.orchard_algebraic_accepts_regular g Es.
+```
+
+The three conjuncts come from the constructive halves that already existed:
+`Vanishing.vanishing_sound_horner` is an equivalence, so gate polynomials
+agreeing with the honest grid on `H` have a vanishing quotient at every
+challenge `y`; `PermutationPoly.permutation_complete_grid_invariant` exhibits
+the running products division-free as
+`prefix(identity side) · suffix(σ side) · total⁻¹`; and
+`PlonkishLookupPoly.lookup_arguments_complete` builds the permuted columns
+`A'`, `S'` and the product column `Z` from set membership.
+
+`Es` is the prover's choice of gate polynomials, pinned only on `H`, so the
+unconditional form supplies one and drops the hypothesis:
+
+```coq
+Theorem orchard_honest_algebraic_accepts_ex (w : HonestInput) :
+  valid w -> nondegenerate w ->
+  exists (g : RawGrid.t) (Es : list Poly.t),
+    apply_events orchard_events
+      (initial_grid (orchard_advice w) (orchard_instance w)) = Some g /\
+    mock_prover_accepts orchard_indexed_system orchard_events g
+      orchard_table_rows /\
+    OrchardCompiledAlgebraic.orchard_algebraic_accepts_regular g Es.
+```
+
+The witness is `PlonkishAlgebraic.zero_gate_polys`: on a grid whose compiled
+gates already vanish on `H`, the zero polynomials agree with them there, which
+is all `gates_agree` asks. This is the **non-vacuity certificate for the L1
+soundness surface** — `algebraic_accepts_regular`, the hypothesis
+`orchard_algebraic_action_statement` runs on, is inhabited.
+
+### Why the acceptance predicate is the regular-challenge one
+
+`algebraic_accepts` quantifies the permutation conjunct over every `(β, γ)`.
+That is not achievable, and not for want of proof: at an *irregular* challenge
+— one where an identity-side factor `v + β·lbl(c) + γ` vanishes on a usable
+cell — the running-product recurrence divides by zero, and the honest prover
+has no product column there either. The lookup conjunct already carried exactly
+this restriction internally (`PlonkishLookupPoly.lookup_challenge_regular`,
+inside `lookup_identities_hold`); `PermutationPoly.challenge_regular` names the
+permutation side of it.
+
+Soundness loses nothing by reading the same predicate. An irregular challenge
+sends the identity-side product to `0`, which is the escape branch the counting
+argument already allows, so `PlonkishAlgebraic.algebraic_sound_regular` reaches
+the same conclusion from the weaker hypothesis, and `algebraic_sound` /
+`algebraic_accepts` remain as the all-challenge weakenings. The two directions
+therefore meet exactly at `algebraic_accepts_regular`.
+
+### The one new σ fact
+
+Soundness needs σ only to land in the cell space and to fix the non-usable
+cells. Completeness additionally needs it to be **injective**, since the honest
+running products rest on the σ-side factors being a permutation of the
+identity-side ones. That is not a new certificate: `sigma.v`'s `assembly_inv` —
+the invariant the σ construction already maintains through `fold_forward` —
+records both domain preservation and injectivity, and `sigma_of_copies_dom` /
+`sigma_of_copies_inj` export them. `orchard_sigma_ginj` lifts injectivity to
+the whole cell type: inside the space σ is the assembly's injection, outside it
+is the identity, and the space is σ-closed, so the two regimes cannot mix.
+
 ## What this does not ensure
 
-- **Cryptographic completeness.** The theorem is about the constraint system:
-  an honest witness satisfies it. It says nothing about the proving system —
-  that a prover holding such a witness produces a proof a verifier accepts is
-  a property of Halo 2, not of the circuit.
+- **Cryptographic completeness.** The theorems are about the constraint system
+  and its polynomial reading: an honest witness satisfies them. They say
+  nothing about the proving system — that a prover holding such a witness
+  produces a proof a verifier accepts is a property of Halo 2, not of the
+  circuit. The L0 boundary (polynomial-commitment binding, Fiat–Shamir) is
+  untouched here, exactly as on the soundness side.
 - **The degenerate branch.** Inputs outside `valid`/`nondegenerate` are not
   covered, as described under "The domain".
 - **The model caveats.** The operational layer closes the completeness
   direction against the *same* ideal checker the soundness direction uses; it
   does not narrow the gap recorded in
   [`operational-soundness.md`](operational-soundness.md).
-  `mock_prover_accepts` still quantifies over all integer rows rather than the
-  `2^k` cyclic domain.
+  `mock_prover_accepts` itself still quantifies over all integer rows rather
+  than the `2^k` cyclic domain — the compiled and algebraic layers above do
+  move past that, reading everything on the cyclic domain from the compiled
+  rung on.
 
 ## Model caveats inherited by the theorem
 

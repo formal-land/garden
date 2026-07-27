@@ -1056,6 +1056,48 @@ Section GridCorrectness.
     rewrite Hcl, Hcr. left. exact Hr.
   Qed.
 
+  (** ** The assembly is a permutation of the cell domain
+
+      [assembly_inv], which the forward fold maintains, already records
+      that the constructed [Sigma.perm] maps the cell domain into itself
+      and does so injectively.  Both are exactly what the completeness
+      direction of the permutation argument asks of σ
+      ([PermutationPoly.permutation_complete]), so they are exported
+      here. *)
+
+  Lemma sigma_of_copies_inv (n_rows : nat)
+      (copies : list (Raw.Cell.t * Raw.Cell.t)) (assembly : Sigma.t) :
+    Sigma.sigma_of_copies cols n_rows copies = Some assembly ->
+    assembly_inv n_rows assembly.
+  Proof.
+    intro Hsig.
+    unfold Sigma.sigma_of_copies in Hsig.
+    destruct (fold_forward n_rows copies (Sigma.init cols n_rows) assembly
+      (assembly_inv_init n_rows) Hsig) as (Hinv & _ & _).
+    exact Hinv.
+  Qed.
+
+  Lemma sigma_of_copies_dom (n_rows : nat)
+      (copies : list (Raw.Cell.t * Raw.Cell.t)) (assembly : Sigma.t)
+      (Hsig : Sigma.sigma_of_copies cols n_rows copies = Some assembly) :
+    forall c, cell_dom n_rows c -> cell_dom n_rows (Sigma.perm assembly c).
+  Proof.
+    destruct (sigma_of_copies_inv n_rows copies assembly Hsig)
+      as (_ & _ & _ & Hdom & _).
+    exact Hdom.
+  Qed.
+
+  Lemma sigma_of_copies_inj (n_rows : nat)
+      (copies : list (Raw.Cell.t * Raw.Cell.t)) (assembly : Sigma.t)
+      (Hsig : Sigma.sigma_of_copies cols n_rows copies = Some assembly) :
+    forall c d, cell_dom n_rows c -> cell_dom n_rows d ->
+      Sigma.perm assembly c = Sigma.perm assembly d -> c = d.
+  Proof.
+    destruct (sigma_of_copies_inv n_rows copies assembly Hsig)
+      as (_ & _ & _ & _ & Hinj & _).
+    exact Hinj.
+  Qed.
+
   (** ** The correctness theorem *)
 
   Theorem sigma_correct (n_rows : nat)

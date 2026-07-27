@@ -46,7 +46,15 @@
     is why the completeness direction excludes exactly those challenges).
     The running products are exhibited division-free as
     [prefix(identity side) * suffix(σ side) * total⁻¹], so the row
-    recurrence holds identically and only the endpoints use invariance. *)
+    recurrence holds identically and only the endpoints use invariance.
+
+    [challenge_regular] names the excluded set, and
+    [permutation_sound_regular] is the form of soundness that meets
+    completeness on it: the rules are needed at the regular challenges
+    only, because an irregular challenge sends [iprod] to [0] outright —
+    the escape branch of [rules_products] — so the all-challenge
+    disjunction [match_cell] consumes is still available.  The
+    all-challenge [permutation_sound] is the corresponding weakening. *)
 
 Require Import Stdlib.Bool.Bool.
 Require Import Stdlib.Lists.List.
@@ -500,6 +508,18 @@ Section WithPrime.
 
     Definition sprod (beta gamma : Z) : Z :=
       fprod (List.map (sfac beta gamma) all_cells).
+
+    (** Regular challenges: no identity-side factor vanishes on a usable
+        cell.  The excluded [(β, γ)] set is a union of [|all_cells|] lines;
+        on it the running-product recurrence divides by zero and even the
+        honest prover has no product column, so the completeness direction
+        is stated over the regular challenges only — the same shape as
+        [PlonkishLookupPoly.lookup_challenge_regular] on the lookup side.
+        Soundness loses nothing: an irregular challenge sends [iprod] to
+        [0], which is the escape branch [rules_products] already
+        allows. *)
+    Definition challenge_regular (beta gamma : Z) : Prop :=
+      forall c, usable_cell c -> ifac beta gamma c <> 0.
 
     (** ** The four product rules
 
@@ -1275,25 +1295,59 @@ Section WithPrime.
         intros gamma _. apply Hor.
     Qed.
 
-    (** ** Soundness: the all-challenge rules force σ-invariance
+    (** ** Soundness: the rules force σ-invariance
 
         Label injectivity resolves the matched cell to [σ c], so the σ
         image of a usable cell is usable and carries the same value. *)
 
-    Theorem permutation_sound
+    (** A vanishing identity-side factor sends the whole identity-side
+        product to zero. *)
+    Lemma iprod_zero_of_ifac (beta gamma : Z) (c : Sigma.cell) :
+      usable_cell c -> ifac beta gamma c = 0 -> iprod beta gamma = 0.
+    Proof.
+      intros Hc Hz.
+      unfold iprod.
+      apply fprod_zero_iff.
+      exists (ifac beta gamma c).
+      split.
+      - apply List.in_map. exact (proj2 (in_all_cells c) Hc).
+      - rewrite Hz. apply Zmod_0_l.
+    Qed.
+
+    (** Contrapositive: a nonzero identity-side product certifies that the
+        challenge is regular. *)
+    Lemma challenge_regular_of_iprod (beta gamma : Z) :
+      iprod beta gamma <> 0 -> challenge_regular beta gamma.
+    Proof.
+      intros Hnz c Hc Hz.
+      exact (Hnz (iprod_zero_of_ifac beta gamma c Hc Hz)).
+    Qed.
+
+    (** The primitive form: only the *regular* challenges need carry
+        running products.  At an irregular challenge the identity-side
+        product is [0] outright, which is exactly the escape branch
+        [rules_products] leaves open, so [match_cell]'s all-challenge
+        disjunction is still available. *)
+    Theorem permutation_sound_regular
         (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
         (Hinj : forall c d, space_cell c -> space_cell d ->
           lbl c mod p = lbl d mod p -> c = d)
         (Hrange : forall c, usable_cell c -> space_cell (sigma c))
         (Hrules : forall beta gamma,
+          challenge_regular beta gamma ->
           exists zs, permutation_rules beta gamma zs) :
       forall c, usable_cell c ->
       usable_cell (sigma c) /\ g c mod p = g (sigma c) mod p.
     Proof.
       intros c Hc.
       assert (Hor : forall beta gamma,
-        iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma)
-        by (intros beta gamma; apply rules_products; exact (Hrules beta gamma)).
+        iprod beta gamma = 0 \/ iprod beta gamma = sprod beta gamma).
+      { intros beta gamma.
+        destruct (Z.eq_dec (iprod beta gamma) 0) as [Hz | Hz];
+          [left; exact Hz |].
+        apply rules_products.
+        exact (Hrules beta gamma
+          (challenge_regular_of_iprod beta gamma Hz)). }
       destruct (match_cell Hbig Hor c (proj2 (in_all_cells c) Hc))
         as [d [Hdin [Hgd Hld]]].
       assert (Hd : d = sigma c).
@@ -1306,10 +1360,53 @@ Section WithPrime.
       - symmetry. exact Hgd.
     Qed.
 
+    (** The all-challenge reading, a weakening of the hypothesis. *)
+    Theorem permutation_sound
+        (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
+        (Hinj : forall c d, space_cell c -> space_cell d ->
+          lbl c mod p = lbl d mod p -> c = d)
+        (Hrange : forall c, usable_cell c -> space_cell (sigma c))
+        (Hrules : forall beta gamma,
+          exists zs, permutation_rules beta gamma zs) :
+      forall c, usable_cell c ->
+      usable_cell (sigma c) /\ g c mod p = g (sigma c) mod p.
+    Proof.
+      exact (permutation_sound_regular Hbig Hinj Hrange
+        (fun beta gamma _ => Hrules beta gamma)).
+    Qed.
+
     (** The composition form: with σ the permutation of a closed assembly,
         fixing every non-usable cell, and a reduced grid, the conclusion is
         [sigma.v]'s [grid_invariant] verbatim — the hypothesis
         [sigma_correct] turns into the copy equalities. *)
+    Theorem permutation_sound_grid_invariant_regular
+        (assembly : Sigma.t)
+        (Hsig : forall c, sigma c = Sigma.perm assembly c)
+        (Hbig : 2 * Z.of_nat (List.length all_cells) + 1 <= p)
+        (Hinj : forall c d, space_cell c -> space_cell d ->
+          lbl c mod p = lbl d mod p -> c = d)
+        (Hrange : forall c, usable_cell c -> space_cell (sigma c))
+        (Hfix : forall c, ~ usable_cell c -> sigma c = c)
+        (Hred : forall c, usable_cell c -> 0 <= g c < p)
+        (Hrules : forall beta gamma,
+          challenge_regular beta gamma ->
+          exists zs, permutation_rules beta gamma zs) :
+      grid_invariant g assembly.
+    Proof.
+      intro c. rewrite <- Hsig.
+      destruct (Nat.ltb_spec (fst c) ncols) as [H1 | H1];
+        [destruct (Nat.ltb_spec (snd c) un) as [H2 | H2] |].
+      - destruct
+          (permutation_sound_regular Hbig Hinj Hrange Hrules c (conj H1 H2))
+          as [Hu Hg].
+        rewrite <- (Z.mod_small (g c) p (Hred c (conj H1 H2))).
+        rewrite <- (Z.mod_small (g (sigma c)) p (Hred (sigma c) Hu)).
+        exact Hg.
+      - rewrite Hfix; [reflexivity |]. intros [_ Hc2]. lia.
+      - rewrite Hfix; [reflexivity |]. intros [Hc1 _]. lia.
+    Qed.
+
+    (** The all-challenge reading, a weakening of the hypothesis. *)
     Theorem permutation_sound_grid_invariant
         (assembly : Sigma.t)
         (Hsig : forall c, sigma c = Sigma.perm assembly c)
@@ -1323,16 +1420,8 @@ Section WithPrime.
           exists zs, permutation_rules beta gamma zs) :
       grid_invariant g assembly.
     Proof.
-      intro c. rewrite <- Hsig.
-      destruct (Nat.ltb_spec (fst c) ncols) as [H1 | H1];
-        [destruct (Nat.ltb_spec (snd c) un) as [H2 | H2] |].
-      - destruct (permutation_sound Hbig Hinj Hrange Hrules c (conj H1 H2))
-          as [Hu Hg].
-        rewrite <- (Z.mod_small (g c) p (Hred c (conj H1 H2))).
-        rewrite <- (Z.mod_small (g (sigma c)) p (Hred (sigma c) Hu)).
-        exact Hg.
-      - rewrite Hfix; [reflexivity |]. intros [_ Hc2]. lia.
-      - rewrite Hfix; [reflexivity |]. intros [Hc1 _]. lia.
+      exact (permutation_sound_grid_invariant_regular assembly Hsig Hbig Hinj
+        Hrange Hfix Hred (fun beta gamma _ => Hrules beta gamma)).
     Qed.
 
     (** ** Completeness: a σ-invariant grid satisfies the rules
@@ -1536,7 +1625,7 @@ Section WithPrime.
         (Hsinj : forall c d, usable_cell c -> usable_cell d ->
           sigma c = sigma d -> c = d)
         (beta gamma : Z)
-        (Hnz : forall c, usable_cell c -> ifac beta gamma c <> 0) :
+        (Hnz : challenge_regular beta gamma) :
       exists zs, permutation_rules beta gamma zs.
     Proof.
       assert (Hperm : Permutation (List.map sigma all_cells) all_cells).
@@ -1669,7 +1758,7 @@ Section WithPrime.
         (Hfix : forall c, ~ usable_cell c -> sigma c = c)
         (Hginj : forall c d, sigma c = sigma d -> c = d)
         (beta gamma : Z)
-        (Hnz : forall c, usable_cell c -> ifac beta gamma c <> 0) :
+        (Hnz : challenge_regular beta gamma) :
       exists zs, permutation_rules beta gamma zs.
     Proof.
       apply permutation_complete; [| | | exact Hnz].
