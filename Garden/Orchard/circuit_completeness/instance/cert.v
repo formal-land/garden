@@ -40,10 +40,6 @@ Require Import Garden.Orchard.circuit_completeness.generator.certificates.
 Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
 Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.instance.domain.
-Require Import Garden.Orchard.circuit_completeness.instance.mul_a.
-Require Import Garden.Orchard.circuit_completeness.instance.mul_b.
-Require Import Garden.Orchard.circuit_completeness.instance.mul_c.
-Require Import Garden.Orchard.circuit_completeness.instance.mul_d.
 Require Import Garden.Orchard.circuit_completeness.instance.read.
 Require Import Garden.Orchard.circuit_completeness.instance.witness.
 Require Import Garden.Orchard.circuit_completeness.instance.shards_merkle.
@@ -77,10 +73,7 @@ Module OrchardCompletenessInstance.
       OrchardCompletenessInstanceDomain.nc_old_nondeg_cert
       OrchardCompletenessInstanceDomain.nc_new_nondeg_cert
       OrchardCompletenessInstanceDomain.civk_nondeg_cert
-      OrchardCompletenessInstanceMulA.mul_range_a_cert
-      OrchardCompletenessInstanceMulB.mul_range_b_cert
-      OrchardCompletenessInstanceMulC.mul_range_c_cert
-      OrchardCompletenessInstanceMulD.mul_range_d_cert).
+      OrchardCompletenessInstanceDomain.mul_chain_cert).
   Qed.
 
   (** ** The join: every enabled point passes the checker *)
