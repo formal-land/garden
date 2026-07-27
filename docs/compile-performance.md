@@ -125,16 +125,15 @@ long-line-but-valid formatting — 30 KB max line, correct total size.)
 ### Shard large literal tables across files — single-file elaboration is superlinear
 
 Elaboration cost of successive literal-table `Definition`s in one file grows
-with file position, even though the definitions are independent.  Measured on
-the Vesta SRS tables (2026-07-23, sixteen 128-entry shards of 7-tuples with
-four ~77-digit literals each): identical successive shard definitions cost
+with file position, even though the definitions are independent.  Measured
+2026-07-23 on sixteen 128-entry shards of 7-tuples with four ~77-digit
+literals each: identical successive shard definitions cost
 2.6 / 4.1 / 10.4 / 14.5 s in one file — the 700 KB whole-table file ran
 > 6 minutes without finishing where 16 × 2.6 s was expected.  Splitting the
-tables one-per-file (`Orchard/vk_srs_data_{0..15}.v`, assembled by a
-constants-only `vk_srs_data.v`) resets the cost: ≈ 2.5 s per file, fully
-parallel.  Independently, an applicative entry constructor
-(`VkSrsEntry.E i ws0 r0 ws1 r1 x y`, each argument checked against a fixed
-expected type) elaborates ≈ 2× cheaper than the nested tuple notation
+tables one-per-file, assembled by a constants-only aggregator, resets the
+cost: ≈ 2.5 s per file, fully parallel.  Independently, an applicative
+entry constructor (`E i ws0 r0 ws1 r1 x y`, each argument checked against a
+fixed expected type) elaborates ≈ 2× cheaper than the nested tuple notation
 `(i, ws0, …, y)` for the same 128-entry table (5.2 s → 2.6 s) — prefer it
 for any new wide-tuple table.
 
@@ -589,8 +588,8 @@ the unreduced 260 kbit integer before the outer `mod` — on the VM and on
 the lazy machine alike, and the lazy machine is reached by more than
 tactics: `change`, a goal-side `rewrite` whose occurrence search unifies
 its pattern against the pow subterm, and the `Qed`-time conversion of a
-cast all forced it (observed 2026-07-24, `Orchard/vk_msm.v`
-`omega_inv_half`: three different >7-minute stalls).  Certify the power
+cast all forced it (observed 2026-07-24 on a root-of-unity half-power
+certificate: three different >7-minute stalls).  Certify the power
 through the square-and-multiply `modpow` (`vm_cast_no_check`, ~1 s),
 transfer to the `Z.pow` spelling by rewriting `modpow_correct` *in the
 hypothesis* (never in a goal that contains the pow term) followed by
@@ -841,24 +840,21 @@ unfolding: any tactic whose unification touches the term — `apply
 in_map_iff in H`, `f_equal` between mismatched sides, `rewrite` pattern
 search — diverges (>7 min).  `Strategy opaque [fft]` protects kernel
 conversion but NOT tactic unification: additionally state every consumer
-lemma over an *abstract* list (`map_mod_{length,range,nth}` in
-`Orchard/vk_msm.v`) and instantiate at the concrete term with pure
-`exact`-terms (`eq_trans`/`f_equal`/`eq_ind_r` compositions), so the
+lemma over an *abstract* list and instantiate at the concrete term with
+pure `exact`-terms (`eq_trans`/`f_equal`/`eq_ind_r` compositions), so the
 only checks are syntactic.  The same discipline carries into the leaf
-assembly (`Orchard/vk_msm_calibrate.v`): the replayed-column certificate
+assembly: a replayed-column certificate
 is stated as the raw `option_map` term and consumed by an `eq_trans` of
 `f_equal`s — an `injection`/`rewrite`-based version sat >10 min, and a
-`rewrite` against a goal containing an applied `commit_lagrange` would
-lazily evaluate the 2048-point `g_lagrange` spec, which must never be
-computed.
+`rewrite` against a goal containing an applied never-computable spec
+would lazily evaluate that spec, which must not happen.
 
 ### Instantiate curve-law wrappers with fully applied terms
 
-`apply (GroupOrderCosets.mul_on_curve …)` against a `Vesta.on_curve`
+`apply (GroupOrderCosets.mul_on_curve …)` against an `on_curve`
 goal stalls in evarconv (>5 min) where the fully applied `exact` term is
-instant; every `Vesta`-instance group-law wrapper in `Orchard/vk_msm.v`
-(`vadd_*`, `vmul_*`, `vswap4`, `good_*`) is an `exact`-style one-liner
-for this reason.  When such a wrapper is itself applied by later proofs
+instant; curve-instance group-law wrappers should be `exact`-style
+one-liners for this reason.  When such a wrapper is itself applied by later proofs
 the unification stays within one definitional layer and does not stall.
 
 ### Never duplicate an instance-bearing module — alias it
@@ -950,8 +946,8 @@ predates the completeness-instance layer entirely. Heavy leaves:
   `OrchardCompiledCheck.compiled` (the compiled Orchard system) with the
   pinned literal; the first sentence pays the one-time `compiled` global
   build shared by the rest. `circuit_compiled_pinned.v` (the pinned literal
-  data) is ≈ 1.1 s; the six
-  `Halo2/plonkish/{main,compile,mock,sigma,orbit,smoke}.v` proof-layer files
+  data) is ≈ 1.1 s; the five
+  `Halo2/plonkish/{main,compile,mock,sigma,orbit}.v` proof-layer files
   are each < 1 s (generic theorems, no concrete-instance `vm_compute`).
 - `Orchard/circuit_compiled_algebraic.v`: ≈ 21 s / 1.3 GB — the L1
   side-condition certificates: the σ-mapping scans and boundary fixed
@@ -1109,50 +1105,6 @@ predates the completeness-instance layer entirely. Heavy leaves:
   ~200 s wall on eight cores, never re-paid while iterating elsewhere.
   Sharding finer was declined — per-leaf memory is small (< 1 GiB) and the
   cost is pure per-point CPU, so more shards only add `Require` overhead.
-
-- The vk-commitment MSM layer (2026-07-24; machinery + the fixed-column-0
-  calibration certificate):
-  `EllipticCurve/GroupOrderTight.v` ≈ 8 s (the three-coset order theorem
-  and the ladder-distribution point algebra, all symbolic);
-  `EllipticCurve/VestaOrder.v` ≈ 115 s — dominated by the
-  [pallas_p]-fold `placeholder_order` ladder (`vm_cast_no_check`, ~100 s)
-  plus the Euler-criterion cube certificate (~1.3 s);
-  `Orchard/vk_msm.v` ≈ 14 s (95 `Qed`, no concrete-instance heavy
-  `vm_compute`; the largest sentence is `fft_spec`'s `Qed` at ~19 s under
-  a cold elaborator, ~7 s warm);
-  `Orchard/vk_msm_data_fixed0.v` ≈ 19 s (2 × 2048 pasted literals + two
-  checkpoint points);
-  `Orchard/vk_msm_calibrate.v` ≈ 110 s — the replayed-column certificate
-  (≈ 17 s: the 19,617-event replay + 2048 installed-plane reads), the
-  inverse-NTT coefficient certificate (≈ 82 s: 11-level radix-2 FFT,
-  ~22.5 k modular multiplications), the sub-second range/length/
-  blind-and-compare certificates, and the term-style assembly theorem;
-  `Orchard/vk_msm_calibrate_{a,b}.v`: MEASURED_SHARD — one half-range
-  1024-base Pippenger `vm_compute` each (32 windows of 8 bits,
-  255 filter-buckets, suffix-sum aggregation; ≈ 49 k affine point
-  operations at ≈ 57 ms each), mutually independent, ≈ 0.7 GB peak.
-  The 44-commitment fan-out runs two such leaves per commitment fully
-  parallel; under route (b) every column is a dense 2048-scalar MSM, so
-  the per-commitment cost is uniform.
-
-- The Vesta SRS provenance shards (2026-07-23):
-  `Orchard/vk_srs_cert_{0..15}.v` — ≈ 295 s CPU each
-  (`vk_srs_shard_N_check`, a 128-point raw-`forallb` `vm_compute` over the
-  witnessed `GroupHashVesta` recomputation — BLAKE2b XMD, witnessed SSWU
-  onto iso-Vesta, iso-curve addition, `iso_map` — ≈ 2.3 s per point under
-  16-way parallel load; witnesses pasted from
-  `scripts/generate_vk_srs_witnesses.py`, never an in-kernel `field_sqrt`).
-  The sixteen leaves are mutually independent and only
-  `Orchard/vk_srs_cert.v` (≈ 70 s: the 2049-point on-curve/reducedness scan,
-  the single-point `w` certificate, the index scan, and list-plumbing
-  assembly — all `Qed`) consumes them: ≈ 5.2 min wall for all 16 on 32
-  cores, never re-paid while iterating elsewhere.  Supporting leaves:
-  `GroupHash/sswu_vesta.v` ≈ 14 s (two Euler-criterion nonsquare checks, the
-  λ-provenance `modpow`, and the pinned SSWU test vectors),
-  `GroupHash/group_hash_vesta.v` ≈ 8 s (the pinned Vesta `hash_to_curve`
-  reference vector), the sixteen `Orchard/vk_srs_data_*.v` literal files
-  ≈ 2.5 s each (see the literal-table sharding pitfall above),
-  `EllipticCurve/Vesta.v` and `Orchard/vk_srs_entry.v` < 1 s.
 
 Remaining single-file levers: the `hash_to_point_round_proof` round proof
 and the `sinsemilla_s` table literal, the two largest links in the chain

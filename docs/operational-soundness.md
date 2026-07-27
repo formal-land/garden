@@ -48,6 +48,16 @@ and instance planes are symbolic — advice is free witness, not an event.
 `realize idx rs` reads a relational `Assignment.t` back off the grid,
 re-imposing region addressing through the placement.
 
+Fills are keygen-faithful: `Raw.Event.FillFromRow` carries an upper bound
+and writes the half-open range `[from_row, usable_rows)`, mirroring Halo2
+keygen's `fill_from_row`, which iterates over the usable rows only. A
+lookup table's default band therefore stops at `usable_rows` and the
+`l_last` + blinding rows stay at `0` — the column as the deployed
+verifying key commits it. The relational `Fact.LookupTableLoaded` is
+correspondingly narrow (it pins the assigned rows `[0, length values)`);
+the default band and the zero tail are pinned operationally by the
+fill-replay lemmas of `realize/facts.v`.
+
 ### The ideal checker (`Halo2/realize/sound.v`)
 
 `mock_prover_accepts` is the in-model counterpart of Rust Halo2's
