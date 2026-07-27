@@ -1,0 +1,283 @@
+Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
+Require Import Garden.Orchard.columns.
+Require Garden.Halo2.halo2_poseidon.p128pow5t3.
+Require Garden.Halo2.halo2_gadgets.poseidon.p128pow5t3_synthesis.
+Require Garden.Halo2.halo2_gadgets.utilities.
+
+Import ListNotations.
+Global Open Scope pstring_scope.
+Global Open Scope Z_scope.
+
+Module State.
+  Record t : Set := {
+    state_0 : Cell.t columns RegionId.t;
+    state_1 : Cell.t columns RegionId.t;
+    state_2 : Cell.t columns RegionId.t;
+  }.
+End State.
+
+Definition pow_5
+    (value : Expression.t columns)
+    : Expression.t columns :=
+  let value_2 := Garden.Halo2.halo2_gadgets.utilities.square value in
+  let value_4 := Garden.Halo2.halo2_gadgets.utilities.square value_2 in
+  value_4 ✖️ value.
+
+Definition full_round_sum
+    (row : nat)
+    : Expression.t columns :=
+  let state_0 := Expression.Advice Advice.A6 Rotation.cur in
+  let state_1 := Expression.Advice Advice.A7 Rotation.cur in
+  let state_2 := Expression.Advice Advice.A8 Rotation.cur in
+  let rc_a_0 := Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur in
+  let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
+  let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
+  let state_0_sbox := pow_5 (state_0 ➕ rc_a_0) in
+  let state_1_sbox := pow_5 (state_1 ➕ rc_a_1) in
+  let state_2_sbox := pow_5 (state_2 ➕ rc_a_2) in
+  (state_0_sbox ● (p128pow5t3.mds_coeff row 0))
+    ➕ (state_1_sbox ● (p128pow5t3.mds_coeff row 1))
+    ➕ (state_2_sbox ● (p128pow5t3.mds_coeff row 2)).
+
+Definition mid
+    (row : nat)
+    : Expression.t columns :=
+  let mid_0 := Expression.Advice Advice.A5 Rotation.cur in
+  let state_1 := Expression.Advice Advice.A7 Rotation.cur in
+  let state_2 := Expression.Advice Advice.A8 Rotation.cur in
+  let rc_a_1 := Expression.Fixed Fixed.LagrangeCoeffs3 Rotation.cur in
+  let rc_a_2 := Expression.Fixed Fixed.LagrangeCoeffs4 Rotation.cur in
+  (mid_0 ● (p128pow5t3.mds_coeff row 0))
+    ➕ ((state_1 ➕ rc_a_1) ● (p128pow5t3.mds_coeff row 1))
+    ➕ ((state_2 ➕ rc_a_2) ● (p128pow5t3.mds_coeff row 2)).
+
+Definition next
+    (row : nat)
+    : Expression.t columns :=
+  let state_0 := Expression.Advice Advice.A6 Rotation.next in
+  let state_1 := Expression.Advice Advice.A7 Rotation.next in
+  let state_2 := Expression.Advice Advice.A8 Rotation.next in
+  (state_0 ● (p128pow5t3.mds_inv_coeff row 0))
+    ➕ (state_1 ● (p128pow5t3.mds_inv_coeff row 1))
+    ➕ (state_2 ● (p128pow5t3.mds_inv_coeff row 2)).
+
+Definition full_round_gate : Gate.t columns := {|
+    Gate.name := "full round";
+    Gate.constraints :=
+      let state_0_next := Expression.Advice Advice.A6 Rotation.next in
+      let state_1_next := Expression.Advice Advice.A7 Rotation.next in
+      let state_2_next := Expression.Advice Advice.A8 Rotation.next in
+      Constraints.with_selector Selector.QPoseidonFull [
+        (None, Constraint.Equal (full_round_sum 0) state_0_next);
+        (None, Constraint.Equal (full_round_sum 1) state_1_next);
+        (None, Constraint.Equal (full_round_sum 2) state_2_next)
+      ];
+  |}.
+
+Definition partial_rounds_gate : Gate.t columns := {|
+    Gate.name := "partial rounds";
+    Gate.constraints :=
+      let cur_0 := Expression.Advice Advice.A6 Rotation.cur in
+      let mid_0 := Expression.Advice Advice.A5 Rotation.cur in
+      let rc_a_0 := Expression.Fixed Fixed.LagrangeCoeffs2 Rotation.cur in
+      let rc_b_0 := Expression.Fixed Fixed.LagrangeCoeffs5 Rotation.cur in
+      let rc_b_1 := Expression.Fixed Fixed.LagrangeCoeffs6 Rotation.cur in
+      let rc_b_2 := Expression.Fixed Fixed.LagrangeCoeffs7 Rotation.cur in
+      Constraints.with_selector Selector.QPoseidonPartial [
+        (None, Constraint.Equal (pow_5 (cur_0 ➕ rc_a_0)) mid_0);
+        (None, Constraint.Equal (pow_5 (mid 0 ➕ rc_b_0)) (next 0));
+        (None, Constraint.Equal (mid 1 ➕ rc_b_1) (next 1));
+        (None, Constraint.Equal (mid 2 ➕ rc_b_2) (next 2))
+      ];
+  |}.
+
+Definition pad_and_add_gate : Gate.t columns := {|
+    Gate.name := "pad-and-add";
+    Gate.constraints :=
+      let state_0_prev := Expression.Advice Advice.A6 Rotation.prev in
+      let state_1_prev := Expression.Advice Advice.A7 Rotation.prev in
+      let state_2_prev := Expression.Advice Advice.A8 Rotation.prev in
+      let state_0_cur := Expression.Advice Advice.A6 Rotation.cur in
+      let state_1_cur := Expression.Advice Advice.A7 Rotation.cur in
+      let state_0_next := Expression.Advice Advice.A6 Rotation.next in
+      let state_1_next := Expression.Advice Advice.A7 Rotation.next in
+      let state_2_next := Expression.Advice Advice.A8 Rotation.next in
+      Constraints.with_selector Selector.QPoseidonPadAndAdd [
+        (None, Constraint.Equal (state_0_prev ➕ state_0_cur) state_0_next);
+        (None, Constraint.Equal (state_1_prev ➕ state_1_cur) state_1_next);
+        (None, Constraint.Equal state_2_prev state_2_next)
+      ];
+  |}.
+
+Definition configure : 𝓒 columns unit :=
+  do🞵 𝓒.CreateGate full_round_gate in
+  do🞵 𝓒.CreateGate partial_rounds_gate in
+  do🞵 𝓒.CreateGate pad_and_add_gate in
+  return🞵 tt.
+
+Definition state_at
+    (region : RegionId.t)
+    (offset : Z)
+    : State.t :=
+  let state_0 := Cell.advice region Advice.A6 offset in
+  let state_1 := Cell.advice region Advice.A7 offset in
+  let state_2 := Cell.advice region Advice.A8 offset in
+  {|
+    State.state_0 := state_0;
+    State.state_1 := state_1;
+    State.state_2 := state_2;
+  |}.
+
+Definition copy_state_to
+    (region : RegionId.t)
+    (offset : Z)
+    (state : State.t)
+    : 𝓡 columns RegionId.t unit :=
+  let target := state_at region offset in
+  do🞵 𝓡.Copy target.(State.state_0) state.(State.state_0) in
+  do🞵 𝓡.Copy target.(State.state_1) state.(State.state_1) in
+  𝓡.Copy target.(State.state_2) state.(State.state_2).
+
+(** The initial capacity element of the [ConstantLength<2>] domain:
+    [L << 64] with [L = 2]. *)
+Definition initial_capacity_element : Z := 2 ^ 65.
+
+Definition synthesize_initial_state
+    : 𝓛 columns RegionId.t State.t :=
+  𝓛.InNamespace "Poseidon init" (
+    𝓛.AddRegion
+      (RegionId.Poseidon RegionId.Poseidon.InitialState)
+      "initial state for domain ConstantLength<2>"
+      (fun region =>
+        let state := state_at region 0 in
+        (* The rate words start at zero and the capacity word at the domain
+           constant ([pow5.rs] [initial_state],
+           [assign_advice_from_constant]). *)
+        do🞵 𝓡.ConstrainConstant state.(State.state_0) 0 in
+        do🞵 𝓡.ConstrainConstant state.(State.state_1) 0 in
+        do🞵
+          𝓡.ConstrainConstant state.(State.state_2) initial_capacity_element in
+        return🞵 state)).
+
+Fixpoint assign_round_constant_entries
+    (offset : Z)
+    (entries :
+      list
+        Garden.Halo2.halo2_gadgets.poseidon.p128pow5t3_synthesis
+          .round_constant_entry)
+    : 𝓡 columns RegionId.t unit :=
+  match entries with
+  | [] => return🞵 tt
+  | (column, annotation, value) :: entries =>
+      do🞵
+        𝓡.AssignFixed annotation column offset value in
+      assign_round_constant_entries offset entries
+  end.
+
+Definition assign_round_constant_row
+    (offset : Z)
+    (row :
+      Garden.Halo2.halo2_gadgets.poseidon.p128pow5t3_synthesis
+        .round_constant_row)
+    : 𝓡 columns RegionId.t unit :=
+  let '(selector, entries) := row in
+  do🞵 𝓡.EnableSelector selector offset "" in
+  assign_round_constant_entries offset entries.
+
+Fixpoint assign_permutation_rows
+    (region : RegionId.t)
+    (offset : Z)
+    (rows :
+      list
+        Garden.Halo2.halo2_gadgets.poseidon.p128pow5t3_synthesis
+          .round_constant_row)
+    : 𝓡 columns RegionId.t State.t :=
+  match rows with
+  | [] => return🞵 (state_at region offset)
+  | row :: rows =>
+      do🞵 assign_round_constant_row offset row in
+      assign_permutation_rows region (offset + 1) rows
+  end.
+
+Definition synthesize_add_input_region
+    (state : State.t)
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t State.t :=
+  𝓛.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.AddInput)
+    "add input for domain ConstantLength<2>" (fun region =>
+    do🞵 𝓡.EnableSelector Selector.QPoseidonPadAndAdd 1 "" in
+    do🞵 copy_state_to region 0 state in
+    let state_0 := Cell.advice region Advice.A6 1 in
+    let state_1 := Cell.advice region Advice.A7 1 in
+    let state_2 := Cell.advice region Advice.A8 1 in
+    do🞵 𝓡.Copy input_0 state_0 in
+    do🞵 𝓡.Copy input_1 state_1 in
+    let state_0 := Cell.advice region Advice.A6 2 in
+    let state_1 := Cell.advice region Advice.A7 2 in
+    let state_2 := Cell.advice region Advice.A8 2 in
+    return🞵 {|
+      State.state_0 := state_0;
+      State.state_1 := state_1;
+      State.state_2 := state_2;
+    |}).
+
+Definition synthesize_permute_state
+    (state : State.t)
+    : 𝓛 columns RegionId.t State.t :=
+  𝓛.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PermuteState)
+    "permute state" (fun region =>
+    do🞵 copy_state_to region 0 state in
+    assign_permutation_rows
+      region
+      0
+      Garden.Halo2.halo2_gadgets.poseidon.p128pow5t3_synthesis
+        .permutation_rows).
+
+Definition synthesize_sponge
+    (state : State.t)
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t State.t :=
+  𝓛.InNamespace "PoseidonSponge" (
+    let🞵 state := synthesize_add_input_region state input_0 input_1 in
+    synthesize_permute_state state).
+
+Definition synthesize_hash
+    (input_0 input_1 : Cell.t columns RegionId.t)
+    : 𝓛 columns RegionId.t (Cell.t columns RegionId.t) :=
+  let🞵 state := synthesize_initial_state in
+  𝓛.InNamespace "Poseidon hash (nk, rho)" (
+    do🞵 𝓛.InNamespace "absorb_0" (return🞵 tt) in
+    do🞵 𝓛.InNamespace "absorb_1" (return🞵 tt) in
+    let🞵 state :=
+      𝓛.InNamespace "finish absorbing" (
+        synthesize_sponge state input_0 input_1) in
+    do🞵 𝓛.InNamespace "squeeze" (return🞵 tt) in
+    return🞵 state.(State.state_0)).
+
+Definition synthesize_full_round
+    : 𝓛 columns RegionId.t unit :=
+  𝓛.AddRegion (RegionId.Poseidon RegionId.Poseidon.FullRound) "full round" (fun _ =>
+    𝓡.EnableSelector Selector.QPoseidonFull 0 "").
+
+Definition synthesize_partial_rounds
+    : 𝓛 columns RegionId.t unit :=
+  𝓛.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PartialRounds)
+    "partial rounds" (fun _ =>
+    𝓡.EnableSelector Selector.QPoseidonPartial 0 "").
+
+Definition synthesize_pad_and_add
+    : 𝓛 columns RegionId.t unit :=
+  𝓛.AddRegion
+    (RegionId.Poseidon RegionId.Poseidon.PadAndAdd)
+    "pad-and-add" (fun _ =>
+    𝓡.EnableSelector Selector.QPoseidonPadAndAdd 0 "").
+
+Definition synthesize
+    : 𝓛 columns RegionId.t unit :=
+  do🞵 synthesize_full_round in
+  do🞵 synthesize_partial_rounds in
+  synthesize_pad_and_add.

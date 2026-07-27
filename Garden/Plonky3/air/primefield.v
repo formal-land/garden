@@ -1,6 +1,7 @@
-Require Import Coq.ZArith.ZArith.
-Require Import Plonky3.M.
-Require Import Coq.ZArith.Znumtheory.
+Require Import Stdlib.ZArith.ZArith.
+Require Import Garden.Field.Field.
+Require Import Garden.Field.Fermat.
+Require Import Stdlib.ZArith.Znumtheory.
 Open Scope Z_scope.
 
 
@@ -41,13 +42,16 @@ Module Type PrimeField.
   Axiom add_assoc : forall a b c, add (add a b) c = add a (add b c).
   Axiom mul_comm : forall a b, mul a b = mul b a.
   Axiom mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Axiom add_zero : forall a, add a zero = a.
-  Axiom mul_one : forall a, mul a one = a.
+  Axiom add_zero : forall a, add a zero = mod_p a.
+  Axiom mul_one : forall a, mul a one = mod_p a.
   Axiom mul_zero : forall a, mul a zero = zero.
   Axiom add_neg : forall a, add a (neg a) = zero.
   Axiom sub_def : forall a b, sub a b = add a (neg b).
   Axiom div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
-  Axiom mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
+  (* The hypothesis requires the reduced value [mod_p a] to be nonzero; the bare
+     integer disequality [a <> zero] does not suffice, since e.g. [a = p] reduces
+     to zero. *)
+  Axiom mul_inv : forall a c, mod_p a <> zero -> mul a (inv a c) = one.
   Axiom distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
   Axiom of_bool_true : of_bool true = one.
   Axiom of_bool_false : of_bool false = zero.
@@ -98,37 +102,76 @@ Module MakePrimeField (P : PrimeParameter) <: PrimeField.
   Qed.
   
   Lemma add_assoc : forall a b c, add (add a b) c = add a (add b c).
-  Proof. Admitted.
-  
+  Proof.
+    intros a b c. unfold add, mod_p.
+    rewrite Zplus_mod_idemp_l, Zplus_mod_idemp_r, Z.add_assoc.
+    reflexivity.
+  Qed.
+
   Lemma mul_comm : forall a b, mul a b = mul b a.
-  Proof. Admitted.
-  
+  Proof.
+    intros a b. unfold mul, mod_p.
+    rewrite Z.mul_comm. reflexivity.
+  Qed.
+
   Lemma mul_assoc : forall a b c, mul (mul a b) c = mul a (mul b c).
-  Proof. Admitted.
-  
-  Lemma add_zero : forall a, add a zero = a.
-  Proof. Admitted.
-  
-  Lemma mul_one : forall a, mul a one = a.
-  Proof. Admitted.
-  
+  Proof.
+    intros a b c. unfold mul, mod_p.
+    rewrite Zmult_mod_idemp_l, Zmult_mod_idemp_r, Z.mul_assoc.
+    reflexivity.
+  Qed.
+
+  Lemma add_zero : forall a, add a zero = mod_p a.
+  Proof.
+    intros a. unfold add, zero.
+    rewrite Z.add_0_r. reflexivity.
+  Qed.
+
+  Lemma mul_one : forall a, mul a one = mod_p a.
+  Proof.
+    intros a. unfold mul, one.
+    rewrite Z.mul_1_r. reflexivity.
+  Qed.
+
   Lemma mul_zero : forall a, mul a zero = zero.
-  Proof. Admitted.
-  
+  Proof.
+    intros a. unfold mul, zero, mod_p.
+    rewrite Z.mul_0_r. apply Zmod_0_l.
+  Qed.
+
   Lemma add_neg : forall a, add a (neg a) = zero.
-  Proof. Admitted.
-  
+  Proof.
+    intros a. unfold add, neg, zero, mod_p.
+    rewrite Zplus_mod_idemp_r.
+    replace (a + (p - a)) with p by ring.
+    apply Z_mod_same_full.
+  Qed.
+
   Lemma sub_def : forall a b, sub a b = add a (neg b).
-  Proof. Admitted.
-  
+  Proof.
+    intros a b. unfold sub, add, neg, mod_p.
+    rewrite Zplus_mod_idemp_r.
+    f_equal. ring.
+  Qed.
+
   Lemma div_def : forall a b, div a b (b <> 0) = mul a (inv b (b <> 0)).
-  Proof. Admitted.
-  
-  Lemma mul_inv : forall a c, a <> zero -> mul a (inv a c) = one.
-  Proof. Admitted.
-  
+  Proof. reflexivity. Qed.
+
+  Lemma mul_inv : forall a c, mod_p a <> zero -> mul a (inv a c) = one.
+  Proof.
+    intros a c Hnz.
+    unfold mul, inv, mod_p, one, zero in *.
+    apply Fermat.inv_correct_gen.
+    - exact p_prime.
+    - exact Hnz.
+  Qed.
+
   Lemma distrib : forall a b c, mul a (add b c) = add (mul a b) (mul a c).
-  Proof. Admitted.
+  Proof.
+    intros a b c. unfold mul, add, mod_p.
+    rewrite Zmult_mod_idemp_r, <- Zplus_mod.
+    f_equal. ring.
+  Qed.
   
   Lemma of_bool_true : of_bool true = one.
   Proof. unfold of_bool, one. reflexivity. Qed.
@@ -139,40 +182,40 @@ End MakePrimeField.
 
 (* Define Mersenne31 prime as the prime parameter module *)
 Module Mersenne31Parameter <: PrimeParameter.
-  Definition p : Z := 2147483647.  (* 2^31 - 1 *)
+  Definition p : Z := Primes.mersenne31.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.mersenne31_prime. Qed.
 End Mersenne31Parameter.
 
 Module Mersenne31 := MakePrimeField(Mersenne31Parameter).
 
 (* Define BabyBear prime, 2^31 - 2^27 + 1, as the prime parameter module *)
 Module BabyBearParameter <: PrimeParameter.
-  Definition p : Z := 2^31 - 2^27 + 1.
+  Definition p : Z := Primes.baby_bear.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.baby_bear_prime. Qed.
 End BabyBearParameter.
 
 Module BabyBear := MakePrimeField(BabyBearParameter).
 
 
-(* Define KoalaBear prime field, 2^31 - 2^24 + 1 *)
+(* Define KoalaBear prime field. *)
 Module KoalaBearParameter <: PrimeParameter.
-  Definition p : Z := 2^31 - 2^27 + 1.
+  Definition p : Z := Primes.koala_bear.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.koala_bear_prime. Qed.
 End KoalaBearParameter.
 
 Module KoalaBear := MakePrimeField(KoalaBearParameter).
 
 (* Define Goldilocks prime field, which is 2^64 - 2^32 + 1 *)
 Module GoldilocksParameter <: PrimeParameter.
-  Definition p : Z := 2^64 - 2^32 + 1.
+  Definition p : Z := Primes.goldilocks.
   
   Lemma p_prime : IsPrime p.
-  Proof. Admitted.
+  Proof. exact Primes.goldilocks_prime. Qed.
 End GoldilocksParameter.
 Module Goldilocks := MakePrimeField(GoldilocksParameter).

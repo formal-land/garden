@@ -1,7 +1,16 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.Util.
-Require Import Coq.omega.PreOmega.
-Require Import Coqtail.Arith.Zeqm.
+Require Import Stdlib.omega.PreOmega.
+Require Import Stdlib.ZArith.Znumtheory.
+
+Lemma eqm_minus_0 : forall a b m, eqm m a b <-> eqm m (a - b) 0.
+Proof.
+  intros a b m.
+  unfold eqm.
+  rewrite Zmod_0_l.
+  apply Z.cong_iff_0.
+Qed.
 
 (* TODO: these are to be declared as shared constants / methods, copied from blake3/constants.v *)
 Definition BITS_PER_LIMB : Z := 16.
@@ -20,9 +29,30 @@ Definition pack_16_limbs (bits : Array.t Z U32_LIMBS) : Z :=
 Definition unpack_16_limbs (value : Z) : Array.t Z U32_LIMBS := 
   double_val (value mod (2 ^ BITS_PER_LIMB)) (value / (2 ^ BITS_PER_LIMB)).
 
+(* An odd prime divides no power of two. *)
+Lemma not_div_pow2 (p : Z) (Hp : Znumtheory.prime p) (Hp2 : 2 < p) :
+  forall n : nat, ~ (p | 2 ^ (Z.of_nat n)).
+Proof.
+  induction n as [|n IH].
+  - simpl. intro Hd. apply Z.divide_pos_le in Hd; lia.
+  - rewrite Nat2Z.inj_succ. rewrite Z.pow_succ_r by lia.
+    intro Hd.
+    apply (Znumtheory.prime_mult p Hp 2 (2 ^ (Z.of_nat n))) in Hd.
+    destruct Hd as [Hd | Hd].
+    + apply Z.divide_pos_le in Hd; lia.
+    + exact (IH Hd).
+Qed.
+
+(* An odd prime cannot divide a power of two, so it is coprime to it. *)
 Lemma large_prime_coprime_exp_of_2 {p} `{Prime p} : 2 < p -> Znumtheory.rel_prime (2 ^ 16) p.
 Proof.
-Admitted.
+  intros Hp2.
+  pose proof (@is_prime p _) as Hp. unfold IsPrime in Hp.
+  apply Znumtheory.rel_prime_sym.
+  apply Znumtheory.prime_rel_prime; [exact Hp |].
+  change (2 ^ 16) with (2 ^ (Z.of_nat 16)).
+  apply (not_div_pow2 p Hp Hp2 16).
+Qed.
 
 Module RangeCheck32.
   Record t (x : Array.t Z U32_LIMBS) : Prop := {
@@ -116,9 +146,9 @@ Module Add2Proof.
       unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b)) mod 2 ^ 32).
 
     Lemma implies {p} `{Prime p} (result a b : Array.t Z U32_LIMBS) :
-      (* let result := M.map_mod result in
-      let a := M.map_mod a in
-      let b := M.map_mod b in *)
+      (* let result := Field.map_mod result in
+      let a := Field.map_mod a in
+      let b := Field.map_mod b in *)
       2 ^ 17 < p ->
       RangeCheck32.t result ->
       RangeCheck32.t a ->
@@ -598,9 +628,9 @@ Module Add3Proof.
       unpack_16_limbs (((pack_16_limbs a) + (pack_16_limbs b) + (pack_16_limbs c)) mod 2 ^ 32).
 
     Lemma implies {p} `{Prime p} (result a b c : Array.t Z U32_LIMBS) :
-      (* let result := M.map_mod result in
-      let a := M.map_mod a in
-      let b := M.map_mod b in *)
+      (* let result := Field.map_mod result in
+      let a := Field.map_mod a in
+      let b := Field.map_mod b in *)
       p > 3 * 2 ^ 17 ->
       RangeCheck32.t result ->
       RangeCheck32.t a ->
@@ -973,5 +1003,4 @@ Module Add3Proof.
 
       easy.
     Qed.  
-
 End Add3Proof.

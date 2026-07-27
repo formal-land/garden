@@ -1,5 +1,5 @@
 opam-version: "2.0"
-name: "coq-garden"
+name: "rocq-garden"
 version: "0.1.0"
 synopsis: "Garden"
 description: """
@@ -14,12 +14,14 @@ homepage: "https://github.com/formal-land/garden"
 bug-reports: "https://github.com/formal-land/garden/issues"
 dev-repo: "git+https://github.com/formal-land/garden.git"
 depends: [
-  "coq" {>= "8.20.0" }
-  "coq-coqtail"  
-  "coq-coqutil" {>= "0.0.5"}
-  "coq-hammer"
-  "coq-mathcomp-algebra"
-  "coq-smpl"
+  "rocq-core" {= "9.0.1"}
+  "rocq-stdlib" {= "9.0.0"}
+  "coq-coqutil" {>= "0.0.7"}
+  "coq-hammer" {= "1.3.2+9.0"}
+  "rocq-mathcomp-algebra" {>= "2.4.0" & < "2.6~"}
+  "rocq-smpl" {= "9.0"}
+  "coq-coqprime" {>= "1.6.0"}
+  "coq-fiat-crypto" {>= "0.1.6"}
 ]
 build: [
   [make]

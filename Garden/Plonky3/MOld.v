@@ -1,9 +1,9 @@
-Require Export Coq.Strings.Ascii.
-Require Export Coq.Strings.String.
-Require Export Coq.ZArith.ZArith.
+Require Export Stdlib.Strings.Ascii.
+Require Export Stdlib.Strings.String.
+Require Export Stdlib.ZArith.ZArith.
 Require Export RecordUpdate.
 
-Require Export Lia.
+From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 
 (* Activate the modulo arithmetic in [lia] *)
@@ -200,7 +200,7 @@ Module Run.
 End Run.
 Export Run.
 
-(** We will need later to make the field reasoning. For now we axiomatize it. *)
+(** Primality is axiomatized; the field reasoning does not depend on its definition. *)
 Parameter IsPrime : Z -> Prop.
 
 Module Examples.

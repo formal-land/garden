@@ -13,22 +13,23 @@ git submodule update --init --recursive
 
 ## Install Opam Environment
 
-In order to install dependencies and build the Coq part of the project, run the following commands for the proper `ocaml` environment.
+In order to install dependencies and build the Rocq part of the project, run the following commands for the proper `ocaml` environment.
 
 Create a new opam switch:
 
 ```sh
-opam switch create garden --packages=ocaml-variants.4.14.0+options,ocaml-option-flambda
+opam switch create garden-rocq-9.0.1 ocaml-base-compiler.5.2.0
 ```
 
 Update shell environment to use the new switch:
 ```sh
-eval $(opam env --switch=garden)
+eval $(opam env --switch=garden-rocq-9.0.1)
 ```
 
-Add the repository with Coq packages:
+Add the repository with Rocq packages:
 ```sh
-opam repo add coq-released https://coq.inria.fr/opam/released
+opam repo add rocq-released https://rocq-prover.org/opam/released
+opam update
 ```
 
 If you don't have a local Rust environment pre-installed:
@@ -37,9 +38,10 @@ curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 source "$HOME/.cargo/env"
 ```
 
-Then we install the dependency files in the Coq program
+Then we install the dependency files in the Rocq program:
 ```sh
 opam install -y --deps-only Garden/rocq-garden.opam
+rocq -v
 ```
 
 ## Setting Up Circom
@@ -83,20 +85,37 @@ python scripts/rocq_of_circom_ci.py
 ```
 
 
-## Compile Coq Project
+## Compile Rocq Project
 
-Finally, we compile the Coq project.
+Finally, we compile the Rocq project.
 ```sh
 cd Garden
 make
 cd ..
 ```
 
-## If Using VSCoq
+To compile one Rocq file directly, run from `garden/Garden` and keep the same
+logical load path:
 
-You should use version 2.2.3.
 ```sh
-opam pin add vscoq-language-server.2.2.3 https://github.com/rocq-prover/vscoq/releases/download/v2.2.3/vscoq-language-server-2.2.3.tar.gz
+opam exec -- coqc -impredicative-set -R . Garden Halo2/halo2_gadgets/poseidon/pow5_proof.v
 ```
 
-Install the language LSP server and `ocamlformat` as needed.
+The current Halo2/Orchard proof work is checked with `-impredicative-set`.
+
+To regenerate the checked constraint snapshots:
+
+```sh
+cd Garden
+make snapshot
+cd ..
+```
+
+## If Using VsRocq
+
+Install the language server for the Rocq VS Code extension.
+```sh
+opam install vsrocq-language-server
+```
+
+Install `ocamlformat` as needed.

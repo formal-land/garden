@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.keccak.columns.
 Require Import Garden.Plonky3.keccak.constants.
 Require Import Garden.Plonky3.keccak.round_flags.
@@ -40,7 +41,7 @@ Module preimage_a.
   End Spec.
 
   Lemma implies {p} `{Prime p} (local' : KeccakCols.t) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     {{ eval local 🔽
       tt,
       Spec.t local
@@ -101,8 +102,8 @@ Module preimage_next_preimage.
   Lemma implies {p} `{Prime p}
       (local next : KeccakCols.t)
       (is_transition : bool) :
-      let local := M.map_mod local in
-      let next := M.map_mod next in
+      let local := Field.map_mod local in
+      let next := Field.map_mod next in
       let final_step := local.(KeccakCols.step_flags).[NUM_ROUNDS - 1] in
       let not_final_step := 1 -F final_step in
       {{ eval local next (Z.b2z is_transition) 🔽
@@ -140,7 +141,7 @@ Module export_bool.
 
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      let local := Field.map_mod local in
     {{
       eval local 🔽
       tt,
@@ -169,7 +170,7 @@ Module export_zero.
 
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      let local := Field.map_mod local in
       let final_step := local.(KeccakCols.step_flags).(Array.get) (NUM_ROUNDS - 1) in
       let not_final_step := 1 -F final_step in
       {{ eval local 🔽
@@ -234,7 +235,7 @@ Module c_c_prime.
 
   Lemma implies {p} `{Prime p}
       (local' : KeccakCols.t) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     {{ eval local 🔽
       tt,
       Valid.t local
@@ -326,7 +327,7 @@ Module a_a_prime_c_c_prime.
 
   Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     {{ eval local 🔽 tt, Valid.t local }}.
   Proof.
     intros.
@@ -346,7 +347,7 @@ Module a_a_prime_c_c_prime.
       pose proof (H_run y H_y x H_x) as [_ H_run_x_y]; clear H_run.
       pose proof (H_a x ltac:(assumption) y ltac:(assumption)) as H_a_x_y; clear H_a.
       generalize z H_z; clear z H_z.
-      apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); trivial.
+      apply (Limbs.limbs_eq_implies_bools_eq U64_LIMBS BITS_PER_LIMB); [reflexivity|]; trivial.
       intros limb H_limb.
       rewrite <- H_a_x_y by assumption; clear H_a_x_y.
       cbn - [Limbs.of_bools].
@@ -406,7 +407,7 @@ Module a_prime_c_prime.
 
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      let local := Field.map_mod local in
     {{ eval local 🔽
       tt,
       forall (x z : Z),
@@ -500,7 +501,7 @@ Module a_prime_prime.
 
   Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
@@ -550,7 +551,7 @@ Module a_prime_prime_0_0_bits_bools.
 
   Lemma implies {p} `{Prime p}
       (local : KeccakCols.t) :
-      let local := M.map_mod local in
+      let local := Field.map_mod local in
     {{ eval local 🔽
       tt,
       Post.t local
@@ -603,7 +604,7 @@ Module a_prime_prime_0_0_limbs.
 
   Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
@@ -674,7 +675,7 @@ Module a_prime_prime_prime_0_0_limbs.
       (H_round : 0 <= round < NUM_ROUNDS)
       (i : Z)
       (H_i : 0 <= i < 64) :
-    let local := M.map_mod local' in
+    let local := Field.map_mod local' in
     IsBool.t local.(KeccakCols.a_prime_prime_0_0_bits) ->
     step_flags.Valid.t local round ->
     get_xored_bit local i =
@@ -719,7 +720,7 @@ Module a_prime_prime_prime_0_0_limbs.
 
   Lemma implies {p} `{Prime p} (H_p : 2 ^ BITS_PER_LIMB < p)
       (local' : KeccakCols.t) :
-      let local := M.map_mod local' in
+      let local := Field.map_mod local' in
     {{ eval local 🔽
       tt,
       Post.t local
@@ -793,8 +794,8 @@ Module a_prime_prime_prime_next_a.
   Lemma implies {p} `{Prime p}
       (local' next' : KeccakCols.t)
       (is_transition : bool) :
-    let local := M.map_mod local' in
-    let next := M.map_mod next' in
+    let local := Field.map_mod local' in
+    let next := Field.map_mod next' in
     {{ eval local next (Z.b2z is_transition) 🔽
       tt,
       Post.t local next is_transition

@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.blake3.constants.
 
 (*
@@ -22,7 +23,6 @@ Module Blake3State.
     row3 : Array.t (Array.t T 32) 4;
   }.
   Arguments t : clear implicits.
-
 End Blake3State.
 
 (*
@@ -51,7 +51,6 @@ Module FullRound.
     state_output : Blake3State.t T;
   }.
   Arguments t : clear implicits.
-
 End FullRound.
 
 

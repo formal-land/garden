@@ -1,4 +1,5 @@
 Require Import Garden.Plonky3.M.
+Require Import Garden.Field.Field.
 Require Import Garden.Brevis.chips.gadgets.add.
 Require Import Garden.Brevis.compiler.word.
 Require Import Garden.Brevis.primitives.consts.
@@ -14,11 +15,11 @@ Module AddSubValueCols.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod t := {
     map_mod x := {|
-      add_operation := M.map_mod x.(add_operation);
-      operand_1 := M.map_mod x.(operand_1);
-      operand_2 := M.map_mod x.(operand_2);
-      is_add := M.map_mod x.(is_add);
-      is_sub := M.map_mod x.(is_sub);
+      add_operation := Field.map_mod x.(add_operation);
+      operand_1 := Field.map_mod x.(operand_1);
+      operand_2 := Field.map_mod x.(operand_2);
+      is_add := Field.map_mod x.(is_add);
+      is_sub := Field.map_mod x.(is_sub);
     |};
   }.
 
@@ -43,7 +44,7 @@ Module AddSubCols.
 
   Global Instance IsMapMod {p} `{Prime p} : MapMod t := {
     map_mod x := {|
-      values := M.map_mod x.(values);
+      values := Field.map_mod x.(values);
     |};
   }.
 

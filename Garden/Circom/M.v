@@ -1,11 +1,11 @@
-Require Export Coq.Strings.Ascii.
-Require Coq.Strings.HexString.
-Require Export Coq.Strings.String.
-Require Export Coq.ZArith.ZArith.
+Require Export Stdlib.Strings.Ascii.
+Require Stdlib.Strings.HexString.
+Require Export Stdlib.Strings.String.
+Require Export Stdlib.ZArith.ZArith.
 From Ltac2 Require Ltac2.
 Require Export RecordUpdate.
 
-Require Export Lia.
+From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 
 (* Activate the modulo arithmetic in [lia] *)

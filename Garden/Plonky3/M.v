@@ -1,10 +1,11 @@
-Require Export Coq.PArith.BinPosDef.
-Require Export Coq.Strings.PrimString.
-Require Export Coq.ZArith.ZArith.
+Require Export Stdlib.PArith.BinPosDef.
+Require Export Stdlib.Strings.PrimString.
+Require Export Stdlib.ZArith.ZArith.
+Require Export Stdlib.ZArith.Znumtheory.
 
 Require Export RecordUpdate.
 
-Require Export Lia.
+From Stdlib Require Export Lia.
 From Hammer Require Export Tactics.
 Require Export smpl.Smpl.
 
@@ -20,14 +21,12 @@ Global Open Scope bool_scope.
 
 Export List.ListNotations.
 
-(** We will need later to make the field reasoning. For now we axiomatize it. *)
-Parameter IsPrime : Z -> Prop.
-Require Export Coq.Strings.PrimString.
-Class Prime (p : Z) : Prop := {
-  is_prime : IsPrime p;
-}.
+Require Import Garden.Field.Field.
 
-Axiom prime_range : forall {p} `{Prime p}, 1 < p.
+
+(* One shared set of prime constants, primality facts, and [Prime] instances
+   for the whole development: an alias of [Garden.Field.Field.Primes] *)
+Module Primes := Garden.Field.Field.Primes.
 
 Module Default.
   Class C (A : Set) : Set := {
@@ -55,9 +54,6 @@ Global Instance ZIsEqual : Equal.C Z := {
   Equal.t := eq;
 }.
 
-Class MapMod {p : Z} `{Prime p} (A : Set) : Set := {
-  map_mod : A -> A;
-}.
 
 Module Mappable.
   Class C (Self : Set -> Set) (A B : Set) : Set := {
@@ -79,14 +75,6 @@ Module IsBool.
   }.
 End IsBool.
 
-Module InField.
-  Class C {p} `{Prime p} (z : Z) : Prop := {
-    make : z = z mod p;
-  }.
-
-  Global Instance mod_is_in_field {p} `{Prime p} (z : Z) : InField.C (z mod p).
-  Admitted.
-End InField.
 
 Module Array.
   Record t {A : Set} {N : Z} : Set := {
@@ -178,63 +166,8 @@ End Array.
 
 Notation "x .[ i ]" := (Array.get x i) (at level 9).
 
-Module UnOp.
-  Definition opp {p} `{Prime p} (x : Z) : Z :=
-    (-x) mod p.
 
-  Definition from {p} `{Prime p} (x : Z) : Z := 
-    x mod p.
-End UnOp.
 
-Module BinOp.
-  Definition add {p} `{Prime p} (x y : Z) : Z :=
-    (x + y) mod p.
-
-  Definition sub {p} `{Prime p} (x y : Z) : Z :=
-    (x - y) mod p.
-
-  Definition mul {p} `{Prime p} (x y : Z) : Z :=
-    (x * y) mod p.
-
-  Definition div {p} `{Prime p} (x y : Z) : Z :=
-    (x / y) mod p.
-
-  Definition mod_ {p} `{Prime p} (x y : Z) : Z :=
-    (x mod y) mod p.
-End BinOp.
-
-(* Notations *)
-Notation "x +F y" := (BinOp.add x y) (at level 50, left associativity).
-Notation "x -F y" := (BinOp.sub x y) (at level 50, left associativity).
-Notation "-F x" := (UnOp.opp x) (at level 35, right associativity).
-Notation "x *F y" := (BinOp.mul x y) (at level 40, left associativity).
-
-Global Instance ZIsMapMod {p} `{Prime p} : MapMod Z := {
-  map_mod := UnOp.from;
-}.
-
-Module IsInField.
-  Global Instance from_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.from x).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance opp_is_in_field {p} `{Prime p} (x : Z) : InField.C (UnOp.opp x).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance add_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.add x y).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance sub_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.sub x y).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance mul_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mul x y).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance div_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.div x y).
-  Proof. typeclasses eauto. Qed.
-
-  Global Instance mod_is_in_field {p} `{Prime p} (x y : Z) : InField.C (BinOp.mod_ x y).
-  Proof. typeclasses eauto. Qed.
-End IsInField.
 
 Module Trace.
   Module Event.
@@ -458,67 +391,28 @@ Module List.
     end.
 End List.
 
-Ltac show_equality_modulo :=
-  unfold
-    UnOp.from,
-    BinOp.add,
-    BinOp.sub,
-    BinOp.mul,
-    BinOp.div,
-    BinOp.mod_;
-  repeat (
-    (
-      (
-        apply Zplus_eqm ||
-        apply Zmult_eqm ||
-        apply Zopp_eqm
-      );
-      unfold eqm
-    ) ||
-    rewrite Zmod_eqm ||
-    reflexivity
-  ).
 
-Axiom mul_zero_implies_zero : forall {p} `{Prime p} (x y : Z),
-  BinOp.mul x y = 0 <->
-  UnOp.from x = 0 \/ UnOp.from y = 0.
-
-Lemma mul_zero_implies_zero_3 {p} `{Prime p} (x y z : Z) :
-  BinOp.mul (BinOp.mul x y) z = 0 <->
-  UnOp.from x = 0 \/ UnOp.from y = 0 \/ UnOp.from z = 0.
+Lemma sum_for_in_zero_to_n_aux_zeros_eq {p} `{Prime p} (N : nat) (f : Z -> Z)
+    (H_body : forall (i : Z), 0 <= i < Z.of_nat N -> f i = 0) :
+  sum_for_in_zero_to_n_aux N f = 0.
 Proof.
-  rewrite mul_zero_implies_zero.
-  replace (UnOp.from _) with (BinOp.mul x y) by show_equality_modulo.
-  rewrite mul_zero_implies_zero.
-  tauto.
+  pose proof (prime_range (p := p)).
+  induction N; cbn; [reflexivity|].
+  rewrite IHN by (intros; apply H_body; lia).
+  rewrite H_body by lia.
+  unfold BinOp.add.
+  rewrite Z.add_0_l.
+  apply Z.mod_0_l; lia.
 Qed.
-
-(** This lemma is often useful when the value we are comparing to zero is small and known. *)
-Lemma is_zero_small {p} `{Prime p} (x : Z) :
-  -p < x < p ->
-  UnOp.from x = 0 <->
-  x = 0.
-Proof.
-  intros.
-  unfold UnOp.from.
-  split; intros; [|now subst].
-  assert (-p < x < 0 \/ 0 <= x < p) as [] by lia.
-  { rewrite <- (Z.mod_unique x p (-1) (p + x)) in *; lia. }
-  { rewrite <- (Z.mod_unique x p 0 x) in *; lia. }
-Qed.
-
-(* TODO: prove with Coqtail *)
-Lemma sub_zero_equiv {p} `{Prime p} (x y : Z) :
-  BinOp.sub x y = 0 <->
-  UnOp.from x = UnOp.from y.
-Proof.
-Admitted.
 
 Lemma sum_for_in_zero_to_n_zeros_eq {p} `{Prime p} (N : Z) (f : Z -> Z)
     (H_body : forall (i : Z), 0 <= i < N -> f i = 0) :
   M.sum_for_in_zero_to_n N f = 0.
 Proof.
-Admitted.
+  unfold M.sum_for_in_zero_to_n.
+  apply sum_for_in_zero_to_n_aux_zeros_eq.
+  intros; apply H_body; lia.
+Qed.
 
 (** Rewrite rules for field operations. *)
 Module FieldRewrite.
@@ -530,7 +424,10 @@ Module FieldRewrite.
 
   Lemma from_one {p} `{Prime p} : UnOp.from 1 = 1.
   Proof.
-  Admitted.
+    unfold UnOp.from.
+    pose proof (prime_range (p := p)).
+    apply Z.mod_1_l; lia.
+  Qed.
   Global Hint Rewrite @from_one : field_rewrite.
 
   Lemma from_bool {p} `{Prime p} (x : bool) :
@@ -736,6 +633,20 @@ Module Limbs.
     now FieldRewrite.run.
   Qed.
 
+  (** A fold only depends on the values of the function at the elements of the list. *)
+  Lemma fold_ext_in {A : Set} (g1 g2 : Z -> A -> Z) (l : list A) :
+    forall acc : Z,
+    (forall x, Lists.List.In x l -> forall a, g1 a x = g2 a x) ->
+    Lists.List.fold_left g1 l acc = Lists.List.fold_left g2 l acc.
+  Proof.
+    induction l; cbn; intros acc H_in; [reflexivity|].
+    rewrite (H_in a) by now left.
+    apply IHl.
+    intros x Hx a'.
+    apply H_in.
+    now right.
+  Qed.
+
   Lemma of_Z_bools_eq {p} `{Prime p} (NB_LIMBS BITS_PER_LIMB : Z)
       (f1 f2 : Z -> Z)
       (H_f1_f2_eq :
@@ -748,7 +659,12 @@ Module Limbs.
     of_Z_bools BITS_PER_LIMB f1 limb =
     of_Z_bools BITS_PER_LIMB f2 limb.
   Proof.
-  Admitted.
+    unfold of_Z_bools.
+    apply fold_ext_in.
+    intros z Hz a.
+    apply Lists.List.in_rev, Lists.List.in_seq in Hz.
+    rewrite H_f1_f2_eq; [reflexivity|nia].
+  Qed.
 
   (** Convert an array of bools to an array of limbs. *)
   Definition of_bools (BITS_PER_LIMB : Z)
@@ -766,6 +682,33 @@ Module Limbs.
       (2 * acc) + Z.b2z (f z)
     ) l 0.
 
+  (** As long as the accumulator stays below [p], the field fold computes the same
+      thing as the plain integer fold. *)
+  Lemma fold_bits_eq_aux {p} `{Prime p} (f : Z -> bool) (l : list nat) :
+    forall acc : Z,
+    0 <= acc ->
+    (acc + 1) * 2 ^ (Z.of_nat (List.length l)) <= p ->
+    Lists.List.fold_left (fun acc z => (2 *F acc) +F Z.b2z (f (Z.of_nat z))) l acc =
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f (Z.of_nat z))) l acc.
+  Proof.
+    induction l; intros acc H_acc H_bound; [reflexivity|].
+    rewrite Lists.List.length_cons, Nat2Z.inj_succ, Z.pow_succ_r in H_bound by lia.
+    assert (H_pow : 0 < 2 ^ (Z.of_nat (List.length l))) by (apply Z.pow_pos_nonneg; lia).
+    assert (H_b : 0 <= Z.b2z (f (Z.of_nat a)) <= 1) by (destruct (f (Z.of_nat a)); cbn; lia).
+    cbn [Lists.List.fold_left].
+    assert (H_step : (2 *F acc) +F Z.b2z (f (Z.of_nat a)) = 2 * acc + Z.b2z (f (Z.of_nat a))). {
+      unfold BinOp.add, BinOp.mul.
+      rewrite (Z.mod_small (2 * acc)) by nia.
+      apply Z.mod_small; nia.
+    }
+    rewrite H_step.
+    set (b := Z.b2z (f (Z.of_nat a))) in *.
+    set (q := 2 ^ Z.of_nat (List.length l)) in *.
+    apply IHl; fold q; [lia|].
+    assert (H_le : 2 * acc + b + 1 <= 2 * (acc + 1)) by lia.
+    nia.
+  Qed.
+
   Lemma of_bools_eq_of_Z_bools {p} `{Prime p} (BITS_PER_LIMB : Z)
       (H_p : 2 ^ BITS_PER_LIMB < p)
       (f : Z -> bool)
@@ -773,7 +716,18 @@ Module Limbs.
     of_bools BITS_PER_LIMB f limb =
     of_Z_bools BITS_PER_LIMB (fun z => Z.b2z (f z)) limb.
   Proof.
-  Admitted.
+    pose proof (prime_range (p := p)).
+    unfold of_bools, of_Z_bools.
+    symmetry.
+    apply fold_bits_eq_aux; [lia|].
+    rewrite Lists.List.length_rev, Lists.List.length_seq.
+    assert (H_pow_le : 2 ^ Z.of_nat (Z.to_nat BITS_PER_LIMB) <= Z.max 1 (2 ^ BITS_PER_LIMB)). {
+      destruct (Z.le_gt_cases 0 BITS_PER_LIMB).
+      - rewrite Z2Nat.id by lia; lia.
+      - replace (Z.to_nat BITS_PER_LIMB) with 0%nat by lia; cbn; lia.
+    }
+    nia.
+  Qed.
 
   Lemma of_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
       (f1 f2 : Z -> bool)
@@ -782,12 +736,45 @@ Module Limbs.
         0 <= z < NB_LIMBS * BITS_PER_LIMB ->
         f1 z = f2 z
       )
-      (limb : Z) :
+      (limb : Z)
+      (H_limb : 0 <= limb < NB_LIMBS) :
     of_bools BITS_PER_LIMB f1 limb =
     of_bools BITS_PER_LIMB f2 limb.
-  Admitted.
+  Proof.
+    unfold of_bools.
+    apply fold_ext_in.
+    intros z Hz a.
+    apply Lists.List.in_rev, Lists.List.in_seq in Hz.
+    rewrite H_f1_f2_eq; [reflexivity|nia].
+  Qed.
+
+  (** The bits of one limb, most-significant first, determine the value of the limb
+      injectively: two bit functions giving the same limb values are equal bitwise. *)
+  Lemma bits_fold_inj (f1 f2 : Z -> bool) :
+    forall (n s : nat),
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f1 (Z.of_nat z)))
+      (Lists.List.rev (Lists.List.seq s n)) 0 =
+    Lists.List.fold_left (fun acc z => 2 * acc + Z.b2z (f2 (Z.of_nat z)))
+      (Lists.List.rev (Lists.List.seq s n)) 0 ->
+    forall k : nat, (s <= k < s + n)%nat -> f1 (Z.of_nat k) = f2 (Z.of_nat k).
+  Proof.
+    induction n; intros s H_eq k H_k; [lia|].
+    cbn [Lists.List.seq Lists.List.rev] in H_eq.
+    rewrite 2 Lists.List.fold_left_app in H_eq.
+    cbn [Lists.List.fold_left] in H_eq.
+    set (V1 := Lists.List.fold_left _ (Lists.List.rev (Lists.List.seq (S s) n)) 0) in H_eq.
+    set (V2 := Lists.List.fold_left _ (Lists.List.rev (Lists.List.seq (S s) n)) 0) in H_eq.
+    assert (H_b1 : 0 <= Z.b2z (f1 (Z.of_nat s)) <= 1) by (destruct (f1 (Z.of_nat s)); cbn; lia).
+    assert (H_b2 : 0 <= Z.b2z (f2 (Z.of_nat s)) <= 1) by (destruct (f2 (Z.of_nat s)); cbn; lia).
+    assert (H_bits : Z.b2z (f1 (Z.of_nat s)) = Z.b2z (f2 (Z.of_nat s)) /\ V1 = V2) by lia.
+    destruct H_bits as [H_bit H_V].
+    destruct (Nat.eq_dec k s) as [->|H_ne].
+    { destruct (f1 (Z.of_nat s)), (f2 (Z.of_nat s)); cbn in H_bit; congruence || lia. }
+    { apply (IHn (S s)); [exact H_V|lia]. }
+  Qed.
 
   Lemma limbs_eq_implies_bools_eq (NB_LIMBS BITS_PER_LIMB : Z)
+      (H_bits_per_limb : 0 < BITS_PER_LIMB)
       (f1 f2 : Z -> bool)
       (H_limbs :
         forall (limb : Z),
@@ -798,7 +785,23 @@ Module Limbs.
     forall (z : Z),
     0 <= z < NB_LIMBS * BITS_PER_LIMB ->
     f1 z = f2 z.
-  Admitted.
+  Proof.
+    intros z H_z.
+    assert (H_limb : 0 <= z / BITS_PER_LIMB < NB_LIMBS). {
+      split.
+      - apply Z.div_pos; lia.
+      - apply Z.div_lt_upper_bound; lia.
+    }
+    specialize (H_limbs (z / BITS_PER_LIMB) H_limb).
+    unfold of_bools in H_limbs.
+    replace z with (Z.of_nat (Z.to_nat z)) by lia.
+    apply (bits_fold_inj f1 f2 (Z.to_nat BITS_PER_LIMB) (Z.to_nat (z / BITS_PER_LIMB * BITS_PER_LIMB))).
+    { exact H_limbs. }
+    { pose proof (Z.mul_div_le z BITS_PER_LIMB).
+      pose proof (Z.mod_pos_bound z BITS_PER_LIMB ltac:(lia)).
+      pose proof (Z.div_mod z BITS_PER_LIMB ltac:(lia)).
+      lia. }
+  Qed.
 End Limbs.
 
 (** Rules to check if the contraints are what we expect, typically a unique possible value. *)
@@ -1045,100 +1048,8 @@ Module Complete.
 End Complete.
 Export Complete.
 
-(* could be later moved together to a single module doing modulo arithmetics. *)
 
-(* Utilities used for modulo arithmetics *)
-Lemma mod_when_smaller {p : Z} (x : Z) (Hx : 0 <= x < p) :
-  x mod p = x.
-Proof.
-  apply Zmod_small; auto.
-Qed.
 
-(* possible referencehttps://math.stackexchange.com/questions/2542245/how-to-prove-chinese-remainder-theorem-by-coq *)
-Lemma chinese_remainder_simpler: forall n p a b : Z,
-    n <> 0 ->
-    p <> 0 ->
-    Znumtheory.rel_prime n p ->
-    exists x:Z, (x mod n = a mod n) /\ (x mod p = b mod p). 
-Proof.
-  intros n p a b npos ppos coprime. 
-  destruct (Znumtheory.rel_prime_bezout _ _ coprime) as [u v H0].
-  exists (a * v * p + b * u * n). split.
-  - rewrite Z.mod_add. 2: exact npos.
-    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
-    assert ((u * n + v * p) mod n = 1 mod n) as H.
-    rewrite H0. reflexivity.
-    rewrite Z.add_comm, Z.mod_add in H. rewrite H.
-    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
-    reflexivity. exact npos.
-  - rewrite Z.add_comm, Z.mod_add. 2: exact ppos.
-    rewrite <- Z.mul_assoc, <- Zdiv.Zmult_mod_idemp_r.
-    assert ((u * n + v * p) mod p = 1 mod p) as H.
-    rewrite H0. reflexivity.
-    rewrite Z.mod_add in H. rewrite H.
-    rewrite Zdiv.Zmult_mod_idemp_r, Z.mul_1_r.
-    reflexivity. exact ppos.  
-Qed.
-
-(** Binary Chinese Remainder Theorem: if p, q are coprime, then the equation system 
-    "x mod p = a /\ x mod q = b" has a unique solution modulo p * q *)
-Axiom binary_chinese_remainder_alt : forall (p q x t : Z),
-  p <> 0 ->
-  q <> 0 ->
-  Znumtheory.rel_prime p q ->
-  x mod p = t mod p ->
-  x mod q = t mod q ->
-  x mod (p * q) = t mod (p * q).
-
-Lemma mod_0_range (k : Z) (x : Z) :
-    k > 0 -> 
-    -k < x < k ->
-    x mod k = 0 ->
-    x = 0.
-Proof.
-Admitted.
-
-Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
-  match exponent with
-  | xH => (acc * base) mod modulus
-  | xO p =>
-    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
-  | xI p =>
-    let acc := (acc * base) mod modulus in
-    fast_pow_modulo_positive acc ((base * base) mod modulus) modulus p
-  end.
-
-Definition mod_inverse (a p : Z) : Z :=
-  match p with
-  | Zpos p' => fast_pow_modulo_positive 1 a p (Pos.pred (Pos.pred p'))
-  | _ => 0 (* We will always have 1 <= p *)
-  end.
-
-Module Test_mod_inverse.
-  Definition test1 : Z := mod_inverse 3 7.
-  Goal test1 = 5.
-  Proof.
-    reflexivity.
-  Qed.
-
-  Definition test2 : Z := mod_inverse 2 11. 
-  Goal test2 = 6.
-  Proof.
-    reflexivity.
-  Qed.
-
-  Definition test3 : Z := mod_inverse 5 17.
-  Goal test3 = 7.
-  Proof.
-    reflexivity.
-  Qed.
-
-  Definition test4 : Z := mod_inverse 5 (2 ^ 31 - 1).
-  Goal test4 = 858993459.
-  Proof.
-    reflexivity.
-  Qed.
-End Test_mod_inverse.
 
 (** A monad to simplify the generation of data structures with fresh variables. This is useful to
     validate that our models have the same constraints as the original implementations. *)

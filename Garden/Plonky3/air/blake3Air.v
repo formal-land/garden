@@ -1,5 +1,5 @@
-Require Export Coq.ZArith.ZArith.
-Require Export List.
+Require Export Stdlib.ZArith.ZArith.
+From Stdlib Require Export List.
 Import ListNotations.
 Require Export AirStructure.
 Open Scope Z_scope.
@@ -110,5 +110,4 @@ Module Blake3AIR (F : PrimeField).
       builder
     | _, _, _ => builder (* Invalid input - should have exactly 2 limbs each *)
     end.
-
 End Blake3AIR.
