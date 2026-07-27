@@ -20,7 +20,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.witness_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Div.
 Require Import Garden.Field.Lemmas.
@@ -358,18 +359,18 @@ Module OrchardActionInputs.
      These are the benign nondeterminism the public outputs depend on only
      through [u²]; [read_action_inputs] does not carry them. *)
   Definition read_action_witness
-      (Γ : Assignment.t columns RegionId.t) : OrchardSpec.ActionWitness := {|
-    OrchardSpec.w_us_alpha :=
+      (Γ : Assignment.t columns RegionId.t) : OrchardCircuitSpec.ActionWitness := {|
+    OrchardCircuitSpec.w_us_alpha :=
       read_us Γ (RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete) 85;
-    OrchardSpec.w_us_v :=
+    OrchardCircuitSpec.w_us_v :=
       read_us Γ
         (RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitVIncomplete) 22;
-    OrchardSpec.w_us_rcv :=
+    OrchardCircuitSpec.w_us_rcv :=
       read_us Γ
         (RegionId.ValueCommitment RegionId.ValueCommitment.ValueCommitRIncomplete) 85;
-    OrchardSpec.w_us_k :=
+    OrchardCircuitSpec.w_us_k :=
       read_us Γ (RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete) 85;
-    OrchardSpec.w_us_rcm :=
+    OrchardCircuitSpec.w_us_rcm :=
       read_us Γ
         (RegionId.NoteCommit RegionId.NoteCommit.Which.New
            RegionId.NoteCommit.FixedBaseIncomplete) 85;
@@ -410,42 +411,57 @@ Module OrchardActionInputs.
       first [ reflexivity | left; eexists; reflexivity | left; reflexivity | right ].
 
   (* The fixed public Orchard parameters, as a genuine [Definition] from the
-     circuit's own constants: the Sinsemilla domain points are the affine
-     [q_*] literals, and the six fixed-base generators are the windowed Lagrange
-     tables.  Nothing here is abstract — so the functional theorem below is
-     about a *single* concrete value and is not refutable. *)
+     circuit's own constants: the three Sinsemilla domain points as the affine
+     [q_*] literals.  Nothing here is abstract — so the functional theorem
+     below is about a *single* concrete value and is not refutable. *)
   Definition orchard_circuit_params : OrchardSpec.Params := {|
-    OrchardSpec.spend_auth_g :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.spend_auth_g.full_fixed_rows;
-    OrchardSpec.value_commit_v :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.value_commit_v.short_fixed_rows;
-    OrchardSpec.value_commit_r :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.value_commit_r.full_fixed_rows;
-    OrchardSpec.nullifier_k :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.nullifier_k.base_field_fixed_rows;
     OrchardSpec.note_commit_q := {|
       Point.x := Garden.Orchard.circuit.note_commit.q_note_commit_m_x;
       Point.y := Garden.Orchard.circuit.note_commit.q_note_commit_m_y;
     |};
-    OrchardSpec.note_commit_r :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.note_commit_r.full_fixed_rows;
     OrchardSpec.commit_ivk_q := {|
       Point.x := Garden.Orchard.circuit.commit_ivk.q_commit_ivk_m_x;
       Point.y := Garden.Orchard.circuit.commit_ivk.q_commit_ivk_m_y;
     |};
-    OrchardSpec.commit_ivk_r :=
-      EccSpec.fixed_table_of_rows
-        Garden.Orchard.constants.fixed_bases.commit_ivk_r.full_fixed_rows;
     OrchardSpec.merkle_crh_q := {|
       Point.x := Garden.Orchard.circuit.merkle_q_x;
       Point.y := Garden.Orchard.circuit.merkle_q_y;
     |};
   |}.
+
+  (* The circuit-internal parameters: the six fixed-base generators as the
+     windowed Lagrange tables of the circuit constants, over the protocol
+     domain points ([domain := orchard_circuit_params]).  Consumed by the
+     circuit-structured functions of [OrchardCircuitSpec]
+     ([circuit_proof/internal_spec.v]). *)
+  Definition orchard_internal_params : OrchardCircuitSpec.Params := {|
+    OrchardCircuitSpec.spend_auth_g :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.spend_auth_g.full_fixed_rows;
+    OrchardCircuitSpec.value_commit_v :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.value_commit_v.short_fixed_rows;
+    OrchardCircuitSpec.value_commit_r :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.value_commit_r.full_fixed_rows;
+    OrchardCircuitSpec.nullifier_k :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.nullifier_k.base_field_fixed_rows;
+    OrchardCircuitSpec.note_commit_r :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.note_commit_r.full_fixed_rows;
+    OrchardCircuitSpec.commit_ivk_r :=
+      EccSpec.fixed_table_of_rows
+        Garden.Orchard.constants.fixed_bases.commit_ivk_r.full_fixed_rows;
+    OrchardCircuitSpec.domain := orchard_circuit_params;
+  |}.
+
+  (* The [domain] projection of the internal parameters is the protocol
+     parameter record — a one-iota read-off, named so proofs rewrite it
+     syntactically instead of leaving the projection to conversion. *)
+  Lemma orchard_internal_domain_eq :
+    OrchardCircuitSpec.domain orchard_internal_params = orchard_circuit_params.
+  Proof. reflexivity. Qed.
 
   (* Abbreviation for "Γ is a satisfying assignment of the Orchard circuit". *)
   Local Notation Holds Γ :=
@@ -457,9 +473,9 @@ Module OrchardActionInputs.
      circuit parameters.  The witness ([ActionWitness]) is the benign square-root
      nondeterminism, kept separate from the genuine inputs. *)
   Definition output_with_witness (inputs : OrchardSpec.ActionInputs)
-      (wit : OrchardSpec.ActionWitness)
+      (wit : OrchardCircuitSpec.ActionWitness)
       : OrchardSpec.ActionOutputs :=
-    OrchardSpec.orchard_action_spec orchard_circuit_params inputs wit.
+    OrchardCircuitSpec.orchard_action_spec orchard_internal_params inputs wit.
 
   (* The Orchard action's output record as the spec computes it from the cells
      read out of Γ.  Naming it keeps the (large) spec application out of the
@@ -488,22 +504,22 @@ Module OrchardActionInputs.
      roots for each fixed-base multiplication's scalar (exactly the scalars
      [orchard_action_spec] feeds to [fixed_scalar_mul]). *)
   Definition canonical_witness (inp : OrchardSpec.ActionInputs)
-      : OrchardSpec.ActionWitness := {|
-    OrchardSpec.w_us_alpha :=
-      canonical_us_for (OrchardSpec.spend_auth_g orchard_circuit_params)
+      : OrchardCircuitSpec.ActionWitness := {|
+    OrchardCircuitSpec.w_us_alpha :=
+      canonical_us_for (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
         (OrchardSpec.in_alpha inp);
-    OrchardSpec.w_us_v :=
-      canonical_us_for (OrchardSpec.value_commit_v orchard_circuit_params)
+    OrchardCircuitSpec.w_us_v :=
+      canonical_us_for (OrchardCircuitSpec.value_commit_v orchard_internal_params)
         (OrchardSpec.in_magnitude inp);
-    OrchardSpec.w_us_rcv :=
-      canonical_us_for (OrchardSpec.value_commit_r orchard_circuit_params)
+    OrchardCircuitSpec.w_us_rcv :=
+      canonical_us_for (OrchardCircuitSpec.value_commit_r orchard_internal_params)
         (OrchardSpec.in_rcv inp);
-    OrchardSpec.w_us_k :=
-      canonical_us_for (OrchardSpec.nullifier_k orchard_circuit_params)
+    OrchardCircuitSpec.w_us_k :=
+      canonical_us_for (OrchardCircuitSpec.nullifier_k orchard_internal_params)
         (Poseidon.poseidon_hash2 (OrchardSpec.in_nk inp) (OrchardSpec.in_rho_old inp)
           +F OrchardSpec.in_psi_old inp);
-    OrchardSpec.w_us_rcm :=
-      canonical_us_for (OrchardSpec.note_commit_r orchard_circuit_params)
+    OrchardCircuitSpec.w_us_rcm :=
+      canonical_us_for (OrchardCircuitSpec.note_commit_r orchard_internal_params)
         (OrchardSpec.in_rcm_new inp);
   |}.
 
@@ -684,38 +700,38 @@ Module OrchardActionInputs.
       [orchard_action_spec]; equal muls (with [nf_old] threaded into [rho_new])
       give equal outputs.  Pure unfolding + rewriting. *)
   Lemma orchard_action_spec_us_congr
-      (prm : OrchardSpec.Params) (inp : OrchardSpec.ActionInputs)
-      (W1 W2 : OrchardSpec.ActionWitness)
-      (Ek : EccSpec.fixed_scalar_mul (OrchardSpec.nullifier_k prm)
+      (prm : OrchardCircuitSpec.Params) (inp : OrchardSpec.ActionInputs)
+      (W1 W2 : OrchardCircuitSpec.ActionWitness)
+      (Ek : EccSpec.fixed_scalar_mul (OrchardCircuitSpec.nullifier_k prm)
               (Poseidon.poseidon_hash2 (OrchardSpec.in_nk inp)
                  (OrchardSpec.in_rho_old inp) +F OrchardSpec.in_psi_old inp)
-              (OrchardSpec.w_us_k W1) =
-            EccSpec.fixed_scalar_mul (OrchardSpec.nullifier_k prm)
+              (OrchardCircuitSpec.w_us_k W1) =
+            EccSpec.fixed_scalar_mul (OrchardCircuitSpec.nullifier_k prm)
               (Poseidon.poseidon_hash2 (OrchardSpec.in_nk inp)
                  (OrchardSpec.in_rho_old inp) +F OrchardSpec.in_psi_old inp)
-              (OrchardSpec.w_us_k W2))
-      (Ev : EccSpec.fixed_scalar_mul (OrchardSpec.value_commit_v prm)
-              (OrchardSpec.in_magnitude inp) (OrchardSpec.w_us_v W1) =
-            EccSpec.fixed_scalar_mul (OrchardSpec.value_commit_v prm)
-              (OrchardSpec.in_magnitude inp) (OrchardSpec.w_us_v W2))
-      (Er : EccSpec.fixed_scalar_mul (OrchardSpec.value_commit_r prm)
-              (OrchardSpec.in_rcv inp) (OrchardSpec.w_us_rcv W1) =
-            EccSpec.fixed_scalar_mul (OrchardSpec.value_commit_r prm)
-              (OrchardSpec.in_rcv inp) (OrchardSpec.w_us_rcv W2))
-      (Ea : EccSpec.fixed_scalar_mul (OrchardSpec.spend_auth_g prm)
-              (OrchardSpec.in_alpha inp) (OrchardSpec.w_us_alpha W1) =
-            EccSpec.fixed_scalar_mul (OrchardSpec.spend_auth_g prm)
-              (OrchardSpec.in_alpha inp) (OrchardSpec.w_us_alpha W2))
-      (Ercm : EccSpec.fixed_scalar_mul (OrchardSpec.note_commit_r prm)
-                (OrchardSpec.in_rcm_new inp) (OrchardSpec.w_us_rcm W1) =
-              EccSpec.fixed_scalar_mul (OrchardSpec.note_commit_r prm)
-                (OrchardSpec.in_rcm_new inp) (OrchardSpec.w_us_rcm W2)) :
-    OrchardSpec.orchard_action_spec prm inp W1 =
-    OrchardSpec.orchard_action_spec prm inp W2.
+              (OrchardCircuitSpec.w_us_k W2))
+      (Ev : EccSpec.fixed_scalar_mul (OrchardCircuitSpec.value_commit_v prm)
+              (OrchardSpec.in_magnitude inp) (OrchardCircuitSpec.w_us_v W1) =
+            EccSpec.fixed_scalar_mul (OrchardCircuitSpec.value_commit_v prm)
+              (OrchardSpec.in_magnitude inp) (OrchardCircuitSpec.w_us_v W2))
+      (Er : EccSpec.fixed_scalar_mul (OrchardCircuitSpec.value_commit_r prm)
+              (OrchardSpec.in_rcv inp) (OrchardCircuitSpec.w_us_rcv W1) =
+            EccSpec.fixed_scalar_mul (OrchardCircuitSpec.value_commit_r prm)
+              (OrchardSpec.in_rcv inp) (OrchardCircuitSpec.w_us_rcv W2))
+      (Ea : EccSpec.fixed_scalar_mul (OrchardCircuitSpec.spend_auth_g prm)
+              (OrchardSpec.in_alpha inp) (OrchardCircuitSpec.w_us_alpha W1) =
+            EccSpec.fixed_scalar_mul (OrchardCircuitSpec.spend_auth_g prm)
+              (OrchardSpec.in_alpha inp) (OrchardCircuitSpec.w_us_alpha W2))
+      (Ercm : EccSpec.fixed_scalar_mul (OrchardCircuitSpec.note_commit_r prm)
+                (OrchardSpec.in_rcm_new inp) (OrchardCircuitSpec.w_us_rcm W1) =
+              EccSpec.fixed_scalar_mul (OrchardCircuitSpec.note_commit_r prm)
+                (OrchardSpec.in_rcm_new inp) (OrchardCircuitSpec.w_us_rcm W2)) :
+    OrchardCircuitSpec.orchard_action_spec prm inp W1 =
+    OrchardCircuitSpec.orchard_action_spec prm inp W2.
   Proof.
-    unfold OrchardSpec.orchard_action_spec, OrchardSpec.value_commit,
-      OrchardSpec.spend_auth_randomize, OrchardSpec.nullifier,
-      OrchardSpec.OrchardCmx, OrchardSpec.note_commit.
+    unfold OrchardCircuitSpec.orchard_action_spec, OrchardCircuitSpec.value_commit,
+      OrchardCircuitSpec.spend_auth_randomize, OrchardCircuitSpec.nullifier,
+      OrchardCircuitSpec.OrchardCmx, OrchardCircuitSpec.note_commit.
     cbv zeta.
     rewrite !Ek, !Ev, !Er, !Ea, !Ercm.
     reflexivity.
@@ -729,55 +745,55 @@ Module OrchardActionInputs.
   Lemma action_spec_us_free_of_table_eqs
       (Γ : Assignment.t columns RegionId.t)
       (Ek : EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                  (OrchardSpec.in_nk (read_action_inputs Γ))
                  (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
                  OrchardSpec.in_psi_old (read_action_inputs Γ))
-              (OrchardSpec.w_us_k (read_action_witness Γ)) =
+              (OrchardCircuitSpec.w_us_k (read_action_witness Γ)) =
             EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                  (OrchardSpec.in_nk (read_action_inputs Γ))
                  (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
                  OrchardSpec.in_psi_old (read_action_inputs Γ))
-              (OrchardSpec.w_us_k (canonical_witness (read_action_inputs Γ))))
+              (OrchardCircuitSpec.w_us_k (canonical_witness (read_action_inputs Γ))))
       (Ev : EccSpec.fixed_scalar_mul
-              (OrchardSpec.value_commit_v orchard_circuit_params)
+              (OrchardCircuitSpec.value_commit_v orchard_internal_params)
               (OrchardSpec.in_magnitude (read_action_inputs Γ))
-              (OrchardSpec.w_us_v (read_action_witness Γ)) =
+              (OrchardCircuitSpec.w_us_v (read_action_witness Γ)) =
             EccSpec.fixed_scalar_mul
-              (OrchardSpec.value_commit_v orchard_circuit_params)
+              (OrchardCircuitSpec.value_commit_v orchard_internal_params)
               (OrchardSpec.in_magnitude (read_action_inputs Γ))
-              (OrchardSpec.w_us_v (canonical_witness (read_action_inputs Γ))))
+              (OrchardCircuitSpec.w_us_v (canonical_witness (read_action_inputs Γ))))
       (Er : EccSpec.fixed_scalar_mul
-              (OrchardSpec.value_commit_r orchard_circuit_params)
+              (OrchardCircuitSpec.value_commit_r orchard_internal_params)
               (OrchardSpec.in_rcv (read_action_inputs Γ))
-              (OrchardSpec.w_us_rcv (read_action_witness Γ)) =
+              (OrchardCircuitSpec.w_us_rcv (read_action_witness Γ)) =
             EccSpec.fixed_scalar_mul
-              (OrchardSpec.value_commit_r orchard_circuit_params)
+              (OrchardCircuitSpec.value_commit_r orchard_internal_params)
               (OrchardSpec.in_rcv (read_action_inputs Γ))
-              (OrchardSpec.w_us_rcv (canonical_witness (read_action_inputs Γ))))
+              (OrchardCircuitSpec.w_us_rcv (canonical_witness (read_action_inputs Γ))))
       (Ea : EccSpec.fixed_scalar_mul
-              (OrchardSpec.spend_auth_g orchard_circuit_params)
+              (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
               (OrchardSpec.in_alpha (read_action_inputs Γ))
-              (OrchardSpec.w_us_alpha (read_action_witness Γ)) =
+              (OrchardCircuitSpec.w_us_alpha (read_action_witness Γ)) =
             EccSpec.fixed_scalar_mul
-              (OrchardSpec.spend_auth_g orchard_circuit_params)
+              (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
               (OrchardSpec.in_alpha (read_action_inputs Γ))
-              (OrchardSpec.w_us_alpha (canonical_witness (read_action_inputs Γ))))
+              (OrchardCircuitSpec.w_us_alpha (canonical_witness (read_action_inputs Γ))))
       (Ercm : EccSpec.fixed_scalar_mul
-                (OrchardSpec.note_commit_r orchard_circuit_params)
+                (OrchardCircuitSpec.note_commit_r orchard_internal_params)
                 (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-                (OrchardSpec.w_us_rcm (read_action_witness Γ)) =
+                (OrchardCircuitSpec.w_us_rcm (read_action_witness Γ)) =
               EccSpec.fixed_scalar_mul
-                (OrchardSpec.note_commit_r orchard_circuit_params)
+                (OrchardCircuitSpec.note_commit_r orchard_internal_params)
                 (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-                (OrchardSpec.w_us_rcm (canonical_witness (read_action_inputs Γ)))) :
+                (OrchardCircuitSpec.w_us_rcm (canonical_witness (read_action_inputs Γ)))) :
     action_spec_of Γ = output (read_action_inputs Γ).
   Proof.
     unfold action_spec_of, output, output_with_witness.
-    apply (orchard_action_spec_us_congr orchard_circuit_params
+    apply (orchard_action_spec_us_congr orchard_internal_params
              (read_action_inputs Γ) (read_action_witness Γ)
              (canonical_witness (read_action_inputs Γ))
              Ek Ev Er Ea Ercm).

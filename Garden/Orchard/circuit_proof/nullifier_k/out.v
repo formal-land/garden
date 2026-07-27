@@ -41,7 +41,8 @@ Require Garden.Orchard.constants.fixed_bases.nullifier_k.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
 Require Import Garden.Halo2.PallasModel.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -99,18 +100,18 @@ Module NullifierKOut.
 
   Definition nullifier_k_first : EccSpec.fixed_window :=
     List.hd fixed_window_default
-      (OrchardSpec.nullifier_k orchard_circuit_params).
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params).
 
   Definition nullifier_k_middle : EccSpec.fixed_table :=
     List.firstn 83
-      (List.skipn 1 (OrchardSpec.nullifier_k orchard_circuit_params)).
+      (List.skipn 1 (OrchardCircuitSpec.nullifier_k orchard_internal_params)).
 
   Definition nullifier_k_last : EccSpec.fixed_window :=
-    List.nth 84 (OrchardSpec.nullifier_k orchard_circuit_params)
+    List.nth 84 (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       fixed_window_default.
 
   Lemma nullifier_k_spec_table_split :
-    OrchardSpec.nullifier_k orchard_circuit_params =
+    OrchardCircuitSpec.nullifier_k orchard_internal_params =
     nullifier_k_first :: nullifier_k_middle ++ [nullifier_k_last].
   Proof. reflexivity. Qed.
 
@@ -138,7 +139,7 @@ Module NullifierKOut.
     rewrite <- nullifier_k_spec_table_split in Hnth.
     assert (Hj : (j < 85)%nat).
     { pose proof (proj1 (List.nth_error_Some
-        (OrchardSpec.nullifier_k orchard_circuit_params) j)) as Hlt.
+        (OrchardCircuitSpec.nullifier_k orchard_internal_params) j)) as Hlt.
       rewrite OrchardActionUsFreeNullifierK.nullifier_k_table_length in Hlt.
       apply Hlt.
       rewrite Hnth.
@@ -232,7 +233,7 @@ Module NullifierKOut.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     fixed_scalar_mul_circuit_precondition
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (nf_scalar Γ)
       (read_us Γ bf_region 85).
   Proof.
@@ -288,7 +289,7 @@ Module NullifierKOut.
             (Garden.Halo2.Synthesis.Cell.advice scalar_add_region
               Advice.A6 0)))) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (nf_scalar Γ)
       (read_us Γ bf_region 85).
   Proof.
@@ -355,7 +356,7 @@ Module NullifierKOut.
           (Garden.Orchard.circuit
             .synth_nullifier_k_mul scalar))) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (Poseidon.poseidon_hash2
         (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
         (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F
@@ -379,11 +380,11 @@ Module NullifierKOut.
       (Hcircuit : Holds Γ) :
     point_on_curve
       (EccSpec.fixed_scalar_mul
-        (OrchardSpec.nullifier_k orchard_circuit_params)
+        (OrchardCircuitSpec.nullifier_k orchard_internal_params)
         (nf_scalar Γ)
         (read_us Γ bf_region 85)) \/
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (nf_scalar Γ)
       (read_us Γ bf_region 85) = EccSpec.identity.
   Proof.
@@ -442,12 +443,12 @@ Module NullifierKOut.
     UnOp.from
       (Point.x
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           (nf_scalar Γ)
           (read_us Γ bf_region 85))) =
     Point.x
       (EccSpec.fixed_scalar_mul
-        (OrchardSpec.nullifier_k orchard_circuit_params)
+        (OrchardCircuitSpec.nullifier_k orchard_internal_params)
         (nf_scalar Γ)
         (read_us Γ bf_region 85)).
   Proof.
@@ -461,12 +462,12 @@ Module NullifierKOut.
     UnOp.from
       (Point.y
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           (nf_scalar Γ)
           (read_us Γ bf_region 85))) =
     Point.y
       (EccSpec.fixed_scalar_mul
-        (OrchardSpec.nullifier_k orchard_circuit_params)
+        (OrchardCircuitSpec.nullifier_k orchard_internal_params)
         (nf_scalar Γ)
         (read_us Γ bf_region 85)).
   Proof.
@@ -565,7 +566,7 @@ Module NullifierKOut.
         (read_point Γ
           (RegionId.WitnessInput RegionId.WitnessInput.CmOld))
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           (Poseidon.poseidon_hash2
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F
@@ -575,7 +576,7 @@ Module NullifierKOut.
     Point.x
       (EccSpec.point_add
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           (Poseidon.poseidon_hash2
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.Nk))
             (read Γ (RegionId.WitnessInput RegionId.WitnessInput.RhoOld)) +F

@@ -35,7 +35,8 @@ Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -79,7 +80,7 @@ Module NoteCommitNewCmx.
   (** [action_spec_of] as its body — two delta steps, no field access. *)
   Lemma action_spec_of_eq (Γ : Assignment.t columns RegionId.t) :
     action_spec_of Γ =
-    OrchardSpec.orchard_action_spec orchard_circuit_params
+    OrchardCircuitSpec.orchard_action_spec orchard_internal_params
       (read_action_inputs Γ) (read_action_witness Γ).
   Proof. reflexivity. Qed.
 
@@ -87,24 +88,24 @@ Module NoteCommitNewCmx.
       both sides unfold to the same application without touching the hash
       fold. *)
   Lemma out_cmx_generic
-      (prm : OrchardSpec.Params)
-      (inp : OrchardSpec.ActionInputs) (wit : OrchardSpec.ActionWitness) :
-    OrchardSpec.out_cmx (OrchardSpec.orchard_action_spec prm inp wit) =
+      (prm : OrchardCircuitSpec.Params)
+      (inp : OrchardSpec.ActionInputs) (wit : OrchardCircuitSpec.ActionWitness) :
+    OrchardSpec.out_cmx (OrchardCircuitSpec.orchard_action_spec prm inp wit) =
     Point.x
       (EccSpec.point_add
         (SinsemillaSpec.sinsemilla_hash_to_point
-          (OrchardSpec.note_commit_q prm)
+          (OrchardSpec.note_commit_q (OrchardCircuitSpec.domain prm))
           (OrchardSpec.note_commit_message
             (OrchardSpec.in_g_d_new inp)
             (OrchardSpec.in_pk_d_new inp)
             (OrchardSpec.in_v_new inp)
             (OrchardSpec.out_nf_old
-              (OrchardSpec.orchard_action_spec prm inp wit))
+              (OrchardCircuitSpec.orchard_action_spec prm inp wit))
             (OrchardSpec.in_psi_new inp)))
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.note_commit_r prm)
+          (OrchardCircuitSpec.note_commit_r prm)
           (OrchardSpec.in_rcm_new inp)
-          (OrchardSpec.w_us_rcm wit))).
+          (OrchardCircuitSpec.w_us_rcm wit))).
   Proof. reflexivity. Qed.
 
   (** The new-note input fields of [read_action_inputs], as the raw readers
@@ -148,14 +149,15 @@ Module NoteCommitNewCmx.
             (OrchardSpec.out_nf_old (action_spec_of Γ))
             (OrchardActionInputs.read Γ RegionId.NoteCommitNewWitnessPsi)))
         (EccSpec.fixed_scalar_mul
-          (OrchardSpec.note_commit_r orchard_circuit_params)
+          (OrchardCircuitSpec.note_commit_r orchard_internal_params)
           (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-          (OrchardSpec.w_us_rcm (read_action_witness Γ)))).
+          (OrchardCircuitSpec.w_us_rcm (read_action_witness Γ)))).
   Proof.
     rewrite (action_spec_of_eq Γ).
     rewrite
-      (out_cmx_generic orchard_circuit_params
+      (out_cmx_generic orchard_internal_params
         (read_action_inputs Γ) (read_action_witness Γ)).
+    rewrite orchard_internal_domain_eq.
     rewrite (in_g_d_new_read Γ).
     rewrite (in_pk_d_new_read Γ).
     rewrite (in_v_new_read Γ).
@@ -370,7 +372,7 @@ Module NoteCommitNewCmx.
 
       The two CMX side conditions packaged as a single per-assignment
       predicate, the [merkle_witness_ok] shape consumed by the top-level
-      [deterministic] / [deterministic_relational] theorems:
+      [satisfies_specification] / [deterministic] theorems:
 
       - the Sinsemilla incomplete-add nondegeneracy of the witnessed
         109-word new-note message (the hash fold's gradients are

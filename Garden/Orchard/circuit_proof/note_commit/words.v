@@ -50,7 +50,7 @@ Require Import Garden.Halo2.halo2_gadgets.sinsemilla.chip_proof.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.merkle.

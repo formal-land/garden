@@ -37,7 +37,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.window_disc.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -404,7 +405,7 @@ Module OrchardActionUsFreeNullifierK.
   Proof. reflexivity. Qed.
 
   Lemma nullifier_k_table_length :
-    List.length (OrchardSpec.nullifier_k orchard_circuit_params) = 85%nat.
+    List.length (OrchardCircuitSpec.nullifier_k orchard_internal_params) = 85%nat.
   Proof. reflexivity. Qed.
 
   (** Window correctness at a row known through its shape bit (the base-field
@@ -458,12 +459,12 @@ Module OrchardActionUsFreeNullifierK.
       (i : nat) (Hi : (i < 85)%nat) :
     incomplete_additions_window_point Γ bf_region (Z.of_nat i) =
     EccSpec.fixed_window_point
-      (List.nth i (OrchardSpec.nullifier_k orchard_circuit_params)
+      (List.nth i (OrchardCircuitSpec.nullifier_k orchard_internal_params)
         fixed_window_default)
       (EccSpec.window_digit (nf_scalar Γ) i)
       (List.nth i (read_us Γ bf_region 85) 0).
   Proof.
-    change (OrchardSpec.nullifier_k orchard_circuit_params) with
+    change (OrchardCircuitSpec.nullifier_k orchard_internal_params) with
       (EccSpec.fixed_table_of_rows
         Garden.Orchard.constants.fixed_bases.nullifier_k
           .base_field_fixed_rows).
@@ -489,7 +490,7 @@ Module OrchardActionUsFreeNullifierK.
       (i : nat) (Hi : (i < 85)%nat) :
     point_on_curve
       (EccSpec.fixed_window_point
-        (List.nth i (OrchardSpec.nullifier_k orchard_circuit_params)
+        (List.nth i (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           fixed_window_default)
         (EccSpec.window_digit (nf_scalar Γ) i)
         (List.nth i (read_us Γ bf_region 85) 0)).
@@ -510,26 +511,26 @@ Module OrchardActionUsFreeNullifierK.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (Poseidon.poseidon_hash2
          (OrchardSpec.in_nk (read_action_inputs Γ))
          (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
          OrchardSpec.in_psi_old (read_action_inputs Γ))
-      (OrchardSpec.w_us_k (read_action_witness Γ)) =
+      (OrchardCircuitSpec.w_us_k (read_action_witness Γ)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (Poseidon.poseidon_hash2
          (OrchardSpec.in_nk (read_action_inputs Γ))
          (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
          OrchardSpec.in_psi_old (read_action_inputs Γ))
-      (OrchardSpec.w_us_k (canonical_witness (read_action_inputs Γ))).
+      (OrchardCircuitSpec.w_us_k (canonical_witness (read_action_inputs Γ))).
   Proof.
     unfold read_action_witness, canonical_witness, read_action_inputs,
       read_action_inputs_with_anchor.
-    cbn [OrchardSpec.w_us_k OrchardSpec.in_nk OrchardSpec.in_rho_old
+    cbn [OrchardCircuitSpec.w_us_k OrchardSpec.in_nk OrchardSpec.in_rho_old
       OrchardSpec.in_psi_old].
     apply (table_us_free_of_oncurve
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       (nf_scalar Γ)
       (read_us Γ bf_region 85)
       fixed_window_default).

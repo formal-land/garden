@@ -228,6 +228,25 @@ forced), one-delta lemmas, and per-field reader lemmas, assembled with
 syntactic `rewrite`s so the final `reflexivity` compares literally identical
 terms; the file compiles in ~1 s that way.
 
+### Never `match` on a concrete heavy computation — project through combinators
+
+Elaborating a `match` whose scrutinee is a *constant that unfolds to a big
+computation* sends that computation to the lazy machine at pretyping time,
+before any tactic runs. In `Halo2/halo2_poseidon/p128pow5t3_provenance.v`,
+`Definition derived_round_constants := match derived with Some (rc, _) => rc
+| None => [] end` — where `derived` is the whole Grain/MDS generation
+pipeline applied to concrete parameters — stalled `rocq compile` at 99% CPU
+for >12 minutes (killed), on both the plain and the `-vos` build; even a
+flat `match derived with Some _ => true | None => false end` hangs, while
+the same `match` on a `None`-bodied constant of the identical type is
+instant. Deceptive symptom under `-vos`/`-time`: every sentence logs
+`0. secs` and the stall appears after the last sentence. Fix: never place
+the concrete constant in scrutinee position — route projections through
+combinators whose own `match` is on a bound variable
+(`option_get [] (option_map fst derived)`), leaving the pipeline unreduced
+until a checker's `vm_compute` (which runs it in milliseconds after a ~5 s
+one-time bytecode compilation of the closure).
+
 ### Scope `lia`/`nia` with `clear -` in div/mod-heavy contexts
 
 Micromega cost is a function of the whole context, not the goal: `lia`'s
@@ -285,19 +304,61 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
 
 - Fixed-base table leaves (`circuit_proof/<base>/table.v`): ~79 s ∥ 80 s ∥
   80 s ∥ 20 s in parallel (value_commit_v is the cheap one); the
-  note_commit_r leaf lands in the ~100 s band.
+  note_commit_r leaf lands in the ~100 s band; the commit_ivk_r leaf
+  measured 81 s / 742 MB peak (2026-07-09).
+- The commit_ivk_r certificate leaves (2026-07-09): `disc_cert.v` 19 s,
+  `sign_cert.v` 7.3 s, `x_cert.v` 6.5 s,
+  `protocol_mul/commit_ivk_r.v` 0.8 s — all inside the per-family bands
+  below.
+- The ownership variable-base-mul leaves (2026-07-09):
+  `circuit_proof/ownership/var_base_incomplete.v` ~30 s — dominated by two
+  symbolic-row `field_solve`s (the `q_mul_2`/`q_mul_3` secant conjuncts)
+  plus six gate-membership ltac `In`-proofs; `var_base_mul.v` ~21 s;
+  `var_base_overflow.v` ~10 s; `var_base_complete.v` ~6 s.
 - `sinsemilla/hash_to_point_round_final_proof.v`: 96 s, parallel with the
   round proof; `hash_to_point_proof.v` (shared definitions) 3 s;
   `hash_to_point_fold_proof.v` 1.5 s.
 - `circuit_proof/fixed_base/main.v`: 78 s.
-- The `order_<base>.v` ladder-certificate leaves: 16 s each
-  (value_commit_v 30 s), `make -j` parallel.
+- The `order_<base>.v` certificate leaves: < 1 s each — instances of
+  `PallasOrder.pallas_mul_q_on_curve` at the generator's
+  `reduced`/`on_curve` facts (2026-07-10; formerly 16 s ladder
+  certificates each, value_commit_v 30 s). The only remaining `[q]·G`
+  ladder is `Pallas.placeholder_order` (`EllipticCurve/Pallas.v`), the
+  bootstrap certificate the general theorem itself consumes — it cannot
+  be replaced by instantiation without circularity.
 - Discriminant certificates (`circuit_proof/<base>/disc_cert.v`): ≈ 92 s CPU
   total across the five self-contained files (≈ 21 s per 85-window family,
   6 s for the 22-window value_commit_v).
 - x-coordinate certificates ≈ 7 s each; window-sign certificates ≈ 9–10 s
   each.
-- `circuit_proof/main.v` 0.9 s; everything else seconds.
+- `circuit_proof/main.v` ~1 s; everything else seconds.
+- The Poseidon constants-provenance pair (2026-07-10):
+  `halo2_poseidon/grain.v` (executable Grain/MDS transcription, no proofs)
+  < 1 s; `halo2_poseidon/p128pow5t3_provenance.v` ~6 s — 5.3 s in the first
+  checker's `vm_compute` (one-time bytecode compilation of the pipeline
+  closure), the remaining four checkers milliseconds each (see the
+  match-scrutinee pitfall above for the elaboration trap this file dodges).
+- The `GroupHash^P` chain (2026-07-10): `GroupHash/blake2b.v` and `xmd.v`
+  < 1 s each (their `vm_compute` reference vectors included), `sswu.v` ~5 s
+  (the transcription-check `vm_compute`s over the iso-Pallas constants),
+  `group_hash.v` < 1 s; the checker leaves
+  `Orchard/Pallas/generators_provenance.v` ~9 s (six points) and
+  `q_points_provenance.v` ~5 s (three points) — one raw-`forallb`
+  `vm_compute` each, recomputing BLAKE2b/XMD and the witnessed SSWU +
+  `iso_map` per point with pasted offline square-root witnesses
+  (`scripts/generate_grouphash_witnesses.py`), never an in-kernel
+  `field_sqrt`.
+- The Sinsemilla S-table provenance shards (2026-07-10):
+  `Halo2/halo2_gadgets/sinsemilla/provenance/shard_{0..7}.v` — ~196 s each
+  (`sinsemilla_s_shard_N_check`, a 128-point raw-`forallb` `vm_compute`
+  over the same witnessed `GroupHash^P` recomputation, ~1.5 s per point;
+  witnesses pasted from `scripts/generate_sinsemilla_witnesses.py`; the
+  companion index lemma's `vm_compute` is negligible). The eight leaves are
+  mutually independent and off every other file's `Require` path (only
+  `provenance/main.v`, < 2 s, consumes them), so they run fully parallel:
+  ~200 s wall on eight cores, never re-paid while iterating elsewhere.
+  Sharding finer was declined — per-leaf memory is small (< 1 GiB) and the
+  cost is pure per-point CPU, so more shards only add `Require` overhead.
 
 Remaining single-file levers: the `hash_to_point_round_proof` round proof
 and the `sinsemilla_s` table literal, the two largest links in the chain
@@ -327,8 +388,10 @@ wall (see the pitfall above).
 exponentiation to extended Euclid, collapsing every inversion-dominated
 `vm_compute`: the table-leaf checks fell from ≈ 23 min each to the band in
 the cost table above, `Orchard/Pallas/Generators.v`'s six `[q]·G` order
-ladders from ≈ 30 min to 87 s, the `order_<base>.v` leaves from ≈ 5 min
-each to their current cost. The first full clean rebuild after the switch:
+ladders from ≈ 30 min to 87 s, the `order_<base>.v` ladder certificates
+from ≈ 5 min each to 16 s (value_commit_v 30 s) — later retired to the
+sub-second instantiations in the cost table above. The first full clean
+rebuild after the switch:
 313 files, ≈ 9 800 s CPU, ≈ 16 min wall — of which the Euler-criterion
 discriminant shards were ≈ 8 100 s CPU (~83% of the build; `modpow`-bound,
 no inversion, so egcd did not help them). The switch also surfaced
@@ -342,10 +405,11 @@ shard). Each family now carries a pasted `nonres_root_table` — per entry a
 root `r` of `disc / pallas_b` — and one checker verifying
 `disc = pallas_b *F (r *F r)` and `r <> 0`: one field multiplication per
 entry (3–7 s per former shard, 238 s CPU total). The exported lemma
-statements stayed byte-identical, so consumers and `Print Assumptions
-OrchardAction.deterministic` were untouched. With the per-entry cost gone,
-the 50-file band sharding cost more in per-file `Require` loading than the
-checks themselves and was retired to one self-contained `disc_cert.v` per
+statements stayed byte-identical, so consumers and `Print Assumptions` on
+the whole-circuit determinism theorem were untouched. With the per-entry
+cost gone, the 50-file band sharding cost more in per-file `Require` loading
+than the checks themselves and was retired to one self-contained
+`disc_cert.v` per
 family (current figure above).
 
 **Critical-path pass (2026-07-06).** With the discriminant block retired,

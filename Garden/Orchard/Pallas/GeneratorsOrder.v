@@ -8,14 +8,15 @@
     [Weierstrass] order theory ([mul_eq_Infinity_iff] /
     [mul_injective_mod]) and [Pallas.pallas_q_is_prime].
 
-    The [pallas_q]-fold double-and-add ladder certificates themselves live in
-    the [order_<base>.v] leaf files (one [vm_cast_no_check] each, `make -j`
-    parallel); this file only re-exports them under the [PallasGeneratorsOrder]
-    names and derives the order characterisation and injectivity.  Keeping the
-    ladders out of [Generators.v] keeps
-    the generator points file cheap: the fixed-base table leaves depend on the
-    points but not on the order facts, so they never wait on the six ladder
-    reductions. *)
+    The per-generator certificates live in the [order_<base>.v] leaf files,
+    each an instance of [PallasOrder.pallas_mul_q_on_curve]
+    ([Garden/EllipticCurve/PallasOrder.v] — every reduced on-curve Pallas
+    point is annihilated by [pallas_q]) at that generator's
+    [reduced] / [on_curve] facts; this file only re-exports them under the
+    [PallasGeneratorsOrder] names and derives the order characterisation and
+    injectivity.  Keeping the certificates out of [Generators.v] keeps the
+    generator points file cheap: the fixed-base table leaves depend on the
+    points but not on the order facts. *)
 
 Require Import Garden.Field.Field.
 Require Import Garden.EllipticCurve.Weierstrass.

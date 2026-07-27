@@ -1,37 +1,43 @@
-(** * Pallas prime-order certificate for the NoteCommitR fixed base
+(** * Prime-order certificate for the Pallas NoteCommitR fixed base
 
-    The
-    prime-order certificate [[pallas_q] G = identity] for the NoteCommitR
-    generator [G = PallasGenerators.note_commit_r_G], by the finite
-    [vm_compute] of the double-and-add ladder over the Pallas base field.
+    Discharges the certificate consumed by
+    [PallasGeneratorsOrder.note_commit_r_order]: the scalar multiple
+    [[pallas_q] G] of the NoteCommitR generator equals the group identity
+    (the point at infinity).
 
-    This is a curve-arithmetic computation over [Garden.EllipticCurve.Pallas];
-    the NoteCommitR generator point comes from
+    The fact is an instance of [PallasOrder.pallas_mul_q_on_curve]
+    ([Garden/EllipticCurve/PallasOrder.v]): every reduced on-curve Pallas
+    point is annihilated by [pallas_q], so the certificate follows from the
+    generator's [reduced] / [on_curve] facts ([Generators.v]) with no
+    per-generator ladder computation.
+
+    Layering: the order theorem depends only on [Garden.EllipticCurve]; the
+    NoteCommitR generator point itself comes from
     [Garden.Orchard.Pallas.Generators], which is why this file lives under
-    [Garden/Orchard/] rather than [Garden/EllipticCurve/]. It proves exactly
-    the certificate consumed by
-    [PallasGeneratorsOrder.note_commit_r_order].
+    [Garden/Orchard/] rather than [Garden/EllipticCurve/]. *)
 
-    The generator carries the real Zcash NoteCommitR coordinates; because
-    [#E_Pallas(F_p) = pallas_q] is prime, the group is cyclic of prime order
-    [pallas_q], so every non-identity point has order [pallas_q] and is
-    annihilated by the scalar [pallas_q].
-
-    Proof discipline. The heavy computation ([pallas_q] is a 255-bit scalar,
-    ~300 point operations, each dominated by one extended-Euclid modular inverse over
-    the 254-bit prime [pallas_p]) is run exactly once, inside the kernel, via
-    [vm_cast_no_check (eq_refl Pallas.identity)]: the tactic provides the
-    reflexivity witness without a tactic-time reduction and asks the kernel to
-    discharge the conversion [[pallas_q] G == identity] with the bytecode VM. *)
-
+Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
+Require Import Garden.EllipticCurve.PallasOrder.
 Require Import Garden.Orchard.Pallas.Generators.
 
 Module PallasOrder_note_commit_r.
+  (** [Weierstrass.mul] stays opaque to conversion here so that checking the
+      instantiated theorem never attempts to evaluate the concrete
+      [pallas_q]-scalar ladder. *)
+  Strategy opaque [Weierstrass.mul].
+
+  (** [[pallas_q] G = O] for the NoteCommitR generator [G], matching the
+      exact form of [PallasGeneratorsOrder.note_commit_r_order]. *)
   Lemma note_commit_r_order :
     Pallas.mul Pallas.pallas_q PallasGenerators.note_commit_r_G =
       Pallas.identity.
   Proof.
-    vm_cast_no_check (eq_refl Pallas.identity).
+    exact (PallasOrder.pallas_mul_q_on_curve
+             PallasGenerators.note_commit_r_G
+             PallasGenerators.note_commit_r_reduced
+             PallasGenerators.note_commit_r_on_curve).
   Qed.
+
+  Strategy transparent [Weierstrass.mul].
 End PallasOrder_note_commit_r.

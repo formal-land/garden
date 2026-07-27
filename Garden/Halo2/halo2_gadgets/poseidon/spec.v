@@ -25,7 +25,15 @@ Global Open Scope Z_scope.
     (composing [FullRound.deterministic] / [PartialRound.deterministic] /
     [PadAndAdd.deterministic] along the permute region rows) is the
     soundness obligation discharged at the [Orchard/circuit_proof/main.v] level,
-    where the Poseidon synthesis region is in scope. *)
+    where the Poseidon synthesis region is in scope.
+
+    Protocol reference: §5.4.1.10 'PoseidonHash Function' of the Zcash
+    protocol specification — the Poseidon permutation
+    over [F_qP³] with S-box [x ↦ x⁵], [R_F = 8] full rounds and [R_P = 56]
+    partial rounds, used as a sponge with rate 2 / capacity 1 in
+    Constant-Input-Length mode.  The MDS matrix and round constants
+    ([p128pow5t3.v]) are the Grain-generated parameters of the Poseidon
+    reference implementation, transcribed from the vendored Rust crate. *)
 
 Module Poseidon.
   Definition rc (round column : nat) : Z :=
@@ -87,13 +95,19 @@ Module Poseidon.
     s.
 
   (** Domain initial-capacity element for [ConstantLength<2>]: the rate-position
-      lane is seeded with [(L as u128) << 64] = [2 * 2^64] before absorbing. *)
+      lane is seeded with [(L as u128) << 64] = [2 * 2^64] before absorbing.
+      Protocol: §5.4.1.10 — "for a 2-element input, the initial value of the
+      capacity element is 2⁶⁵". *)
   Definition domain_iv_constant_length_2 : Z :=
     2 * 2 ^ 64.
 
   (** The two-input fixed-length Poseidon hash used by the Orchard nullifier PRF:
       absorb [x], [y] into the rate lanes of the freshly-seeded state, run the
-      permutation, squeeze the first rate lane. *)
+      permutation, squeeze the first rate lane.
+
+      Protocol: §5.4.1.10, [PoseidonHash(x, y) = f([x, y, 2⁶⁵])₁]; §5.4.2
+      instantiates the nullifier PRF as
+      [PRF^nfOrchard_nk(ρ) = PoseidonHash(nk, ρ)]. *)
   Definition poseidon_hash2 (x y : Z) : Z :=
     (permute {|
       State.x0 := x;

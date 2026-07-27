@@ -44,7 +44,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.window_disc.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -94,15 +95,15 @@ Module OrchardActionUsFree.
   (** Concrete lengths of the three full-width spec tables ([value_commit_v]'s
       is [value_commit_v_table_length] in [circuit_proof/fixed_base/main.v]). *)
   Lemma spend_auth_g_table_length :
-    List.length (OrchardSpec.spend_auth_g orchard_circuit_params) = 85%nat.
+    List.length (OrchardCircuitSpec.spend_auth_g orchard_internal_params) = 85%nat.
   Proof. reflexivity. Qed.
 
   Lemma value_commit_r_table_length :
-    List.length (OrchardSpec.value_commit_r orchard_circuit_params) = 85%nat.
+    List.length (OrchardCircuitSpec.value_commit_r orchard_internal_params) = 85%nat.
   Proof. reflexivity. Qed.
 
   Lemma note_commit_r_table_length :
-    List.length (OrchardSpec.note_commit_r orchard_circuit_params) = 85%nat.
+    List.length (OrchardCircuitSpec.note_commit_r orchard_internal_params) = 85%nat.
   Proof. reflexivity. Qed.
 
   (** ** Generic full-width per-window correctness over a whole rows table
@@ -407,7 +408,7 @@ Module OrchardActionUsFree.
       (i : nat) (Hi : (i < 85)%nat) :
     point_on_curve
       (EccSpec.fixed_window_point
-        (List.nth i (OrchardSpec.spend_auth_g orchard_circuit_params)
+        (List.nth i (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
           fixed_window_default)
         (EccSpec.window_digit
           (read_scalar_from_windows Γ
@@ -438,7 +439,7 @@ Module OrchardActionUsFree.
       (i : nat) (Hi : (i < 85)%nat) :
     point_on_curve
       (EccSpec.fixed_window_point
-        (List.nth i (OrchardSpec.value_commit_r orchard_circuit_params)
+        (List.nth i (OrchardCircuitSpec.value_commit_r orchard_internal_params)
           fixed_window_default)
         (EccSpec.window_digit
           (read_scalar_from_windows Γ
@@ -469,7 +470,7 @@ Module OrchardActionUsFree.
       (i : nat) (Hi : (i < 85)%nat) :
     point_on_curve
       (EccSpec.fixed_window_point
-        (List.nth i (OrchardSpec.note_commit_r orchard_circuit_params)
+        (List.nth i (OrchardCircuitSpec.note_commit_r orchard_internal_params)
           fixed_window_default)
         (EccSpec.window_digit
           (read_scalar_from_windows Γ
@@ -508,19 +509,19 @@ Module OrchardActionUsFree.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (OrchardSpec.in_alpha (read_action_inputs Γ))
-      (OrchardSpec.w_us_alpha (read_action_witness Γ)) =
+      (OrchardCircuitSpec.w_us_alpha (read_action_witness Γ)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (OrchardSpec.in_alpha (read_action_inputs Γ))
-      (OrchardSpec.w_us_alpha (canonical_witness (read_action_inputs Γ))).
+      (OrchardCircuitSpec.w_us_alpha (canonical_witness (read_action_inputs Γ))).
   Proof.
     unfold read_action_witness, canonical_witness, read_action_inputs,
       read_action_inputs_with_anchor.
-    cbn [OrchardSpec.w_us_alpha OrchardSpec.in_alpha].
+    cbn [OrchardCircuitSpec.w_us_alpha OrchardSpec.in_alpha].
     apply (table_us_free_of_oncurve
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.SpendAuthority RegionId.SpendAuthority.FullFixedIncomplete)
         85)
@@ -543,19 +544,19 @@ Module OrchardActionUsFree.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.value_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       (OrchardSpec.in_rcv (read_action_inputs Γ))
-      (OrchardSpec.w_us_rcv (read_action_witness Γ)) =
+      (OrchardCircuitSpec.w_us_rcv (read_action_witness Γ)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.value_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       (OrchardSpec.in_rcv (read_action_inputs Γ))
-      (OrchardSpec.w_us_rcv (canonical_witness (read_action_inputs Γ))).
+      (OrchardCircuitSpec.w_us_rcv (canonical_witness (read_action_inputs Γ))).
   Proof.
     unfold read_action_witness, canonical_witness, read_action_inputs,
       read_action_inputs_with_anchor.
-    cbn [OrchardSpec.w_us_rcv OrchardSpec.in_rcv].
+    cbn [OrchardCircuitSpec.w_us_rcv OrchardSpec.in_rcv].
     apply (table_us_free_of_oncurve
-      (OrchardSpec.value_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.ValueCommitment
           RegionId.ValueCommitment.ValueCommitRIncomplete) 85)
@@ -578,19 +579,19 @@ Module OrchardActionUsFree.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-      (OrchardSpec.w_us_rcm (read_action_witness Γ)) =
+      (OrchardCircuitSpec.w_us_rcm (read_action_witness Γ)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-      (OrchardSpec.w_us_rcm (canonical_witness (read_action_inputs Γ))).
+      (OrchardCircuitSpec.w_us_rcm (canonical_witness (read_action_inputs Γ))).
   Proof.
     unfold read_action_witness, canonical_witness, read_action_inputs,
       read_action_inputs_with_anchor.
-    cbn [OrchardSpec.w_us_rcm OrchardSpec.in_rcm_new].
+    cbn [OrchardCircuitSpec.w_us_rcm OrchardSpec.in_rcm_new].
     apply (table_us_free_of_oncurve
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.NoteCommit RegionId.NoteCommit.Which.New
           RegionId.NoteCommit.FixedBaseIncomplete) 85)
@@ -618,19 +619,19 @@ Module OrchardActionUsFree.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.value_commit_v orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       (OrchardSpec.in_magnitude (read_action_inputs Γ))
-      (OrchardSpec.w_us_v (read_action_witness Γ)) =
+      (OrchardCircuitSpec.w_us_v (read_action_witness Γ)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.value_commit_v orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       (OrchardSpec.in_magnitude (read_action_inputs Γ))
-      (OrchardSpec.w_us_v (canonical_witness (read_action_inputs Γ))).
+      (OrchardCircuitSpec.w_us_v (canonical_witness (read_action_inputs Γ))).
   Proof.
     unfold read_action_witness, canonical_witness, read_action_inputs,
       read_action_inputs_with_anchor.
-    cbn [OrchardSpec.w_us_v OrchardSpec.in_magnitude].
+    cbn [OrchardCircuitSpec.w_us_v OrchardSpec.in_magnitude].
     apply (table_us_free_of_oncurve
-      (OrchardSpec.value_commit_v orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       (read9 Γ
         (RegionId.ValueCommitment
           RegionId.ValueCommitment.MagnitudeRangeCheck))
@@ -664,19 +665,19 @@ Module OrchardActionUsFree.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ)
       (Ek : EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                  (OrchardSpec.in_nk (read_action_inputs Γ))
                  (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
                  OrchardSpec.in_psi_old (read_action_inputs Γ))
-              (OrchardSpec.w_us_k (read_action_witness Γ)) =
+              (OrchardCircuitSpec.w_us_k (read_action_witness Γ)) =
             EccSpec.fixed_scalar_mul
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               (Poseidon.poseidon_hash2
                  (OrchardSpec.in_nk (read_action_inputs Γ))
                  (OrchardSpec.in_rho_old (read_action_inputs Γ)) +F
                  OrchardSpec.in_psi_old (read_action_inputs Γ))
-              (OrchardSpec.w_us_k (canonical_witness (read_action_inputs Γ)))) :
+              (OrchardCircuitSpec.w_us_k (canonical_witness (read_action_inputs Γ)))) :
     action_spec_of Γ = output (read_action_inputs Γ).
   Proof.
     exact (action_spec_us_free_of_table_eqs Γ Ek

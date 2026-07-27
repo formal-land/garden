@@ -17,7 +17,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.full_width_proof.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.witness_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.poseidon.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Div.
 Require Import Garden.Field.Lemmas.
@@ -1984,7 +1985,7 @@ Module OrchardActionFixedBase.
   |}.
 
   Definition spend_auth_g_fixed_table : EccSpec.fixed_table :=
-    OrchardSpec.spend_auth_g orchard_circuit_params.
+    OrchardCircuitSpec.spend_auth_g orchard_internal_params.
 
   (** The 83 incomplete-addition edges of the SpendAuthG full-width ladder
       (rows 1..83).  Row 84 is a *complete* addition, not an incomplete-add
@@ -2287,8 +2288,8 @@ Module OrchardActionFixedBase.
         0).
   Proof.
     unfold spend_auth_g_first, spend_auth_g_middle, spend_auth_g_last,
-      spend_auth_g_fixed_table, OrchardSpec.spend_auth_g,
-      orchard_circuit_params in Hnth.
+      spend_auth_g_fixed_table, OrchardCircuitSpec.spend_auth_g,
+      orchard_internal_params in Hnth.
     cbn in Hnth.
     do 85
       (destruct j as [| j];
@@ -2474,7 +2475,7 @@ Module OrchardActionFixedBase.
               RegionId.SpendAuthority.FullFixedIncomplete) 0))
       (Hcircuit_pre :
         fixed_scalar_mul_circuit_precondition
-          (OrchardSpec.spend_auth_g orchard_circuit_params)
+          (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
           (read_scalar_from_windows Γ
             (RegionId.SpendAuthority
               RegionId.SpendAuthority.FullFixedIncomplete) 85)
@@ -2486,7 +2487,7 @@ Module OrchardActionFixedBase.
         (layouter_value
           Garden.Orchard.circuit.synthesize_full_fixed_base_mul_spend_auth_g)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.SpendAuthority
           RegionId.SpendAuthority.FullFixedIncomplete) 85)
@@ -2525,7 +2526,7 @@ Module OrchardActionFixedBase.
             (RegionId.SpendAuthority
               RegionId.SpendAuthority.FullFixedIncomplete) 0)) :
     fixed_scalar_mul_circuit_precondition
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.SpendAuthority
           RegionId.SpendAuthority.FullFixedIncomplete) 85)
@@ -2539,7 +2540,7 @@ Module OrchardActionFixedBase.
     apply interpret_layouter_facts_bind_left in Hfacts.
     pose proof (spend_auth_g_window_correct Γ Hfacts
       (holds_gates Γ Hcircuit) 0%nat spend_auth_g_first eq_refl) as Hfirst.
-    unfold OrchardSpec.spend_auth_g, orchard_circuit_params.
+    unfold OrchardCircuitSpec.spend_auth_g, orchard_internal_params.
     rewrite spend_auth_g_table_split.
     cbn [fixed_scalar_mul_circuit_precondition].
     rewrite <- Hfirst.
@@ -2600,7 +2601,7 @@ Module OrchardActionFixedBase.
         (layouter_value
           Garden.Orchard.circuit.synthesize_full_fixed_base_mul_spend_auth_g)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.spend_auth_g orchard_circuit_params)
+      (OrchardCircuitSpec.spend_auth_g orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.SpendAuthority
           RegionId.SpendAuthority.FullFixedIncomplete) 85)
@@ -3659,7 +3660,7 @@ Module OrchardActionFixedBase.
   Qed.
 
   Lemma value_commit_v_table_length :
-    List.length (OrchardSpec.value_commit_v orchard_circuit_params) = 22%nat.
+    List.length (OrchardCircuitSpec.value_commit_v orchard_internal_params) = 22%nat.
   Proof. reflexivity. Qed.
 
   (* Per-window digit match at the spec scalar: digit [i] of [in_magnitude]
@@ -3705,7 +3706,7 @@ Module OrchardActionFixedBase.
       (j : nat) (w : EccSpec.fixed_window)
       (Hnth :
         List.nth_error
-          (OrchardSpec.value_commit_v orchard_circuit_params) j = Some w) :
+          (OrchardCircuitSpec.value_commit_v orchard_internal_params) j = Some w) :
     incomplete_additions_window_point Γ
       (RegionId.ValueCommitment
         RegionId.ValueCommitment.ValueCommitVIncomplete)
@@ -3737,7 +3738,7 @@ Module OrchardActionFixedBase.
       rewrite eval_advice_cur_cell.
       reflexivity. }
     rewrite Hmag.
-    unfold OrchardSpec.value_commit_v, orchard_circuit_params in Hnth.
+    unfold OrchardCircuitSpec.value_commit_v, orchard_internal_params in Hnth.
     cbn in Hnth.
     do 22
       (destruct j as [| j];
@@ -3773,7 +3774,7 @@ Module OrchardActionFixedBase.
     point_on_curve
       (EccSpec.fixed_window_point
         (List.nth i
-          (OrchardSpec.value_commit_v orchard_circuit_params)
+          (OrchardCircuitSpec.value_commit_v orchard_internal_params)
           fixed_window_default)
         (EccSpec.window_digit
           (read9 Γ
@@ -3799,17 +3800,17 @@ Module OrchardActionFixedBase.
         (holds_gates Γ Hcircuit)
         Hi) as Honc.
     assert (Hnth :
-      List.nth_error (OrchardSpec.value_commit_v orchard_circuit_params) i =
+      List.nth_error (OrchardCircuitSpec.value_commit_v orchard_internal_params) i =
       Some
         (List.nth i
-          (OrchardSpec.value_commit_v orchard_circuit_params)
+          (OrchardCircuitSpec.value_commit_v orchard_internal_params)
           fixed_window_default)).
     { apply List.nth_error_nth'.
       rewrite value_commit_v_table_length.
       exact Hi. }
     rewrite (value_commit_v_window_correct Γ Hcircuit i
       (List.nth i
-        (OrchardSpec.value_commit_v orchard_circuit_params)
+        (OrchardCircuitSpec.value_commit_v orchard_internal_params)
         fixed_window_default)
       Hnth) in Honc.
     exact Honc.

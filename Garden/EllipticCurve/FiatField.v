@@ -4,7 +4,7 @@
     ([Crypto.Algebra.Hierarchy.field]) directly over Garden's scalar-field
     layer: the carrier is [Z], the equality is congruence modulo [p]
     ([Stdlib.ZArith.Zdiv.eqm p]), and the operations are Garden's
-    [UnOp]/[BinOp] reductions modulo [p] together with the Fermat-based
+    [UnOp]/[BinOp] reductions modulo [p] together with the extended-Euclid
     [mod_inverse]. It also provides the decidability of [eqm p].
 
     The instance is the bridge that lets [Garden.EllipticCurve.Weierstrass]

@@ -121,9 +121,9 @@ Module InField.
   Qed.
 End InField.
 
-(* Square-and-multiply modular exponentiation, the general
-   modular-exponentiation primitive (e.g. behind [is_square]/[modpow] and the
-   quadratic-nonresidue check in [ecc/chip/spec.v]). *)
+(* Square-and-multiply modular exponentiation, a general
+   modular-exponentiation primitive (e.g. behind the quadratic-nonresidue check
+   in [ecc/chip/spec.v]). *)
 Fixpoint fast_pow_modulo_positive (acc base modulus : Z) (exponent : positive) : Z :=
   match exponent with
   | xH => (acc * base) mod modulus

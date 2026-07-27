@@ -1,6 +1,6 @@
 # The `constrain_constant` gap: issue, cause, and fix
 
-A post-mortem (found 2026-07-02, fixed 2026-07-04): the Rocq synthesis model
+Found 2026-07-02, fixed 2026-07-04: the Rocq synthesis model
 silently dropped every Halo2 `constrain_constant` /
 `assign_advice_from_constant` site, making the relational model strictly more
 permissive than the real circuit. This document records the issue, its cause

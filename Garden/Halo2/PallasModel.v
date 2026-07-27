@@ -13,8 +13,10 @@
     Pallas-specialised wrappers [wadd], [wneg], [wmul], [on_curve], [reduced],
     [nonsingular]). The bridge theorems are proved here against the generic
     Weierstrass laws of [EllipticCurve/Weierstrass.v]; they are the group-law
-    facts that [FixedBaseLadder.v] (and, through it, the Orchard determinism
-    proof) wire onto: [repr] / [unrepr] and their two round-trip statements
+    facts that the fixed-base ladder proofs
+    ([Orchard/circuit_proof/ladder/main.v]) (and, through them, the Orchard
+    determinism proof) wire onto: [repr] / [unrepr] and their two round-trip
+    statements
     ([repr_unrepr] / [unrepr_repr]); [repr_add]
     ([repr (add P Q) = point_add (repr P) (repr Q)] on the documented
     on-curve domain — both inputs [reduced] and [on_curve], precisely where
@@ -29,7 +31,7 @@
     [Z.iter]-defined chip [scalar_mul] the group structure of
     [Weierstrass.mul]); and [mul_equiv_scalar_mul], the same fact restated
     over [EllipticCurve.Pallas]'s own [mul]/[reduced]/[on_curve] wrappers
-    (the shape [FixedBaseLadder.v] actually consumes). *)
+    (the shape the fixed-base ladder proofs consume). *)
 
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Lemmas.

@@ -42,7 +42,8 @@ Require Garden.Orchard.circuit.
 Require Garden.Orchard.circuit.note_commit.
 Require Garden.Orchard.constants.fixed_bases.note_commit_r.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -83,14 +84,14 @@ Module NoteCommitROut.
 
   Definition note_commit_r_first : EccSpec.fixed_window :=
     List.hd fixed_window_default
-      (OrchardSpec.note_commit_r orchard_circuit_params).
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params).
 
   Definition note_commit_r_middle : EccSpec.fixed_table :=
     List.firstn 83
-      (List.skipn 1 (OrchardSpec.note_commit_r orchard_circuit_params)).
+      (List.skipn 1 (OrchardCircuitSpec.note_commit_r orchard_internal_params)).
 
   Definition note_commit_r_last : EccSpec.fixed_window :=
-    List.nth 84 (OrchardSpec.note_commit_r orchard_circuit_params)
+    List.nth 84 (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       fixed_window_default.
 
   Lemma note_commit_r_table_split :
@@ -100,7 +101,7 @@ Module NoteCommitROut.
   Proof. reflexivity. Qed.
 
   Lemma note_commit_r_spec_table_split :
-    OrchardSpec.note_commit_r orchard_circuit_params =
+    OrchardCircuitSpec.note_commit_r orchard_internal_params =
     note_commit_r_first :: note_commit_r_middle ++ [note_commit_r_last].
   Proof. reflexivity. Qed.
 
@@ -241,7 +242,7 @@ Module NoteCommitROut.
     rewrite <- note_commit_r_spec_table_split in Hnth.
     assert (Hj : (j < 85)%nat).
     { pose proof (proj1 (List.nth_error_Some
-        (OrchardSpec.note_commit_r orchard_circuit_params) j)) as Hlt.
+        (OrchardCircuitSpec.note_commit_r orchard_internal_params) j)) as Hlt.
       rewrite OrchardActionUsFree.note_commit_r_table_length in Hlt.
       apply Hlt.
       rewrite Hnth.
@@ -349,7 +350,7 @@ Module NoteCommitROut.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     fixed_scalar_mul_circuit_precondition
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.NoteCommit RegionId.NoteCommit.Which.New
           RegionId.NoteCommit.FixedBaseIncomplete) 85)
@@ -424,7 +425,7 @@ Module NoteCommitROut.
             .synthesize_full_fixed_base_mul_note_commit_r
             RegionId.NoteCommit.Which.New))) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.NoteCommit RegionId.NoteCommit.Which.New
           RegionId.NoteCommit.FixedBaseIncomplete) 85)

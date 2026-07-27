@@ -30,7 +30,7 @@ Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_proof.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_fold_proof.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.spec.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.merkle.
 Require Import Garden.Field.Field.
 Require Import Garden.Field.Lemmas.

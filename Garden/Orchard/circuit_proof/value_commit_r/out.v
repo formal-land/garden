@@ -27,7 +27,7 @@
     [ValueCommitVOut.value_commit_v_hvalue]
     ([circuit_proof/value_commit_v/out.v]) and of
     [full_spend_auth_g_mul_correct_of_complete]
-    ([circuit_proof/fixed_base/main.v:2841]). *)
+    ([circuit_proof/fixed_base/main.v:2589]). *)
 
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
@@ -36,7 +36,8 @@ Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.constants.fixed_bases.value_commit_r.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -77,14 +78,14 @@ Module ValueCommitROut.
 
   Definition value_commit_r_first : EccSpec.fixed_window :=
     List.hd fixed_window_default
-      (OrchardSpec.value_commit_r orchard_circuit_params).
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params).
 
   Definition value_commit_r_middle : EccSpec.fixed_table :=
     List.firstn 83
-      (List.skipn 1 (OrchardSpec.value_commit_r orchard_circuit_params)).
+      (List.skipn 1 (OrchardCircuitSpec.value_commit_r orchard_internal_params)).
 
   Definition value_commit_r_last : EccSpec.fixed_window :=
-    List.nth 84 (OrchardSpec.value_commit_r orchard_circuit_params)
+    List.nth 84 (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       fixed_window_default.
 
   Lemma value_commit_r_table_split :
@@ -94,7 +95,7 @@ Module ValueCommitROut.
   Proof. reflexivity. Qed.
 
   Lemma value_commit_r_spec_table_split :
-    OrchardSpec.value_commit_r orchard_circuit_params =
+    OrchardCircuitSpec.value_commit_r orchard_internal_params =
     value_commit_r_first :: value_commit_r_middle ++ [value_commit_r_last].
   Proof. reflexivity. Qed.
 
@@ -156,7 +157,7 @@ Module ValueCommitROut.
     rewrite <- value_commit_r_spec_table_split in Hnth.
     assert (Hj : (j < 85)%nat).
     { pose proof (proj1 (List.nth_error_Some
-        (OrchardSpec.value_commit_r orchard_circuit_params) j)) as Hlt.
+        (OrchardCircuitSpec.value_commit_r orchard_internal_params) j)) as Hlt.
       rewrite OrchardActionUsFree.value_commit_r_table_length in Hlt.
       apply Hlt.
       rewrite Hnth.
@@ -264,7 +265,7 @@ Module ValueCommitROut.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     fixed_scalar_mul_circuit_precondition
-      (OrchardSpec.value_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.ValueCommitment
           RegionId.ValueCommitment.ValueCommitRIncomplete) 85)
@@ -338,7 +339,7 @@ Module ValueCommitROut.
           Garden.Orchard.circuit
             .synth_value_commit_r_mul)) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.value_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_r orchard_internal_params)
       (read_scalar_from_windows Γ
         (RegionId.ValueCommitment
           RegionId.ValueCommitment.ValueCommitRIncomplete) 85)

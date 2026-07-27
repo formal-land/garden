@@ -12,15 +12,20 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   proof patterns, and tactic/performance notes.
 - `docs/chip-model-caveats.md`: what the relational `proof.v` model captures and
   idealizes, and the synthesis-to-gates gluing (`circuit_holds`).
-- `docs/constrain-constant-fix.md`: post-mortem of the constants-mechanism gap
+- `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with
   its validation gates.
-- `docs/orchard-determinism-proof.md`: the whole-circuit Orchard-action
-  determinism result — the exact `deterministic`/`deterministic_relational`
-  statements, each hypothesis and its motivation (including the two
+- `docs/orchard-soundness-proof.md`: the Orchard Action-statement theorem
+  — the exact `action_statement`/`satisfies_specification`/`deterministic`
+  statements, each hypothesis and its motivation (including the
   witness-honesty side conditions), what the conclusion does and does not
   ensure, the inherited model caveats, and the assumption audit.
+- `docs/orchard-balance-proof.md`: the transaction-level balance theorems
+  built on the Action statement — `balanced_or_dlog` and `no_inflation`,
+  the Pedersen-binding-as-reduction design (with the explicit computable
+  discrete-log witness), the three-step proof, and the two computational
+  boundaries (`SignatureKnowledge`, discrete-log hardness).
 - `docs/compile-performance.md`: READ BEFORE touching heavy `vm_compute`
   certificates or investigating slow compiles — the common pitfalls
   (checker-lemma shape, leaf closures, table literals, memory limits), the

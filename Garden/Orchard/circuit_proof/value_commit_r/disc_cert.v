@@ -9,7 +9,7 @@
     [vcr_table] is definitionally [EccSpec.fixed_table_of_rows
     Garden.Orchard.constants.fixed_bases.value_commit_r.full_fixed_rows], the
     85-window full table, and hence also
-    [OrchardSpec.value_commit_r orchard_circuit_params]; [vcr_default] is the
+    [OrchardCircuitSpec.value_commit_r orchard_internal_params]; [vcr_default] is the
     empty window [{| EccSpec.fw_coeffs := nil; EccSpec.fw_z := 0 |}], so a
     consumer reading windows out of that table matches this statement directly
     for every in-range index.

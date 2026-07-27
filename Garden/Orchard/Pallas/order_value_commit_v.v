@@ -1,40 +1,43 @@
 (** * Prime-order certificate for the Pallas ValueCommitV fixed base
 
-    The prime-order certificate for the
-    ValueCommitV generator: the finite computation [[pallas_q] G = identity].
-    This is Pallas-curve arithmetic ([Garden.EllipticCurve.Pallas]) applied to
-    the ValueCommitV generator point from
-    [Garden.Orchard.Pallas.Generators], isolated in its own file so the heavy
-    [vm_compute] recompiles independently.
+    Discharges the certificate consumed by
+    [PallasGeneratorsOrder.value_commit_v_order]: the scalar multiple
+    [[pallas_q] G] of the ValueCommitV generator equals the group identity
+    (the point at infinity).
 
-    The statement matches [PallasGeneratorsOrder.value_commit_v_order] verbatim.
-    The proof is the [q]G = O finite computation: [Pallas.mul] is binary
-    double-and-add over the textbook complete addition, every field operation
-    (including the extended-Euclid [mod_inverse]) is closed-form computable, and
-    [pallas_q], [pallas_p], [value_commit_v_G] are concrete,
-    so [vm_compute] reduces the scalar multiple to
-    [Weierstrass.Infinity = Pallas.identity]. *)
+    The fact is an instance of [PallasOrder.pallas_mul_q_on_curve]
+    ([Garden/EllipticCurve/PallasOrder.v]): every reduced on-curve Pallas
+    point is annihilated by [pallas_q], so the certificate follows from the
+    generator's [reduced] / [on_curve] facts ([Generators.v]) with no
+    per-generator ladder computation.
 
-Require Import Garden.Field.Field.
+    Layering: the order theorem depends only on [Garden.EllipticCurve]; the
+    ValueCommitV generator point itself comes from
+    [Garden.Orchard.Pallas.Generators], which is why this file lives under
+    [Garden/Orchard/] rather than [Garden/EllipticCurve/]. *)
+
 Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
+Require Import Garden.EllipticCurve.PallasOrder.
 Require Import Garden.Orchard.Pallas.Generators.
 
-Global Open Scope Z_scope.
-
-#[local] Existing Instance Primes.PallasPIsPrime.
-
 Module PallasOrder_value_commit_v.
-  (** ** [[pallas_q] ValueCommitV_G = identity]
+  (** [Weierstrass.mul] stays opaque to conversion here so that checking the
+      instantiated theorem never attempts to evaluate the concrete
+      [pallas_q]-scalar ladder. *)
+  Strategy opaque [Weierstrass.mul].
 
-      Proved by the finite [vm_compute] of the ~255-bit double-and-add ladder
-      (about one extended-Euclid modular inverse per point operation over
-      [pallas_p]). *)
+  (** [[pallas_q] G = O] for the ValueCommitV generator [G], matching the
+      exact form of [PallasGeneratorsOrder.value_commit_v_order]. *)
   Lemma value_commit_v_order :
     Pallas.mul Pallas.pallas_q PallasGenerators.value_commit_v_G =
       Pallas.identity.
   Proof.
-    vm_compute.
-    reflexivity.
+    exact (PallasOrder.pallas_mul_q_on_curve
+             PallasGenerators.value_commit_v_G
+             PallasGenerators.value_commit_v_reduced
+             PallasGenerators.value_commit_v_on_curve).
   Qed.
+
+  Strategy transparent [Weierstrass.mul].
 End PallasOrder_value_commit_v.

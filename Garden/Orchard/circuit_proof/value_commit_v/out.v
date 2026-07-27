@@ -32,7 +32,8 @@ Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.constants.fixed_bases.value_commit_v.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -73,18 +74,18 @@ Module ValueCommitVOut.
 
   Definition value_commit_v_first : EccSpec.fixed_window :=
     List.hd fixed_window_default
-      (OrchardSpec.value_commit_v orchard_circuit_params).
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params).
 
   Definition value_commit_v_middle : EccSpec.fixed_table :=
     List.firstn 20
-      (List.skipn 1 (OrchardSpec.value_commit_v orchard_circuit_params)).
+      (List.skipn 1 (OrchardCircuitSpec.value_commit_v orchard_internal_params)).
 
   Definition value_commit_v_last : EccSpec.fixed_window :=
-    List.nth 21 (OrchardSpec.value_commit_v orchard_circuit_params)
+    List.nth 21 (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       fixed_window_default.
 
   Lemma value_commit_v_spec_table_split :
-    OrchardSpec.value_commit_v orchard_circuit_params =
+    OrchardCircuitSpec.value_commit_v orchard_internal_params =
     value_commit_v_first :: value_commit_v_middle ++ [value_commit_v_last].
   Proof. reflexivity. Qed.
 
@@ -237,7 +238,7 @@ Module ValueCommitVOut.
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ) :
     fixed_scalar_mul_circuit_precondition
-      (OrchardSpec.value_commit_v orchard_circuit_params)
+      (OrchardCircuitSpec.value_commit_v orchard_internal_params)
       (read9 Γ
         (RegionId.ValueCommitment
           RegionId.ValueCommitment.MagnitudeRangeCheck))
@@ -328,7 +329,7 @@ Module ValueCommitVOut.
           "v_net sign" Advice.A9 0) in
     let v_point :=
       EccSpec.fixed_scalar_mul
-        (OrchardSpec.value_commit_v orchard_circuit_params)
+        (OrchardCircuitSpec.value_commit_v orchard_internal_params)
         (read9 Γ
           (RegionId.ValueCommitment
             RegionId.ValueCommitment.MagnitudeRangeCheck))

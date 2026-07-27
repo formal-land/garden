@@ -26,7 +26,7 @@
       and [synthesize_new_cm_point_add_rcm_correct] combines both results:
       the cm_new point is [point_add] of the hash point and
       [EccSpec.fixed_scalar_mul (note_commit_r prm) (in_rcm_new inp)
-      (w_us_rcm wit)] — the exact blinding leg of [OrchardSpec.note_commit]
+      (w_us_rcm wit)] — the exact blinding leg of [OrchardCircuitSpec.note_commit]
       in [out_cmx].
 
     The hash leg is left as the evaluated [HashResult] cells
@@ -43,7 +43,8 @@ Require Garden.Orchard.circuit.
 Require Garden.Orchard.circuit.note_commit.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -229,7 +230,7 @@ Module NoteCommitNewAdd.
   Proof. reflexivity. Qed.
 
   Lemma w_us_rcm_read (Γ : Assignment.t columns RegionId.t) :
-    OrchardSpec.w_us_rcm (read_action_witness Γ) =
+    OrchardCircuitSpec.w_us_rcm (read_action_witness Γ) =
     read_us Γ
       (RegionId.NoteCommit RegionId.NoteCommit.Which.New
         RegionId.NoteCommit.FixedBaseIncomplete) 85.
@@ -247,9 +248,9 @@ Module NoteCommitNewAdd.
             .synthesize_full_fixed_base_mul_note_commit_r
             RegionId.NoteCommit.Which.New))) =
     EccSpec.fixed_scalar_mul
-      (OrchardSpec.note_commit_r orchard_circuit_params)
+      (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-      (OrchardSpec.w_us_rcm (read_action_witness Γ)).
+      (OrchardCircuitSpec.w_us_rcm (read_action_witness Γ)).
   Proof.
     rewrite
       (NoteCommitROut
@@ -262,7 +263,7 @@ Module NoteCommitNewAdd.
 
       The complete-add bridge with the blinding leg replaced by the spec's
       [fixed_scalar_mul] at [in_rcm_new]/[w_us_rcm] — the exact second
-      operand of [OrchardSpec.note_commit] inside [out_cmx
+      operand of [OrchardCircuitSpec.note_commit] inside [out_cmx
       (action_spec_of Γ)].  The remaining CMX gap is the hash leg. *)
 
   Lemma synthesize_new_cm_point_add_rcm_correct
@@ -279,9 +280,9 @@ Module NoteCommitNewAdd.
       (Field.map_mod
         (NoteCommitROut.note_commit_assigned_point_value Γ new_cm_hash_m))
       (EccSpec.fixed_scalar_mul
-        (OrchardSpec.note_commit_r orchard_circuit_params)
+        (OrchardCircuitSpec.note_commit_r orchard_internal_params)
         (OrchardSpec.in_rcm_new (read_action_inputs Γ))
-        (OrchardSpec.w_us_rcm (read_action_witness Γ))).
+        (OrchardCircuitSpec.w_us_rcm (read_action_witness Γ))).
   Proof.
     rewrite
       (synthesize_new_cm_point_add_correct Γ Hcircuit

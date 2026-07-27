@@ -61,7 +61,8 @@ Require Import Garden.Halo2.halo2_gadgets.ecc.chip.fixed_window_canonical.
 Require Import Garden.Orchard.columns.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.constants.fixed_bases.nullifier_k.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.facts.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
@@ -218,7 +219,7 @@ Module NullifierKLadder.
   Qed.
 
   Lemma nullifier_k_table_length :
-    List.length (OrchardSpec.nullifier_k orchard_circuit_params) = 85%nat.
+    List.length (OrchardCircuitSpec.nullifier_k orchard_internal_params) = 85%nat.
   Proof. reflexivity. Qed.
 
   (* The circuit word at row [i] of the NullifierK base-field running sum:
@@ -369,7 +370,7 @@ Module NullifierKLadder.
       (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ)
       (j : nat) (w : EccSpec.fixed_window)
       (Hnth :
-        List.nth_error (OrchardSpec.nullifier_k orchard_circuit_params) j
+        List.nth_error (OrchardCircuitSpec.nullifier_k orchard_internal_params) j
           = Some w) :
     OrchardActionFixedBase.incomplete_additions_window_point Γ NK
       (Z.of_nat j) =
@@ -377,7 +378,7 @@ Module NullifierKLadder.
       (List.nth j (OrchardActionInputs.read_us Γ NK 85) 0).
   Proof.
     pose proof (nullifier_k_incomplete_facts Γ Hcircuit) as Hfacts.
-    unfold OrchardSpec.nullifier_k, orchard_circuit_params in Hnth.
+    unfold OrchardCircuitSpec.nullifier_k, orchard_internal_params in Hnth.
     cbn in Hnth.
     do 85
       (destruct j as [| j];
@@ -430,7 +431,7 @@ Module NullifierKLadder.
       (Hw : (w < 85)%nat) (Hd : 0 <= d < 8) :
     Point.x
       (EccSpec.fixed_window_point
-        (List.nth w (OrchardSpec.nullifier_k orchard_circuit_params)
+        (List.nth w (OrchardCircuitSpec.nullifier_k orchard_internal_params)
           OrchardActionFixedBase.fixed_window_default) d u) =
     Point.x
       (PallasModel.repr
@@ -439,7 +440,7 @@ Module NullifierKLadder.
     refine (fixed_window_point_x_eq_mul_gen PallasGenerators.nullifier_k_G
               PallasGenerators.nullifier_k_on_curve
               PallasGenerators.nullifier_k_reduced 84
-              (OrchardSpec.nullifier_k orchard_circuit_params)
+              (OrchardCircuitSpec.nullifier_k orchard_internal_params)
               _ w d u Hw Hd).
     intros w' i' Hw' Hi'.
     pose proof (NullifierKFixedWindowCert.x_check_entry w' i' Hw' Hi') as Hx.
@@ -490,13 +491,13 @@ Module NullifierKLadder.
       85
       (fun i => nullifier_k_word Γ i)
       (fun i Hi => nullifier_k_word_range Γ Hcircuit i Hi)
-      (OrchardSpec.nullifier_k orchard_circuit_params)
+      (OrchardCircuitSpec.nullifier_k orchard_internal_params)
       _ _ _ _ _ j Hj).
     - (* Hwindow_eq *)
       intros i Hi.
       assert (Hnth : List.nth_error
-          (OrchardSpec.nullifier_k orchard_circuit_params) i
-        = Some (List.nth i (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params) i
+        = Some (List.nth i (OrchardCircuitSpec.nullifier_k orchard_internal_params)
                   OrchardActionFixedBase.fixed_window_default)).
       { apply List.nth_error_nth'.
         rewrite nullifier_k_table_length. exact Hi. }
@@ -504,8 +505,8 @@ Module NullifierKLadder.
     - (* Hwindow_on_curve *)
       intros i Hi.
       assert (Hnth : List.nth_error
-          (OrchardSpec.nullifier_k orchard_circuit_params) i
-        = Some (List.nth i (OrchardSpec.nullifier_k orchard_circuit_params)
+          (OrchardCircuitSpec.nullifier_k orchard_internal_params) i
+        = Some (List.nth i (OrchardCircuitSpec.nullifier_k orchard_internal_params)
                   OrchardActionFixedBase.fixed_window_default)).
       { apply List.nth_error_nth'.
         rewrite nullifier_k_table_length. exact Hi. }

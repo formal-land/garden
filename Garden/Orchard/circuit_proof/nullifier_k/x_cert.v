@@ -21,7 +21,8 @@ Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Halo2.lemmas.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Halo2.PallasModel.
-Require Import Garden.Orchard.circuit_spec.
+Require Import Garden.Orchard.protocol_spec.
+Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.fixed_base.main.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.table_defs.
@@ -45,7 +46,7 @@ Opaque NullifierKFullTable.full_table_reduced.
 Module NullifierKFixedWindowCert.
   (** Alias for the circuit table / default window. *)
   Definition table : EccSpec.fixed_table :=
-    OrchardSpec.nullifier_k OrchardActionInputs.orchard_circuit_params.
+    OrchardCircuitSpec.nullifier_k OrchardActionInputs.orchard_internal_params.
   Definition default : EccSpec.fixed_window :=
     OrchardActionFixedBase.fixed_window_default.
 
