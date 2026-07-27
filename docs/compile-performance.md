@@ -334,12 +334,28 @@ square-root witnesses are read from the window-sign certificates' pasted
 `root_table`s (`circuit_proof/<base>/sign_cert.v`, one root per
 (window, digit) with `root² = fw_z + y`) instead of `canonical_us_for` —
 `y = u² − z` is identical for either root, so every consumer value is
-unchanged.  Two residual rules: the VM is call-by-value, so never pass a
-heavy derivation as a plain argument to a per-cell helper in the *builders*
-themselves; and work is still never shared across `vm_compute` runs (each
-certificate `Qed` re-pays the record build), so keep the number of
-heavy-certificate `Qed`s per file small — within one file's compilation the
-VM shares evaluated globals across successive `vm_compute` sentences.
+unchanged.  One residual rule for the builders themselves: the VM is
+call-by-value, so never pass a heavy derivation as a plain argument to a
+per-cell helper inside them.
+
+**A hoisted record is built once per *file*, not once per `Qed`.**  Earlier
+revisions of this section claimed the opposite — that every certificate
+`Qed` re-pays the record build, so heavy `Qed`s should be spread thinly
+across files.  That is wrong, and it was expensive: it is the reason the
+instance certificates were split across five leaves, each rebuilding the
+same record.  Measured directly (2026-07-27, three `vm_cast_no_check`
+certificates over reads of `Γtest` in one file): **311.6 s, 0 s, 0 s**.
+`Γtest` is a global constant, and the VM caches an evaluated global for the
+whole compilation unit, kernel conversions included.  The rule is therefore
+the reverse of what was written here: **put every certificate that shares a
+heavy global in the same file** — see `instance/certs.v`, where merging four
+leaves cut the group from 1 900 s to 751 s.  Certificates that do *not*
+touch that global belong elsewhere, so they still compile in parallel
+(`instance/domain.v`, `instance/read.v`).
+
+The counter-pressure is wall clock: merging minimises CPU but concentrates
+the critical path into one file.  Merge by *what a file computes*, then
+split only if the merged file dominates the build.
 
 ### Fold a chained quantity once; never certify its members independently
 
@@ -404,6 +420,44 @@ lowest one setting the wall clock by itself (31 min against 15 min for the
 highest).  Fitting `cost(i) ≈ 1.2 + 0.066·(256 − i)` seconds against the two
 measured ends balanced the four shards to 9.4–11.4 min.  Size parallel
 shards by cost, never by member count.
+
+### Certify each side of an equation against a literal, not against the other
+
+A certificate whose two sides are *both* computed pays for one of them
+twice. `vm_cast_no_check (@eq_refl T (rhs))` against the goal `lhs = rhs`
+puts `rhs` on both sides of the checked cast, and the VM re-evaluates it
+rather than noticing the syntactic match. Measured on the completeness
+read-back (2026-07-27, `read_action_inputs Γtest = inputs_of test_input`):
+the reader side costs 294 s and the specification side 207 s on their own,
+yet the certificate took **864 s** — the 363 s gap is the second evaluation
+of `inputs_of test_input`.
+
+Pin the common value as a literal and certify each side against it, then
+compose:
+
+```coq
+Lemma reader_lit : read_action_inputs Γtest = test_action_inputs. (* certs.v *)
+Lemma spec_lit   : inputs_of test_input   = test_action_inputs. (* read.v  *)
+Lemma ok : read_action_inputs Γtest = inputs_of test_input :=
+  eq_trans reader_lit (eq_sym spec_lit).                        (* cert.v  *)
+```
+
+Each cast now compares one computed side against a literal, so nothing is
+evaluated twice, the composition step evaluates nothing at all, and — since
+the two sides share no subcomputation — the halves land in different files
+and compile in parallel. The literal is dumped once with
+`Eval vm_compute in`, and it is verified rather than trusted: both
+certificates would fail if it were wrong. Here it is 5.8 KB and the
+read-back fell from 972 s to 259 s.
+
+The same reasoning applies to the *inputs* of a certificate: bind a value
+that several fields need once, in a `let`, instead of letting each field
+recompute it. `inputs_of` reached `cm_old w` three times — directly, through
+`leaf w`, and through `anchor_root w` — at ≈ 10.6 s marginal each; giving
+`anchor_of_leaf` the leaf as a parameter and binding `cm`/`lf` once removed
+two of them. Beware measuring such a value's cost by a single
+`Eval vm_compute`: the first evaluation also forces the Sinsemilla tables
+and other globals, which made `cm_old` look like 34.3 s rather than 10.6 s.
 
 ### Pre-reduce both sides before `reflexivity` against the hoisted advice plane
 
@@ -845,20 +899,26 @@ arithmetic; see `docs/halo2-proof.md` for the rule and its mechanism.
 ## Current costs
 
 Full clean build (`make clean`, then `make -j32`, measured 2026-07-27 on an
-otherwise idle 32-core machine): **1 258 s wall, 8 686 s user CPU, 401 files
-compiled**, 9.3 GB peak resident. The wall clock is no longer set by a
-dependency chain but by a single file: `instance/read.v` alone is 972 s, i.e.
-77 % of the build, and everything else fits around it. The next-largest
-independent blocks are the other completeness-instance leaves (6–10 min each,
-fully parallel) and the eight Sinsemilla provenance shards (≈ 247 s each,
-fully parallel).
+otherwise idle 32-core machine): **1 089 s wall over 399 files**, with the
+per-file times summing to 7 529 s. The wall clock is not set by a dependency
+chain but by a single file: `instance/certs.v` alone is 792 s, i.e. 73 % of
+the build, and everything else fits around it. Next are `instance/domain.v`
+(593 s) and then, well behind, `instance/read.v` (259 s) and the eight
+Sinsemilla provenance shards (≈ 257 s each, fully parallel).
+
+Measure a build total with `make clean` first: without it `make` recompiles
+only the changed cone, and a 26-file incremental rebuild reports a "build
+time" that has nothing to do with the tree. Note also that `/usr/bin/time`'s
+CPU figure for `make` undercounts, because the `rocqworker` shim runs each
+worker in its own transient systemd scope; sum the per-file `TIMED=1` times
+instead.
 
 That figure covers the files present in this worktree. The compiled-plonkish,
 pinned-vk, transcript-repr, MSM and Vesta SRS layers of the
 circuit-compilation track are **not** on this branch — their cost entries are
 collected under [Leaves of the circuit-compilation track](#leaves-of-the-circuit-compilation-track-not-on-this-branch)
 below and are excluded from the figure; expect the total to grow once they
-land. The superseded 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
+land. The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 ≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
 predates the completeness-instance layer entirely. Heavy leaves:
@@ -882,31 +942,29 @@ predates the completeness-instance layer entirely. Heavy leaves:
   `instance/read.v`):
   file totals remeasured 2026-07-27 inside the 32-way parallel clean build,
   so they run a little above their isolated cost:
-  `instance/read.v` (`read_action_inputs_ok`; the specification side
-  recomputes `anchor_root` and the commitment values) 16:12 — the single
-  most expensive file in the tree, and on its own 77 % of the whole build's
-  wall clock;
+  `instance/certs.v` — every certificate whose subject is `Γtest`: the
+  enabled-point shards of all region families, the 2 964 copy/constant
+  witness facts, and the reader side of the read-back. 791.6 s, of which the
+  one-and-only `tables_of` record build is the bulk; the second and later
+  certificates in the file cost no measurable time. This is now the critical
+  path of the whole build (73 % of its wall clock);
   `instance/domain.v` (`valid_b`, the linear Merkle/Sinsemilla
-  nondegeneracy clauses, and the variable-base ladder chain) 9:30, of which
-  `test_input_valid_b` is 5:30, `mul_chain_cert` 49 s, `merkle_nondeg_cert`
-  47 s and `nc_new_nondeg_cert` 45 s;
-  `instance/shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
-  layer families, one `vm_compute`) 9:16 / 1.0 GB;
-  `instance/shards_blocked.v` (the variable-base ladder, overflow,
-  `NoteCommit` and `Commit^ivk` decomposition/canonicity families 37–40,
-  four `vm_compute`s sharing the record build) 8:32 / 0.95 GB;
-  `instance/shards_misc.v` (witness-input, Poseidon, gadget-local,
-  Orchard-checks + the value-commitment, nullifier and spend-authority
-  families, two `vm_compute`s sharing the record build) 7:36;
-  `instance/witness.v` (all 2 964 copy/constant witness facts, one
-  `vm_compute`) 6:16 / 0.8 GB;
-  `instance/cert.v` 1.1 s, and `instance/defs.v`, `generator/tables.v`,
+  nondegeneracy clauses, and the variable-base ladder chain) 593.5 s, of
+  which `test_input_valid_b` is ≈ 330 s, `mul_chain_cert` 49 s,
+  `merkle_nondeg_cert` 47 s and `nc_new_nondeg_cert` 45 s;
+  `instance/read.v` (the specification side of the read-back: the 32-layer
+  Merkle fold of `anchor_of_leaf` plus the commitments) 258.9 s;
+  `instance/cert.v` 1.5 s, and `instance/defs.v`, `generator/tables.v`,
   `generator/tables_vb.v`, `generator/tables_nc.v` and
-  `generator/honest_assignment.v` (definitions only) ≈ 1 s each.
-  The variable-base nondegeneracy clause used to be four sharded leaves
-  (`instance/mul_{a..d}.v`, one `Pallas.mul` per bit index, ≈ 90 min of CPU
-  and 31 min of wall between them); it is now the 49 s `mul_chain_cert`
-  above — see the chained-quantity pitfall.
+  `generator/honest_assignment.v` (definitions only) ≈ 2 s each.
+  Two earlier arrangements are worth recording. The variable-base
+  nondegeneracy clause was four sharded leaves (`instance/mul_{a..d}.v`, one
+  `Pallas.mul` per bit index, ≈ 90 min of CPU and 31 min of wall between
+  them); it is now the 49 s `mul_chain_cert` — see the chained-quantity
+  pitfall. And the `Γtest` certificates were five leaves
+  (`shards_merkle` 556 s, `shards_blocked` 512 s, `shards_misc` 456 s,
+  `witness` 376 s, `read` 972 s) each rebuilding the record; merging them
+  took the group from 3 442 s to 1 534 s.
 - The operational-completeness leaves
   (`Orchard/circuit_completeness/operational/`, measured 2026-07-27 on a
   shared 32-core host, full `.vo`): `certs.v` 70 s — nine

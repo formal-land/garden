@@ -307,7 +307,7 @@ Module OrchardForwardReadBack.
   Lemma merkle_node_32 (w : HonestInput) :
     merkle_node w 32%nat = anchor_root w.
   Proof.
-    unfold merkle_node, anchor_root, OrchardSpec.anchor.
+    unfold merkle_node, anchor_root, anchor_of_leaf, OrchardSpec.anchor.
     rewrite List.firstn_all2 by (rewrite path_of_length; lia).
     reflexivity.
   Qed.
@@ -621,7 +621,7 @@ Module OrchardForwardReadBack.
     change (OCT.instance_t w (OCT.tables_of w) Garden.Orchard.circuit.ANCHOR)
       with (OCT.t_anchor_row (OCT.tables_of w)).
     rewrite t_anchor_row_def, t_anchor_root.
-    unfold anchor_public_row, UnOp.from.
+    unfold anchor_public_row, anchor_public_row_of_leaf, UnOp.from.
     destruct (hi_v_old w =? 0).
     - exact (Z.mod_small _ _ Hanchor).
     - exact (Z.mod_small _ _ (anchor_root_range w)).
@@ -666,6 +666,7 @@ Module OrchardForwardReadBack.
     destruct (OCF.point_ok_coords _ Hpkdn) as [Hpkdnx Hpkdny].
     destruct (cm_old_coords w) as [Hcmx Hcmy].
     unfold read_action_inputs, read_action_inputs_with_anchor, inputs_of.
+    cbv zeta.
     rewrite (read_point_of w _ (hi_ak w) (cell_ak_x w) (cell_ak_y w)
       Hakx Haky).
     rewrite (read_point_of w _ (hi_g_d_old w) (cell_gd_x w) (cell_gd_y w)
