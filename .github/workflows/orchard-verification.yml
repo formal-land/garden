@@ -69,19 +69,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Build static bundle and generate circuit data
+        run: npm run build
+
       - name: Validate generated circuit data
         working-directory: .
         run: |
           python3 -m unittest scripts.tests.test_generate_orchard_circuit_explorer
+          python3 scripts/generate_orchard_circuit_explorer.py --check
           python3 scripts/generate_orchard_circuit_explorer.py --validate web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
           python3 -m unittest scripts.tests.test_generate_orchard_circuit_grid
           python3 scripts/generate_orchard_circuit_grid.py --check
 
       - name: Type-check and run component tests
         run: npm run check
-
-      - name: Build static bundle
-        run: npm run build
 
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium

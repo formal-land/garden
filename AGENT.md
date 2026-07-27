@@ -39,10 +39,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   `-vos`/`-vok` fast dev loop, and the current cost map of the certificate
   leaves.
 - `web/orchard-verification/`: the Orchard Verification Journey, Atlas,
-  Circuit Explorer, and Circuit Grid source, tests, and versioned circuit data.
-  The ignored `dist/` production bundle is built and deployed to GitHub Pages
-  by `.github/workflows/orchard-verification.yml`; build and validation
-  commands are documented in `docs/BUILD.md`.
+  Circuit Explorer, and Circuit Grid source, tests, and data-generation hooks.
+  The ignored `public/data/` website data and `dist/` production bundle are
+  regenerated in CI, which deploys the bundle to GitHub Pages through
+  `.github/workflows/orchard-verification.yml`; build and validation commands
+  are documented in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.
@@ -59,10 +60,11 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 - Update `docs/halo2-proof.md` whenever proof statements, semantics, tactics,
   or Poseidon proof status changes.
 - Update this map whenever a documentation file is added, renamed, or removed.
-- Treat `web/orchard-verification/dist/` as ephemeral generated output: edit
-  the source or evidence model under `web/orchard-verification/`, run its
-  checks and build, and never commit the generated bundle. GitHub Actions
-  publishes the validated bundle to GitHub Pages after changes reach `main`.
+- Treat `web/orchard-verification/public/data/` and `dist/` as ephemeral
+  generated output: edit the source or evidence model under
+  `web/orchard-verification/`, run its checks and build, and never commit those
+  artifacts. GitHub Actions regenerates the website data and publishes the
+  validated bundle to GitHub Pages after changes reach `main`.
 
 ## Proof iteration workflow
 

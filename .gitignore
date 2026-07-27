@@ -14,6 +14,7 @@ CLAUDE.local.md
 web/orchard-verification/node_modules/
 web/orchard-verification/.vite/
 web/orchard-verification/dist/
+web/orchard-verification/public/data/
 web/orchard-verification/coverage/
 web/orchard-verification/playwright-report/
 web/orchard-verification/test-results/

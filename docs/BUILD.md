@@ -5,8 +5,8 @@ This document provides an introduction to how to build the `garden` project for 
 Before starting, make sure you have `Rust` and `opam` installed.
 
 The Orchard verification visualization is a separate frontend and requires
-[Node.js 22](https://nodejs.org/) and npm. It does not require the Rocq toolchain
-unless you are also changing or checking the proofs.
+[Node.js 22](https://nodejs.org/) and npm. Its checked-in Rocq structure and
+parity snapshots let the website data regenerate without the Rocq toolchain.
 
 ## Setting Up Dependency Submodules
 
@@ -131,20 +131,27 @@ npm ci
 npm run dev
 ```
 
+The `predev` hook regenerates the ignored website data in `public/data` before
+Vite starts. `npm run build` does the same through its `prebuild` hook before
+writing the ignored production bundle to `dist`. Run `npm run generate:data`
+directly when only the derived JSON needs refreshing.
+
 Open the URL printed by Vite for the Journey. Add `/proof-map.html` for the
 Atlas, `/circuit.html` for the generated high-level Rocq circuit explorer, or
 `/circuit-grid.html` for the parity-backed circuit layout grid.
 
-The Circuit Explorer loads its versioned JSON from `public/data`. When the
-Rocq circuit, free-monad evaluator, source mapping, or functional-flow manifest
-changes, regenerate and verify that artifact from `Garden/`:
+The Circuit Explorer loads its generated JSON from `public/data`. When the Rocq
+circuit or free-monad evaluator changes, first refresh the tracked raw
+structure snapshot from `Garden/`:
 
 ```sh
 cd Garden
-make orchard-circuit-visualization-json
-make orchard-circuit-visualization-check
+make orchard-structure-json-from-model
 cd ..
 ```
+
+Changes limited to source mapping, the functional-flow manifest, or the
+frontend do not require Rocq; `npm run generate:data` is sufficient.
 
 The Circuit Grid combines the parsed-equal Rocq-model and Rust-implementation
 configure/synthesis snapshots with the source-enriched Circuit Explorer
@@ -152,10 +159,11 @@ artifact. Regenerate it only after exact parity succeeds:
 
 ```sh
 cd Garden
-make orchard-circuit-grid-json
-make orchard-circuit-grid-check
-make orchard-circuit-grid-test
+make orchard-configure-json-compare
+make orchard-synthesis-json-compare
 cd ..
+npm --prefix web/orchard-verification run generate:data
+python3 -m unittest scripts.tests.test_generate_orchard_circuit_grid
 ```
 
 The generated `garden.halo2.circuit-grid.v1` data records V1 placement,
@@ -177,8 +185,9 @@ npm run test:e2e
 ```
 
 In CI, Playwright installs Chromium together with its system dependencies.
-Pull requests run all validation without publishing. A successful build on
-`main` uploads `dist` as a GitHub Pages artifact and deploys it.
+Pull requests regenerate the website data and run all validation without
+publishing. A successful build on `main` uploads `dist` as a GitHub Pages
+artifact and deploys it.
 
 To inspect the production bundle locally after `npm run build`, serve it from
 the repository root:

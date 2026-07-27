@@ -129,7 +129,7 @@ class GeneratedArtifactTests(unittest.TestCase):
         )
         cls.artifact_bytes = GENERATOR.canonical_json_bytes(cls.artifact)
 
-    def test_committed_artifact_is_byte_current_and_valid(self) -> None:
+    def test_generated_artifact_is_byte_current_and_valid(self) -> None:
         GENERATOR.validate_generated_data(self.artifact)
         self.assertEqual(self.artifact_bytes, OUTPUT_PATH.read_bytes())
 

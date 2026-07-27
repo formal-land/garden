@@ -7,7 +7,10 @@
     "node": ">=22.12.0"
   },
   "scripts": {
+    "generate:data": "python3 ../../scripts/generate_orchard_circuit_explorer.py && python3 ../../scripts/generate_orchard_circuit_grid.py",
+    "predev": "npm run generate:data",
     "dev": "vite",
+    "prebuild": "npm run generate:data",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
