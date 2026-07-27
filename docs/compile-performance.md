@@ -628,6 +628,50 @@ Two companions from the same enumeration:
   chunk — the literal-table superlinearity above does not appear at this
   entry size.
 
+### Compose replay/stream equalities as terms — never `rewrite` at the event stream
+
+`rewrite (replay_is_ok_conflict_free orchard_events _) in Hok`, on the
+hypothesis `replay_is_ok orchard_events (initial_grid _ _) = true`, costs
+**445 s** in one tactic (measured 2026-07-27,
+`circuit_completeness/operational/main.v`). The wildcard grid argument makes
+`rewrite` unify through evarconv, which whnf-normalizes the 19,617-event
+stream and the initial grid on the lazy machine; the same fact composed as a
+term is instant:
+
+```coq
+Lemma orchard_conflict_free : conflict_free orchard_events = true.
+Proof.
+  exact (eq_trans
+    (eq_sym (replay_is_ok_conflict_free orchard_events
+      (initial_grid (fun _ _ : Z => 0) (fun _ _ : Z => 0))))
+    (orchard_replay_ok (fun _ _ : Z => 0) (fun _ _ : Z => 0))).
+Qed.
+```
+
+Same family: `destruct (conflict_free orchard_synthesis_events)` sends the
+whole conflict scan (quadratic in the 15,047 writes) to the lazy machine —
+project with `Bool.andb_true_iff` instead of case-splitting the boolean. This
+is the general rule of the "unification / `fold` / `lia` vs heavy constants"
+and "never `match` on a concrete heavy computation" sections, at the
+event-stream layer: the replay stream, the fact list and the configured
+system are all heavy computable constants, so every equation about them must
+be `eq_trans`/`eq_sym`/`proj` composition, never `rewrite`, `destruct`,
+`change` or `fold`.
+
+Two related traps recorded from the same file set (2026-07-26/27):
+
+- **`region_start_of` is a linear scan** of the 394-entry placement list
+  (`circuit_synthesis_layout.v` `region_start_of_list` over `region_starts`,
+  after a `region_index_of` traversal of the nested `RegionId`). Calling it in the
+  inner loop of a per-point scan is quadratic-times-linear: a 4,858 × 4,858
+  certificate that recomputed it did not finish in 12 minutes, and fell to
+  31.8 s once absolute rows were precomputed once into a global.
+- **`Complete.enabled_memb` / `fixed_lookup` / `table_lookup` re-extract from
+  the fact list on every call.** With `facts` spelled as the *application*
+  `layouter_facts circuit.synthesize`, the VM re-runs the whole
+  14,773-fact synthesis reification per call. Hoist `enabled` / the fixed
+  writes / the table entries into global `Definition`s and scan those.
+
 ### Generalize every compound atom before stripping `mod`s with `setoid_rewrite`
 
 The `Zdiv.eqm` toolkit strips the guarding `mod` of each `BinOp`/`UnOp` by
@@ -818,6 +862,22 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   the cost falls with the index, so the ranges are sized against it)
   ≈ 31 / 24 / 20 / 15 min; `instance_defs.v` / `tables.v` / `tables_vb.v` /
   `tables_nc.v` / `honest_assignment.v` (definitions only) ≈ 1 s each.
+- The operational-completeness (E1) leaves
+  (`Orchard/circuit_completeness/operational/`, measured 2026-07-27 on a
+  shared 32-core host, full `.vo`): `certs.v` 70 s — nine
+  `vm_cast_no_check` certificates, all input-independent, of which the
+  restricted region-uniqueness scan is 32 s, the gate-queried fixed-cell
+  scan 19 s, the 155,861-cell advice inversion 7 s, the enable-placement
+  scan 5 s and the lookup-queried fixed-cell scan 5 s (the rest
+  sub-second); `concrete.v` (the self-contained E1a rung, its own copy of
+  the certificate layer) 53 s / 1.3 GB; `main.v` 5 s (no certificate — the
+  join is projections and hand-lemma rewrites, plus the two
+  `conflict_free` term compositions); and the three generic layers
+  `replay_planes.v` / `agreement_congruences.v` / `placed_intro.v` under
+  0.7 s each (no `vm_compute`, no concrete data, so they never appear on
+  this cost map and iterating on them is free). The certificate layer is
+  input-independent by construction, so the concrete and universal rungs
+  share it and neither pays a `tables_of` record build.
 - `Orchard/circuit_completeness/certificates.v`: ≈ 8.7 s total — three
   `vm_cast_no_check` certificates over `layouter_facts circuit.synthesize`
   (14,773 facts, built by the VM in ≈ 0.07 s). The

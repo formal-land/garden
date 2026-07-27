@@ -469,6 +469,118 @@ orchard_completeness_statement`, which applies
 `orchard_completeness : orchard_completeness_statement` instantiates that
 hypothesis with `witness_facts_ok`.
 
+## Operational completeness (E1): honest witnesses are accepted by the checker
+
+`orchard_completeness` is a statement about the *relational* model. E1 carries
+it across the operational bridge of
+[`operational-soundness.md`](operational-soundness.md), to the ideal
+`mock_prover_accepts` checker that mirrors Rust Halo2's `MockProver` on the
+serialized circuit. It lives in `Orchard/circuit_completeness/operational/`
+and is the completeness mirror of `orchard_operational_sound`.
+
+The bridge theorem is not the work; the **grid identification** is. Two free
+planes are chosen from the honest generator and the Orchard event stream is
+replayed onto them:
+
+```coq
+Definition orchard_advice (w : HonestInput) : Z -> Z -> Z :=
+  fun column row =>
+    match advice_owner column row with          (* input-independent *)
+    | Some (column', region, offset) =>
+        (honest_assignment w).(Assignment.advice) column' region offset
+    | None => 0
+    end.
+Definition orchard_instance (w : HonestInput) : Z -> Z -> Z :=
+  fun _ row => (honest_assignment w).(Assignment.instance_) Instance_.Primary row.
+```
+
+**`Complete.circuit_holds_intro` is not applicable at the realized
+assignment**, and no pointwise-agreement transfer lemma can exist:
+total agreement between `honest_assignment w` and `realize idx rs g` is
+false. `region_start_of` is not row-injective (region indices 1 and 26 both
+start at 1766, 4 and 43 at 1760 — 127 colliding index pairs among the 394
+placed regions) and regions are densely packed, so an offset
+outside one region's extent can land on the absolute row of another region's
+enabled point — where the realized selector plane reads 1 while
+`Complete.enabled_memb` is false. The lookup plane diverges too, past
+`orchard_usable_rows`. So `Complete.honest_planes` is *false* there.
+
+The replacement is a **placed re-derivation** (`operational/placed_intro.v`,
+generic): `placed_selector_off` replaces `honest_selector_plane` with "the
+selector plane is 0 at every absolute address that is not an enabled point's",
+`honest_lookup_plane` shrinks to the single row-0 equation the padding branch
+reads, and the residual per-point obligations are stated at every
+`(region, row)` whose *absolute* row is an enabled point's — then moved to the
+point by `realize_eval_expression` on both sides. `placed_circuit_holds_intro`
+assembles those with `interpret_facts` of the determined facts (free from
+replay success, `determined_facts_hold_incl`) and of the witness facts.
+
+The supporting layers, all universal in the honest input:
+
+- `operational/replay_planes.v` (generic) — the replay never writes the advice
+  or instance plane, so both are the chosen planes verbatim
+  (`replay_advice_plane`, `realize_advice_of_replay`); the write-frame
+  converses (`replay_selector_unwritten`, `replay_fixed_unwritten`) turn a
+  boolean "no such event" scan into a plane reading; `mock_prover_accepts_app`
+  (only the third conjunct mentions the events); and
+  `operational_complete_events` / `_app`, the replay-premise-free restatement
+  of `operational_complete`, proved from the same three exported lemmas of
+  `realize/sound.v`.
+- `operational/agreement_congruences.v` (generic, module `Agree`) — query
+  extractors on expressions, constraints and lookup arguments, the agreement
+  congruences over them, and the realized row shift, packaged as
+  `realize_constraint_transfer` / `realize_lookup_argument_transfer`.
+- `operational/certs.v` — nine `vm_cast_no_check` certificates, every one
+  **input-independent** (they mention only `layouter_facts`, the configured
+  system, `orchard_events` and the placement, never `tables_of w`): the
+  enable placement, the 155,861-cell advice address inversion, the
+  24,230 queried fixed cells all being program-written, the 166 constants-tail
+  bindings' reverse coverage, the loaded table lengths, the witness-fact cell
+  kinds, the guarded gate bodies being selector-free, and the restricted
+  region-uniqueness that the lookup side needs.
+- `operational/main.v` — the join, and `operational/concrete.v` — a
+  self-contained E1a rung on the C1 instance.
+
+Because the certificate layer is input-independent, the concrete and
+universal rungs share it; nothing here is proportional to the witness values.
+
+The agreement is proved once at any `replay_context` — a replayed stream
+carrying the synthesis events whose selector enables are among the full
+stream's — so one derivation serves both checked streams:
+
+```coq
+Theorem orchard_operational_complete (w : HonestInput) (g : RawGrid.t) :
+  valid w -> nondegenerate w ->
+  apply_events orchard_events
+    (initial_grid (orchard_advice w) (orchard_instance w)) = Some g ->
+  mock_prover_accepts orchard_indexed_system orchard_events g
+    orchard_table_rows.
+```
+
+`orchard_grid_identification` is the `circuit_holds` half;
+`orchard_operational_complete_ex` is the unconditional form (replay always
+succeeds, `orchard_replay_some`).
+
+**Which bridge theorem applies.** The full stream is *not* a literal instance
+of `realize/sound.v`'s `operational_complete`: that theorem's replay premise
+names the synthesis-only stream at the *same* grid, while the Orchard honest
+grid replays `orchard_synthesis_events ++ orchard_constants_events`, and the
+tail's 166 `AssignFixed` events change the fixed plane. The full-stream
+headline therefore goes through `operational_complete_events_app` — strictly
+fewer premises, a longer stream, the same `mock_prover_accepts` — with the
+tail's 166 `Copy` obligations discharged separately.
+`orchard_operational_complete_sound` is the literal instance, on the
+synthesis-only stream `operational_complete` does cover, with every premise
+supplied; its replay premise needs no new certificate, since replay success is
+the grid-independent `conflict_free` verdict (`realize/disjoint.v`) and
+`conflict_free_app` projects the prefix out of `orchard_replay_ok`.
+
+**Honest scope.** E1 closes the completeness direction against the *same*
+ideal checker the soundness direction uses. It does not narrow the gap
+recorded in `operational-soundness.md`: `mock_prover_accepts` still quantifies
+over all integer rows rather than the `2^k` cyclic domain, and blinding rows
+stay unmodelled.
+
 ## Status and what remains
 
 Proved and clean (`PrimString.string` + impredicative `Set`):
@@ -519,6 +631,21 @@ pinned list to the reified `Complete.witness_facts` — is an
 order-insensitive `existsb` scan over the fact multiset, so any regrouping
 that preserves that multiset re-runs unchanged.
 
-Open: nothing on the C2 surface. The completeness direction of
-`circuit_holds` is closed for the whole Orchard Action circuit, at every
-valid, nondegenerate honest input.
+Also proved and clean, on the operational rung (E1,
+`circuit_completeness/operational/`):
+
+- `replay_planes.v`, `agreement_congruences.v`, `placed_intro.v` — the three
+  generic layers (no Orchard dependency), including
+  `placed_circuit_holds_intro` and `operational_complete_events`.
+- `certs.v` — the nine input-independent placement certificates.
+- `main.v` — `orchard_grid_identification`,
+  `orchard_operational_complete` (the E1 headline),
+  `orchard_operational_complete_sound` (the literal `operational_complete`
+  instance on the synthesis-only stream), and the unconditional `_ex` forms.
+- `concrete.v` — the E1a rung on the C1 instance
+  (`orchard_honest_witness_accepted`).
+
+Open: nothing on the C2 surface, and nothing on E1. The completeness
+direction of `circuit_holds` is closed for the whole Orchard Action circuit,
+at every valid, nondegenerate honest input, and carried through to the ideal
+operational checker.
