@@ -1,7 +1,7 @@
-(** * Variable-base nondegeneracy certificate: indices [67 .. 129]
+(** * Variable-base nondegeneracy certificate: indices [40 .. 82]
 
     One range of the variable-base mul nondegeneracy check of the concrete
-    completeness instance ([mul_step_b], one accumulator multiple per bit
+    completeness instance ([mul_step_w], one accumulator multiple per bit
     index); the four ranges compile in parallel and are joined by
     [OrchardCompletenessInstanceDefs.mul_ranges_sound]. *)
 
@@ -16,7 +16,7 @@ Module OrchardCompletenessInstanceMulB.
   Import OrchardCompletenessInstanceDefs.
 
   Lemma mul_range_b_cert :
-    List.forallb (mul_step_b test_input) (List.seq 67 63) = true.
+    List.forallb (mul_step_w test_input) (List.seq 40 43) = true.
   Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
 End OrchardCompletenessInstanceMulB.

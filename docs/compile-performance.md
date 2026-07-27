@@ -335,6 +335,46 @@ certificate `Qed` re-pays the record build), so keep the number of
 heavy-certificate `Qed`s per file small — within one file's compilation the
 VM shares evaluated globals across successive `vm_compute` sentences.
 
+### Per-index checkers must take the derived values, not the witness record
+
+The same sharing rule applies to any range checker, not just to advice
+planes.  Measured on the variable-base nondegeneracy ranges
+(`circuit_completeness/instance/mul_{a..d}.v`, 2026-07-27): `mul_step_b w i`
+reached the ladder scalar through `mul_scalar w`, hence `ivk w`, a
+`Commit^ivk` hash — twice per index, once for the accumulator multiple and
+once for the bit.  One `ivk test_input` costs 28.3 s on its first evaluation
+(bytecode compilation plus global forcing) and **4.9 s marginally**, against
+10.1 s for a whole step at index 250 and 27.2 s at index 10.  So 9.8 s of
+every index was recomputing one scalar: ≈ 41 min of the ≈ 90 min the four
+ranges cost between them.  Taking the scalar and the base points as
+arguments (`mul_step_at k B Bp i`, applied once as `mul_step_w w`) lets the
+VM build the `forallb` closure with the hash already a value, and cut the
+four ranges to 11.4 / 11.2 / 10.9 / 9.4 min.
+
+Two companions from the same change:
+
+- **Size parallel shards by cost, not by index count.**  The step at index
+  `i` multiplies by a `256 − i`-bit scalar, so per-index cost falls roughly
+  linearly with the index, and four equal-length ranges leave the lowest one
+  setting the wall clock by itself (31 min against 15 min for the highest).
+  Fitting `cost(i) ≈ 1.2 + 0.066·(256 − i)` seconds against the two measured
+  ends gives the split `[4,39] / [40,82] / [83,138] / [139,254]`, which
+  measured 9.4–11.4 min across the four.
+- **A delta-identical bridge lemma can still diverge.**  `mul_step_w w i =
+  mul_step_b w i` holds by delta alone, yet `reflexivity` does not terminate
+  (> 10 min at 2.4 GB and climbing): the checker is boolean, so whnf of
+  either side forces the guard of `mul_step_point`, hence `mul_scalar w`,
+  hence `ivk w`, whose body unfolds the whole symbolic `Commit^ivk` chain at
+  a *variable* input.  Prop-level spellings of the same bridge are safe —
+  `Point.x acc <> 0` against its counterpart stays congruent through `eq`,
+  `Point.x`, `repr` and `Pallas.mul`, never reaching a match — but every
+  boolean- or match-headed spelling diverges, including the
+  `mul_step_nondegenerate` conclusion (its `mul_step_point` guard).
+  `Strategy opaque [ivk]` makes all of them instant: both sides get stuck at
+  the same atom and the comparison is structural.  Keep the setting
+  `Local` — `forward/ecc_add.v` and `forward/var_base_ladder.v` unfold
+  `ivk` and must not inherit it.
+
 ### Pre-reduce both sides before `reflexivity` against the hoisted advice plane
 
 A bare `reflexivity` between a generator dispatch applied to the hoisted
@@ -853,7 +893,8 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   ladder record of `tables_vb.v`, one linear double-and-add fold with two
   field inversions per bit; every run pays the ≈ 4 min record build once,
   then per-cell lookups; the eleven leaves are mutually independent and
-  compile fully parallel, ≈ 30 min wall on a free machine):
+  compile fully parallel, ≈ 16 min wall on a free machine, set by
+  `instance/read.v`):
   `instance/shards_merkle.v` (the ≈ 1 950 enabled points of all 32 Merkle
   layer families, one `vm_compute`) 8:32 / 1.0 GB;
   `instance/shards_misc.v` (witness-input, Poseidon, gadget-local,
@@ -868,9 +909,11 @@ clock is set by the Sinsemilla chain — `sinsemilla_s` (59 s) → `chip_proof`
   recomputes `anchor_root` and the commitment values) 15:56 / 0.8 GB;
   `instance/domain.v` (`valid_b` plus the linear Merkle/Sinsemilla
   nondegeneracy clauses) 8:32; the four variable-base nondegeneracy ranges
-  (`instance/mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index —
-  the cost falls with the index, so the ranges are sized against it)
-  ≈ 31 / 24 / 20 / 15 min; `instance/defs.v`, `generator/tables.v`,
+  (`instance/mul_{a..d}.v`, one accumulator `Pallas.mul` per bit index over
+  the hoisted scalar, ranges sized by cost — see the per-index-checker
+  pitfall above) 11.4 / 11.2 / 10.9 / 9.4 min, 0.73 GB peak each
+  (2026-07-27; was 31 / 24 / 20 / 15 min before the scalar was hoisted out
+  of the per-index closure); `instance/defs.v`, `generator/tables.v`,
   `generator/tables_vb.v`, `generator/tables_nc.v` and
   `generator/honest_assignment.v` (definitions only) ≈ 1 s each.
 - The operational-completeness leaves
