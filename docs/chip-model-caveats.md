@@ -125,7 +125,7 @@ interpreter's gate layer only. This document is about that relational model.
    grand-product rules the deployed verifier checks on the cyclic domain,
    with the tables-as-fixed-prefix coherence discharged as a `vm_compute`
    certificate on the pinned instance
-   (`Orchard/circuit_compiled_algebraic.v`) — so the idealized membership
+   (`Orchard/compiled/algebraic.v`) — so the idealized membership
    semantics is no longer a modeling choice but a proved consequence of
    the polynomial identities (see `docs/operational-soundness.md`, "The
    polynomial-identity layer").
@@ -438,7 +438,7 @@ instantiation layers are proved:
   `mock_prover_accepts` ↔ compiled-plonkish satisfaction restricted to
   `[0, n)`, with the blinding-row vacuity and the finite-domain layout as
   computable side conditions (`finite_domain_ok_b`), instantiated on the
-  concrete Orchard domain (k = 11, n = 2048) in `Orchard/circuit_compiled.v`.
+  concrete Orchard domain (k = 11, n = 2048) in `Orchard/compiled/main.v`.
   What remains: the relational `proof.v` model *itself* still uses plain
   integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap, no
   `nb_rows`), and `satisfies_gates` still quantifies over all `(region, row)`

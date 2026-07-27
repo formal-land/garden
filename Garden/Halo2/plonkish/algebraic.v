@@ -30,7 +30,7 @@
 
     [algebraic_sound] discharges the acceptance into the compiled-plonkish
     satisfaction triple consumed by the R2 assembly
-    ([Orchard/circuit_compiled.v]'s [orchard_compiled_accepts] shape):
+    ([Orchard/compiled/main.v]'s [orchard_compiled_accepts] shape):
     compiled-gate vanishing on every domain row, the indexed-system lookup
     conjunct on every domain row of the witness grid, and grid invariance
     under the permutation.  The gate conjunct is the vanishing equivalence

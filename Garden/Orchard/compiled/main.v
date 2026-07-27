@@ -12,8 +12,8 @@
     The compiled system is [OrchardCompiledCheck.compiled] =
     [Compile.compile] on [orchard_indexed_system] with the activations of
     the serialized events and the pinned permutation-column and constants
-    data of [circuit_compiled_pinned.v].  The parity certificates of
-    [circuit_compiled_check.v] identify this object with the deployed
+    data of [compiled/pinned.v].  The parity certificates of
+    [compiled/check.v] identify this object with the deployed
     description [circuit_description_fixed] component by component — the
     193 gate polynomials (indicator factors included), the query tables,
     the lookup arguments, the constants column — so the acceptance
@@ -70,8 +70,8 @@ Require Import Garden.Halo2.plonkish.sigma.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
-Require Import Garden.Orchard.circuit_compiled_pinned.
-Require Import Garden.Orchard.circuit_compiled_check.
+Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.check.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.protocol_spec.
 Require Garden.Orchard.circuit_proof.inputs.

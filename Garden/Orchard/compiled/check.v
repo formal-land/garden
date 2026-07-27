@@ -2,7 +2,7 @@
 
     Machine-checked comparison of [Plonkish.Compile.compile] applied to the
     model's own [orchard_indexed_system] against the pinned compiled
-    description of [circuit_compiled_pinned.v] (transcribed from the deployed
+    description of [compiled/pinned.v] (transcribed from the deployed
     verifying key).  Each certificate is a single [vm_compute] conversion,
     closed with [vm_cast_no_check].
 
@@ -39,7 +39,7 @@ Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.serialize.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Orchard.circuit_operational.
-Require Import Garden.Orchard.circuit_compiled_pinned.
+Require Import Garden.Orchard.compiled.pinned.
 
 Import ListNotations.
 Import Plonkish.

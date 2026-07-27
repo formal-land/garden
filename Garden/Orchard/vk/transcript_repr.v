@@ -12,7 +12,7 @@
 
     — computed over the compact rendering [VkPinnedPrint.vk_pinned_compact]
     of the verified printer, whose pretty rendering the T1 certificate
-    ([vk_pinned_parity.v]) pins byte-for-byte to the deployed dump
+    ([vk/parity.v]) pins byte-for-byte to the deployed dump
     [circuit_description_fixed].  [C = vesta::Affine], so [C::Scalar] is
     the Pallas base field [Primes.pallas_p] (the circuit's own field; the
     dump's [scalar_modulus] string), and [from_uniform_bytes] reads the
@@ -44,8 +44,8 @@ Require Import Stdlib.Strings.PrimString.
 Require Import Stdlib.Numbers.Cyclic.Int63.Uint63.
 Require Import Garden.Field.Field.
 Require Import Garden.GroupHash.blake2b.
-Require Import Garden.Orchard.vk_pinned_print.
-Require Import Garden.Orchard.vk_pinned_parity.
+Require Import Garden.Orchard.vk.print.
+Require Import Garden.Orchard.vk.parity.
 
 Import ListNotations.
 Local Open Scope Z_scope.
@@ -134,7 +134,7 @@ Definition t2_input : list Z :=
   transcript_input VkPinnedPrint.vk_pinned_compact.
 
 (** The input in the byte-parity track's terms: the pinned compact
-    length ([vk_pinned_parity.v]) and the track's byte view. *)
+    length ([vk/parity.v]) and the track's byte view. *)
 Lemma t2_input_eq :
   t2_input
   = Blake2b.le_bytes_of_word 285134

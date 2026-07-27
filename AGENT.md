@@ -18,7 +18,13 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   the placement-generic replay-success conditions (`realize/disjoint.v`),
   the whole-circuit Orchard instantiation with its `vm_compute` certificates
   (`circuit_operational.v`), and the assurance upgrade this delivers for the
-  Action-statement surface.
+  Action-statement surface. It continues down the refinement ladder with the
+  compiled plonkish layer (`Halo2/plonkish/`, `Orchard/compiled/` — selector
+  compression, the permutation σ, and the pinned-vk parity certificates), the
+  polynomial-identity layer over the cyclic domain, and the random-challenge
+  counting layer with its named proof-system boundary hypotheses
+  (`plonkish/boundary.v`) and the byte-level `vk.pinned()` anchor
+  (`Orchard/vk/`).
 - `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with

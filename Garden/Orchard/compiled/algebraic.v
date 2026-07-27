@@ -53,9 +53,9 @@ Require Import Garden.Halo2.plonkish.algebraic.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
-Require Import Garden.Orchard.circuit_compiled_pinned.
-Require Import Garden.Orchard.circuit_compiled_check.
-Require Import Garden.Orchard.circuit_compiled.
+Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.check.
+Require Import Garden.Orchard.compiled.main.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.protocol_spec.
 Require Garden.Orchard.circuit_proof.inputs.

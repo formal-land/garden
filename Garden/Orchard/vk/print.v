@@ -3,7 +3,7 @@
     A structural printer from the model's compiled system
     ([OrchardCompiledCheck.compiled], the [Plonkish.Compile.compile] output
     the twelve parity certificates pin) plus the pinned literals of
-    [vk_pinned_data.v], to the byte string of Rust's [Debug] rendering of
+    [vk/data.v], to the byte string of Rust's [Debug] rendering of
     [vk.pinned()].  The printer is parameterized on the alternate-form flag
     [alt], mirroring [core::fmt]: [alt = true] yields the pretty [{:#?}]
     rendering (the in-tree dump [circuit_description_fixed], the T1 parity
@@ -46,7 +46,7 @@
     modeled association differs (the flattened-fingerprint parity
     certificate [gate_polynomials_match] compares modulo exactly this
     re-association); [printed_gates_gate_fp] proves the fingerprints are
-    unchanged, and the T1 byte parity ([vk_pinned_parity.v]) certifies the
+    unchanged, and the T1 byte parity ([vk/parity.v]) certifies the
     printed bytes against the deployed dump. *)
 
 Require Import Stdlib.ZArith.ZArith.
@@ -57,9 +57,9 @@ Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.serialize.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Halo2.plonkish.poly_domain.
-Require Import Garden.Orchard.circuit_compiled_pinned.
-Require Import Garden.Orchard.circuit_compiled_check.
-Require Import Garden.Orchard.vk_pinned_data.
+Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.check.
+Require Import Garden.Orchard.vk.data.
 
 Import ListNotations.
 Import Plonkish.
@@ -246,7 +246,7 @@ Definition pp_column (alt : bool) (d : nat) (kind : PrimString.string)
 
     The model carries no query indices; every query leaf resolves its
     [query_index] by position in the pinned keygen-order query table of its
-    column kind ([circuit_compiled_pinned.v]; set-equal to the model's
+    column kind ([compiled/pinned.v]; set-equal to the model's
     collected tables by the query parity certificates).  The same pinned
     tables are printed as the query sections, so the internal consistency
     of leaf indices and tables is forced by the byte parity. *)
@@ -339,7 +339,7 @@ Fixpoint pp_expr (alt : bool) (d : nat)
     same factor sequence differently on two gates (indices 6 and 7, the
     curve-equation checks), whose top-level product is rotated one step
     here to the deployed association.  [gate_polynomials_match]
-    ([circuit_compiled_check.v]) compares gates by flattened factor
+    ([compiled/check.v]) compares gates by flattened factor
     fingerprint precisely because of this re-association;
     [printed_gates_gate_fp] below proves the rotation preserves those
     fingerprints, so the printed gates are the parity-certified

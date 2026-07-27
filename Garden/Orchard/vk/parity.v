@@ -1,7 +1,7 @@
 (** * T1: byte parity of the printed pinned description with the dump.
 
     The dump-parity certificate of the [transcript_repr] byte channel: the
-    in-model printer ([vk_pinned_print.v]), run in pretty mode over the
+    in-model printer ([vk/print.v]), run in pretty mode over the
     compiled Orchard system and the pinned literals, reproduces
     [orchard/src/circuit_data/circuit_description_fixed] — the
     [format!("{:#?}\n", vk.pinned())] Debug dump the orchard test suite
@@ -13,7 +13,7 @@
     the 193 compiled gate polynomials with their selector-indicator
     factors and keygen query indices, the query tables, the permutation
     columns, the lookup arguments, the constants column, the domain
-    constants, and the pinned literals of [vk_pinned_data.v] (moduli
+    constants, and the pinned literals of [vk/data.v] (moduli
     strings, [extended_k], the 44 commitment coordinate pairs,
     [minimum_degree]) — retiring the offline-transcription trust of the
     literal files, which T1 pins to the deployed dump.
@@ -29,8 +29,8 @@
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Strings.PrimString.
 Require Import Stdlib.Numbers.Cyclic.Int63.Uint63.
-Require Import Garden.Orchard.vk_pinned_print.
-Require Import Garden.Orchard.vk_pinned_bytes.
+Require Import Garden.Orchard.vk.print.
+Require Import Garden.Orchard.vk.bytes.
 
 Module VkPinnedParity.
 

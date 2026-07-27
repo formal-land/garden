@@ -201,7 +201,7 @@ this bridge:
   ↔ compiled-plonkish satisfaction restricted to `[0, n)`, under the decidable
   `finite_domain_ok_b` layout checks.
 
-The whole-circuit composition is `Orchard/circuit_compiled.v`: from compiled
+The whole-circuit composition is `Orchard/compiled/main.v`: from compiled
 algebraic acceptance of `OrchardCompiledCheck.compiled` (the compiled Orchard
 system) together with grid invariance under the σ built from the Orchard
 copies, `orchard_compiled_sound` derives `mock_prover_accepts` of the replayed
@@ -216,7 +216,7 @@ fixed-plane hypotheses) are discharged by structural replay lemmas over
 `orchard_events`, not by symbolic-grid `vm_compute`.
 
 The compiled system is anchored to the deployed verifying key by parity:
-`Orchard/circuit_compiled_check.v` proves twelve `vm_cast_no_check`
+`Orchard/compiled/check.v` proves twelve `vm_cast_no_check`
 certificates that `Compile.compile` applied to the model's `ConstraintSystem.t`
 makes byte-identical choices to the deployed keygen — gate polynomials and
 counts, the 56-selector → combination-column assignment, query tables,
@@ -264,7 +264,7 @@ isolated as the counting lemmas of the R4 package (pending):
   families over a `CompiledSystem`, all challenges quantified, stated over
   column polynomials agreeing with the grid on `H`) and `algebraic_sound`:
   algebraic acceptance implies compiled-plonkish satisfaction.
-- `Orchard/circuit_compiled_algebraic.v` — the pinned composition:
+- `Orchard/compiled/algebraic.v` — the pinned composition:
   `orchard_algebraic_sound` → `orchard_algebraic_mock_accepts` →
   `orchard_algebraic_operational_sound` →
   `orchard_algebraic_action_statement` — algebraic acceptance of the
@@ -310,8 +310,8 @@ verifier at the byte level.
   abstract commitment space, to be instantiated by a future L0.
 
 The byte-level anchor upgrades the pinned-vk trust from offline
-transcription to certified bytes (`Orchard/vk_pinned_*.v`,
-`Orchard/vk_transcript_repr.v`):
+transcription to certified bytes (`Orchard/vk/*.v`,
+`Orchard/vk/transcript_repr.v`):
 
 - **T1 (dump parity)** — `vk_pinned_dump_parity`: a verified Debug printer
   over the model's compiled Orchard system (real `Expression` trees,
@@ -320,7 +320,7 @@ transcription to certified bytes (`Orchard/vk_pinned_*.v`,
   pairs, `minimum_degree`) emits the pretty rendering, proved
   primitive-string-equal to all 1,285,701 bytes of the in-tree
   `circuit_description_fixed` (the Debug dump of `vk.pinned()`). This
-  retires the offline-transcription trust of `circuit_compiled_pinned.v` —
+  retires the offline-transcription trust of `compiled/pinned.v` —
   the fingerprint literals stay as the checkers' interface, now backed by
   certified bytes.
 - **T2 (Fiat–Shamir scalar)** — `transcript_repr_spec`: the same printer's
@@ -396,17 +396,17 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/plonkish/orbit.v` | `FiniteOrbit` (generic finite-orbit / two-orbit merge theory) |
 | `Halo2/plonkish/sigma.v` | `sigma_correct`, `sigma_copies_connected` |
 | `Halo2/plonkish/mock.v` | `plonkish_of_mock_prover` |
-| `Orchard/circuit_compiled_pinned.v` / `circuit_compiled_check.v` | pinned-vk data + 12 parity certificates |
-| `Orchard/circuit_compiled.v` | `orchard_compiled_sound`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
+| `Orchard/compiled/pinned.v` / `compiled/check.v` | pinned-vk data + 12 parity certificates |
+| `Orchard/compiled/main.v` | `orchard_compiled_sound`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
 | `Halo2/plonkish/poly.v` / `poly_domain.v` | univariate polynomial library; the pinned ω, `H`, `X^n − 1` factorization |
 | `Halo2/plonkish/lookup_compile.v` | `lookup_compile_correct`, `plonkish_accepts_compiled_iff` |
 | `Halo2/plonkish/vanishing.v` | `vanishing_sound` |
 | `Halo2/plonkish/permutation_poly.v` | `permutation_sound`, `permutation_complete` |
 | `Halo2/plonkish/lookup_poly.v` | `lookup_sound`, `lookup_complete` |
 | `Halo2/plonkish/algebraic.v` | `algebraic_accepts`, `algebraic_sound` |
-| `Orchard/circuit_compiled_algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_action_statement` |
+| `Orchard/compiled/algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_action_statement` |
 | `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
 | `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |
-| `Orchard/vk_pinned_print.v` / `vk_pinned_data.v` / `vk_pinned_bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
-| `Orchard/vk_pinned_parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_fixed`, all 1,285,701 bytes) |
-| `Orchard/vk_transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |
+| `Orchard/vk/print.v` / `vk/data.v` / `vk/bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
+| `Orchard/vk/parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_fixed`, all 1,285,701 bytes) |
+| `Orchard/vk/transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |

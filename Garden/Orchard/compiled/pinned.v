@@ -5,7 +5,7 @@
     serialization of [vk.pinned()] for the post-NU6.2 Orchard action
     circuit), the compiled/post-[compress_selectors] constraint system the
     deployed verifier keys against.  These literals are untrusted witness
-    input: [circuit_compiled_check.v] runs in-model checkers that compare
+    input: [compiled/check.v] runs in-model checkers that compare
     them against [Plonkish.Compile.compile] applied to the model's own
     [orchard_indexed_system], component by component.
 
