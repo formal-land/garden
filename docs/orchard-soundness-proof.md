@@ -172,6 +172,13 @@ acceptance by the ideal `mock_prover_accepts` checker back to `Holds`, and
 residual idealization is in the checker itself — it quantifies over all
 integer rows rather than the `2^k` cyclic domain.
 
+Below that checker the same conclusion is available from the *compiled*
+system Halo 2's keygen produces, and from the polynomial identities the
+deployed verifier checks over the cyclic domain; that layer, and the
+translation-validation argument tying the compiled Rocq circuit to the
+deployed verifying key byte for byte, are documented in
+[`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
+
 ## Model caveats inherited by the theorems
 
 The relational circuit model (`Garden/Halo2/proof.v`) idealizes real Halo2

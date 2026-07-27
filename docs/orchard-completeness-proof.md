@@ -337,7 +337,10 @@ The completeness surface continues down the refinement ladder of
 [`operational-soundness.md`](operational-soundness.md), mirroring the soundness
 chain rung for rung. Every rung below `mock_prover_accepts` is either an
 equivalence or already had its constructive half, so the composition
-(`circuit_completeness/algebraic.v`) is assembly, not new theory.
+(`circuit_completeness/algebraic.v`) is assembly, not new theory. What those
+rungs *are* — the modelled keygen, and why its output is the deployed
+verifying key — is documented in
+[`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
 
 **The compiled rung** (`OrchardCompiled.orchard_compiled_complete`) is the
 converse of `orchard_compiled_sound`, through the same three seams read

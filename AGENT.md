@@ -53,6 +53,20 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   (`orchard_honest_algebraic_accepts`, `circuit_completeness/algebraic.v`),
   where soundness and completeness meet at the regular-challenge predicate
   `algebraic_accepts_regular`.
+- `docs/orchard-compilation-correctness.md`: the companion to the two
+  theorem documents, covering the layer beneath them — the modelled Halo2
+  keygen (cyclic domain and blinding tail, selector compression by
+  indicator polynomials, the permutation σ closed from the copies, lookup
+  input substitution, query tables), the three equivalences that close the
+  L3 ↔ L2 ↔ L1 arrows, what the layer adds to the assurance claim, and the
+  translation-validation argument for the Rocq circuit being the Rust one:
+  the modelled keygen bracketed at both ends — the structural JSON
+  comparison of its inputs (`Orchard/Snapshots/`, out-of-kernel), the `Qed`
+  identification of those exported objects with the terms the stack
+  compiles, and the byte-level `vk.pinned()` anchor plus the Fiat–Shamir
+  binding scalar on its output — with an explicit account of which end
+  covers what, which fields are pass-through rather than evidence, and
+  what neither reaches.
 - `docs/orchard-balance-proof.md`: the transaction-level balance theorems
   built on the Action statement — `balanced_or_dlog` and `no_inflation`,
   the Pedersen-binding-as-reduction design (with the explicit computable

@@ -285,6 +285,12 @@ placeholder event for it unless the shared DSL starts tracking equality state.
 
 ## Generated Configure Snapshots
 
+These snapshots are one end of the faithfulness argument — they pin the
+*inputs* of the modelled Halo 2 keygen, whose output is pinned byte-for-byte
+against the deployed verifying key. How the two ends join, and what each
+covers that the other does not, is documented in
+[`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
+
 Configure snapshots are generated as JSON only. The Rust/Halo2 implementation
 snapshot is produced by ignored Orchard tests, and the structured Rocq model
 snapshot is produced by extraction:
