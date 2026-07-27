@@ -332,14 +332,37 @@ transcription to certified bytes (`Orchard/vk_pinned_*.v`,
   is sharded per the `compile-performance.md` discipline; a personalized
   BLAKE2b reference vector guards the parameter-block wiring.
 
-The vk-commitment MSM (computing the 44 pinned commitments from the
-compiled polynomials) stays deferred — T1 pins their coordinate literals
-and certifies them as bytes; the MSM certificate would additionally prove
-they are the commitments *of the compiled polynomials*.
+The third byte channel — the vk-commitment MSM, proving the pinned points
+are the commitments *of the compiled polynomials* rather than only
+certified bytes (T1) — is under way: the machinery and the SRS are
+complete, and **1 of the 44 commitments** is certified.
+
+- **The Vesta layer** — `EllipticCurve/Vesta.v`, `VestaOrder.v`,
+  `GroupOrderTight.v`, `GroupHash/sswu_vesta.v`, `group_hash_vesta.v`: the
+  other field of the Pasta cycle (commitment scalars mod `pallas_p`, point
+  coordinates mod `pallas_q`), its group-order theorem, and the
+  SSWU/group-hash pipeline that generates the SRS.
+- **The SRS certificate** — `Orchard/vk_srs_cert.v` (+ the sixteen
+  `vk_srs_data_*` / `vk_srs_cert_*` shards): `vk_srs_g_points_ok` derives
+  each of the 2048 generators as `hash_to_curve("Halo2-Parameters")` of the
+  5-byte message `[0x00, le32(i)]`, `vk_srs_w_ok` the blinding base `w`,
+  and `vk_srs_points_valid` their on-curve/reducedness — the SRS is
+  computed in-model, not pasted on trust.
+- **The MSM machinery** — `Orchard/vk_msm.v`: `commit_lagrange` is the
+  faithful spec (`Σ_j v_j · g_lagrange_j + w`, the `Blind::default() = 1`
+  term mandatory); `commit_lagrange_intt` moves it to the coefficient side
+  so the never-computable `g_lagrange` drops out; `pippenger_correct`
+  validates the bucket-method checker the certificates `vm_compute`; and
+  `commit_two_shards` packages a two-half-range leaf certificate.
+- **The instance** — `Orchard/vk_msm_calibrate.v`: `vk_commit_fixed0`, the
+  commitment of compiled fixed column 0 read off the replayed grid, equals
+  `VkPinnedData.fixed_commitments[0]`. The remaining 43 (28 fixed, 15
+  permutation) are open work.
 
 Assumption audit: the counting lemmas are at impredicative `Set` only (no
 `PrimString`); the boundary corollaries, T1, and T2 add exactly the
-`PrimString`/`PrimInt63` primitive family; no classical axioms anywhere,
+`PrimString`/`PrimInt63` primitive family; `vk_commit_fixed0` is at
+`PrimString.string` + impredicative `Set`. No classical axioms anywhere,
 and `orchard_algebraic_action_statement` / `OrchardAction.action_statement`
 re-audit unchanged at their baselines.
 
@@ -375,7 +398,10 @@ distance to a deployed prover is recorded, not hidden:
   reduction (`MultiopenReduction`) — the L0 layer. Each is a named
   `SignatureKnowledge`-style hypothesis, never an axiom. The vk-commitment
   MSM (the compiled polynomials' commitments equal the pinned points) is
-  the one remaining byte-level stretch, still deferred.
+  the one remaining byte-level stretch: its machinery, the certified Vesta
+  SRS, and the first of the 44 commitments are proved; the other 43 are
+  open, so the pinned commitment *points* are still trusted through T1's
+  byte parity rather than recomputed.
 - The four witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged.
 
@@ -410,3 +436,8 @@ distance to a deployed prover is recorded, not hidden:
 | `Orchard/vk_pinned_print.v` / `vk_pinned_data.v` / `vk_pinned_bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
 | `Orchard/vk_pinned_parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_fixed`, all 1,285,701 bytes) |
 | `Orchard/vk_transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |
+| `EllipticCurve/Vesta.v` / `VestaOrder.v` / `GroupOrderTight.v` | Vesta curve arithmetic and its group-order theorem |
+| `GroupHash/sswu_vesta.v` / `group_hash_vesta.v` | the Vesta SSWU / `hash_to_curve` pipeline |
+| `Orchard/vk_srs_cert.v` (+ 16 shards) | `vk_srs_g_points_ok`, `vk_srs_w_ok`, `vk_srs_points_valid` (the SRS derived in-model) |
+| `Orchard/vk_msm.v` | `commit_lagrange`, `commit_lagrange_intt`, `pippenger_correct`, `commit_two_shards` |
+| `Orchard/vk_msm_calibrate.v` | `vk_commit_fixed0` (1 of the 44 pinned commitments; the rest open) |

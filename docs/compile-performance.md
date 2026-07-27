@@ -892,6 +892,38 @@ For pure mod-p polynomial identities use `mod_ring_solve`
 (`Garden/Halo2/lemmas.v`), reserving `field_solve` for genuine linear
 arithmetic; see `docs/halo2-proof.md` for the rule and its mechanism.
 
+### Trading `mod_inverse` for extra multiplications is a loss
+
+Under `vm_compute` at `pallas_q` a `mod_inverse` costs ≈ 10 `BinOp.mul`, not
+the ≈ 500 its fuel bound (`mod_inv_fuel = 2 log2 p + 4` = 514,
+`Garden/Field/Field.v:159`) suggests: `mod_inv_loop`'s operands shrink
+geometrically, so the bound is a termination measure and almost none of the
+iterations run at full width.  Measured: `BinOp.mul` ≈ 3.0-3.4 ms,
+`mod_inverse` ≈ 33-35 ms.  Within one `BinOp.mul`, `Z.modulo` of a 510-bit
+by a 255-bit operand is ≈ 87% of the time and the 255×255 `Z.mul` ≈ 6%, so
+the cost atom of the whole layer is the modular reduction, not the multiply.
+
+Consequence for elliptic-curve code: affine `Weierstrass.add` costs 3-4
+multiplies plus one inversion ≈ 13 multiply-equivalents, which is *cheaper*
+than any inversion-free Jacobian addition (the `a = 0` unified formula is
+≈ 21 multiplies; even a hand-tuned 11M+5S mixed addition is 16).  The
+Jacobian mirror `EllipticCurve/VestaJacobian.v` / `Orchard/vk_msm_jac.v` is
+correct and division-free, and it is measurably slower: one full vk shard
+leaf is 37:59 against the affine 32:24 (see the cost map below).  Reach for
+a cheaper `BinOp.mul` instead — the Pasta primes are Solinas-shaped
+(`q = 2^254 + c` with `c ≈ 2^125`), and a shift/mask/small-multiply
+reduction measures ≈ 0.42 ms against `Z.modulo`'s ≈ 2.6-3.0 ms.  That
+speeds up multiplies but not `mod_inv_loop`, whose divisors vary, so the two
+optimisations are complementary and inversion-free coordinates only start
+paying once the reduction is cheap.
+
+The one structural saving that *is* free: never let a `Fixpoint` body mention
+the same expensive call twice — `vm_compute` performs no CSE.
+`VkMsm.aggr_go` (`Orchard/vk_msm.v:1187`) evaluates `padd run b` twice and so
+pays three additions per bucket; the `let`-bound shape
+(`VkMsmJac.aggr_go_j`) pays two.  Measured on 32 buckets: 4.49 s versus
+2.93 s, and the two bodies are zeta-equal.
+
 ## Current costs
 
 Full clean build (`make clean`, then `make -j32`, measured 2026-07-27 on an
@@ -1202,13 +1234,46 @@ numbers.
   inverse-NTT coefficient certificate (≈ 82 s: 11-level radix-2 FFT,
   ~22.5 k modular multiplications), the sub-second range/length/
   blind-and-compare certificates, and the term-style assembly theorem;
-  `Orchard/vk_msm_calibrate_{a,b}.v`: MEASURED_SHARD — one half-range
-  1024-base Pippenger `vm_compute` each (32 windows of 8 bits,
+  `Orchard/vk_msm_calibrate_{a,b}.v`: ≈ 32 min wall each (measured
+  2026-07-24 on an unloaded machine: 32:23.95, max RSS 724 MB) — one
+  half-range 1024-base Pippenger `vm_compute` each (32 windows of 8 bits,
   255 filter-buckets, suffix-sum aggregation; ≈ 49 k affine point
-  operations at ≈ 57 ms each), mutually independent, ≈ 0.7 GB peak.
-  The 44-commitment fan-out runs two such leaves per commitment fully
-  parallel; under route (b) every column is a dense 2048-scalar MSM, so
-  the per-commitment cost is uniform.
+  operations at ≈ 39 ms each), mutually independent.  These two leaves
+  dominate every other cost in the layer by an order of magnitude and are
+  the whole budget of the fan-out.  The 44-commitment fan-out runs two
+  such leaves per commitment fully parallel; under route (b) every column
+  is a dense 2048-scalar MSM, so the per-commitment cost is uniform:
+  the 43 remaining columns are 86 shard compiles ≈ 46 CPU-hours, ≈ 11.5 h
+  wall at four concurrent.
+
+- The inversion-free (Jacobian) mirror of that pipeline (2026-07-25):
+  `EllipticCurve/VestaJacobian.v` ≈ 2 s and `Orchard/vk_msm_jac.v` ≈ 11 s
+  (all symbolic — the transported group law, the structural `jrepr`
+  refinements, and `commit_two_shards_jac`);
+  `Orchard/vk_msm_jac_calibrate_{a,b}.v`: 37:59 / 37:36 wall, max RSS
+  ≈ 1 004 MB (measured 2026-07-25, 99% CPU on an otherwise unloaded
+  32-core machine) — the same two half-range checkpoints computed with
+  `VkMsmJac.msm_pippenger_jac` and tested by `VestaJac.jcheck`, so no
+  `mod_inverse` runs anywhere on the path;
+  `Orchard/vk_msm_jac_calibrate.v` ≈ 1 s (the assembly, reusing the affine
+  file's column/length/range/`intt`/blind certificates).
+  **This route is 1.17× slower and 1.39× heavier than the affine one** and
+  is not the way to shrink the 43-commitment fan-out; see the
+  `mod_inverse` pitfall above for why, and what to attack instead.  It is
+  kept because it is the correct-by-construction Jacobian layer any future
+  cheap-reduction `BinOp.mul` would need, and because
+  `vk_commit_fixed0_routes_agree` makes it a second, independent
+  derivation of the pinned fixed-column-0 commitment.
+
+- `Field/PastaFast.v` ≈ 3 s: the Solinas replacements for the field
+  operations at both Pasta primes, each proved equal to its `BinOp`
+  counterpart on reduced inputs.  Measured under `vm_compute`, `mulq` is
+  ≈ 3.3× `BinOp.mul` and `addq` ≈ 57× `BinOp.add`; the multiply both routes
+  pay (254×254, ≈ 0.57 ms) caps any Solinas `mulq` at ≈ 5.2×.
+  `VestaJac.jadd_fast` is proved equal to `jadd`, but the Pippenger
+  pipeline still calls `jadd`, so no shard has yet been compiled on the
+  fast path and its end-to-end cost is unmeasured.
+
 
 - The Vesta SRS provenance shards (2026-07-23):
   `Orchard/vk_srs_cert_{0..15}.v` — ≈ 295 s CPU each
