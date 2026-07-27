@@ -5,14 +5,14 @@
     the Sinsemilla clauses of the exceptional-case exclusions (the Merkle
     chain and the three hash messages, each one linear accumulator pass).
     The variable-base clause's four index-range certificates live in the
-    parallel [instance_mul_*.v] leaves; [instance_cert.v] assembles
+    parallel [instance_mul_*.v] leaves; [instance/cert.v] assembles
     [test_input_nondegenerate] from all eight. *)
 
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
 

@@ -41,15 +41,15 @@ Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Halo2.halo2_gadgets.sinsemilla.spec.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.constants.
 Require Garden.Halo2.halo2_gadgets.ecc.chip.mul_fixed.
 Require Garden.Halo2.halo2_gadgets.utilities.decompose_running_sum.
@@ -107,38 +107,11 @@ Module OrchardForwardRunningSums.
           eval_lookup_argument (OrchardHonestAssignment.honest_assignment w)
             (region, row) 1024 arg.
 
-  (** ** Decidable equality on expressions, constraints and lookup
-      arguments
+  (** ** Decidable equality on lookup arguments
 
-      Used by the [vm_compute] classification certificates: every
-      constraint body guarded by one of this file's selectors, and every
-      lookup argument mentioning them, is pinned to its literal. *)
-
-  Definition rotation_eq_dec (x y : Rotation.t) : {x = y} + {x <> y}.
-  Proof. decide equality; apply Z.eq_dec. Defined.
-
-  Definition expression_eq_dec (x y : Expression.t columns)
-      : {x = y} + {x <> y}.
-  Proof.
-    decide equality;
-      first
-        [ apply Z.eq_dec
-        | apply rotation_eq_dec
-        | apply OrchardDecidableEq.selector_eq_dec
-        | apply OrchardDecidableEq.fixed_eq_dec
-        | apply OrchardDecidableEq.advice_eq_dec
-        | apply OrchardDecidableEq.instance_eq_dec ].
-  Defined.
-
-  Definition constraint_eq_dec (x y : Constraint.t columns)
-      : {x = y} + {x <> y}.
-  Proof.
-    decide equality;
-      first
-        [ apply expression_eq_dec
-        | apply OrchardDecidableEq.selector_eq_dec
-        | apply Nat.eq_dec ].
-  Defined.
+      Used by the [vm_compute] classification certificates: every lookup
+      argument mentioning one of this file's selectors is pinned to its
+      literal.  Constraint bodies use [OrchardDecidableEq.constraint_eqb]. *)
 
   Definition arg_pair_eq_dec (x y : Expression.t columns * Lookup.t)
       : {x = y} + {x <> y}.
@@ -146,7 +119,7 @@ Module OrchardForwardRunningSums.
     decide equality;
       first
         [ apply OrchardDecidableEq.lookup_eq_dec
-        | apply expression_eq_dec ].
+        | apply OrchardDecidableEq.expression_eq_dec ].
   Defined.
 
   Definition arg_eq_dec (x y : LookupArgument.t columns)
@@ -156,12 +129,6 @@ Module OrchardForwardRunningSums.
     apply List.list_eq_dec.
     exact arg_pair_eq_dec.
   Defined.
-
-  Definition constraint_eqb : Constraint.t columns -> Constraint.t columns -> bool :=
-    OrchardDecidableEq.dec_to_eqb constraint_eq_dec.
-  Definition constraint_eqb_eq (x y : Constraint.t columns) :
-      constraint_eqb x y = true <-> x = y :=
-    OrchardDecidableEq.dec_to_eqb_eq constraint_eq_dec x y.
 
   Definition arg_eqb : LookupArgument.t columns -> LookupArgument.t columns -> bool :=
     OrchardDecidableEq.dec_to_eqb arg_eq_dec.
@@ -181,13 +148,6 @@ Module OrchardForwardRunningSums.
         (Expression.Advice Advice.A9 Rotation.next))
       (Expression.Advice Advice.A9 Rotation.cur).
 
-  Lemma bitshift_body_tie :
-    (Garden.Halo2.halo2_gadgets.utilities.lookup_range_check
-       .short_lookup_bitshift_gate 10 Selector.QBitshift Advice.A9)
-      .(Gate.constraints) =
-    [(None, Constraint.Select Selector.QBitshift bitshift_body)].
-  Proof. reflexivity. Qed.
-
   (** The single constraint of the running-sum decomposition gate
       ([decompose_running_sum.range_check_gate] at
       [window_num_bits = 3], column [A4]): [z_i − 8·z_{i+1} ∈ [0, 8)]. *)
@@ -198,15 +158,6 @@ Module OrchardForwardRunningSums.
         (Expression.Negated
           (Expression.Scaled (Expression.Advice Advice.A4 Rotation.next) 8)))
       8%nat.
-
-  Lemma range_check_body_tie :
-    (Garden.Halo2.halo2_gadgets.utilities.decompose_running_sum
-       .range_check_gate
-       Garden.Halo2.halo2_gadgets.ecc.chip.constants.fixed_base_window_size
-       Selector.QMulFixedRunningSum Advice.A4)
-      .(Gate.constraints) =
-    [(None, Constraint.Select Selector.QMulFixedRunningSum range_check_body)].
-  Proof. reflexivity. Qed.
 
   (** The range-check lookup argument ([lookup_range_check.configure] at
       [k = 10], column [A9], table [TableIdx]): the looked-up word is the
@@ -393,7 +344,7 @@ Module OrchardForwardRunningSums.
             match constraint with
             | Constraint.Select sel body =>
                 if OrchardDecidableEq.selector_eqb sel Selector.QBitshift
-                then constraint_eqb body bitshift_body
+                then OrchardDecidableEq.constraint_eqb body bitshift_body
                 else true
             | _ => true
             end)
@@ -414,10 +365,10 @@ Module OrchardForwardRunningSums.
                 if OrchardDecidableEq.selector_eqb sel
                      Selector.QMulFixedRunningSum
                 then
-                  constraint_eqb body range_check_body
+                  OrchardDecidableEq.constraint_eqb body range_check_body
                   || List.existsb
                        (fun '(_, constraint') =>
-                         constraint_eqb
+                         OrchardDecidableEq.constraint_eqb
                            (Constraint.Select Selector.QMulFixedRunningSum
                              body)
                            constraint')
@@ -581,7 +532,7 @@ Module OrchardForwardRunningSums.
     pose proof (proj1 (List.forallb_forall _ _) H1 _ Hbody) as H2.
     cbn beta iota in H2.
     rewrite (OrchardDecidableEq.selector_eqb_refl Selector.QBitshift) in H2.
-    exact (proj1 (constraint_eqb_eq _ _) H2).
+    exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
   Qed.
 
   (** Constraint bodies guarded by [QMulFixedRunningSum]: the range check,
@@ -606,11 +557,11 @@ Module OrchardForwardRunningSums.
       in H2.
     apply orb_true_iff in H2.
     destruct H2 as [H2 | H2].
-    - left. exact (proj1 (constraint_eqb_eq _ _) H2).
+    - left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
     - right.
       apply List.existsb_exists in H2.
       destruct H2 as ([name' constraint'] & Hin' & Heq').
-      apply constraint_eqb_eq in Heq'.
+      apply OrchardDecidableEq.constraint_eqb_eq in Heq'.
       subst constraint'.
       change (Constraint.Select Selector.QMulFixedRunningSum body) with
         (snd (name', Constraint.Select Selector.QMulFixedRunningSum body)).

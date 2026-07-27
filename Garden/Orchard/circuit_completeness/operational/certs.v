@@ -54,7 +54,7 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
 Require Garden.Orchard.circuit_synthesis_constants.
-Require Import Garden.Orchard.circuit_completeness.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
 Require Import Garden.Orchard.circuit_completeness.operational.agreement_congruences.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.

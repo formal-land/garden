@@ -49,8 +49,8 @@ Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.ZArith.ZArith.
@@ -197,10 +197,6 @@ Module OrchardVarBaseTables.
       vb_s := (alpha + k254 * 2 ^ 130) mod Primes.pallas_p;
       vb_eta := if z130 =? 0 then 0 else mod_inverse z130 Primes.pallas_p;
     |}.
-
-  (** The spec-anchored instantiation at an honest input. *)
-  Definition vb_tables_of (w : HonestInput) : t :=
-    vb_columns (ivk w) (hi_g_d_old w).
 
   (** ** The variable-base region reader *)
 

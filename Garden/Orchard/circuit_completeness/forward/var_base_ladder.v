@@ -61,19 +61,20 @@ Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
+Require Import Garden.Orchard.circuit_completeness.forward.arith.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.Pallas.Generators.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
 Require Import Garden.Orchard.circuit_proof.ownership.var_base_defs.
 Require Import Garden.Orchard.circuit_proof.ownership.var_base_incomplete.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Garden.Orchard.circuit_completeness.forward.ecc_add.
 Require Garden.Orchard.circuit.
@@ -362,15 +363,6 @@ Module OrchardVarBaseForward.
     unfold Primes.pallas_p, Primes.t_p; lia.
   Qed.
 
-  Lemma pallas_p_pos : 2 < Primes.pallas_p.
-  Proof. unfold Primes.pallas_p, Primes.t_p; lia. Qed.
-
-  Lemma sub_0_opp (y : Z) : 0 -F y = UnOp.opp y.
-  Proof.
-    unfold BinOp.sub, UnOp.opp.
-    f_equal; lia.
-  Qed.
-
   Lemma from_div_reduced (a b : Z) :
     UnOp.from (BinOp.div a b) = BinOp.div a b.
   Proof.
@@ -490,23 +482,6 @@ Module OrchardVarBaseForward.
       split; assumption.
   Qed.
 
-  (** An affine [macc]: the accumulator with a nonzero [x] is the [repr] of
-      an affine on-curve point with exactly its coordinates. *)
-  Lemma macc_affine (alpha : Z) (B : Point.t) (i : nat)
-      (Hx0 : Point.x (macc alpha B i) <> 0) :
-    Pallas.mul
-      (2 ^ (255 - Z.of_nat i) + 2 * (mk alpha / 2 ^ Z.of_nat i) + 1)
-      (PallasModel.unrepr B) =
-    Weierstrass.Affine (Point.x (macc alpha B i)) (Point.y (macc alpha B i)).
-  Proof.
-    unfold macc in *.
-    set (P := Pallas.mul _ (PallasModel.unrepr B)) in *.
-    clearbody P.
-    destruct P as [| ax ay].
-    - exfalso. apply Hx0. reflexivity.
-    - reflexivity.
-  Qed.
-
   Local Notation two_inv :=
     Garden.Halo2.halo2_gadgets.ecc.chip.constants.two_inv.
 
@@ -514,21 +489,6 @@ Module OrchardVarBaseForward.
   Lemma x_r_raw (xa bx l1 : Z) :
     x_r xa bx l1 = l1 *F l1 -F xa -F bx.
   Proof. reflexivity. Qed.
-
-  (** The incomplete-addition [x] in the ladder's raw spelling. *)
-  Lemma incomplete_add_x (P Q : Point.t) :
-    Point.x (EccSpec.point_add_incomplete P Q) =
-    (let l :=
-      BinOp.div (Point.y P -F Point.y Q) (Point.x P -F Point.x Q) in
-     l *F l -F Point.x P -F Point.x Q).
-  Proof. reflexivity. Qed.
-
-  Lemma mstep_x (alpha : Z) (B : Point.t) (m : nat) :
-    Point.x (mstep alpha B m) = Point.x B.
-  Proof.
-    unfold mstep.
-    destruct (scalar_bit (mk alpha) m =? 1); reflexivity.
-  Qed.
 
   Lemma mstep_y (alpha : Z) (B : Point.t) (m : nat) :
     Point.y (mstep alpha B m) =
@@ -581,12 +541,12 @@ Module OrchardVarBaseForward.
     assert (Hs1 : L1 *F (xa -F bx) = ya -F yp).
     { unfold L1.
       rewrite div_mul;
-        [| exact pallas_p_pos | exact Hd1].
+        [| exact OrchardForwardArith.pallas_p_gt_2 | exact Hd1].
       apply from_sub_reduced. }
     assert (Hs2 : L2 *F (xa -F XR) = ya -F YR).
     { unfold L2.
       rewrite div_mul;
-        [| exact pallas_p_pos | exact Hd2].
+        [| exact OrchardForwardArith.pallas_p_gt_2 | exact Hd2].
       apply from_sub_reduced. }
     assert (Hchord1 : L1 *F (xa -F XR) = YR +F ya).
     { unfold YR. mod_ring_solve. }
@@ -1231,16 +1191,6 @@ Module OrchardVarBaseForward.
         end)
       g.(Gate.constraints).
 
-  Lemma bodies_ecc_add :
-    guarded_bodies Selector.QEccAdd =
-    gate_raw_bodies
-      Garden.Halo2.halo2_gadgets.ecc.chip.add.complete_addition_gate.
-  Proof.
-    vm_cast_no_check (@eq_refl (list (Constraint.t columns))
-      (gate_raw_bodies
-        Garden.Halo2.halo2_gadgets.ecc.chip.add.complete_addition_gate)).
-  Qed.
-
   Lemma bodies_hi1 :
     guarded_bodies Selector.QMulIncompleteHi1 =
     gate_raw_bodies
@@ -1453,10 +1403,6 @@ Module OrchardVarBaseForward.
       (OrchardVarBaseTables.vb_acc1 (vbc alpha B)).
   Proof. vbfield. Qed.
 
-  Lemma vb_k254_e (alpha : Z) (B : Point.t) :
-    OrchardVarBaseTables.vb_k254 (vbc alpha B) = mk alpha / 2 ^ 254.
-  Proof. vbfield. Qed.
-
   Lemma vb_s_e (alpha : Z) (B : Point.t) :
     OrchardVarBaseTables.vb_s (vbc alpha B) =
     (alpha + mk alpha / 2 ^ 254 * 2 ^ 130) mod Primes.pallas_p.
@@ -1510,17 +1456,6 @@ Module OrchardVarBaseForward.
     Complete.enabled_memb OrchardHonestAssignment.selector_eqb
       OrchardHonestAssignment.region_eqb OrchardHonestAssignment.facts
       sel region row.
-
-  Lemma memb_of_in (sel : Selector.t) (region : RegionId.t) (row : Z) :
-    List.In (sel, region, row) enabled ->
-    memb sel region row = true.
-  Proof.
-    intros Hin.
-    exact (Complete.enabled_memb_complete
-      OrchardHonestAssignment.selector_eqb OrchardDecidableEq.selector_eqb_eq
-      OrchardHonestAssignment.region_eqb OrchardDecidableEq.region_id_eqb_eq
-      OrchardHonestAssignment.facts sel region row Hin).
-  Qed.
 
   Lemma hsel_eq (w : HonestInput) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.selector) =
@@ -1580,22 +1515,6 @@ Module OrchardVarBaseForward.
 
   (** ** The range-check lookup argument *)
 
-  Definition rotation_eq_dec (x y : Rotation.t) : {x = y} + {x <> y}.
-  Proof. decide equality; apply Z.eq_dec. Defined.
-
-  Definition expression_eq_dec (x y : Expression.t columns)
-      : {x = y} + {x <> y}.
-  Proof.
-    decide equality;
-      first
-        [ apply Z.eq_dec
-        | apply rotation_eq_dec
-        | apply OrchardDecidableEq.selector_eq_dec
-        | apply OrchardDecidableEq.fixed_eq_dec
-        | apply OrchardDecidableEq.advice_eq_dec
-        | apply OrchardDecidableEq.instance_eq_dec ].
-  Defined.
-
   Definition arg_eq_dec (x y : LookupArgument.t columns)
       : {x = y} + {x <> y}.
   Proof.
@@ -1603,7 +1522,7 @@ Module OrchardVarBaseForward.
     apply List.list_eq_dec.
     decide equality.
     - apply OrchardDecidableEq.lookup_eq_dec.
-    - apply expression_eq_dec.
+    - apply OrchardDecidableEq.expression_eq_dec.
   Defined.
 
   Definition arg_eqb : LookupArgument.t columns
@@ -1754,7 +1673,7 @@ Module OrchardVarBaseForward.
     unfold BinOp.sub, BinOp.mul, UnOp.from.
     transitivity (b mod Primes.pallas_p).
     2:{ apply Z.mod_small.
-        pose proof pallas_p_pos as Hp.
+        pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
         clear -Hb Hp.
         lia. }
     lazymatch goal with
@@ -1783,7 +1702,7 @@ Module OrchardVarBaseForward.
     unfold BinOp.sub, BinOp.mul, UnOp.from.
     transitivity (b mod Primes.pallas_p).
     2:{ apply Z.mod_small.
-        pose proof pallas_p_pos as Hp.
+        pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
         clear -Hb Hp.
         lia. }
     lazymatch goal with
@@ -2100,7 +2019,7 @@ Module OrchardVarBaseForward.
     rewrite Hinv.
     (* The goal is already [1 mod p = 1], the exact shape of [Z.mod_1_l]. *)
     apply Z.mod_1_l.
-    pose proof pallas_p_pos as Hp.
+    pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
     clear -Hp.
     lia.
   Qed.
@@ -2317,7 +2236,7 @@ Module OrchardVarBaseForward.
     rewrite table_value_id by (clear -Hw; lia).
     rewrite rot_cur, rot_next.
     rewrite Hc, Hn.
-    pose proof pallas_p_pos as Hp.
+    pose proof OrchardForwardArith.pallas_p_gt_2 as Hp.
     unfold BinOp.mul, BinOp.add, BinOp.sub, UnOp.from.
     transitivity ((zc mod 1024) mod Primes.pallas_p);
       [| apply Z.mod_small; clear -Hw;
@@ -2467,7 +2386,6 @@ Module OrchardVarBaseForward.
     unfold next_x_a, x_r, square.
     reflexivity.
   Qed.
-
 
   (** ** The incomplete-ladder gates over abstract row values *)
 

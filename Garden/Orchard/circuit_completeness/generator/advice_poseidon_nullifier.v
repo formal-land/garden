@@ -13,7 +13,7 @@ Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.ZArith.ZArith.
@@ -303,59 +303,5 @@ Module OrchardAdvicePoseidonNullifier.
     | RegionId.Nullifier sub => advice_nullifier w col sub off
     | _ => 0
     end.
-
-  (** ** Agreement lemmas on the generator's own definitions *)
-
-  (** The base-8 running sum telescopes one window at a time: the value on
-      [A4] of row [i] is the row-[(i+1)] value scaled by 8 plus the window
-      digit the coordinates-check gate reads. *)
-  Lemma advice_A4_running_sum_step (w : HonestInput) (i : nat) :
-    running_sum_at (nullifier_scalar w) i =
-      EccSpec.window_digit (nullifier_scalar w) i
-        + 8 * running_sum_at (nullifier_scalar w) (S i).
-  Proof. apply running_sum_step. Qed.
-
-  (** The canonicity split [z_84 = alpha_1 + 4·alpha_2] the [z_84_alpha_check]
-      constraint pins. *)
-  Lemma z84_split (w : HonestInput) :
-    z84 w = alpha1 w + 4 * alpha2 w.
-  Proof.
-    unfold alpha1, alpha2.
-    pose proof (Z.div_mod (z84 w) 4 ltac:(lia)) as Hdm.
-    lia.
-  Qed.
-
-  (** The [PermuteState] output cell [A6] at row 36 is the Poseidon hash of
-      the two inputs — the value [circuit_proof/poseidon.v] reads as the
-      nullifier PRF output. *)
-  Lemma advice_permute_output (w : HonestInput) :
-    advice_poseidon w Advice.A6 RegionId.Poseidon.PermuteState 36 =
-      Poseidon.poseidon_hash2 (hi_nk w) (hi_rho_old w).
-  Proof.
-    unfold advice_poseidon.
-    change ((0 <=? 36) && (36 <=? 36)) with true.
-    cbv iota.
-    change (Z.to_nat 36) with 36%nat.
-    apply poseidon_round_state_hash2.
-  Qed.
-
-  (** The absorbed [PermuteState] row-0 lanes are the PRF seed
-      [{nk, rho_old, 2^65}]. *)
-  Lemma advice_permute_seed (w : HonestInput) :
-    advice_poseidon w Advice.A6 RegionId.Poseidon.PermuteState 0 = hi_nk w /\
-    advice_poseidon w Advice.A7 RegionId.Poseidon.PermuteState 0 =
-      hi_rho_old w /\
-    advice_poseidon w Advice.A8 RegionId.Poseidon.PermuteState 0 =
-      Poseidon.domain_iv_constant_length_2.
-  Proof.
-    unfold advice_poseidon.
-    change ((0 <=? 0) && (0 <=? 36)) with true.
-    cbv iota.
-    change (Z.to_nat 0) with 0%nat.
-    unfold poseidon_round_state, poseidon_state.
-    cbn [List.seq Stdlib.Lists.List.fold_left poseidon_input_state
-      State.x0 State.x1 State.x2].
-    repeat split.
-  Qed.
 
 End OrchardAdvicePoseidonNullifier.

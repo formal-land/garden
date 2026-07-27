@@ -226,71 +226,11 @@ Module OrchardWitnessInput.
     OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
       (inputs_of w).
 
-  (** Read-offs of [outputs_of] against the named derived values — one per
-      §4.18.4 public output. *)
-  Lemma outputs_of_anchor (w : HonestInput) :
-    OrchardSpec.out_anchor (outputs_of w) = anchor_public_row w.
-  Proof.
-    unfold outputs_of, OrchardProtocolSpec.orchard_action_spec.
-    cbv zeta; cbn [OrchardSpec.out_anchor OrchardSpec.in_v_old
-      OrchardSpec.in_anchor_public OrchardSpec.in_leaf OrchardSpec.in_path
-      inputs_of].
-    unfold anchor_public_row, anchor_root.
-    destruct (hi_v_old w =? 0); reflexivity.
-  Qed.
-
-  Lemma outputs_of_cv_net (w : HonestInput) :
-    OrchardSpec.out_cv_net (outputs_of w) = cv_net w.
-  Proof. reflexivity. Qed.
-
-  (** The [nf_old] / [cmx] read-offs reduce both sides to one syntactic
-      term before [reflexivity]: their values contain the Poseidon
-      permutation, and handing conversion two sides that differ underneath
-      it normalizes the 36-round chain. *)
-  Lemma outputs_of_nf_old (w : HonestInput) :
-    OrchardSpec.out_nf_old (outputs_of w) = nf_old w.
-  Proof.
-    unfold outputs_of, OrchardProtocolSpec.orchard_action_spec.
-    cbv zeta.
-    cbn [OrchardSpec.out_nf_old OrchardSpec.in_nk OrchardSpec.in_rho_old
-      OrchardSpec.in_psi_old OrchardSpec.in_cm_old inputs_of].
-    unfold nf_old.
-    reflexivity.
-  Qed.
-
-  Lemma outputs_of_rk (w : HonestInput) :
-    OrchardSpec.out_rk (outputs_of w) = rk w.
-  Proof.
-    unfold outputs_of, OrchardProtocolSpec.orchard_action_spec.
-    cbv zeta.
-    cbn [OrchardSpec.out_rk OrchardSpec.in_ak OrchardSpec.in_alpha
-      inputs_of].
-    unfold rk.
-    reflexivity.
-  Qed.
-
-  Lemma outputs_of_cmx (w : HonestInput) :
-    OrchardSpec.out_cmx (outputs_of w) = cmx w.
-  Proof.
-    unfold outputs_of, OrchardProtocolSpec.orchard_action_spec.
-    cbv zeta.
-    cbn [OrchardSpec.out_cmx OrchardSpec.in_g_d_new OrchardSpec.in_pk_d_new
-      OrchardSpec.in_v_new OrchardSpec.in_psi_new OrchardSpec.in_rcm_new
-      OrchardSpec.in_nk OrchardSpec.in_rho_old OrchardSpec.in_psi_old
-      OrchardSpec.in_cm_old inputs_of].
-    unfold cmx, rho_new, nf_old.
-    reflexivity.
-  Qed.
-
   (** ** Fixed-base legs: window digits, running sums, square-root witnesses
 
       Each fixed-base multiplication witnesses its scalar as 3-bit window
       cells with a running-sum decomposition ([z_{i} = k_i + 8·z_{i+1}],
       [z_0 = k]) and one square-root witness [u] per window. *)
-
-  (** The [count] base-8 window digits of [k], low window first. *)
-  Definition window_digits (k : Z) (count : nat) : list Z :=
-    List.map (fun i => EccSpec.window_digit k i) (List.seq 0%nat count).
 
   (** Running sum after [i] absorbed windows: [z_i = k / 8^i]. *)
   Definition running_sum_at (k : Z) (i : nat) : Z :=
@@ -338,9 +278,6 @@ Module OrchardWitnessInput.
   Definition us_rcm_old (w : HonestInput) : list Z :=
     canonical_us_for (OrchardCircuitSpec.note_commit_r orchard_internal_params)
       (hi_rcm_old w).
-  Definition us_rivk (w : HonestInput) : list Z :=
-    canonical_us_for (OrchardCircuitSpec.commit_ivk_r orchard_internal_params)
-      (hi_rivk w).
 
   (** The five-leg witness record, bundled in the [ActionWitness] shape. *)
   Definition honest_witness (w : HonestInput)
@@ -351,21 +288,6 @@ Module OrchardWitnessInput.
     OrchardCircuitSpec.w_us_k := us_nullifier w;
     OrchardCircuitSpec.w_us_rcm := us_rcm_new w;
   |}.
-
-  (** The bundle is the canonical witness of the read-back inputs — the
-      [ActionWitness] under which [output_with_witness] is the witness-free
-      [output]. *)
-  Lemma honest_witness_canonical (w : HonestInput) :
-    honest_witness w = canonical_witness (inputs_of w).
-  Proof.
-    unfold honest_witness, canonical_witness.
-    cbn [OrchardSpec.in_alpha OrchardSpec.in_magnitude OrchardSpec.in_rcv
-      OrchardSpec.in_nk OrchardSpec.in_rho_old OrchardSpec.in_psi_old
-      OrchardSpec.in_rcm_new inputs_of].
-    unfold us_alpha, us_magnitude, us_rcv, us_nullifier, us_rcm_new,
-      nullifier_scalar.
-    reflexivity.
-  Qed.
 
   (** ** Poseidon: the permutation's per-row states
 
@@ -538,19 +460,6 @@ Module OrchardWitnessInput.
     destruct (path_bit w i); reflexivity.
   Qed.
 
-  (** Per-hash accumulator instances. *)
-  Definition merkle_layer_acc (w : HonestInput) (i n : nat) : Point.t :=
-    sinsemilla_acc merkle_Q (merkle_layer_words w i) n.
-  Definition note_commit_old_acc (w : HonestInput) (n : nat) : Point.t :=
-    sinsemilla_acc (OrchardSpec.note_commit_q orchard_circuit_params)
-      (note_commit_old_words w) n.
-  Definition note_commit_new_acc (w : HonestInput) (n : nat) : Point.t :=
-    sinsemilla_acc (OrchardSpec.note_commit_q orchard_circuit_params)
-      (note_commit_new_words w) n.
-  Definition commit_ivk_acc (w : HonestInput) (n : nat) : Point.t :=
-    sinsemilla_acc (OrchardSpec.commit_ivk_q orchard_circuit_params)
-      (commit_ivk_words w) n.
-
   (** ** Variable-base mul: the [[ivk] g_d_old] ladder values
 
       The mul chip witnesses the 255-bit decomposition of [ivk + t_q]
@@ -631,8 +540,10 @@ Module OrchardWitnessInput.
         [OrchardValidActionInputs.commit_ivk_witness_ok] (the hash
         nondegeneracy and [VarBaseMul.mul_nondegenerate] conjuncts).
 
-      The implications are proved where the generated assignment is in
-      scope (the assembly step). *)
+      The shaping is a design correspondence, not a theorem: no lemma
+      derives those predicates at [honest_assignment w], so the completeness
+      surface certifies [circuit_holds] rather than the hypotheses of the
+      Action statement. *)
 
   (** One incomplete double-and-add step is nondegenerate: the accumulator
       is affine (no curve point has [x = 0]), the first chord is
@@ -720,33 +631,6 @@ Module OrchardWitnessInput.
     hi_pk_d_old w =
       PallasModel.repr
         (Pallas.mul (ivk w) (PallasModel.unrepr (hi_g_d_old w))).
-
-  (** [valid] lands the read-back inputs in the protocol-typed domain of the
-      spec-equivalence layer. *)
-  Lemma valid_protocol_typed (w : HonestInput) :
-    valid w ->
-    OrchardProtocolEquiv.ProtocolTypedInputs (inputs_of w).
-  Proof.
-    intros (Hty & _).
-    assert (Hq : Primes.pallas_q < 8 ^ 85)
-      by (unfold Primes.pallas_q, Primes.t_q; lia).
-    unfold OrchardProtocolEquiv.ProtocolTypedInputs.
-    cbn [inputs_of OrchardSpec.in_alpha OrchardSpec.in_rcv
-      OrchardSpec.in_rcm_new OrchardSpec.in_magnitude OrchardSpec.in_sign].
-    unfold well_typed in Hty.
-    destruct Hty as (Hvold & Hvnew & Halpha & Hrcv & _ & Hrcm & _).
-    repeat split.
-    - lia.
-    - lia.
-    - lia.
-    - lia.
-    - lia.
-    - lia.
-    - unfold magnitude. clear -Hvold Hvnew. lia.
-    - unfold magnitude. clear -Hvold Hvnew. lia.
-    - unfold sign.
-      destruct (hi_v_new w <=? hi_v_old w); [left | right]; reflexivity.
-  Qed.
 
   (** ** The completeness target
 

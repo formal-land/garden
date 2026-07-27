@@ -3,7 +3,7 @@
     The statement layer for proving
     [OrchardHonestAssignment.orchard_completeness_statement]: the
     [circuit_holds_intro] obligations over [honest_assignment w], split by
-    the region-family partition [family_index] of [instance_defs.v] and
+    the region-family partition [family_index] of [instance/defs.v] and
     quantified over every valid, nondegenerate input.
 
     - [family_gates_ok] / [family_lookups_ok]: the per-enabled-point gate and
@@ -36,10 +36,10 @@ Require Import Garden.Plonky3.M.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Lists.List.
@@ -58,7 +58,7 @@ Module OrchardCompletenessForward.
   (** ** The per-family symbolic obligations
 
       [enabled], [system] and [family_index] are the shared definitions of
-      [instance_defs.v]: the enabled selector points of
+      [instance/defs.v]: the enabled selector points of
       [layouter_facts circuit.synthesize], the configured constraint system,
       and the region-family shard key. *)
 
@@ -164,15 +164,6 @@ Module OrchardCompletenessForward.
       Anti-monotonicity in the family list and the union of two certified
       groups, for both obligation kinds. *)
 
-  Lemma family_gates_ok_incl (fams fams' : list Z) :
-    List.incl fams fams' ->
-    family_gates_ok fams' ->
-    family_gates_ok fams.
-  Proof.
-    intros Hincl Hok w Hvalid Hnondeg sel region row Hin Hfam.
-    exact (Hok w Hvalid Hnondeg sel region row Hin (Hincl _ Hfam)).
-  Qed.
-
   Lemma family_gates_ok_app (fams1 fams2 : list Z) :
     family_gates_ok fams1 ->
     family_gates_ok fams2 ->
@@ -183,15 +174,6 @@ Module OrchardCompletenessForward.
     destruct Hfam as [Hfam | Hfam].
     - exact (H1 w Hvalid Hnondeg sel region row Hin Hfam).
     - exact (H2 w Hvalid Hnondeg sel region row Hin Hfam).
-  Qed.
-
-  Lemma family_lookups_ok_incl (fams fams' : list Z) :
-    List.incl fams fams' ->
-    family_lookups_ok fams' ->
-    family_lookups_ok fams.
-  Proof.
-    intros Hincl Hok w Hvalid Hnondeg sel region row Hin Hfam.
-    exact (Hok w Hvalid Hnondeg sel region row Hin (Hincl _ Hfam)).
   Qed.
 
   Lemma family_lookups_ok_app (fams1 fams2 : list Z) :

@@ -44,12 +44,12 @@ Require Import Garden.Orchard.circuit_proof.value_commit_v.sign_cert.
 Require Import Garden.Orchard.circuit_proof.nullifier_k.sign_cert.
 Require Import Garden.Orchard.circuit_proof.note_commit_r.sign_cert.
 Require Import Garden.Orchard.circuit_proof.commit_ivk_r.sign_cert.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_poseidon_nullifier.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
@@ -88,14 +88,6 @@ Module OrchardForwardFixedBaseCerts.
     RegionId.Nullifier RegionId.Nullifier.BaseFieldIncomplete.
   Definition R_canon : RegionId.t :=
     RegionId.Nullifier RegionId.Nullifier.CanonicityChecks.
-
-  (** The fixed-base selectors. *)
-  Definition is_fb (s : Selector.t) : bool :=
-    match s with
-    | Selector.QMulFixedRunningSum | Selector.QMulFixedFull
-    | Selector.QMulFixedShort | Selector.QMulFixedBaseField => true
-    | _ => false
-    end.
 
   Definition zin (lo hi row : Z) : bool := (lo <=? row) && (row <? hi).
 

@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.Synthesis.
+Require Import Garden.Halo2.main.
 Require Import Garden.Orchard.columns.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
@@ -267,4 +268,42 @@ Module OrchardDecidableEq.
   Definition cell_eqb_eq x y : cell_eqb x y = true <-> x = y := dec_to_eqb_eq cell_eq_dec x y.
   Definition cell_eqb_refl x : cell_eqb x x = true := dec_to_eqb_refl cell_eq_dec x.
   Definition cell_eqb_spec x y : reflect (x = y) (cell_eqb x y) := dec_to_eqb_spec cell_eq_dec x y.
+
+  (** Decidable equality on the gate syntax.  The per-family forward lemmas
+      compare a configured constraint against a pinned literal, so they need
+      a computable equality on [Constraint.t] and, under it, on the
+      expression and rotation it carries. *)
+
+  Definition rotation_eq_dec (x y : Rotation.t) : {x = y} + {x <> y}.
+  Proof. decide equality; apply Z.eq_dec. Defined.
+
+  Definition expression_eq_dec (x y : Expression.t columns)
+      : {x = y} + {x <> y}.
+  Proof.
+    decide equality;
+      first
+        [ apply Z.eq_dec
+        | apply rotation_eq_dec
+        | apply selector_eq_dec
+        | apply fixed_eq_dec
+        | apply advice_eq_dec
+        | apply instance_eq_dec ].
+  Defined.
+
+  Definition constraint_eq_dec (x y : Constraint.t columns)
+      : {x = y} + {x <> y}.
+  Proof.
+    decide equality;
+      first
+        [ apply expression_eq_dec
+        | apply selector_eq_dec
+        | apply Nat.eq_dec ].
+  Defined.
+
+  Definition constraint_eqb
+      : Constraint.t columns -> Constraint.t columns -> bool :=
+    dec_to_eqb constraint_eq_dec.
+  Definition constraint_eqb_eq (x y : Constraint.t columns) :
+      constraint_eqb x y = true <-> x = y :=
+    dec_to_eqb_eq constraint_eq_dec x y.
 End OrchardDecidableEq.

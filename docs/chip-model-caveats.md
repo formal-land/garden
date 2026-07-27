@@ -180,7 +180,8 @@ interpreter's gate layer only. This document is about that relational model.
    direction — an honestly synthesized Γ satisfies `circuit_holds` — is now
    supplied generically by `Complete.circuit_holds_intro` (`Halo2/complete.v`)
    and instantiated for the add chip and, constructively, for the whole Orchard
-   circuit; see [`circuit-completeness.md`](circuit-completeness.md) for the
+   circuit; see
+   [`orchard-completeness-proof.md`](orchard-completeness-proof.md) for the
    theorem surface and [Open gaps](#open-gaps) for what is proved and what
    remains.
 
@@ -358,7 +359,8 @@ hypotheses. Both instantiation layers are proved:
 - **Completeness of `circuit_holds`.** The gluing (item 4) was originally used
   in the soundness direction only. The dual — an honestly synthesized Γ
   *satisfies* `circuit_holds` — is now addressed (full account in
-  [`circuit-completeness.md`](circuit-completeness.md)). The well-formedness
+  [`orchard-completeness-proof.md`](orchard-completeness-proof.md)). The
+  well-formedness
   fact the model did not track — selectors are 0 except where the synthesis
   program enables them — is now supplied as the selector plane of the
   `honest_planes` predicate (the enabled-point indicator), which makes
@@ -370,15 +372,15 @@ hypotheses. Both instantiation layers are proved:
   - `CompleteAdditionCompleteness.completeness` (`ecc/chip/add_complete.v`,
     `Qed`, clean audit) is the add-chip instance.
   - `OrchardCompletenessInstance.orchard_completeness_instance`
-    (`Orchard/circuit_completeness/instance_cert.v`, `Qed`, clean audit) is
-    the constructive whole-circuit C1 instance
+    (`Orchard/circuit_completeness/instance/cert.v`, `Qed`, clean audit) is
+    the constructive whole-circuit concrete instance
     (`Holds (honest_assignment test_input)` plus read-back for one concrete
     valid input): all 4,858 enabled gate points and all 2,964 witness facts
     are machine-verified by `vm_compute`.
 
   - `OrchardCompletenessAssembly.orchard_completeness`
     (`Orchard/circuit_completeness/forward/assembly.v`, `Qed`) is the
-    universally quantified C2 theorem
+    universally quantified completeness theorem
     `OrchardHonestAssignment.orchard_completeness_statement` — every valid,
     nondegenerate honest input yields a satisfying Γ that reads back to the
     input. It composes, through `forward/api.v`'s
@@ -390,13 +392,13 @@ hypotheses. Both instantiation layers are proved:
 
   Remaining: nothing. `orchard_completeness`'s assumption audit is exactly the
   repo baseline, so the universal whole-circuit completeness claim is
-  unconditional — the concrete C1 instance is now a special case of it rather
-  than the strongest available statement. The last leaf, the 97 witness facts
-  whose two cell addresses the generator fills through *different* derivations
+  unconditional, and the concrete instance is a special case of it. The last
+  leaf, the 97 witness facts whose two cell addresses the generator fills
+  through *different* derivations
   of one value, closed as the five group files of
   `forward/witness/`. There is no `Admitted`, `Axiom` or `admit` anywhere
   under `Garden/Orchard/` or `Garden/Halo2/` (per-file account in
-  [`circuit-completeness.md`](circuit-completeness.md)).
+  [`orchard-completeness-proof.md`](orchard-completeness-proof.md)).
 
   - `OrchardOperationalAgreement.orchard_operational_complete`
     (`Orchard/circuit_completeness/operational/main.v`, `Qed`, clean audit)
@@ -408,7 +410,7 @@ hypotheses. Both instantiation layers are proved:
     completeness direction either.
 
   Completeness is a non-vacuity result in both readings: it says the honest
-  witness is accepted, not that nothing else is, and the operational rung
+  witness is accepted, not that nothing else is, and the operational layer
   inherits the ideal checker's own limits (all integer rows rather than the
   `2^k` cyclic domain, blinding rows unmodelled). The model idealizations
   listed elsewhere in this file remain in force.

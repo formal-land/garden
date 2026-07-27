@@ -73,16 +73,17 @@ Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.regions.
 Require Import Garden.Orchard.decidable_eq.
+Require Import Garden.Orchard.circuit_completeness.forward.arith.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.advice_merkle_sinsemilla.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.tables_vb.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_vb.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.api.
 Require Import Garden.Orchard.circuit_completeness.forward.sinsemilla.
 Require Import Garden.Orchard.circuit_completeness.forward.witness.bits_column.
@@ -292,9 +293,6 @@ Module OrchardForwardLookupsWitness.
   Qed.
 
   (** ** Field-arithmetic cores of the two range-check shapes *)
-
-  Lemma pallas_p_pos : 0 < Primes.pallas_p.
-  Proof. unfold Primes.pallas_p, Primes.t_p. lia. Qed.
 
   Lemma pallas_p_big : 2 ^ 250 < Primes.pallas_p.
   Proof. unfold Primes.pallas_p, Primes.t_p. lia. Qed.
@@ -563,7 +561,7 @@ Module OrchardForwardLookupsWitness.
     end.
     cbn [OrchardVarBaseTables.vb_s].
     apply Z.mod_pos_bound.
-    exact pallas_p_pos.
+    exact OrchardForwardArith.pallas_p_pos.
   Qed.
 
   (** ** The running-site values
@@ -666,7 +664,7 @@ Module OrchardForwardLookupsWitness.
       unfold alpha_z0.
       cbv zeta.
       apply Z.mod_pos_bound.
-      exact pallas_p_pos.
+      exact OrchardForwardArith.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -697,7 +695,7 @@ Module OrchardForwardLookupsWitness.
     - intros w _ _.
       unfold OrchardNoteCommitCells.civk_a_prime, OrchardNoteCommitCells.prime_of.
       apply Z.mod_pos_bound.
-      exact pallas_p_pos.
+      exact OrchardForwardArith.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -711,7 +709,7 @@ Module OrchardForwardLookupsWitness.
       unfold OrchardNoteCommitCells.civk_b2_c_prime,
         OrchardNoteCommitCells.prime_of.
       apply Z.mod_pos_bound.
-      exact pallas_p_pos.
+      exact OrchardForwardArith.pallas_p_pos.
     - vm_compute. reflexivity.
   Qed.
 
@@ -722,7 +720,7 @@ Module OrchardForwardLookupsWitness.
   Proof.
     unfold OrchardNoteCommitCells.prime_of.
     apply Z.mod_pos_bound.
-    exact pallas_p_pos.
+    exact OrchardForwardArith.pallas_p_pos.
   Qed.
 
   Lemma ycanon_j_range (y : Z) :
@@ -1671,13 +1669,6 @@ Module OrchardForwardLookupsWitness.
       exact (Hneq Hzero).
     Qed.
 
-    (** [two_inv] halves. *)
-    Lemma two_inv_eqm :
-      Zdiv.eqm Primes.pallas_p
-        (2 * 14474011154664524427946373126085988481681528240970780357977338382174983815169)
-        1.
-    Proof. vm_cast_no_check (@eq_refl Z 1). Qed.
-
     (** ** bits telescoping *)
 
     (** The running-sum column telescopes within a piece. *)
@@ -1780,8 +1771,6 @@ Module OrchardForwardLookupsWitness.
     Qed.
 
     (** ** table plane *)
-
-
 
     Lemma table_x_entry :
       Complete.table_lookup OrchardHonestAssignment.lookup_eqb

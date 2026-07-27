@@ -16,7 +16,7 @@
       canonicity-lookup subregions, read off the same bit-slice layer over
       the packed §5.4.8.4 note message. *)
 
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
 Require Import Stdlib.Lists.List.

@@ -50,19 +50,19 @@ Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.advice_ecc_muls.
-Require Import Garden.Orchard.circuit_completeness.advice_poseidon_nullifier.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_ecc_muls.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_poseidon_nullifier.
 Require Import Garden.Orchard.circuit_proof.spend_auth_g.sign_cert.
 Require Import Garden.Orchard.circuit_proof.value_commit_r.sign_cert.
 Require Import Garden.Orchard.circuit_proof.value_commit_v.sign_cert.
 Require Import Garden.Orchard.circuit_proof.nullifier_k.sign_cert.
 Require Import Garden.Orchard.circuit_proof.note_commit_r.sign_cert.
 Require Import Garden.Orchard.circuit_proof.commit_ivk_r.sign_cert.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.tables.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.generator.tables.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.forward.fixed_base_certs.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
@@ -118,45 +118,6 @@ Module OrchardForwardFixedBase.
             sel arg = true ->
           eval_lookup_argument (OrchardHonestAssignment.honest_assignment w)
             (region, row) 1024 arg.
-
-  (** ** Decidable equality on expressions and constraints
-
-      Used by the [vm_compute] gate-classification certificates: every
-      constraint body guarded by a fixed-base selector is pinned to one of
-      its gate's bodies. *)
-
-  Definition rotation_eq_dec (x y : Rotation.t) : {x = y} + {x <> y}.
-  Proof. decide equality; apply Z.eq_dec. Defined.
-
-  Definition expression_eq_dec (x y : Expression.t columns)
-      : {x = y} + {x <> y}.
-  Proof.
-    decide equality;
-      first
-        [ apply Z.eq_dec
-        | apply rotation_eq_dec
-        | apply OrchardDecidableEq.selector_eq_dec
-        | apply OrchardDecidableEq.fixed_eq_dec
-        | apply OrchardDecidableEq.advice_eq_dec
-        | apply OrchardDecidableEq.instance_eq_dec ].
-  Defined.
-
-  Definition constraint_eq_dec (x y : Constraint.t columns)
-      : {x = y} + {x <> y}.
-  Proof.
-    decide equality;
-      first
-        [ apply expression_eq_dec
-        | apply OrchardDecidableEq.selector_eq_dec
-        | apply Nat.eq_dec ].
-  Defined.
-
-  Definition constraint_eqb
-      : Constraint.t columns -> Constraint.t columns -> bool :=
-    OrchardDecidableEq.dec_to_eqb constraint_eq_dec.
-  Definition constraint_eqb_eq (x y : Constraint.t columns) :
-      constraint_eqb x y = true <-> x = y :=
-    OrchardDecidableEq.dec_to_eqb_eq constraint_eq_dec x y.
 
   (** ** The gate bodies
 
@@ -294,10 +255,10 @@ Module OrchardForwardFixedBase.
             | Constraint.Select s body =>
                 if OrchardDecidableEq.selector_eqb s Selector.QMulFixedFull
                 then
-                  constraint_eqb body (check_x_body w_full_e)
-                  || constraint_eqb body check_y_body
-                  || constraint_eqb body on_curve_body
-                  || constraint_eqb body range_full_body
+                  OrchardDecidableEq.constraint_eqb body (check_x_body w_full_e)
+                  || OrchardDecidableEq.constraint_eqb body check_y_body
+                  || OrchardDecidableEq.constraint_eqb body on_curve_body
+                  || OrchardDecidableEq.constraint_eqb body range_full_body
                 else true
             | _ => true
             end)
@@ -315,10 +276,10 @@ Module OrchardForwardFixedBase.
                 if OrchardDecidableEq.selector_eqb s
                      Selector.QMulFixedRunningSum
                 then
-                  constraint_eqb body (check_x_body w_rs_e)
-                  || constraint_eqb body check_y_body
-                  || constraint_eqb body on_curve_body
-                  || constraint_eqb body range_rs_body
+                  OrchardDecidableEq.constraint_eqb body (check_x_body w_rs_e)
+                  || OrchardDecidableEq.constraint_eqb body check_y_body
+                  || OrchardDecidableEq.constraint_eqb body on_curve_body
+                  || OrchardDecidableEq.constraint_eqb body range_rs_body
                 else true
             | _ => true
             end)
@@ -335,10 +296,10 @@ Module OrchardForwardFixedBase.
             | Constraint.Select s body =>
                 if OrchardDecidableEq.selector_eqb s Selector.QMulFixedShort
                 then
-                  constraint_eqb body last_window_body
-                  || constraint_eqb body sign_check_body
-                  || constraint_eqb body y_check_body
-                  || constraint_eqb body negation_check_body
+                  OrchardDecidableEq.constraint_eqb body last_window_body
+                  || OrchardDecidableEq.constraint_eqb body sign_check_body
+                  || OrchardDecidableEq.constraint_eqb body y_check_body
+                  || OrchardDecidableEq.constraint_eqb body negation_check_body
                 else true
             | _ => true
             end)
@@ -356,14 +317,14 @@ Module OrchardForwardFixedBase.
                 if OrchardDecidableEq.selector_eqb s
                      Selector.QMulFixedBaseField
                 then
-                  constraint_eqb body canon_1_body
-                  || constraint_eqb body canon_2_body
-                  || constraint_eqb body canon_3_body
-                  || constraint_eqb body canon_4_body
-                  || constraint_eqb body canon_5_body
-                  || constraint_eqb body canon_6_body
-                  || constraint_eqb body canon_7_body
-                  || constraint_eqb body canon_8_body
+                  OrchardDecidableEq.constraint_eqb body canon_1_body
+                  || OrchardDecidableEq.constraint_eqb body canon_2_body
+                  || OrchardDecidableEq.constraint_eqb body canon_3_body
+                  || OrchardDecidableEq.constraint_eqb body canon_4_body
+                  || OrchardDecidableEq.constraint_eqb body canon_5_body
+                  || OrchardDecidableEq.constraint_eqb body canon_6_body
+                  || OrchardDecidableEq.constraint_eqb body canon_7_body
+                  || OrchardDecidableEq.constraint_eqb body canon_8_body
                 else true
             | _ => true
             end)
@@ -399,10 +360,10 @@ Module OrchardForwardFixedBase.
     apply orb_true_iff in H2; destruct H2 as [H2 | H2];
       [apply orb_true_iff in H2; destruct H2 as [H2 | H2];
         [apply orb_true_iff in H2; destruct H2 as [H2 | H2] |] |].
-    - left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; right. exact (proj1 (constraint_eqb_eq _ _) H2).
+    - left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; right. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
   Qed.
 
   Lemma qmfrs_body_eq (gate : Gate.t columns) :
@@ -423,10 +384,10 @@ Module OrchardForwardFixedBase.
     apply orb_true_iff in H2; destruct H2 as [H2 | H2];
       [apply orb_true_iff in H2; destruct H2 as [H2 | H2];
         [apply orb_true_iff in H2; destruct H2 as [H2 | H2] |] |].
-    - left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; right. exact (proj1 (constraint_eqb_eq _ _) H2).
+    - left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; right. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
   Qed.
 
   Lemma qmfs_body_eq (gate : Gate.t columns) :
@@ -447,10 +408,10 @@ Module OrchardForwardFixedBase.
     apply orb_true_iff in H2; destruct H2 as [H2 | H2];
       [apply orb_true_iff in H2; destruct H2 as [H2 | H2];
         [apply orb_true_iff in H2; destruct H2 as [H2 | H2] |] |].
-    - left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; left. exact (proj1 (constraint_eqb_eq _ _) H2).
-    - right; right; right. exact (proj1 (constraint_eqb_eq _ _) H2).
+    - left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; left. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
+    - right; right; right. exact (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _) H2).
   Qed.
 
   Lemma qmfbf_body_eq (gate : Gate.t columns) :
@@ -477,7 +438,7 @@ Module OrchardForwardFixedBase.
               [apply orb_true_iff in H2; destruct H2 as [H2 | H2];
                 [apply orb_true_iff in H2; destruct H2 as [H2 | H2] |]
               |] |] |] |] |];
-      apply (proj1 (constraint_eqb_eq _ _)) in H2; subst body; tauto.
+      apply (proj1 (OrchardDecidableEq.constraint_eqb_eq _ _)) in H2; subst body; tauto.
   Qed.
 
   (** ** Arithmetic and plane helpers *)

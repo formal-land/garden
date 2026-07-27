@@ -3,7 +3,7 @@ Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.lemmas.
 Require Import Garden.Halo2.halo2_gadgets.ecc.chip.spec.
 Require Import Garden.Orchard.columns.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 
@@ -169,99 +169,5 @@ Module OrchardAdviceWitnessIo.
     | 8 => hi_enable_outputs w      (* ENABLE_OUTPUT *)
     | _ => 0
     end.
-
-  (** ** Layout-agreement lemmas
-
-      Small equalities documenting the copy / instance invariants the gate
-      satisfaction and read-back proofs rely on.  They fix the intended
-      values against [circuit.v]'s named constants and the copy sources;
-      the per-gate constraint proofs are the follow-up (C2) step. *)
-
-  (** The public rows land at their named constants (the [ConstrainInstance]
-      row indices of [circuit.v]). *)
-  Lemma public_instance_row_anchor (w : HonestInput) :
-    public_instance_row w Garden.Orchard.circuit.ANCHOR = anchor_public_row w.
-  Proof. reflexivity. Qed.
-
-  Lemma public_instance_row_nf_old (w : HonestInput) :
-    public_instance_row w Garden.Orchard.circuit.NF_OLD = nf_old w.
-  Proof. reflexivity. Qed.
-
-  Lemma public_instance_row_cmx (w : HonestInput) :
-    public_instance_row w Garden.Orchard.circuit.CMX = cmx w.
-  Proof. reflexivity. Qed.
-
-  Lemma public_instance_row_enable_spends (w : HonestInput) :
-    public_instance_row w Garden.Orchard.circuit.ENABLE_SPEND =
-      hi_enable_spends w.
-  Proof. reflexivity. Qed.
-
-  Lemma public_instance_row_enable_outputs (w : HonestInput) :
-    public_instance_row w Garden.Orchard.circuit.ENABLE_OUTPUT =
-      hi_enable_outputs w.
-  Proof. reflexivity. Qed.
-
-  (** The [OrchardCircuitChecks] value copies agree with their sources in the
-      [WitnessInput] regions (the [Copy v_old_target v_old] /
-      [Copy v_new_target v_new] obligations). *)
-  Lemma orchard_checks_copies_v_old (w : HonestInput) :
-    advice_witness_io w Advice.A0 RegionId.OrchardCircuitChecks 0 =
-      advice_witness_io w Advice.A0
-        (RegionId.WitnessInput RegionId.WitnessInput.VOld) 0.
-  Proof. reflexivity. Qed.
-
-  Lemma orchard_checks_copies_v_new (w : HonestInput) :
-    advice_witness_io w Advice.A1 RegionId.OrchardCircuitChecks 0 =
-      advice_witness_io w Advice.A0
-        (RegionId.WitnessInput RegionId.WitnessInput.VNew) 0.
-  Proof. reflexivity. Qed.
-
-  (** The instance copies agree with the public rows they read
-      ([Copy anchor_target anchor_instance] and the two enable-flag copies). *)
-  Lemma orchard_checks_copies_anchor (w : HonestInput) :
-    advice_witness_io w Advice.A5 RegionId.OrchardCircuitChecks 0 =
-      public_instance_row w Garden.Orchard.circuit.ANCHOR.
-  Proof. reflexivity. Qed.
-
-  Lemma orchard_checks_copies_enable_spends (w : HonestInput) :
-    advice_witness_io w Advice.A6 RegionId.OrchardCircuitChecks 0 =
-      public_instance_row w Garden.Orchard.circuit.ENABLE_SPEND.
-  Proof. reflexivity. Qed.
-
-  Lemma orchard_checks_copies_enable_outputs (w : HonestInput) :
-    advice_witness_io w Advice.A7 RegionId.OrchardCircuitChecks 0 =
-      public_instance_row w Garden.Orchard.circuit.ENABLE_OUTPUT.
-  Proof. reflexivity. Qed.
-
-  (** On a real spend ([v_old ≠ 0]) the root ([A4]) and anchor ([A5]) cells
-      coincide, discharging the [QOrchard] "root = anchor" conjunct's value
-      obligation; on a dummy spend the conjunct is waived by the [v_old = 0]
-      branch. *)
-  Lemma orchard_checks_root_anchor (w : HonestInput) :
-    hi_v_old w <> 0 ->
-    advice_witness_io w Advice.A4 RegionId.OrchardCircuitChecks 0 =
-      advice_witness_io w Advice.A5 RegionId.OrchardCircuitChecks 0.
-  Proof.
-    intro Hv.
-    apply Z.eqb_neq in Hv.
-    unfold advice_witness_io, orchard_checks_advice, anchor_public_row.
-    rewrite Z.eqb_refl, Hv.
-    reflexivity.
-  Qed.
-
-  (** The [CmOld] [A0] cell serves both the commitment x-coordinate
-      ([in_cm_old]) and the Merkle leaf ([in_leaf]): [leaf w = Point.x
-      (cm_old w)]. *)
-  Lemma witness_input_cm_old_leaf (w : HonestInput) :
-    advice_witness_io w Advice.A0
-      (RegionId.WitnessInput RegionId.WitnessInput.CmOld) 0 = leaf w.
-  Proof.
-    unfold advice_witness_io, witness_input_advice, leaf, EccSpec.extract_x.
-    (* Both sides project the [x] lane of [cm_old w]; abstracting the point
-       keeps the projection stuck, so [reflexivity] never forces the whnf of
-       the [NoteCommit] Sinsemilla fold hidden in [cm_old]. *)
-    generalize (cm_old w); intro P.
-    reflexivity.
-  Qed.
 
 End OrchardAdviceWitnessIo.

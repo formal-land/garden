@@ -10,15 +10,15 @@
     conditions), and an end-to-end machine check of the honest-witness
     generator.
 
-    Structure (see [instance_defs.v] for the shared definitions):
+    Structure (see [instance/defs.v] for the shared definitions):
 
     - [test_input]: the concrete §4.18.4 auxiliary input, certified valid and
-      nondegenerate in [instance_domain.v];
+      nondegenerate in [instance/domain.v];
     - the gate/lookup obligations of [Complete.circuit_holds_intro],
       discharged by [vm_compute] over the enabled selector points, sharded by
       region family across the [instance_shards_*] leaf files;
-    - the witness facts ([instance_witness.v]) and the [read_action_inputs]
-      read-back ([instance_read.v]).
+    - the witness facts ([instance/witness.v]) and the [read_action_inputs]
+      read-back ([instance/read.v]).
 
     The theorem inherits the model caveats of [docs/chip-model-caveats.md];
     its content is relative to the relational [circuit_holds] semantics. *)
@@ -35,20 +35,20 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
-Require Import Garden.Orchard.circuit_completeness.instance_defs.
-Require Import Garden.Orchard.circuit_completeness.instance_domain.
-Require Import Garden.Orchard.circuit_completeness.instance_mul_a.
-Require Import Garden.Orchard.circuit_completeness.instance_mul_b.
-Require Import Garden.Orchard.circuit_completeness.instance_mul_c.
-Require Import Garden.Orchard.circuit_completeness.instance_mul_d.
-Require Import Garden.Orchard.circuit_completeness.instance_read.
-Require Import Garden.Orchard.circuit_completeness.instance_witness.
-Require Import Garden.Orchard.circuit_completeness.instance_shards_merkle.
-Require Import Garden.Orchard.circuit_completeness.instance_shards_misc.
-Require Import Garden.Orchard.circuit_completeness.instance_shards_blocked.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.instance.defs.
+Require Import Garden.Orchard.circuit_completeness.instance.domain.
+Require Import Garden.Orchard.circuit_completeness.instance.mul_a.
+Require Import Garden.Orchard.circuit_completeness.instance.mul_b.
+Require Import Garden.Orchard.circuit_completeness.instance.mul_c.
+Require Import Garden.Orchard.circuit_completeness.instance.mul_d.
+Require Import Garden.Orchard.circuit_completeness.instance.read.
+Require Import Garden.Orchard.circuit_completeness.instance.witness.
+Require Import Garden.Orchard.circuit_completeness.instance.shards_merkle.
+Require Import Garden.Orchard.circuit_completeness.instance.shards_misc.
+Require Import Garden.Orchard.circuit_completeness.instance.shards_blocked.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.

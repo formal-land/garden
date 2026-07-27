@@ -7,7 +7,7 @@
     checker [check_point] with its region-family shard partition.  The
     [vm_compute] certificates over these definitions live in the sibling
     [instance_*] leaf files (so they compile in parallel and are never
-    re-paid while this file is edited); [instance_cert.v] joins them into
+    re-paid while this file is edited); [instance/cert.v] joins them into
     the instance theorem.
 
     The nondegeneracy checkers are linear: each Sinsemilla clause folds the
@@ -35,9 +35,9 @@ Require Import Garden.Orchard.decidable_eq.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.internal_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.certificates.
-Require Import Garden.Orchard.circuit_completeness.honest_assignment.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.certificates.
+Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.

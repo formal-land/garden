@@ -7,8 +7,8 @@ Require Import Garden.Halo2.halo2_gadgets.sinsemilla.hash_to_point_proof.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
-Require Import Garden.Orchard.circuit_completeness.witness_input.
-Require Import Garden.Orchard.circuit_completeness.tables_nc.
+Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.tables_nc.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
 Require Import Stdlib.ZArith.ZArith.
