@@ -225,9 +225,8 @@ in-tree Debug dump of `vk.pinned()`. Assumption audit on every new theorem:
 exactly `PrimString.string` + impredicative `Set` (the two `sigma.v`/`orbit.v`
 orbit theorems are cleaner still — impredicative `Set` only).
 
-This closes the L3 ↔ L2 arrow of the refinement ladder in
-`docs-local/circuit-compilation-plan.md`; the polynomial-identity layer
-below it is the next section.
+This closes the L3 ↔ L2 arrow of the refinement ladder; the
+polynomial-identity layer below it is the next section.
 
 ## The polynomial-identity layer (reaching L1)
 
