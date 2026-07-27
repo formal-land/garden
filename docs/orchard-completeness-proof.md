@@ -164,11 +164,12 @@ Theorem orchard_completeness_instance :
   read_action_inputs Γtest = inputs_of test_input.
 ```
 
-with `Γtest = honest_assignment test_input`. All 4,858 enabled gate points and
-all 2,964 witness facts are verified by `vm_compute`, sharded by `RegionId`
-family across `instance/shards_*.v` and `instance/witness.v`, with the
-domain and nondegeneracy certificates in `instance/domain.v` and the
-read-back in `instance/read.v`. It is a
+with `Γtest = honest_assignment test_input`. All 4,858 enabled gate points,
+all 2,964 witness facts and the reader side of the read-back are verified by
+`vm_compute` in `instance/certs.v` — together, because they share one
+evaluation of `Γtest` — with the domain and nondegeneracy certificates in
+`instance/domain.v` and the specification side of the read-back in
+`instance/read.v`. It is a
 special case of the universal theorem, retained because it is a fully
 computational witness: every cell is a closed literal.
 

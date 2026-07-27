@@ -4,11 +4,13 @@
     concrete honest input [test_input], the Boolean forms of the
     completeness-domain predicates ([valid_b], [nondegenerate_b]) with their
     soundness lemmas, the generated assignment [Γtest], and the per-point
-    checker [check_point] with its region-family shard partition.  The
-    [vm_compute] certificates over these definitions live in the sibling
-    [instance_*] leaf files (so they compile in parallel and are never
-    re-paid while this file is edited); [instance/cert.v] joins them into
-    the instance theorem.
+    checker [check_point] with its region-family shard partition, and the
+    pinned read-back value [test_action_inputs].  The [vm_compute]
+    certificates over these definitions live in the sibling leaf files,
+    grouped by the heavy computation they share rather than by subject:
+    everything reading [Γtest] in [instance/certs.v], everything reading
+    [test_input] in [instance/domain.v] and [instance/read.v].
+    [instance/cert.v] joins them into the instance theorem.
 
     The nondegeneracy checkers are linear: each Sinsemilla clause folds the
     accumulator through the message once ([sins_nondeg_go]), the Merkle
@@ -769,5 +771,120 @@ Module OrchardCompletenessInstanceDefs.
     apply List.filter_In.
     split; [exact Hin | exact Hfam].
   Qed.
+
+  (** The value both sides of the read-back certificate reduce to.
+      Pinning it lets the reader side and the specification side be
+      certified independently, in parallel, instead of being compared
+      to each other in one conversion that evaluates [inputs_of] twice. *)
+  Definition test_action_inputs : OrchardSpec.ActionInputs :=
+     {|
+        OrchardSpec.in_ak :=
+          {|
+            Point.x :=
+              23086803432884955728087073312209723542120506047735460087757239757681103736529;
+            Point.y :=
+              2008260733349480776792597907324841974075376177005355926586073894450279518853
+          |};
+        OrchardSpec.in_nk := 11;
+        OrchardSpec.in_rho_old := 12;
+        OrchardSpec.in_psi_old := 13;
+        OrchardSpec.in_cm_old :=
+          {|
+            Point.x :=
+              24630627294302742423012669121045034654997501738907340497975122850196611208508;
+            Point.y :=
+              26033792874846409567060615178532519341822716432177126186718375341188937453618
+          |};
+        OrchardSpec.in_g_d_old :=
+          {|
+            Point.x :=
+              4027241023027617754036171531542546502751647131375064771810253584944963179107;
+            Point.y :=
+              21762326383673887073830845720227757791980770399450032709429395080608314263493
+          |};
+        OrchardSpec.in_pk_d_old :=
+          {| Point.x := 0; Point.y := 0 |};
+        OrchardSpec.in_v_old := 2;
+        OrchardSpec.in_rivk := 0;
+        OrchardSpec.in_alpha := 6;
+        OrchardSpec.in_anchor_public :=
+          9554279788040663870271245084527973707977976412104891855744717376222267472079;
+        OrchardSpec.in_rcv := 4;
+        OrchardSpec.in_magnitude := 1;
+        OrchardSpec.in_sign := 1;
+        OrchardSpec.in_leaf :=
+          24630627294302742423012669121045034654997501738907340497975122850196611208508;
+        OrchardSpec.in_path :=
+          cons (pair (pair 0 1) true)
+            (cons (pair (pair 1 2) false)
+               (cons (pair (pair 2 3) true)
+                  (cons (pair (pair 3 4) false)
+                     (cons (pair (pair 4 5) false)
+                        (cons (pair (pair 5 6) false)
+                           (cons (pair (pair 6 7) false)
+                              (cons (pair (pair 7 8) false)
+                                 (cons (pair (pair 8 9) false)
+                                    (cons (pair (pair 9 10) false)
+                                       (cons (pair (pair 10 11) false)
+                                          (cons (pair (pair 11 12) false)
+                                             (cons
+                                                (pair (pair 12 13) false)
+                                                (cons
+                                                (pair (pair 13 14) false)
+                                                (cons
+                                                (pair (pair 14 15) false)
+                                                (cons
+                                                (pair (pair 15 16) false)
+                                                (cons
+                                                (pair (pair 16 17) false)
+                                                (cons
+                                                (pair (pair 17 18) false)
+                                                (cons
+                                                (pair (pair 18 19) false)
+                                                (cons
+                                                (pair (pair 19 20) false)
+                                                (cons
+                                                (pair (pair 20 21) false)
+                                                (cons
+                                                (pair (pair 21 22) false)
+                                                (cons
+                                                (pair (pair 22 23) false)
+                                                (cons
+                                                (pair (pair 23 24) false)
+                                                (cons
+                                                (pair (pair 24 25) false)
+                                                (cons
+                                                (pair (pair 25 26) false)
+                                                (cons
+                                                (pair (pair 26 27) false)
+                                                (cons
+                                                (pair (pair 27 28) false)
+                                                (cons
+                                                (pair (pair 28 29) false)
+                                                (cons
+                                                (pair (pair 29 30) false)
+                                                (cons
+                                                (pair (pair 30 31) false)
+                                                (cons
+                                                (pair (pair 31 32) false)
+                                                nil)))))))))))))))))))))))))))))));
+        OrchardSpec.in_g_d_new :=
+          {|
+            Point.x :=
+              11597971188910290580510217765257817734852330887059848818989398919746936474521;
+            Point.y :=
+              16072930402498746743190202080148926785915484279186972392222802455510868042413
+          |};
+        OrchardSpec.in_pk_d_new :=
+          {|
+            Point.x :=
+              22395455290326124500977609662008208779573158769178530571879529796377080762153;
+            Point.y :=
+              13514763571731510787947890306543887240625618236391309711294671830650954541887
+          |};
+        OrchardSpec.in_v_new := 1;
+        OrchardSpec.in_psi_new := 14;
+        OrchardSpec.in_rcm_new := 10
+      |}.
 
 End OrchardCompletenessInstanceDefs.

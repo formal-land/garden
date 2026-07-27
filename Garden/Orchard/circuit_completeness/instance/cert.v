@@ -14,11 +14,13 @@
 
     - [test_input]: the concrete §4.18.4 auxiliary input, certified valid and
       nondegenerate in [instance/domain.v];
-    - the gate/lookup obligations of [Complete.circuit_holds_intro],
-      discharged by [vm_compute] over the enabled selector points, sharded by
-      region family across the [instance_shards_*] leaf files;
-    - the witness facts ([instance/witness.v]) and the [read_action_inputs]
-      read-back ([instance/read.v]).
+    - the gate/lookup obligations of [Complete.circuit_holds_intro] over the
+      enabled selector points, the copy/constant witness facts, and the
+      reader side of the read-back — all in [instance/certs.v], which shares
+      one evaluation of [Γtest] across them;
+    - the specification side of the read-back ([instance/read.v]), which
+      touches neither [Γtest] nor the table record and so compiles in
+      parallel.
 
     The theorem inherits the model caveats of [docs/chip-model-caveats.md];
     its content is relative to the relational [circuit_holds] semantics. *)
@@ -40,11 +42,8 @@ Require Import Garden.Orchard.circuit_completeness.generator.certificates.
 Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
 Require Import Garden.Orchard.circuit_completeness.instance.defs.
 Require Import Garden.Orchard.circuit_completeness.instance.domain.
+Require Import Garden.Orchard.circuit_completeness.instance.certs.
 Require Import Garden.Orchard.circuit_completeness.instance.read.
-Require Import Garden.Orchard.circuit_completeness.instance.witness.
-Require Import Garden.Orchard.circuit_completeness.instance.shards_merkle.
-Require Import Garden.Orchard.circuit_completeness.instance.shards_misc.
-Require Import Garden.Orchard.circuit_completeness.instance.shards_blocked.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Bool.Bool.
@@ -124,6 +123,18 @@ Module OrchardCompletenessInstance.
         OrchardCompletenessInstanceShardsMisc.misc_shards_ok Hin eq_refl).
   Qed.
 
+  (** The read-back equation, composed from the two sides that were
+      certified independently against the pinned [test_action_inputs].  No
+      computation happens here: both sides are already reduced to the same
+      literal, so this is a transitivity step on proved equalities. *)
+  Lemma read_action_inputs_ok :
+    read_action_inputs Γtest = inputs_of test_input.
+  Proof.
+    exact (eq_trans
+      OrchardCompletenessInstanceReadCells.read_action_inputs_lit
+      (eq_sym OrchardCompletenessInstanceRead.inputs_of_lit)).
+  Qed.
+
   (** ** The instance theorem
 
       [Holds (honest_assignment test_input)] together with the free-witness
@@ -136,7 +147,7 @@ Module OrchardCompletenessInstance.
     read_action_inputs Γtest = inputs_of test_input.
   Proof.
     split;
-      [| exact OrchardCompletenessInstanceRead.read_action_inputs_ok].
+      [| exact read_action_inputs_ok].
     apply (Complete.circuit_holds_intro
       OrchardDecidableEq.selector_eqb OrchardDecidableEq.selector_eqb_eq
       OrchardDecidableEq.fixed_eqb OrchardDecidableEq.lookup_eqb

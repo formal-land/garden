@@ -164,16 +164,24 @@ Module OrchardWitnessInput.
       (hi_v_new w) (rho_new w) (hi_psi_new w) (hi_rcm_new w).
 
   (** §4.9 'Merkle path validity': the root reached from the leaf along the
-      authentication path. *)
+      authentication path.  The leaf is a parameter of [anchor_of_leaf] so
+      that a caller already holding it — [inputs_of] does — reaches the root
+      without recomputing [cm_old]. *)
+  Definition anchor_of_leaf (w : HonestInput) (lf : Z) : Z :=
+    OrchardSpec.anchor orchard_circuit_params lf (path_of w).
+
   Definition anchor_root (w : HonestInput) : Z :=
-    OrchardSpec.anchor orchard_circuit_params (leaf w) (path_of w).
+    anchor_of_leaf w (leaf w).
 
   (** The value of the public [ANCHOR] instance row: the passthrough on a
       dummy spend ([v_old = 0], where §4.18.4 waives path validity), the
       computed root otherwise (the [QOrchard] gate constrains
       [root = anchor] whenever [v_old ≠ 0]). *)
+  Definition anchor_public_row_of_leaf (w : HonestInput) (lf : Z) : Z :=
+    if hi_v_old w =? 0 then hi_anchor_public w else anchor_of_leaf w lf.
+
   Definition anchor_public_row (w : HonestInput) : Z :=
-    if hi_v_old w =? 0 then hi_anchor_public w else anchor_root w.
+    anchor_public_row_of_leaf w (leaf w).
 
   (** §5.4.8.4 [Commit^ivk]: the incoming viewing key derived from
       [ak], [nk], [rivk] — the variable-base scalar of §4.18.4 'Diversified
@@ -196,22 +204,29 @@ Module OrchardWitnessInput.
       reader pins them so the determinism statement is witness-free); the
       genuine [pk_d_old] / [rivk] enter through the ownership conditions
       only. *)
-  Definition inputs_of (w : HonestInput) : OrchardSpec.ActionInputs := {|
+  (** [cm_old] is a Sinsemilla commitment and [vm_compute] shares no work
+      between two applications of the same function, so the commitment, the
+      leaf extracted from it and the root folded over that leaf are bound
+      once here instead of once per field that needs them. *)
+  Definition inputs_of (w : HonestInput) : OrchardSpec.ActionInputs :=
+    let cm := cm_old w in
+    let lf := EccSpec.extract_x cm in
+    {|
     OrchardSpec.in_ak := hi_ak w;
     OrchardSpec.in_nk := hi_nk w;
     OrchardSpec.in_rho_old := hi_rho_old w;
     OrchardSpec.in_psi_old := hi_psi_old w;
-    OrchardSpec.in_cm_old := cm_old w;
+    OrchardSpec.in_cm_old := cm;
     OrchardSpec.in_g_d_old := hi_g_d_old w;
     OrchardSpec.in_pk_d_old := EccSpec.identity;
     OrchardSpec.in_v_old := hi_v_old w;
     OrchardSpec.in_rivk := 0;
     OrchardSpec.in_alpha := hi_alpha w;
-    OrchardSpec.in_anchor_public := anchor_public_row w;
+    OrchardSpec.in_anchor_public := anchor_public_row_of_leaf w lf;
     OrchardSpec.in_rcv := hi_rcv w;
     OrchardSpec.in_magnitude := magnitude w;
     OrchardSpec.in_sign := sign w;
-    OrchardSpec.in_leaf := leaf w;
+    OrchardSpec.in_leaf := lf;
     OrchardSpec.in_path := path_of w;
     OrchardSpec.in_g_d_new := hi_g_d_new w;
     OrchardSpec.in_pk_d_new := hi_pk_d_new w;
