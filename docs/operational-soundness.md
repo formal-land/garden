@@ -195,6 +195,5 @@ to a deployed prover is recorded, not hidden:
 | `Halo2/realize/constraints.v` | `constraint_to_expression_correct` (gate ↔ flattened polynomial) |
 | `Halo2/realize/sound.v` | `mock_prover_accepts`, `operational_sound`, `operational_complete` |
 | `Halo2/realize/disjoint.v` | `replay_is_ok_conflict_free`, `layouter_replay_succeeds` |
-| `Halo2/realize/smoke.v` | add-chip replay instance |
 | `Orchard/circuit_operational.v` | `orchard_replay_ok`, `orchard_operational_sound`, `orchard_action_statement_operational` |
 | `Orchard/circuit_completeness/operational/` | the completeness mirror: `orchard_grid_identification`, `orchard_operational_complete` (see `orchard-completeness-proof.md`) |

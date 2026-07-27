@@ -117,17 +117,17 @@ interpreter's gate layer only. This document is about that relational model.
    `RangeTable.word_sound` with `GeneratorTable.loaded` at
    `Lookup.TableIdx`) and the `α_0'` canonicity lookup
    (`Orchard/circuit_proof/base_field_canonicity.v`,
-   `alpha_lookup_word_range`, same pattern). The polynomial layer closes
-   this `Prop` model's loop from above: `lookup_sound` / `lookup_complete`
-   (`Halo2/plonkish/lookup_poly.v`) prove the set-membership reading of
-   `eval_lookup_argument` equivalent, for all θ, β, γ, to the five lookup
-   grand-product rules the deployed verifier checks on the cyclic domain,
-   with the tables-as-fixed-prefix coherence discharged as a `vm_compute`
-   certificate on the pinned instance
-   (`Orchard/circuit_compiled_algebraic.v`) — so the idealized membership
-   semantics is no longer a modeling choice but a proved consequence of
-   the polynomial identities (see `docs/operational-soundness.md`, "The
-   polynomial-identity layer").
+   `alpha_lookup_word_range`, same pattern). **On this branch the idealized
+   membership semantics remains a modeling choice.** The polynomial layer
+   that closes this `Prop` model's loop from above lives on
+   `valerii-huhnin@compilation-correctness`, not here: there `lookup_sound` /
+   `lookup_complete` (`Halo2/plonkish/lookup_poly.v`) prove the
+   set-membership reading of `eval_lookup_argument` equivalent, for all
+   θ, β, γ, to the five lookup grand-product rules the deployed verifier
+   checks on the cyclic domain, with the tables-as-fixed-prefix coherence
+   discharged as a `vm_compute` certificate on the pinned instance
+   (`Orchard/circuit_compiled_algebraic.v`). Neither `Halo2/plonkish/` nor
+   `Orchard/circuit_compiled*.v` is part of this branch's build.
 
 3. **No cyclic domain, no usable-row distinction.** Rows are plain integers
    and `rotated_row = row + offset` (`proof.v:58-62`); there is no `nb_rows`
@@ -330,9 +330,8 @@ The floor planner's trailing constants block enters `operational_sound` as
 an explicit extra event input with the `constants_materialized`
 correspondence (vacuous for `ConstrainConstant`-free chips,
 `operational_sound_no_tail`). The layout idealizations are thereby a
-per-placement computation (replay success, by `vm_compute` — see the
-add-chip instance in `Halo2/realize/smoke.v`) rather than trusted
-hypotheses. Both instantiation layers are proved:
+per-placement computation (replay success, by `vm_compute`) rather than
+trusted hypotheses. Both instantiation layers are proved:
 
 - `Halo2/realize/disjoint.v` — placement-generic sufficient conditions:
   `replay_is_ok` equals the decidable `conflict_free` verdict at every
@@ -414,26 +413,29 @@ hypotheses. Both instantiation layers are proved:
   inherits the ideal checker's own limits (all integer rows rather than the
   `2^k` cyclic domain, blinding rows unmodelled). The model idealizations
   listed elsewhere in this file remain in force.
-- **Cyclic-domain refinement** (item 3) — *partially discharged at the
-  compiled level.* The finite domain now exists one layer below the relational
-  model: `Halo2/plonkish/main.v`'s `Domain` carries `n = 2^k` rows,
-  `usable_rows = n - (blinding_factors + 1)`, and the `l_0`/`l_last`/`l_blind`
-  row predicates, and `compile_correct` / `plonkish_of_mock_prover`
-  (`Halo2/plonkish/`) connect it upward: compiled-gate satisfaction on the
-  cyclic domain ↔ selector-gated satisfaction on usable rows, and
-  `mock_prover_accepts` ↔ compiled-plonkish satisfaction restricted to
-  `[0, n)`, with the blinding-row vacuity and the finite-domain layout as
-  computable side conditions (`finite_domain_ok_b`), instantiated on the
-  concrete Orchard domain (k = 11, n = 2048) in `Orchard/circuit_compiled.v`.
-  What remains: the relational `proof.v` model *itself* still uses plain
-  integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap, no
-  `nb_rows`), and `satisfies_gates` still quantifies over all `(region, row)`
-  rather than each region's actual extent; folding the finite domain back into
-  the relational reading — and the tables-as-fixed-column-prefixes coherence
-  of the lookup-table work (the refinement noted at the end of [Tying lookups
-  to the loaded table](#tying-lookups-to-the-loaded-table-initlookuptables)) —
-  is still open. See `docs/operational-soundness.md` (the compiled plonkish
-  layer) and `docs-local/circuit-compilation-plan.md`.
+- **Cyclic-domain refinement** (item 3) — *open on this branch; partially
+  discharged on `valerii-huhnin@compilation-correctness`.* There the finite
+  domain exists one layer below the relational model: `Halo2/plonkish/main.v`'s
+  `Domain` carries `n = 2^k` rows, `usable_rows = n - (blinding_factors + 1)`,
+  and the `l_0`/`l_last`/`l_blind` row predicates, and `compile_correct` /
+  `plonkish_of_mock_prover` (`Halo2/plonkish/`) connect it upward:
+  compiled-gate satisfaction on the cyclic domain ↔ selector-gated
+  satisfaction on usable rows, and `mock_prover_accepts` ↔ compiled-plonkish
+  satisfaction restricted to `[0, n)`, with the blinding-row vacuity and the
+  finite-domain layout as computable side conditions (`finite_domain_ok_b`),
+  instantiated on the concrete Orchard domain (k = 11, n = 2048) in
+  `Orchard/circuit_compiled.v`. None of that is part of this branch's build,
+  where the relational model is the bottom of the stack below
+  `Halo2/realize/`.
+  What remains even there: the relational `proof.v` model *itself* still uses
+  plain integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap,
+  no `nb_rows`), and `satisfies_gates` still quantifies over all
+  `(region, row)` rather than each region's actual extent; folding the finite
+  domain back into the relational reading — and the
+  tables-as-fixed-column-prefixes coherence of the lookup-table work (the
+  refinement noted at the end of [Tying lookups to the loaded
+  table](#tying-lookups-to-the-loaded-table-initlookuptables)) — is still
+  open.
 - **Selector-off closure for short lookups** (item 2). The range-check
   chip's `LookupArgument` is now consumed (`RangeTable.word_sound` /
   `short_word_sound`, used by the var-base-mul overflow and base-field
