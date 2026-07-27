@@ -26,8 +26,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   constructive whole-circuit C1 instance `orchard_completeness_instance`
   (`Qed`, clean audit — every enabled point and witness fact machine-verified),
   the C2 forward API (`circuit_completeness/forward/`) with its per-family gate
-  and lookup obligations, and the universal C2 theorem `orchard_completeness`
-  (`Qed`, unconditional — clean assumption audit), with the assumption audit.
+  and lookup obligations, the universal C2 theorem `orchard_completeness`
+  (`Qed`, unconditional — clean assumption audit), and the operational rung
+  (`circuit_completeness/operational/`) carrying it across the replay bridge to
+  the ideal `mock_prover_accepts` checker (`orchard_operational_complete`),
+  with the assumption audit.
 - `docs/constrain-constant-fix.md`: record of the constants-mechanism gap
   — the dropped `constrain_constant` sites, the level-mismatch cause (floor
   planner vs region API, and the parity splice that hid it), and the fix with

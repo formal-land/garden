@@ -398,9 +398,20 @@ hypotheses. Both instantiation layers are proved:
   under `Garden/Orchard/` or `Garden/Halo2/` (per-file account in
   [`circuit-completeness.md`](circuit-completeness.md)).
 
-  This bounds only what completeness means here: honest witnesses are accepted
-  by the *relational* `circuit_holds` model, with the model idealizations
-  listed elsewhere in this file still in force.
+  - `OrchardOperationalAgreement.orchard_operational_complete`
+    (`Orchard/circuit_completeness/operational/main.v`, `Qed`, clean audit)
+    carries that statement across the event-replay bridge (item 6): with the
+    advice and instance planes chosen from the honest generator, the replayed
+    grid of the serialized Orchard stream is accepted by the ideal
+    `mock_prover_accepts` checker, for every valid, nondegenerate input. The
+    relational-model idealization is therefore no longer load-bearing in the
+    completeness direction either.
+
+  Completeness is a non-vacuity result in both readings: it says the honest
+  witness is accepted, not that nothing else is, and the operational rung
+  inherits the ideal checker's own limits (all integer rows rather than the
+  `2^k` cyclic domain, blinding rows unmodelled). The model idealizations
+  listed elsewhere in this file remain in force.
 - **Cyclic-domain refinement** (item 3) — *partially discharged at the
   compiled level.* The finite domain now exists one layer below the relational
   model: `Halo2/plonkish/main.v`'s `Domain` carries `n = 2^k` rows,
