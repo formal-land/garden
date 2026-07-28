@@ -28,8 +28,17 @@ Module OrchardCompletenessInstanceDomain.
   Lemma test_input_valid : valid test_input.
   Proof. exact (valid_b_sound test_input test_input_valid_b). Qed.
 
-  Lemma merkle_nondeg_cert : merkle_nondeg_b test_input = true.
+  (** The Merkle chain runs the fused checker — each layer's hash and its
+      nondegeneracy checks from one traversal — and transports along
+      [merkle_nondeg_fused_eq]. *)
+  Lemma merkle_nondeg_fused_cert : merkle_nondeg_fused_b test_input = true.
   Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+
+  Lemma merkle_nondeg_cert : merkle_nondeg_b test_input = true.
+  Proof.
+    exact (eq_trans (eq_sym (merkle_nondeg_fused_eq test_input))
+             merkle_nondeg_fused_cert).
+  Qed.
 
   Lemma nc_old_nondeg_cert :
     sins_nondeg_go

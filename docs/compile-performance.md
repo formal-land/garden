@@ -33,13 +33,16 @@ rocq compile -vok -impredicative-set -R . Garden -w -stdlib-vector \
   Orchard/circuit_proof/ladder/main.v   # checks THIS file vs .vos deps
 ```
 
-**Adding, moving or renaming a `.v` file rebuilds the whole tree.** `Garden/`'s
-top-level `Makefile` computes `VFILES` by `find`, regenerates `CoqMakefile`
-whenever that set changes, and declares `%.vo: CoqMakefile %.v` — so every
-`.vo` in the project is older than the regenerated makefile and is rebuilt,
-including the multi-hour certificate leaves. Deleting `CoqMakefile` by hand
-has the same effect. Batch file moves into a single change and budget a full
-rebuild for it; editing a file *in place* costs only its own dependents.
+**Adding a `.v` file does NOT rebuild the whole tree** (verified 2026-07-28:
+a scratch file added at the root regenerated `CoqMakefile`, and `make all`
+recompiled only that file). The generated makefile's rule
+`$(VOFILES): %.vo: %.v | $(VDFILE)` keeps the dependency file order-only, so
+a regenerated `CoqMakefile` invalidates no existing `.vo`; an earlier
+revision of this section claimed the opposite. Two real costs remain: a
+rename rebuilds the *dependents* of the old path (their recorded `.vo`
+prerequisite disappeared) — cone-sized, not tree-sized — and a deletion
+leaves the stale `_CoqProject` described under "Regenerate `_CoqProject`"
+below, which needs the forced regeneration.
 
 **Honesty constraint.** `.vos`/`-vok`-against-`.vos` trusts the skipped
 dependency proofs. It is a development accelerator only. Any "closed /
@@ -418,6 +421,18 @@ lowest one setting the wall clock by itself (31 min against 15 min for the
 highest).  Fitting `cost(i) ≈ 1.2 + 0.066·(256 − i)` seconds against the two
 measured ends balanced the four shards to 9.4–11.4 min.  Size parallel
 shards by cost, never by member count.
+
+The same rule catches a checker that shadows a fold it also computes.  The
+Merkle-chain certificate's per-layer `merkle_check` re-walked the 52-word
+layer message that `merkle_step` hashes anyway, so the chain paid every
+incomplete addition twice.  `sins_nondeg_hash_go` (`instance/defs.v`) runs
+one pass returning the checks *and* the accumulator,
+`merkle_nondeg_fused_b` chains it, and the symbolic transfer lemma
+`merkle_nondeg_fused_eq` carries the fused certificate back to the
+`merkle_nondeg_b` statement `instance/cert.v` consumes — the certificate
+fell 318 s → 163 s (2026-07-28, isolated `-time`).  When a range check and
+a value computation traverse the same chain, return both from one fold and
+certify the fused form.
 
 ### Certify each side of an equation against a literal, not against the other
 
@@ -914,26 +929,37 @@ arithmetic; see `docs/halo2-proof.md` for the rule and its mechanism.
 
 ## Current costs
 
-Full clean build (`make clean`, then `make -j32`, measured 2026-07-27 on an
-otherwise idle 32-core machine): **1 089 s wall over 399 files**, with the
-per-file times summing to 7 529 s. The wall clock is not set by a dependency
-chain but by a single file: `instance/certs.v` alone is 792 s, i.e. 73 % of
-the build, and everything else fits around it. Next are `instance/domain.v`
-(593 s) and then, well behind, `instance/read.v` (259 s) and the eight
-Sinsemilla provenance shards (≈ 257 s each, fully parallel).
+Full clean build (`make clean`, then `TIMED=1 make -j32`, measured
+2026-07-28 on an otherwise idle 32-core machine, over this branch's 423
+files, before the fused-Merkle/pinned-literal changes below): **948 s wall**,
+per-file times summing to 6 859 s. The wall clock is exactly the dependency
+critical path — `instance/certs.v`'s Require prefix (213 s, through
+`ecc/chip/mul_fixed_proof.v`, `fixed_base/main.v` and the sign certificates)
+→ `instance/certs.v` (682 s) → `instance/cert.v` →
+`operational/concrete.v` (51 s) — so the last ~730 s of the build run on a
+single core and extra cores change nothing. Next by own cost are
+`instance/domain.v` (504 s) and `instance/read.v` (220 s), then the eight
+Sinsemilla provenance shards (≈ 236 s each, fully parallel). The fused
+Merkle checker and the pinned `test_pk_d_old` literal (2026-07-28, see the
+instance-leaf entry below) then took `domain.v` to 289 s serial, `certs.v`
+to 628 s and `read.v` to 173 s, putting the projected clean-build wall near
+890 s.
 
 Measure a build total with `make clean` first: without it `make` recompiles
 only the changed cone, and a 26-file incremental rebuild reports a "build
 time" that has nothing to do with the tree. Note also that `/usr/bin/time`'s
 CPU figure for `make` undercounts, because the `rocqworker` shim runs each
 worker in its own transient systemd scope; sum the per-file `TIMED=1` times
-instead.
+instead. Per-file times recorded *inside* a `-j32` build run above their
+isolated cost (memory-bandwidth contention — `domain.v` measured 504 s
+in-build against ≈ 475 s serial on the same day), and `-time` sentence
+attribution taken from an in-build log is unreliable: the former
+"`test_input_valid_b` ≈ 330 s" figure in this file was the adjacent Merkle
+certificate's cost, mis-attributed (the real costs, from an isolated
+`-time` run, are ≈ 26 s and ≈ 318 s). Attribute sentence costs only from an
+isolated `-time` compile on an otherwise idle machine.
 
-That figure was measured over the 399 files of
-`valerii-huhnin@orchard-completeness`, so it excludes the 24 compiled-plonkish,
-pinned-vk and transcript-repr files this branch adds; those are listed
-individually among the heavy leaves below, and the whole-branch total has not
-been re-measured since they landed. The vk-commitment MSM and Vesta SRS layers
+The vk-commitment MSM and Vesta SRS layers
 are not on this branch at all — they live on `valerii-huhnin@msm-stretch`, and
 their entries are kept in a separate section at the end only because the
 pitfalls above cite them as worked examples.
@@ -1018,20 +1044,31 @@ predates the completeness-instance layer entirely. Heavy leaves:
   then per-cell lookups; the seven leaves are mutually independent and
   compile fully parallel, ≈ 16 min wall on a free machine, set by
   `instance/read.v`):
-  file totals remeasured 2026-07-27 inside the 32-way parallel clean build,
-  so they run a little above their isolated cost:
+  file totals remeasured 2026-07-28 (in-cone `-j32` figures; `domain.v`
+  serial):
   `instance/certs.v` — every certificate whose subject is `Γtest`: the
   enabled-point shards of all region families, the 2 964 copy/constant
-  witness facts, and the reader side of the read-back. 791.6 s, of which the
+  witness facts, and the reader side of the read-back. 628 s, of which the
   one-and-only `tables_of` record build is the bulk; the second and later
-  certificates in the file cost no measurable time. This is now the critical
-  path of the whole build (73 % of its wall clock);
+  certificates in the file cost no measurable time. This is the critical
+  path of the whole build (≈ 66 % of its wall clock);
   `instance/domain.v` (`valid_b`, the linear Merkle/Sinsemilla
-  nondegeneracy clauses, and the variable-base ladder chain) 593.5 s, of
-  which `test_input_valid_b` is ≈ 330 s, `mul_chain_cert` 49 s,
-  `merkle_nondeg_cert` 47 s and `nc_new_nondeg_cert` 45 s;
+  nondegeneracy clauses, and the variable-base ladder chain) 289 s serial:
+  `test_input_valid_b` 24 s, the fused Merkle-chain certificate
+  `merkle_nondeg_fused_cert` 163 s (the `merkle_nondeg_cert` transport is
+  free — see the fused-fold paragraph in the chained-quantity pitfall),
+  `nc_old_nondeg_cert` 10 s, `nc_new_nondeg_cert` 43 s (its words force
+  `rho_new = nf_old`, a Poseidon plus a full-width `mul_nullifier_k`),
+  `civk_nondeg_cert` 4.6 s and `mul_chain_cert` 44 s;
   `instance/read.v` (the specification side of the read-back: the 32-layer
-  Merkle fold of `anchor_of_leaf` plus the commitments) 258.9 s;
+  Merkle fold of `anchor_of_leaf` plus the commitments) 173 s.
+  `instance/defs.v` pins `test_pk_d_old` as a two-coordinate literal, so
+  forcing `test_input` costs no `Commit^ivk` hash and no full-width
+  multiplication (formerly ≈ 25 s re-paid by every leaf that forces the
+  input); the literal is verified, not trusted — `test_input_valid_b`
+  recomputes `[ivk w] g_d_old` from the input fields, so a wrong literal
+  fails that certificate. `test_ivk` stays a computed definition: nothing
+  forces it once `test_pk_d_old` is a literal;
   `instance/cert.v` 1.5 s, and `instance/defs.v`, `generator/tables.v`,
   `generator/tables_vb.v`, `generator/tables_nc.v` and
   `generator/honest_assignment.v` (definitions only) ≈ 2 s each.

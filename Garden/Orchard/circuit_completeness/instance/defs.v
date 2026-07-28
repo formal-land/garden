@@ -84,8 +84,17 @@ Module OrchardCompletenessInstanceDefs.
   Definition test_ivk : Z :=
     OrchardProtocolSpec.commit_ivk orchard_circuit_params
       (EccSpec.extract_x test_ak) test_nk test_rivk.
-  Definition test_pk_d_old : Point.t :=
-    PallasModel.repr (Pallas.mul test_ivk (PallasModel.unrepr test_g_d_old)).
+  (** [[test_ivk] g_d_old], pinned as a literal: forcing [test_input] then
+      costs no [Commit^ivk] hash and no full-width multiplication.  The
+      literal is verified, not trusted — [test_input_valid_b] recomputes
+      [[ivk w] g_d_old] from the input fields and compares, so a wrong
+      literal fails that certificate. *)
+  Definition test_pk_d_old : Point.t := {|
+    Point.x :=
+      5295601309186944690906940651092314872187038286355737454210209133337815685767;
+    Point.y :=
+      18150891739665653275709094995754928314983006726821911532042062894732794502883;
+  |}.
 
   Definition test_input : HonestInput := {|
     hi_path := List.map Z.of_nat (List.seq 1 32);
@@ -411,6 +420,38 @@ Module OrchardCompletenessInstanceDefs.
     exact (sins_nondeg_go_sound words Q Hgo k Hk).
   Qed.
 
+  (** ** The fused nondegeneracy-and-hash pass
+
+      One traversal of the message computes both the [sins_nondeg_go] checks
+      and the [sinsemilla_hash_to_point] accumulator, so a consumer that
+      needs a layer's hash together with its nondegeneracy pays the
+      incomplete additions once instead of twice. *)
+  Fixpoint sins_nondeg_hash_go (acc : Point.t) (ws : list Z)
+      : bool * Point.t :=
+    match ws with
+    | [] => (true, acc)
+    | wd :: ws' =>
+        let g := SinsemillaSpec.generator wd in
+        let mid := EccSpec.point_add_incomplete acc g in
+        let '(ok, out) :=
+          sins_nondeg_hash_go (EccSpec.point_add_incomplete mid acc) ws' in
+        (negb (Point.x acc =? Point.x g) &&
+         negb (Point.x acc =? Point.x mid) && ok, out)
+    end.
+
+  Lemma sins_nondeg_hash_go_spec (ws : list Z) :
+    forall acc : Point.t,
+      sins_nondeg_hash_go acc ws =
+      (sins_nondeg_go acc ws,
+       SinsemillaSpec.sinsemilla_hash_to_point acc ws).
+  Proof.
+    induction ws as [| wd ws' IH]; intro acc.
+    - reflexivity.
+    - cbn [sins_nondeg_hash_go sins_nondeg_go].
+      rewrite IH.
+      reflexivity.
+  Qed.
+
   (** ** The linear Merkle-chain nondegeneracy checker
 
       Threads the running node through the 32 layers, checking each layer's
@@ -482,6 +523,63 @@ Module OrchardCompletenessInstanceDefs.
         exact (sins_nondeg_sound _ _ Hhead).
       + rewrite (merkle_step_node w i ltac:(lia)) in Hrest.
         exact (IH (S i) ltac:(lia) Hrest j ltac:(lia)).
+  Qed.
+
+  (** ** The fused Merkle-chain certificate form
+
+      [merkle_check] and [merkle_step] each traverse the same 52-word layer
+      message, so the chain of [merkle_nondeg_b] pays every incomplete
+      addition twice.  The fused layer computes the checks and the next node
+      from one [sins_nondeg_hash_go] pass; [merkle_nondeg_fused_eq] transfers
+      a certificate of the fused form to [merkle_nondeg_b]. *)
+  Definition merkle_layer_fused (w : HonestInput) (node : Z) (i : nat)
+      : bool * Z :=
+    let '(ok, pt) :=
+      sins_nondeg_hash_go merkle_Q (merkle_words_node w node i) in
+    (ok, EccSpec.extract_x pt).
+
+  Fixpoint chain_fused_go (layer : Z -> nat -> bool * Z)
+      (node : Z) (i count : nat) : bool :=
+    match count with
+    | O => true
+    | S count' =>
+        let '(ok, node') := layer node i in
+        ok && chain_fused_go layer node' (S i) count'
+    end.
+
+  Definition merkle_nondeg_fused_b (w : HonestInput) : bool :=
+    chain_fused_go (merkle_layer_fused w) (leaf w) 0%nat 32%nat.
+
+  Lemma merkle_layer_fused_spec (w : HonestInput) (node : Z) (i : nat) :
+    merkle_layer_fused w node i =
+    (merkle_check w node i, merkle_step w node i).
+  Proof.
+    unfold merkle_layer_fused, merkle_check, merkle_step.
+    rewrite sins_nondeg_hash_go_spec.
+    unfold SinsemillaSpec.merkle_layer, SinsemillaSpec.merkle_crh,
+      SinsemillaSpec.sinsemilla_hash, merkle_words_node.
+    cbv zeta.
+    destruct (path_bit w i); reflexivity.
+  Qed.
+
+  Lemma chain_fused_go_spec (w : HonestInput) :
+    forall (count : nat) (node : Z) (i : nat),
+      chain_fused_go (merkle_layer_fused w) node i count =
+      chain_nondeg_go (merkle_step w) (merkle_check w) node i count.
+  Proof.
+    induction count as [| count' IH]; intros node i.
+    - reflexivity.
+    - cbn [chain_fused_go chain_nondeg_go].
+      rewrite merkle_layer_fused_spec.
+      cbv beta iota.
+      rewrite IH.
+      reflexivity.
+  Qed.
+
+  Lemma merkle_nondeg_fused_eq (w : HonestInput) :
+    merkle_nondeg_fused_b w = merkle_nondeg_b w.
+  Proof.
+    exact (chain_fused_go_spec w 32%nat (leaf w) 0%nat).
   Qed.
 
   (** ** The variable-base mul nondegeneracy checker
