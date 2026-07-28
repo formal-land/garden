@@ -146,6 +146,20 @@ make snapshot
 cd ..
 ```
 
+To regenerate and verify the Orchard Rust implementation snapshots from the
+pinned `third-party/halo2` and `third-party/orchard` submodules:
+
+```sh
+git submodule update --init --recursive
+scripts/check_orchard_implementation_snapshots.sh
+```
+
+The script keeps Rust build artifacts and temporary files under
+`third-party/orchard/target`. It checks the high-level Orchard JSON together
+with Garden's configure, synthesis, and selector-compression snapshots. The
+Rocq synthesis layout is intentionally not overwritten: Garden extends that
+file with typed `RegionId` mappings used by the proofs.
+
 ## Orchard Verification Visualization
 
 The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and

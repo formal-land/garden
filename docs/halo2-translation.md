@@ -296,13 +296,11 @@ snapshot is produced by ignored Orchard tests, and the structured Rocq model
 snapshot is produced by extraction:
 
 ```sh
-cd orchard
-cargo +1.85.1 test generate_action_circuit_configure_json -- --ignored --nocapture
-cargo +1.85.1 test generate_action_circuit_synthesis_json -- --ignored --nocapture
-
-cd ../garden
+git submodule update --init --recursive
+scripts/check_orchard_implementation_snapshots.sh
 opam exec -- make -C Garden orchard-json-from-model
 opam exec -- make -C Garden orchard-configure-json-compare
+opam exec -- make -C Garden orchard-synthesis-json-compare
 ```
 
 The configure JSON contains only configure-time gates and lookups, using numeric
@@ -324,6 +322,12 @@ The full synthesis trace from the Rust implementation is generated separately in
 `Garden/Orchard/Snapshots/circuit_synthesis_generated_from_implementation.json`; it
 records the same raw synthesis events that Rocq extraction regenerates into
 `Garden/Orchard/Snapshots/circuit_synthesis_generated_from_model.json` for comparison.
+
+The implementation-only selector-compression certificate is generated into
+`Garden/Orchard/Snapshots/circuit_selector_compression_generated_from_implementation.json`.
+It records the virtual-selector to fixed-column lowering performed by Halo2.
+Unlike the configure and synthesis snapshots, it does not yet have a
+Rocq-generated parity counterpart.
 
 The generated files intentionally do not encode the extra Halo2 metadata such as
 query tables, equality/permutation columns, constants, or minimum degree; those

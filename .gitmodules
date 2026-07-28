@@ -10,3 +10,9 @@
 [submodule "third-parties/brevis"]
 	path = third-party/brevis
 	url = https://github.com/brevis-network/pico.git
+[submodule "third-party/halo2"]
+	path = third-party/halo2
+	url = https://github.com/formal-land/halo2.git
+[submodule "third-party/orchard"]
+	path = third-party/orchard
+	url = https://github.com/formal-land/orchard.git

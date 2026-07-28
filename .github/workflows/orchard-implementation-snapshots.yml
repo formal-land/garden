@@ -1,0 +1,36 @@
+name: Orchard implementation snapshots
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: orchard-implementation-snapshots-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  snapshots:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Check out Garden
+      uses: actions/checkout@v4
+    - name: Check out implementation repositories
+      run: git submodule update --init --recursive third-party/halo2 third-party/orchard
+    - name: Install the Orchard Rust toolchain
+      uses: dtolnay/rust-toolchain@1.85.1
+    - name: Cache Rust build artifacts
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: third-party/orchard -> target
+    - name: Regenerate and check implementation snapshots
+      run: scripts/check_orchard_implementation_snapshots.sh
