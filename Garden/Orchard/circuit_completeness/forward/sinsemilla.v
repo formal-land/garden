@@ -2050,7 +2050,7 @@ Module OrchardForwardSinsemilla.
       cbn [sins_point_shape] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       { destruct mr; try discriminate Hshape.
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hshape Hlt].
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hidx Hge].
@@ -2078,7 +2078,7 @@ Module OrchardForwardSinsemilla.
       cbn [sins_point_shape] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + destruct mr; try discriminate Hshape.
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hidx Hrow0].
         assert (Hsec : layer_second ml = false)
@@ -2099,7 +2099,7 @@ Module OrchardForwardSinsemilla.
       cbn [sins_point_shape] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + destruct mr; try discriminate Hshape.
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hshape Hlt].
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hidx Hge].
@@ -2121,7 +2121,7 @@ Module OrchardForwardSinsemilla.
       cbn [sins_point_shape] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + destruct mr; try discriminate Hshape.
         apply Bool.andb_true_iff in Hshape; destruct Hshape as [Hidx Hrow0].
         assert (Hsec : layer_second ml = true)

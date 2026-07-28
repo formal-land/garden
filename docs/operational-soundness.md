@@ -128,7 +128,7 @@ floor-planner region starts (`Orchard/circuit_synthesis_layout.v`), and
 the recorded constants tail (`Orchard/circuit_synthesis_constants.v`).
 Every decidable premise is discharged by a `vm_compute` certificate:
 
-- `orchard_replay_ok` — replay of the full 19,617-event stream (15,047
+- `orchard_replay_ok` — replay of the full 19,679-event stream (15,067
   writes, constants tail included) succeeds on *any* witness planes;
 - `orchard_instance_free` / `orchard_flattening_ok` — the Orchard
   constraint system passes both decision procedures;

@@ -18,7 +18,7 @@ const rawCircuitGridFixture = {
     circuit: {
       id: "orchard-action",
       name: "Fixture Orchard Action circuit",
-      version: "FixedPostNu6_2",
+      version: "PostNu6_3",
       field: "pallas::Base",
       k: 11,
       rowCount: 2048,

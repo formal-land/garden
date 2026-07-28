@@ -12,9 +12,10 @@
       per-family sub-generators ([advice_witness_io], [advice_merkle_sinsemilla],
       [advice_poseidon_nullifier], [advice_ecc_muls]), each of which is total
       over [RegionId.t] and [0] outside its family;
-    - instance plane is the primary-input encoding — the nine-element public
-      sequence (anchor, [cv_net], [nf_old], [rk], [cmx], enable flags) of
-      §4.18.4 — repeated on the single [Instance_.Primary] column.
+    - instance plane is the primary-input encoding — the ten-element public
+      sequence (anchor, [cv_net], [nf_old], [rk], [cmx], enable flags, and
+      [disableCrossAddress]) of post-NU6.3 §4.18.4 — repeated on the single
+      [Instance_.Primary] column.
 
     [honest_planes_ok] establishes the selector/fixed/lookup planes are the
     honest planes by construction (definitionally), so

@@ -109,6 +109,7 @@ Module OrchardCompletenessInstanceDefs.
     hi_anchor_public := 0;
     hi_enable_spends := 1;
     hi_enable_outputs := 1;
+    hi_disable_cross_address := 0;
   |}.
 
   (** ** Boolean forms of the completeness-domain predicates
@@ -249,13 +250,15 @@ Module OrchardCompletenessInstanceDefs.
     List.forallb (fun s => range_b s Primes.pallas_p) (hi_path w) &&
     range_b (hi_pos w) (2 ^ 32) &&
     flag_b (hi_enable_spends w) &&
-    flag_b (hi_enable_outputs w).
+    flag_b (hi_enable_outputs w) &&
+    flag_b (hi_disable_cross_address w).
 
   Lemma well_typed_b_sound (w : HonestInput) :
     well_typed_b w = true -> well_typed w.
   Proof.
     unfold well_typed_b.
     intros H.
+    apply Bool.andb_true_iff in H; destruct H as [H Hflag_cross].
     apply Bool.andb_true_iff in H; destruct H as [H Hflag_out].
     apply Bool.andb_true_iff in H; destruct H as [H Hflag_sp].
     apply Bool.andb_true_iff in H; destruct H as [H Hpos].
@@ -303,13 +306,17 @@ Module OrchardCompletenessInstanceDefs.
         (proj1 (List.forallb_forall _ _) Hpath_range s Hs)). }
     split; [exact (range_b_sound _ _ Hpos) |].
     split; [exact (flag_b_sound _ Hflag_sp) |].
-    exact (flag_b_sound _ Hflag_out).
+    split; [exact (flag_b_sound _ Hflag_out) |].
+    exact (flag_b_sound _ Hflag_cross).
   Qed.
 
   Definition valid_b (w : HonestInput) : bool :=
     well_typed_b w &&
     ((hi_v_old w =? 0) || (hi_enable_spends w =? 1)) &&
     ((hi_v_new w =? 0) || (hi_enable_outputs w =? 1)) &&
+    ((hi_disable_cross_address w =? 0) ||
+      (point_t_eqb (hi_g_d_old w) (hi_g_d_new w) &&
+       point_t_eqb (hi_pk_d_old w) (hi_pk_d_new w))) &&
     point_t_eqb (hi_pk_d_old w)
       (PallasModel.repr
         (Pallas.mul (ivk w) (PallasModel.unrepr (hi_g_d_old w)))).
@@ -320,6 +327,7 @@ Module OrchardCompletenessInstanceDefs.
     unfold valid_b.
     intros H.
     apply Bool.andb_true_iff in H; destruct H as [H Hpk].
+    apply Bool.andb_true_iff in H; destruct H as [H Hcross].
     apply Bool.andb_true_iff in H; destruct H as [H Hout].
     apply Bool.andb_true_iff in H; destruct H as [Hty Hsp].
     unfold valid.
@@ -332,6 +340,14 @@ Module OrchardCompletenessInstanceDefs.
     { apply Bool.orb_true_iff in Hout.
       destruct Hout as [Hout | Hout]; [left | right];
         apply Z.eqb_eq in Hout; exact Hout. }
+    split.
+    { apply Bool.orb_true_iff in Hcross.
+      destruct Hcross as [Hdisabled | Hequal].
+      - left. apply Z.eqb_eq in Hdisabled. exact Hdisabled.
+      - right.
+        apply Bool.andb_true_iff in Hequal.
+        destruct Hequal as [Hgd Hpkd].
+        split; apply point_t_eqb_eq; assumption. }
     exact (point_t_eqb_eq _ _ Hpk).
   Qed.
 
@@ -710,6 +726,7 @@ Module OrchardCompletenessInstanceDefs.
     | RegionId.NoteCommitNewWitnessPkD => 42
     | RegionId.NoteCommitNewWitnessPsi => 42
     | RegionId.OrchardCircuitChecks => 42
+    | RegionId.PostNu63CrossAddressChecks => 42
     end.
 
   (** The enabled points of a group of region families. *)

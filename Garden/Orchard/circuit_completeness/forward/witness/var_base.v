@@ -391,7 +391,7 @@ Module OrchardWitnessVarBase.
   Lemma pkd_result (w : HonestInput) (Hv : valid w) :
     hi_pk_d_old w = OCT.t_vb_result (OCT.tables_of w).
   Proof.
-    destruct Hv as (_ & _ & _ & Hpk).
+    destruct Hv as (_ & _ & _ & _ & Hpk).
     rewrite t_vb_result_ivk.
     exact Hpk.
   Qed.

@@ -574,8 +574,8 @@ opam exec -- make -C Garden orchard-synthesis-json-compare-normalized
 The comparison checks the payload directly. Configure snapshots contain only the
 `configure` object; synthesis snapshots contain only the `events` list.
 
-Current comparison status: strict synthesis JSON comparison succeeds. The model
-and implementation both emit 19617 events, and
+Current comparison status: strict synthesis JSON comparison succeeds. The
+post-NU6.3 model and implementation both emit 19679 events, and
 `opam exec -- make -C Garden orchard-synthesis-json-compare` verifies equality
 of the event list.
 

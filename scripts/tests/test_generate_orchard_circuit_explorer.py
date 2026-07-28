@@ -212,12 +212,12 @@ class GeneratedArtifactTests(unittest.TestCase):
         self.assertEqual(len(configure["lookups"]), 3)
         self.assertEqual(sum(len(gate["constraints"]) for gate in configure["gates"]), 193)
         self.assertEqual(len(synthesis["namespaces"]), 408)
-        self.assertEqual(len(synthesis["regions"]), 394)
+        self.assertEqual(len(synthesis["regions"]), 395)
         self.assertEqual(
             sum(1 for operation in synthesis["operations"] if operation.get("regionId")),
-            14764,
+            14808,
         )
-        self.assertEqual([row["row"] for row in synthesis["instanceRows"]], list(range(9)))
+        self.assertEqual([row["row"] for row in synthesis["instanceRows"]], list(range(10)))
         self.assertEqual(diagnostics["exactGateSources"], 55)
         self.assertEqual(diagnostics["unclassifiedRegions"], 0)
         self.assertEqual(
@@ -237,13 +237,21 @@ class GeneratedArtifactTests(unittest.TestCase):
         flow_nodes = {node["id"]: node for node in self.artifact["flow"]["nodes"]}
         orchard_gate = configure["gates"][0]
         self.assertEqual(orchard_gate["selectorIds"], ["selector:0"])
-        self.assertEqual(orchard_gate["regionIds"], ["region:393"])
+        self.assertEqual(orchard_gate["regionIds"], ["region:393", "region:394"])
         self.assertEqual(orchard_gate["componentId"], "component:action-checks")
         orchard_region = next(region for region in synthesis["regions"] if region["id"] == "region:393")
         self.assertIn(orchard_gate["id"], orchard_region["gateIds"])
         self.assertEqual(
             orchard_region["metrics"]["rowRange"],
-            {"min": 1741, "max": 1741},
+            {"min": 1745, "max": 1745},
+        )
+        cross_address_region = next(
+            region for region in synthesis["regions"] if region["id"] == "region:394"
+        )
+        self.assertEqual(cross_address_region["componentId"], "component:action-checks")
+        self.assertEqual(
+            cross_address_region["metrics"]["rowRange"],
+            {"min": 1681, "max": 1684},
         )
 
         for lookup in configure["lookups"]:

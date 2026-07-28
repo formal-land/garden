@@ -3,7 +3,7 @@
   "generator_version": "1.0.0",
   "circuit": {
     "name": "Orchard Action Circuit",
-    "version": "FixedPostNu6_2",
+    "version": "PostNu6_3",
     "field": "pallas::Base",
     "k": 11,
     "witness_values": "omitted"
@@ -94,7 +94,7 @@
   "flow": {
     "bounds": {
       "width": 1280,
-      "height": 900
+      "height": 980
     },
     "nodes": [
       {
@@ -244,11 +244,11 @@
         "kind": "check",
         "title": "Orchard Action checks",
         "short_title": "Action gate",
-        "summary": "Connects value balance, anchor equality, and spend/output enable flags.",
+        "summary": "Connects value balance, anchor equality, spend/output enable flags, and the post-NU6.3 conditional cross-address restriction.",
         "position": { "x": 890, "y": 320 },
         "proof_node_ids": ["action-valid-inputs", "action-seven-outputs", "action-theorem", "capture-synthesis-model"],
         "match": [
-          { "region_names": ["Orchard circuit checks"] }
+          { "region_names": ["Orchard circuit checks", "post-NU 6.3 cross-address checks"] }
         ]
       },
       {
@@ -331,6 +331,15 @@
         "summary": "Public control flag used by the Action gate; it is a statement input, not a circuit-derived output.",
         "position": { "x": 1160, "y": 780 },
         "match": [{ "instance_rows": [8] }]
+      },
+      {
+        "id": "instance-disable-cross-address",
+        "kind": "instance-flag",
+        "title": "Cross-address control",
+        "short_title": "DISABLE_CROSS_ADDRESS · row 9",
+        "summary": "Public post-NU6.3 control: zero permits distinct receivers; a nonzero value requires the old and new expanded receivers to agree.",
+        "position": { "x": 1160, "y": 860 },
+        "match": [{ "instance_rows": [9] }]
       }
     ],
     "edges": [
@@ -356,7 +365,8 @@
       { "id": "flow-spend-rk-y", "from": "spend-authority", "to": "instance-rk-y", "label": "rk.y", "kind": "public", "summary": "Exposes the y-coordinate of the randomized spend-authority key." },
       { "id": "flow-new-note-cmx", "from": "new-note-commitment", "to": "instance-cmx", "label": "cm_new.x", "kind": "public", "summary": "Exposes the x-coordinate of the newly constructed note commitment." },
       { "id": "flow-enable-spend-action", "from": "instance-enable-spend", "to": "action-checks", "label": "enable_spends", "kind": "constraint", "summary": "Supplies the public spend-enable flag that activates the spend-side Action requirements." },
-      { "id": "flow-enable-output-action", "from": "instance-enable-output", "to": "action-checks", "label": "enable_outputs", "kind": "constraint", "summary": "Supplies the public output-enable flag that activates the output-side Action requirements." }
+      { "id": "flow-enable-output-action", "from": "instance-enable-output", "to": "action-checks", "label": "enable_outputs", "kind": "constraint", "summary": "Supplies the public output-enable flag that activates the output-side Action requirements." },
+      { "id": "flow-disable-cross-address-action", "from": "instance-disable-cross-address", "to": "action-checks", "label": "disableCrossAddress", "kind": "constraint", "summary": "Supplies the post-NU6.3 public control whose nonzero branch requires equality of both expanded receivers." }
     ]
   }
 }

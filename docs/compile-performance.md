@@ -482,7 +482,7 @@ identical stuck terms and the compare is instant; and state
 
 Two members of the same family, both observed in `Orchard/compiled/main.v`
 (2026-07-17), where the context carries hypotheses mentioning the concrete
-19,617-event stream (`orchard_events`) or the compiled system
+19,679-event stream (`orchard_events`) or the compiled system
 (`OrchardCompiledCheck.compiled`):
 
 - **Bare `discriminate` whnf-normalizes every hypothesis type** while looking
@@ -766,7 +766,7 @@ Two companions from the same enumeration:
 hypothesis `replay_is_ok orchard_events (initial_grid _ _) = true`, costs
 **445 s** in one tactic (measured 2026-07-27,
 `circuit_completeness/operational/main.v`). The wildcard grid argument makes
-`rewrite` unify through evarconv, which whnf-normalizes the 19,617-event
+`rewrite` unify through evarconv, which whnf-normalizes the 19,679-event
 stream and the initial grid on the lazy machine; the same fact composed as a
 term is instant:
 
@@ -781,7 +781,7 @@ Qed.
 ```
 
 Same family: `destruct (conflict_free orchard_synthesis_events)` sends the
-whole conflict scan (quadratic in the 15,047 writes) to the lazy machine —
+whole conflict scan (quadratic in the 15,067 writes) to the lazy machine —
 project with `Bool.andb_true_iff` instead of case-splitting the boolean. This
 is the general rule of the "unification / `fold` / `lia` vs heavy constants"
 and "never `match` on a concrete heavy computation" sections, at the
@@ -792,7 +792,7 @@ be `eq_trans`/`eq_sym`/`proj` composition, never `rewrite`, `destruct`,
 
 Two related traps recorded from the same file set (2026-07-26/27):
 
-- **`region_start_of` is a linear scan** of the 394-entry placement list
+- **`region_start_of` is a linear scan** of the 395-entry placement list
   (`circuit_synthesis_layout.v` `region_start_of_list` over `region_starts`,
   after a `region_index_of` traversal of the nested `RegionId`). Calling it in the
   inner loop of a per-point scan is quadratic-times-linear: a 4,858 × 4,858
@@ -944,8 +944,9 @@ predates the completeness-instance layer entirely. Heavy leaves:
 
 - `Orchard/circuit_operational.v` (2026-07-14): 17.8 s / 1.66 GB peak —
   dominated by `orchard_replay_ok`, a single `vm_cast_no_check` VM run of
-  `replay_is_ok` on the 19,617-event Orchard stream (12.3 s; the conflict
-  check is quadratic in the 15,047 write events); the other three
+  `replay_is_ok` on the 19,679-event Orchard stream (12.3 s before the
+  post-NU6.3 update; the conflict check is quadratic in the 15,067 write
+  events); the other three
   `vm_compute` certificates (`constants_materialized` coverage,
   `instance_free`, `flattening_ok`) are < 0.5 s each, and
   `orchard_operational_sound` pays ≈ 4.5 s of delta conversion at
@@ -1160,7 +1161,8 @@ relying on the numbers.
   `Orchard/vk_msm_data_fixed0.v` ≈ 19 s (2 × 2048 pasted literals + two
   checkpoint points);
   `Orchard/vk_msm_calibrate.v` ≈ 110 s — the replayed-column certificate
-  (≈ 17 s: the 19,617-event replay + 2048 installed-plane reads), the
+  (≈ 17 s before the post-NU6.3 update: the 19,679-event replay + 2048
+  installed-plane reads), the
   inverse-NTT coefficient certificate (≈ 82 s: 11-level radix-2 FFT,
   ~22.5 k modular multiplications), the sub-second range/length/
   blind-and-compare certificates, and the term-style assembly theorem;

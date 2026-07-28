@@ -235,5 +235,6 @@ Module RegionId.
   | NoteCommitNewWitnessPkD
   | NoteCommitNewWitnessPsi
   | OrchardCircuitChecks
+  | PostNu63CrossAddressChecks
   | GadgetLocal (region : GadgetLocal.t).
 End RegionId.

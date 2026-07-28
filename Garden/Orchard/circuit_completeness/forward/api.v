@@ -127,7 +127,8 @@ Module OrchardCompletenessForward.
 
   (** All 43 family indices of the partition: [0] the witness-input loads,
       [1..32] the Merkle layers, [33..41] the per-gadget families, [42] the
-      Orchard checks and the note-commitment equality/witness regions. *)
+      Orchard checks (including the post-NU6.3 rows) and the note-commitment
+      equality/witness regions. *)
   Definition all_families : list Z := List.map Z.of_nat (List.seq 0 43).
 
   Lemma family_index_range (region : RegionId.t) :
@@ -135,7 +136,7 @@ Module OrchardCompletenessForward.
   Proof.
     destruct region as
       [wi | layer mr | pr | vr | nr | sr | ar | cr | wh ncr
-      | | | | | | gr];
+      | | | | | | | gr];
       try (cbn; lia).
     - destruct layer; cbn; lia.
     - destruct wh; cbn; lia.

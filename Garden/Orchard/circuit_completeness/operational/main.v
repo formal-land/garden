@@ -200,7 +200,7 @@ Module OrchardOperationalAgreement.
       [orchard_replay_ok] already carries the prefix. *)
   (** Both steps are pure term composition.  A [rewrite] here is
       catastrophic: its occurrence search unifies the pattern against
-      [replay_is_ok orchard_events _], whose arguments are the 19,617-event
+      [replay_is_ok orchard_events _], whose arguments are the 19,679-event
       stream and the initial grid, and normalizes them on the lazy machine
       (measured 445 s for the single tactic). *)
   Lemma orchard_conflict_free : conflict_free orchard_events = true.
@@ -1117,7 +1117,7 @@ Module OrchardOperationalAgreement.
       that theorem's (stated, unused) replay premise names the synthesis
       stream at the *same* grid, whereas the Orchard honest grid is the
       replay of [orchard_synthesis_events ++ orchard_constants_events], and
-      the tail's 166 [AssignFixed] events change the fixed plane.  The route
+      the tail's 182 [AssignFixed] events change the fixed plane.  The route
       is therefore the premise-free restatement
       [operational_complete_events_app] of [replay_planes.v] — proved from
       the same three exported lemmas of [Halo2/realize/sound.v]

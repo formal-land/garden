@@ -7,7 +7,8 @@ public is only: an *anchor* (a Merkle root committing to the set of
 existing notes), the spent note's *nullifier* (preventing double spends),
 a *net value commitment* (hiding the value moved while allowing the
 transaction to balance), a randomized *spend-authorization key* `rk`, the
-new note's *commitment* `cmx`, and two enable flags. A zero-knowledge
+new note's *commitment* `cmx`, two enable flags, and the post-NU6.3
+`disableCrossAddress` control. A zero-knowledge
 proof certifies that these public values are consistent with some hidden
 witness — that the spent note exists under the anchor, that the spender
 owns it, that the nullifier and commitments are computed correctly. The
@@ -70,7 +71,12 @@ magnitude/sign pair that feeds the value commitment, a nonzero spend or
 output requires its enable flag, the spent note's fields open its
 commitment `cm_old`, and the spent note's address belongs to the spender
 (`pk_d = [ivk]·g_d` with `ivk` derived from the spending authority). The
-ownership clause needs the witnessed diversified base to have group order
+post-NU6.3 `disableCrossAddress` public input is also enforced: zero permits
+distinct old and new receivers, while every nonzero field value forces both
+the diversified bases and transmission keys to agree. The public API uses a
+Boolean flag; the circuit theorem is deliberately stronger and does not need
+to assume Booleanity. The ownership clause needs the witnessed diversified
+base to have group order
 `q`; this is proved for every on-curve Pallas point
 (`PallasOrder.pallas_mul_q_on_curve`,
 `Garden/EllipticCurve/PallasOrder.v`, by a Hasse-free counting argument)

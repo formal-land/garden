@@ -1357,7 +1357,7 @@ Module OrchardForwardFixedBase.
     pose proof (fb_dom _ _ _ Hin) as Hshape.
     pose proof (qmff_body_eq gate Hgate name body Hbody) as Hbodies.
     destruct region as [wi | layer mr | pr | vr | nr | sr | ar | cr
-      | wh ncr | | | | | | gr];
+      | wh ncr | | | | | | | gr];
       cbn in Hshape; try discriminate Hshape.
     - (* ValueCommitment *)
       destruct vr; cbn in Hshape; try discriminate Hshape.
@@ -1419,7 +1419,7 @@ Module OrchardForwardFixedBase.
     pose proof (fb_dom _ _ _ Hin) as Hshape.
     pose proof (qmfrs_body_eq gate Hgate name body Hbody) as Hbodies.
     destruct region as [wi | layer mr | pr | vr | nr | sr | ar | cr
-      | wh ncr | | | | | | gr];
+      | wh ncr | | | | | | | gr];
       cbn in Hshape; try discriminate Hshape.
     - (* ValueCommitment: the short 22-window leg. *)
       destruct vr; cbn in Hshape; try discriminate Hshape.
@@ -1520,7 +1520,7 @@ Module OrchardForwardFixedBase.
     pose proof (fb_dom _ _ _ Hin) as Hshape.
     pose proof (qmfs_body_eq gate Hgate name body Hbody) as Hbodies.
     destruct region as [wi | layer mr | pr | vr | nr | sr | ar | cr
-      | wh ncr | | | | | | gr];
+      | wh ncr | | | | | | | gr];
       cbn in Hshape; try discriminate Hshape.
     destruct vr; cbn in Hshape; try discriminate Hshape.
     apply Z.eqb_eq in Hshape. subst row.
@@ -1539,7 +1539,7 @@ Module OrchardForwardFixedBase.
     pose proof (fb_dom _ _ _ Hin) as Hshape.
     pose proof (qmfbf_body_eq gate Hgate name body Hbody) as Hbodies.
     destruct region as [wi | layer mr | pr | vr | nr | sr | ar | cr
-      | wh ncr | | | | | | gr];
+      | wh ncr | | | | | | | gr];
       cbn in Hshape; try discriminate Hshape.
     destruct nr; cbn in Hshape; try discriminate Hshape.
     apply Z.eqb_eq in Hshape. subst row.

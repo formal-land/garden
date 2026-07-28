@@ -6,8 +6,8 @@
 
     - [QOrchard] — the whole-circuit checks gate ([circuit.v]
       [orchard_circuit_checks_gate]): the magnitude/sign split of the net
-      value, the anchor equality on an active spend, and the two enable-flag
-      clauses;
+      value, the anchor equality on an active spend, the two enable-flag
+      clauses, and the four post-NU6.3 conditional cross-address checks;
     - [QAdd] — the nullifier scalar sum ([gadget/add_chip.v]
       [addition_gate]);
     - [QCondSwap1] / [QCondSwap2] — the Merkle cond-swap gate
@@ -52,6 +52,7 @@ Require Import Garden.EllipticCurve.Pallas.
 Require Import Garden.Halo2.PallasModel.
 Require Import Garden.Orchard.Pallas.Generators.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
+Require Import Garden.Orchard.circuit_completeness.generator.advice_witness_io.
 Require Import Garden.Orchard.circuit_completeness.generator.advice_merkle_sinsemilla.
 Require Import Garden.Orchard.circuit_completeness.generator.tables.
 Require Import Garden.Orchard.circuit_completeness.generator.honest_assignment.
@@ -271,6 +272,8 @@ Module OrchardForwardResidual.
       : bool :=
     match sel, region with
     | Selector.QOrchard, RegionId.OrchardCircuitChecks => row =? 0
+    | Selector.QOrchard, RegionId.PostNu63CrossAddressChecks =>
+        (0 <=? row) && (row <? 4)
     | Selector.QAdd, RegionId.Nullifier RegionId.Nullifier.ScalarAdd =>
         row =? 0
     | Selector.QCondSwap1,
@@ -392,7 +395,9 @@ Module OrchardForwardResidual.
 
       The [OrchardCircuitChecks] row carries [v_old], [v_new], the
       magnitude/sign split, the computed Merkle root, the public anchor row
-      and the two enable flags. *)
+      and the two enable flags.  The same gate is also enabled on the four
+      [PostNu63CrossAddressChecks] rows; those rows are handled immediately
+      after the original whole-circuit row. *)
 
   Lemma cell_chk_a0 (w : HonestInput) :
     (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
@@ -487,6 +492,140 @@ Module OrchardForwardResidual.
     - destruct Houtputs as [Hzero | Hflag].
       + left. rewrite cell_chk_a1. exact (from_eq_zero _ Hzero).
       + right. rewrite cell_chk_a7, Hflag. reflexivity.
+  Qed.
+
+  (** ** The post-NU6.3 cross-address rows ([QOrchard])
+
+      Each row compares one coordinate of the old and new expanded
+      receivers.  The copied public flag occupies [A0] and [A2]; constants
+      make the first, third, and fourth [QOrchard] bodies tautological.  The
+      second body is exactly [flag = 0 \/ old_coordinate = new_coordinate],
+      which follows from the final input-side clause of [valid]. *)
+
+  Definition cross_coordinate (g_d pk_d : Point.t) (row : Z) : Z :=
+    match row with
+    | 0 => Point.x g_d
+    | 1 => Point.y g_d
+    | 2 => Point.x pk_d
+    | 3 => Point.y pk_d
+    | _ => 0
+    end.
+
+  Lemma cross_row_active (row : Z) (Hlo : 0 <= row) (Hhi : row < 4) :
+    (0 <=? row) && (row <? 4) = true.
+  Proof.
+    apply andb_true_iff.
+    split; [apply Z.leb_le | apply Z.ltb_lt]; assumption.
+  Qed.
+
+  Lemma cell_cross (w : HonestInput) (column : Advice.t) (row : Z) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      column RegionId.PostNu63CrossAddressChecks row =
+    OrchardAdviceWitnessIo.cross_address_checks_advice w column row.
+  Proof. reflexivity. Qed.
+
+  Ltac cross_cell :=
+    rewrite cell_cross;
+    unfold OrchardAdviceWitnessIo.cross_address_checks_advice;
+    rewrite cross_row_active by assumption;
+    reflexivity.
+
+  Lemma cell_cross_a0 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A0 RegionId.PostNu63CrossAddressChecks row =
+    hi_disable_cross_address w.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a1 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A1 RegionId.PostNu63CrossAddressChecks row = 0.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a2 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A2 RegionId.PostNu63CrossAddressChecks row =
+    hi_disable_cross_address w.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a3 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A3 RegionId.PostNu63CrossAddressChecks row = 1.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a4 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A4 RegionId.PostNu63CrossAddressChecks row =
+    cross_coordinate (hi_g_d_old w) (hi_pk_d_old w) row.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a5 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A5 RegionId.PostNu63CrossAddressChecks row =
+    cross_coordinate (hi_g_d_new w) (hi_pk_d_new w) row.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a6 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A6 RegionId.PostNu63CrossAddressChecks row = 1.
+  Proof. cross_cell. Qed.
+
+  Lemma cell_cross_a7 (w : HonestInput) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4) :
+    (OrchardHonestAssignment.honest_assignment w).(Assignment.advice)
+      Advice.A7 RegionId.PostNu63CrossAddressChecks row = 1.
+  Proof. cross_cell. Qed.
+
+  Lemma cross_coordinate_eq
+      (g_d_old pk_d_old g_d_new pk_d_new : Point.t) (row : Z)
+      (Hg_d : g_d_old = g_d_new) (Hpk_d : pk_d_old = pk_d_new) :
+    cross_coordinate g_d_old pk_d_old row =
+    cross_coordinate g_d_new pk_d_new row.
+  Proof. now rewrite Hg_d, Hpk_d. Qed.
+
+  Lemma rotated_cur (row : Z) : rotated_row row Rotation.cur = row.
+  Proof. cbn [rotated_row Rotation.cur]. apply Z.add_0_r. Qed.
+
+  Ltac ev_cross_cells :=
+    cbn [eval_constraint eval_expression ac];
+    rewrite ?rotated_cur.
+
+  Lemma cross_address_point
+      (w : HonestInput) (Hvalid : valid w) (row : Z)
+      (Hlo : 0 <= row) (Hhi : row < 4)
+      (body : Constraint.t columns) (Hb : List.In body orchard_bodies) :
+    eval_constraint (OrchardHonestAssignment.honest_assignment w)
+      (RegionId.PostNu63CrossAddressChecks, row) body.
+  Proof.
+    destruct Hvalid as (_ & _ & _ & Hcross & _).
+    cbv [orchard_bodies] in Hb.
+    destruct Hb as [<- | [<- | [<- | [<- | [] ] ] ] ]; ev_cross_cells.
+    - rewrite (cell_cross_a0 w row Hlo Hhi),
+        (cell_cross_a1 w row Hlo Hhi),
+        (cell_cross_a2 w row Hlo Hhi),
+        (cell_cross_a3 w row Hlo Hhi).
+      mod_ring_solve.
+    - destruct Hcross as [Hflag | (Hg_d & Hpk_d)].
+      + left.
+        rewrite (cell_cross_a0 w row Hlo Hhi).
+        exact (from_eq_zero _ Hflag).
+      + right.
+        rewrite (cell_cross_a4 w row Hlo Hhi),
+          (cell_cross_a5 w row Hlo Hhi),
+          (cross_coordinate_eq _ _ _ _ row Hg_d Hpk_d).
+        reflexivity.
+    - right.
+      rewrite (cell_cross_a6 w row Hlo Hhi).
+      reflexivity.
+    - left.
+      rewrite (cell_cross_a1 w row Hlo Hhi).
+      reflexivity.
   Qed.
 
   (** ** Merkle layer data: the cells of the two Merkle gate regions *)
@@ -1222,7 +1361,8 @@ Module OrchardForwardResidual.
       The shape certificate turns an enabled point guarded by one of the six
       selectors into its region and row, the [guarded_*_eq] certificates turn
       the constraint into one of the pinned bodies, and the point lemmas
-      discharge it. *)
+      discharge it.  [QOrchard] has two region cases: its original checks row
+      and the four post-NU6.3 cross-address rows. *)
   Theorem residual_gates_forward : residual_selector_gates_ok.
   Proof.
     intros w Hvalid Hnondeg sel region row Hin Hres gate Hgate name body Hbody.
@@ -1238,13 +1378,21 @@ Module OrchardForwardResidual.
       try discriminate Hsh;
       destruct region as
         [wi | layer mr | pr | vr | nr | sr | ar | cr | wh ncr
-        | | | | | | gr];
+        | | | | | | | gr];
       try discriminate Hsh.
     (* [QOrchard]: the whole-circuit checks row. *)
     { cbn [residual_shape] in Hsh.
       apply Z.eqb_eq in Hsh. subst row.
       rewrite guarded_orchard_eq in Hb.
       exact (orchard_point w Hvalid body Hb). }
+    (* [QOrchard]: the four post-NU6.3 cross-address rows. *)
+    { cbn [residual_shape] in Hsh.
+      apply andb_true_iff in Hsh.
+      destruct Hsh as [Hlo Hhi].
+      apply Z.leb_le in Hlo.
+      apply Z.ltb_lt in Hhi.
+      rewrite guarded_orchard_eq in Hb.
+      exact (cross_address_point w Hvalid row Hlo Hhi body Hb). }
     (* [QAdd]: the nullifier scalar sum row. *)
     { destruct nr; try discriminate Hsh.
       cbn [residual_shape] in Hsh.
@@ -1288,4 +1436,3 @@ Module OrchardForwardResidual.
   Qed.
 
 End OrchardForwardResidual.
-

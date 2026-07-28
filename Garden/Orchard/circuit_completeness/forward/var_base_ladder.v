@@ -2133,7 +2133,7 @@ Module OrchardVarBaseForward.
       (wpkd_region, 0) body.
   Proof.
     rewrite bodies_witness_non_id in Hbody.
-    destruct Hval as (Hty & _ & _ & Hpk).
+    destruct Hval as (Hty & _ & _ & _ & Hpk).
     assert (Hpkok : point_ok (hi_pk_d_old w)).
     { unfold well_typed in Hty.
       destruct Hty as
@@ -3097,7 +3097,7 @@ Module OrchardVarBaseForward.
   Proof.
     destruct region as
       [wi | layer mr | pr | vr | nr | sr | ar | cr | wh ncr
-      | | | | | | gr];
+      | | | | | | | gr];
       cbn in Hf; try discriminate.
     - destruct layer; cbn in Hf; discriminate.
     - exists ar; reflexivity.

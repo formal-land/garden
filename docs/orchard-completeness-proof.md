@@ -134,8 +134,15 @@ gate polynomial is unsatisfiable at a 2-torsion point.
 auxiliary input to an `Assignment.t`: the three determined planes over
 `layouter_facts circuit.synthesize`, the advice plane routed per `RegionId`
 family to four per-gadget sub-generators, and the instance plane carrying the
-nine-element public sequence. `honest_planes_ok` proves the plane conditions
+ten-element public sequence, including the post-NU6.3
+`disableCrossAddress` flag. `honest_planes_ok` proves the plane conditions
 by reflexivity, the fields being the exact honest-plane builders.
+
+The honest-input relation restricts `disableCrossAddress` to `0` or `1`.
+The current concrete completeness fixture uses `0` and deliberately keeps
+the old and new receivers distinct, exercising the ordinary cross-address
+branch. With value `1`, validity instead requires equality of both the old
+and new diversified bases and transmission keys.
 
 `generator/tables.v` hoists the per-family derivation record `tables_of w`
 that keeps the whole-circuit `vm_compute` certificates feasible (see
@@ -324,10 +331,10 @@ witness values.
 The full stream is not a literal instance of `realize/sound.v`'s
 `operational_complete`: that theorem's replay premise names the synthesis-only
 stream at the same grid, while the Orchard honest grid replays
-`orchard_synthesis_events ++ orchard_constants_events`, whose 166 trailing
+`orchard_synthesis_events ++ orchard_constants_events`, whose 182 trailing
 `AssignFixed` events change the fixed plane. The headline therefore goes
 through `operational_complete_events_app` — strictly fewer premises, a longer
-stream, the same conclusion — with the tail's 166 `Copy` obligations
+stream, the same conclusion — with the tail's 182 `Copy` obligations
 discharged separately. `orchard_operational_complete_sound` is the literal
 instance on the synthesis-only stream.
 

@@ -361,7 +361,7 @@ instantiation layers are proved:
 - `Orchard/circuit_operational.v` — the whole-circuit Orchard
   instantiation: `orchard_operational_sound` discharges every decidable
   premise of `operational_sound` by `vm_compute` certificates on the
-  19,617-event stream (replay success on symbolic witness planes,
+  19,679-event stream (replay success on symbolic witness planes,
   `instance_free`/`flattening_ok`, and the `constants_materialized`
   coverage of the concrete constants tail), so the `Holds` hypothesis of
   the Orchard action surface follows from mock acceptance of the

@@ -2738,7 +2738,7 @@ Module OrchardCompletenessForwardEccAdd.
   Proof.
     intros w Hvalid Hnd sel region row Hin Hsel gate Hgate name body Hbody.
     pose proof (ecc_shape sel region row Hin) as Hshape.
-    destruct Hvalid as (Hty & Hens & Heno & Hpkd).
+    destruct Hvalid as (Hty & Hens & Heno & _ & Hpkd).
     destruct Hty as (Hv_old & Hv_new & Halpha & Hrcv & Hrcm_old & Hrcm_new &
       Hrivk & Hnk & Hrho & Hpsi_old & Hpsi_new & Hanchor & Hak & Hgd_old &
       Hpkd_old & Hgd_new & Hpkd_new & Hpath_len & Hpath & Hpos & Hes & Heo).
@@ -2752,7 +2752,7 @@ Module OrchardCompletenessForwardEccAdd.
       cbn [ecc_shape_b] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       destruct wir; try discriminate Hshape.
       apply Z.eqb_eq in Hshape; subst row.
       assert (Hcm : wgood (t_cm_old (tables_of w))).
@@ -2777,7 +2777,7 @@ Module OrchardCompletenessForwardEccAdd.
       cbn [ecc_shape_b] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + (* WitnessInput: GDOld / AkP *)
         destruct wir; try discriminate Hshape;
           apply Z.eqb_eq in Hshape; subst row.
@@ -2833,7 +2833,7 @@ Module OrchardCompletenessForwardEccAdd.
       cbn [ecc_shape_b] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + (* ValueCommitment *)
         destruct vr; try discriminate Hshape.
         * (* ValueCommitVIncomplete, rows 1..20 *)
@@ -2982,7 +2982,7 @@ Module OrchardCompletenessForwardEccAdd.
       cbn [ecc_shape_b] in Hshape.
       destruct region as
         [wir | ml mr | pr | vr | nr | sr | air | cr | ncw ncr
-         | | | | | | glr]; try discriminate Hshape.
+         | | | | | | | glr]; try discriminate Hshape.
       + (* ValueCommitment *)
         destruct vr; try discriminate Hshape.
         * (* ValueCommitVMsb *)
