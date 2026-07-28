@@ -16,9 +16,13 @@ import type {
   WorkUnit,
 } from "./model";
 
-const GARDEN_REF = "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71";
-const HALO2_REF = "6fcb5136a9ad1a4ee452e233d65558fe1f572665";
-const ORCHARD_REF = "8da86412a213bc6681ad7ac54daa4bd2c23c45c5";
+const GARDEN_REF = "938af2a12433e420ec9da9918b0863fb99970b90";
+const HALO2_REF = "cca1dd70c5ac76daa7d9773eb9a26e33ceea9a6a";
+const ORCHARD_REF = "05d899241b7a907d9c47dc5d3d7b3aa1361d785c";
+const HALO2_CONFIG_EXPORT_REF = "c221cd295c660912a7aaaeda2ae8803d5e572dc2";
+const ORCHARD_SYNTHESIS_EXPORT_REF = "24ce0eb265919ea55d52af587305f222983b7098";
+const ORCHARD_CIRCUIT_EXPORT_REF = "e114b20d35fc6e9c8f8f82dfe11075d803b2c720";
+const PUBLIC_PR_88_REF = "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71";
 
 const GARDEN_URL = "https://github.com/formal-land/garden";
 const HALO2_URL = "https://github.com/formal-land/halo2";
@@ -37,8 +41,8 @@ export const REPOSITORIES: readonly Repository[] = [
     revisions: [
       {
         ref: GARDEN_REF,
-        shortRef: "3d15d1a",
-        label: "Public Orchard verification merge",
+        shortRef: "938af2a",
+        label: "Post-NU6.3 verification artifacts",
         date: "2026-07-28",
         publication: "public",
         url: `${GARDEN_URL}/commit/${GARDEN_REF}`,
@@ -70,11 +74,19 @@ export const REPOSITORIES: readonly Repository[] = [
     revisions: [
       {
         ref: HALO2_REF,
-        shortRef: "6fcb5136",
+        shortRef: "cca1dd70",
+        label: "Deterministic lookup-table fill ordering",
+        date: "2026-07-28",
+        publication: "public",
+        url: `${HALO2_URL}/commit/${HALO2_REF}`,
+      },
+      {
+        ref: HALO2_CONFIG_EXPORT_REF,
+        shortRef: "c221cd29",
         label: "Flattened configure JSON serialization",
         date: "2026-06-13",
         publication: "public",
-        url: `${HALO2_URL}/commit/${HALO2_REF}`,
+        url: `${HALO2_URL}/commit/${HALO2_CONFIG_EXPORT_REF}`,
       },
       {
         ref: "dirty:6e13baf0",
@@ -95,18 +107,26 @@ export const REPOSITORIES: readonly Repository[] = [
     url: ORCHARD_URL,
     revisions: [
       {
-        ref: "5b9b5c7",
-        shortRef: "5b9b5c7",
+        ref: ORCHARD_SYNTHESIS_EXPORT_REF,
+        shortRef: "24ce0eb",
         label: "Synthesis JSON dump support",
         date: "2026-06-08",
         publication: "public",
-        url: `${ORCHARD_URL}/commit/5b9b5c7`,
+        url: `${ORCHARD_URL}/commit/${ORCHARD_SYNTHESIS_EXPORT_REF}`,
+      },
+      {
+        ref: ORCHARD_CIRCUIT_EXPORT_REF,
+        shortRef: "e114b20",
+        label: "Orchard circuit export tooling",
+        date: "2026-07-03",
+        publication: "public",
+        url: `${ORCHARD_URL}/commit/${ORCHARD_CIRCUIT_EXPORT_REF}`,
       },
       {
         ref: ORCHARD_REF,
-        shortRef: "8da8641",
-        label: "Orchard circuit export tooling",
-        date: "2026-07-03",
+        shortRef: "05d8992",
+        label: "Post-NU6.3 circuit snapshots",
+        date: "2026-07-28",
         publication: "public",
         url: `${ORCHARD_URL}/commit/${ORCHARD_REF}`,
       },
@@ -487,7 +507,7 @@ export const WORK_REFERENCES: readonly WorkReference[] = [
     title: "Add Orchard circuit verification",
     date: "2026-07-27",
     status: "merged",
-    commitRef: GARDEN_REF,
+    commitRef: PUBLIC_PR_88_REF,
     url: `${GARDEN_URL}/pull/88`,
     description: "Public umbrella pull request containing the Orchard verification development.",
   },
@@ -807,7 +827,7 @@ const SOURCE_EVIDENCE: readonly EvidenceRef[] = [
     "Garden/Halo2/proof.v",
     "circuit_holds",
     "proved",
-    641,
+    645,
   ),
   gardenSource(
     "source-serialize",
@@ -992,7 +1012,7 @@ const SOURCE_EVIDENCE: readonly EvidenceRef[] = [
     "Garden/Orchard/circuit_operational.v",
     "orchard_action_statement_operational",
     "proved",
-    539,
+    543,
   ),
   gardenSource(
     "doc-soundness",
@@ -1093,41 +1113,69 @@ const SOURCE_EVIDENCE: readonly EvidenceRef[] = [
   {
     id: "halo2-config-export",
     repoId: "halo2",
-    revision: HALO2_REF,
+    revision: HALO2_CONFIG_EXPORT_REF,
     kind: "commit",
     label: "Flattened configure JSON serialization",
     description: "Narrow instrumentation that exports gates and lookups after configure flattening.",
     date: "2026-06-13",
     publication: "public",
-    url: `${HALO2_URL}/commit/${HALO2_REF}`,
+    url: `${HALO2_URL}/commit/${HALO2_CONFIG_EXPORT_REF}`,
     status: "implemented",
     tags: ["capture", "small-upstream-change"],
   },
   {
     id: "orchard-synthesis-export",
     repoId: "orchard",
-    revision: "5b9b5c7",
+    revision: ORCHARD_SYNTHESIS_EXPORT_REF,
     kind: "commit",
     label: "Orchard synthesis JSON dump",
-    description: "Records Assignment-level V1 synthesis events used for the strict parity snapshot.",
+    description: "Records Assignment-level V1 synthesis events used for strict snapshot comparison.",
     date: "2026-06-08",
     publication: "public",
-    url: `${ORCHARD_URL}/commit/5b9b5c7`,
+    url: `${ORCHARD_URL}/commit/${ORCHARD_SYNTHESIS_EXPORT_REF}`,
     status: "implemented",
     tags: ["capture", "small-upstream-change"],
   },
   {
     id: "orchard-circuit-export",
     repoId: "orchard",
-    revision: ORCHARD_REF,
+    revision: ORCHARD_CIRCUIT_EXPORT_REF,
     kind: "commit",
     label: "Orchard circuit export tooling",
     description: "Adds high-level circuit and proof-test artifacts without changing the circuit statement.",
     date: "2026-07-03",
     publication: "public",
-    url: `${ORCHARD_URL}/commit/${ORCHARD_REF}`,
+    url: `${ORCHARD_URL}/commit/${ORCHARD_CIRCUIT_EXPORT_REF}`,
     status: "implemented",
     tags: ["capture", "small-upstream-change"],
+  },
+  {
+    id: "halo2-snapshot-source",
+    repoId: "halo2",
+    revision: HALO2_REF,
+    kind: "commit",
+    label: "Pinned Post-NU6.3 Halo2 source",
+    description:
+      "The Halo2 source revision used to export the flattened configuration and deterministic lookup-table fills.",
+    date: "2026-07-28",
+    publication: "public",
+    url: `${HALO2_URL}/commit/${HALO2_REF}`,
+    status: "implemented",
+    tags: ["capture", "snapshot-source"],
+  },
+  {
+    id: "orchard-snapshot-source",
+    repoId: "orchard",
+    revision: ORCHARD_REF,
+    kind: "commit",
+    label: "Pinned Post-NU6.3 Orchard source",
+    description:
+      "The Orchard source revision used for the post-NU6.3 circuit, synthesis, high-level, and proof-test artifacts.",
+    date: "2026-07-28",
+    publication: "public",
+    url: `${ORCHARD_URL}/commit/${ORCHARD_REF}`,
+    status: "implemented",
+    tags: ["capture", "snapshot-source"],
   },
   {
     id: "report-gate-side-branch",
@@ -1336,7 +1384,7 @@ const BASE_NODES: readonly Omit<ProofNode, "workUnitIds">[] = [
     carried: ["Exporter correctness is checked by parity with an independently structured Garden model."],
     metrics: [
       { label: "Upstream repositories", value: "2", detail: "Halo2 and Orchard" },
-      { label: "Pinned exporter refs", value: "3", detail: "6fcb5136, 5b9b5c7, 8da8641" },
+      { label: "Exporter provenance refs", value: "3", detail: "c221cd29, 24ce0eb, e114b20" },
     ],
     tags: ["rust", "json", "instrumentation", "v1-floor-planner"],
   },
@@ -1376,7 +1424,13 @@ const BASE_NODES: readonly Omit<ProofNode, "workUnitIds">[] = [
     status: "checked",
     track: "parity",
     repoIds: ["garden", "halo2", "orchard"],
-    evidenceIds: ["artifact-config-model", "artifact-config-rust", "halo2-config-export", "commit-configure-flatten"],
+    evidenceIds: [
+      "artifact-config-model",
+      "artifact-config-rust",
+      "halo2-snapshot-source",
+      "orchard-snapshot-source",
+      "commit-configure-flatten",
+    ],
     stageIds: ["stage-3-parity"],
     position: { x: 590, y: 170 },
     established: ["Ordered configure JSON comparison succeeds."],
@@ -1400,7 +1454,7 @@ const BASE_NODES: readonly Omit<ProofNode, "workUnitIds">[] = [
     status: "checked",
     track: "parity",
     repoIds: ["garden", "orchard"],
-    evidenceIds: ["artifact-synthesis-model", "artifact-synthesis-rust", "orchard-synthesis-export"],
+    evidenceIds: ["artifact-synthesis-model", "artifact-synthesis-rust", "orchard-snapshot-source"],
     stageIds: ["stage-3-parity", "stage-11-operational"],
     position: { x: 735, y: 265 },
     established: ["All 19,679 ordered synthesis events match under strict comparison."],
@@ -1408,9 +1462,9 @@ const BASE_NODES: readonly Omit<ProofNode, "workUnitIds">[] = [
     metrics: [
       { label: "Raw events", value: "19,679" },
       { label: "Writes replayed", value: "15,067" },
-      { label: "Fixed assignments", value: "10,186" },
-      { label: "Selector enables", value: "4,858" },
-      { label: "Copies", value: "2,964" },
+      { label: "Fixed assignments", value: "10,202" },
+      { label: "Selector enables", value: "4,862" },
+      { label: "Copies", value: "3,004" },
     ],
     tags: ["synthesis", "snapshot", "strict-comparison", "event-stream"],
   },
@@ -1923,7 +1977,7 @@ export const EDGES: readonly ProofEdge[] = [
     relation: "serializes",
     label: "implementation configure JSON",
     status: "checked",
-    evidenceIds: ["halo2-config-export", "artifact-config-rust"],
+    evidenceIds: ["halo2-snapshot-source", "orchard-snapshot-source", "artifact-config-rust"],
     stageIds: ["stage-3-parity"],
   },
   {
@@ -1945,7 +1999,7 @@ export const EDGES: readonly ProofEdge[] = [
     relation: "serializes",
     label: "implementation event stream",
     status: "checked",
-    evidenceIds: ["orchard-synthesis-export", "artifact-synthesis-rust"],
+    evidenceIds: ["orchard-snapshot-source", "artifact-synthesis-rust"],
     stageIds: ["stage-3-parity"],
   },
   {
@@ -2265,6 +2319,8 @@ const BASE_STAGES: readonly Omit<JourneyStage, "workUnitIds">[] = [
       "artifact-config-rust",
       "artifact-synthesis-model",
       "artifact-synthesis-rust",
+      "halo2-snapshot-source",
+      "orchard-snapshot-source",
     ],
     established: ["55 gates, three lookups, and 19,679 synthesis events agree."],
     carried: [
@@ -2566,7 +2622,7 @@ export const ORCHARD_VERIFICATION_DATA: OrchardVerificationData = {
       orchard: ORCHARD_REF,
     },
     caveat:
-      "The public verification snapshot is pinned to Garden PR #88. Side-branch reports and selector-compression patches remain local WIP evidence only.",
+      "The public verification snapshot is pinned to the post-NU6.3 Garden, Halo2, and Orchard revisions. Side-branch reports and selector-compression patches remain local WIP evidence only.",
   },
   development: DEVELOPMENT,
   repositories: REPOSITORIES,

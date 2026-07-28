@@ -279,9 +279,25 @@ describe("Orchard verification evidence model", () => {
   it("pins the evidence snapshot and upstream exporter revisions", () => {
     expect(data.snapshot.asOf).toBe("2026-07-28");
     expect(data.development.asOf).toBe("2026-07-28");
-    expect(data.snapshot.repositoryRefs.garden).toMatch(/^3d15d1a[0-9a-f]*$/);
-    expect(data.snapshot.repositoryRefs.halo2).toMatch(/^6fcb5136[0-9a-f]*$/);
-    expect(data.snapshot.repositoryRefs.orchard).toMatch(/^8da8641[0-9a-f]*$/);
+    expect(data.snapshot.repositoryRefs.garden).toMatch(/^938af2a[0-9a-f]*$/);
+    expect(data.snapshot.repositoryRefs.halo2).toMatch(/^cca1dd70[0-9a-f]*$/);
+    expect(data.snapshot.repositoryRefs.orchard).toMatch(/^05d8992[0-9a-f]*$/);
+
+    const manifestPath = resolve(
+      GARDEN_ROOT,
+      "scripts/orchard_circuit_explorer_manifest.v1.json",
+    );
+    const manifest = JSON.parse(readFileSync(manifestPath, "utf8")) as {
+      readonly repositories: readonly {
+        readonly id: "garden" | "halo2" | "orchard";
+        readonly revision: string;
+      }[];
+    };
+    expect(data.snapshot.repositoryRefs).toEqual(
+      Object.fromEntries(
+        manifest.repositories.map(({ id, revision }) => [id, revision]),
+      ),
+    );
 
     const revisions = new Map(
       data.repositories.map((repository) => [
@@ -292,7 +308,49 @@ describe("Orchard verification evidence model", () => {
     expect(revisions.get("garden")).toContain(data.snapshot.repositoryRefs.garden);
     expect(revisions.get("halo2")).toContain(data.snapshot.repositoryRefs.halo2);
     expect(revisions.get("orchard")).toContain(data.snapshot.repositoryRefs.orchard);
-    expect(revisions.get("orchard")).toContain("5b9b5c7");
+    expect(revisions.get("orchard")).toContain(
+      "24ce0eb265919ea55d52af587305f222983b7098",
+    );
+
+    const evidenceById = new Map(data.evidence.map((item) => [item.id, item]));
+    expect(evidenceById.get("halo2-snapshot-source")?.revision).toBe(
+      data.snapshot.repositoryRefs.halo2,
+    );
+    expect(evidenceById.get("orchard-snapshot-source")?.revision).toBe(
+      data.snapshot.repositoryRefs.orchard,
+    );
+  });
+
+  it("reports the synthesis event breakdown from the pinned snapshot", () => {
+    const snapshotPath = resolve(
+      GARDEN_ROOT,
+      "Garden/Orchard/Snapshots/circuit_synthesis_generated_from_model.json",
+    );
+    const snapshot = JSON.parse(readFileSync(snapshotPath, "utf8")) as {
+      readonly events: readonly { readonly tag: string }[];
+    };
+    const eventCounts = new Map<string, number>();
+    for (const event of snapshot.events) {
+      eventCounts.set(event.tag, (eventCounts.get(event.tag) ?? 0) + 1);
+    }
+
+    const parityNode = data.nodes.find(({ id }) => id === "parity-synthesis")!;
+    const metrics = new Map(
+      parityNode.metrics?.map(({ label, value }) => [
+        label,
+        Number(value.replaceAll(",", "")),
+      ]),
+    );
+
+    expect(metrics.get("Raw events")).toBe(snapshot.events.length);
+    expect(metrics.get("Writes replayed")).toBe(
+      (eventCounts.get("AssignFixed") ?? 0) +
+        (eventCounts.get("EnableSelector") ?? 0) +
+        (eventCounts.get("FillFromRow") ?? 0),
+    );
+    expect(metrics.get("Fixed assignments")).toBe(eventCounts.get("AssignFixed"));
+    expect(metrics.get("Selector enables")).toBe(eventCounts.get("EnableSelector"));
+    expect(metrics.get("Copies")).toBe(eventCounts.get("Copy"));
   });
 
   it("records the public verification and publication work through 28 July", () => {
@@ -311,6 +369,7 @@ describe("Orchard verification evidence model", () => {
     expect(referenceById.get(data.development.verificationPullRequestId)).toMatchObject({
       number: 88,
       status: "merged",
+      commitRef: "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
       url: "https://github.com/formal-land/garden/pull/88",
     });
     expect(referenceById.get(data.development.websitePullRequestId)).toMatchObject({
@@ -398,6 +457,9 @@ describe("Orchard verification evidence model", () => {
 
     for (const evidence of currentGardenAnchors) {
       const anchor = evidence.anchor!;
+      expect(evidence.revision, `${evidence.id} revision`).toBe(
+        data.snapshot.repositoryRefs.garden,
+      );
       expect(anchor.path, evidence.id).not.toMatch(/^(?:\/|\.\.\/)/);
       const sourcePath = resolve(GARDEN_ROOT, anchor.path);
       expect(existsSync(sourcePath), `${evidence.id}: ${anchor.path}`).toBe(true);

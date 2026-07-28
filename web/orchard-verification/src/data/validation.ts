@@ -244,9 +244,9 @@ export function validateOrchardVerificationData(
   });
 
   const requiredRefs: Readonly<Record<"garden" | "halo2" | "orchard", string>> = {
-    garden: "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
-    halo2: "6fcb5136a9ad1a4ee452e233d65558fe1f572665",
-    orchard: "8da86412a213bc6681ad7ac54daa4bd2c23c45c5",
+    garden: "938af2a12433e420ec9da9918b0863fb99970b90",
+    halo2: "cca1dd70c5ac76daa7d9773eb9a26e33ceea9a6a",
+    orchard: "05d899241b7a907d9c47dc5d3d7b3aa1361d785c",
   };
   for (const [repoId, expected] of Object.entries(requiredRefs)) {
     const actual = data.snapshot.repositoryRefs[repoId as keyof typeof requiredRefs];
