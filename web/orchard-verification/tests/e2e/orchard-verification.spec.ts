@@ -98,6 +98,10 @@ test.describe("Orchard verification journey", () => {
 
     await expect(page.getByRole("navigation", { name: "Visualization views" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Journey controls" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /PR #88 · Add Orchard circuit verification/i }))
+      .toHaveAttribute("href", "https://github.com/formal-land/garden/pull/88");
+    await expect(page.getByRole("link", { name: /PR #89 · Add Journey Pages/i }))
+      .toHaveAttribute("href", "https://github.com/formal-land/garden/pull/89");
     if ((page.viewportSize()?.width ?? 1280) > 980) {
       const snapshotContext = page.locator(".evidence-context");
       await snapshotContext.locator("summary").click();
@@ -109,7 +113,8 @@ test.describe("Orchard verification journey", () => {
     await expect(page.getByRole("article").getByText("Not yet established")).toBeVisible();
     await expect(page.locator(".stage-story .evidence-chip").filter({ hasText: gardenEvidence.label }))
       .toHaveAttribute("href", gardenEvidence.url!);
-    expect(gardenEvidence.url).toMatch(/^https:\/\/github\.com\/clarus\/garden-private\//);
+    expect(gardenEvidence.url).toMatch(/^https:\/\/github\.com\/formal-land\/garden\//);
+    await expect(page.getByLabel("Work delivered")).toBeVisible();
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
     const stageNodeList = page.getByRole("list", { name: "Proof nodes in this stage" });
     if (mobile) await expect(stageNodeList).toBeVisible();
@@ -140,15 +145,19 @@ test.describe("Orchard verification atlas", () => {
     const inspector = page.getByRole("complementary", { name: "Proof node details" });
     await expect(page.getByRole("heading", { name: "Orchard Verification Atlas" })).toBeVisible();
     await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
+    await expect(inspector.getByText("Development history")).toBeVisible();
 
     const mobile = (page.viewportSize()?.width ?? 1280) <= 760;
     if (mobile) {
+      await expect(page.getByLabel("Filter by work unit")).toBeHidden();
       await inspector.getByRole("button", { name: "Close proof node details" }).click();
       await page.getByRole("button", { name: "Filter nodes" }).click();
+      await expect(page.getByLabel("Filter by work unit")).toBeVisible();
       await page.getByRole("checkbox", { name: otherStatus.label }).check();
       await page.getByRole("button", { name: "Reset", exact: true }).click();
       await page.getByRole("tab", { name: "Graph" }).click();
     } else {
+      await expect(page.getByLabel("Filter by work unit")).toBeVisible();
       await page.getByRole("checkbox", { name: otherStatus.label }).check();
       await expect(inspector.getByRole("heading", { name: pinned.title })).toBeVisible();
       await expect(inspector.getByText(/pinned node is outside the current filters/i)).toBeVisible();

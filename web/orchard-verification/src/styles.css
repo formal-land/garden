@@ -2481,6 +2481,357 @@ input[type="range"] {
   }
 }
 
+/* Public development history shared by the Journey and Atlas. */
+
+.development-summary {
+  margin: 1rem 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-raised);
+}
+
+.development-summary__heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
+  gap: 2rem;
+  align-items: end;
+  padding: 1.4rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.development-summary__heading h2 {
+  margin-top: 0.25rem;
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", serif;
+  font-size: clamp(1.45rem, 2.5vw, 2.1rem);
+  letter-spacing: -0.025em;
+}
+
+.development-summary__heading > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.84rem;
+}
+
+.development-summary__pulls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid var(--line);
+}
+
+.development-summary__pulls > a {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+  padding: 1rem 1.5rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.development-summary__pulls > a + a {
+  border-left: 1px solid var(--line);
+}
+
+.development-summary__pulls > a:hover {
+  background: var(--surface-soft);
+}
+
+.development-summary__pulls span,
+.development-summary__pulls small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.development-summary__pulls span {
+  color: var(--evergreen);
+  font-weight: 760;
+  text-transform: uppercase;
+}
+
+.development-summary__pulls strong {
+  font-size: 0.9rem;
+}
+
+.development-summary__timeline {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.development-summary__timeline > article + article {
+  border-left: 1px solid var(--line);
+}
+
+.work-unit-panel__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.work-unit-panel__heading h3 {
+  margin: 0;
+}
+
+.work-unit-panel__heading > span {
+  color: var(--muted);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.68rem;
+}
+
+.work-unit-panel__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.work-unit-card {
+  min-width: 0;
+  padding: 0.9rem;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface-soft);
+}
+
+.development-summary__timeline .work-unit-card {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.work-unit-card > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.work-unit-card h4 {
+  margin: 0.18rem 0 0;
+  color: var(--ink-strong);
+  font-size: 0.84rem;
+}
+
+.work-unit-card > p {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.work-unit-card__meta {
+  margin: 0;
+  color: var(--evergreen);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+}
+
+.work-unit-card__count {
+  flex: none;
+  color: var(--muted);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.work-unit-card__contributors > span:first-child {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.work-unit-card__contributors a {
+  color: var(--evergreen);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
+.work-unit-card__contributors small {
+  font-size: 0.68rem;
+}
+
+.work-unit-card__references {
+  margin-top: 0.7rem;
+  border-top: 1px solid var(--line);
+}
+
+.work-unit-card__references summary {
+  padding-top: 0.65rem;
+  color: var(--ink);
+  font-size: 0.7rem;
+  font-weight: 720;
+  cursor: pointer;
+}
+
+.work-unit-card__references > div,
+.work-unit-card__references-list {
+  display: grid;
+  gap: 0.35rem;
+  margin-top: 0.55rem;
+}
+
+.work-reference {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  color: inherit;
+  background: var(--surface-raised);
+  text-decoration: none;
+}
+
+.work-reference:hover {
+  border-color: var(--line-strong);
+}
+
+.work-reference > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.work-reference strong {
+  color: var(--evergreen);
+  font-size: 0.66rem;
+}
+
+.work-reference small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.66rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stage-step__work {
+  display: block;
+  margin-top: 0.22rem;
+  color: var(--evergreen);
+  font-size: 0.64rem;
+  font-weight: 700;
+}
+
+.stage-story__work {
+  grid-column: 1 / -1;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.proof-map__filters {
+  grid-template-columns: minmax(0, 0.75fr) minmax(0, 1.1fr) minmax(11rem, 0.7fr);
+}
+
+.proof-map__work-filter {
+  display: grid;
+  align-content: start;
+  gap: 0.28rem;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 0.68rem;
+  font-weight: 730;
+}
+
+.proof-map__work-filter select {
+  width: 100%;
+  min-height: 36px;
+  padding: 0.35rem 1.8rem 0.35rem 0.5rem;
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  color: var(--ink);
+  background: var(--surface-raised);
+  font-size: 0.72rem;
+}
+
+.work-unit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.4rem;
+}
+
+.work-unit-chips > span {
+  padding: 0.2rem 0.38rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--evergreen);
+  background: var(--surface-soft);
+  font-size: 0.62rem;
+  font-weight: 680;
+}
+
+.proof-map__work-history {
+  padding: 0;
+}
+
+.proof-map__work-history .work-unit-panel__grid {
+  grid-template-columns: 1fr;
+}
+
+.proof-map__work-history .work-unit-card {
+  background: var(--surface-raised);
+}
+
+@media (max-width: 1120px) {
+  .development-summary__timeline {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .development-summary__timeline > article:nth-child(3) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .development-summary__timeline > article:nth-child(4) {
+    border-top: 1px solid var(--line);
+  }
+
+  .proof-map__filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .proof-map__work-filter {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .development-summary__heading,
+  .development-summary__pulls,
+  .development-summary__timeline,
+  .work-unit-panel__grid,
+  .proof-map__filters {
+    grid-template-columns: 1fr;
+  }
+
+  .development-summary__heading {
+    gap: 1rem;
+    padding: 1.1rem;
+  }
+
+  .development-summary__pulls > a {
+    padding: 0.9rem 1.1rem;
+  }
+
+  .development-summary__pulls > a + a {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .development-summary__timeline > article + article,
+  .development-summary__timeline > article:nth-child(4) {
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+
+  .stage-story__work {
+    padding: 1.1rem;
+  }
+
+  .proof-map__work-filter {
+    grid-column: auto;
+  }
+}
+
 /* Orchard circuit grid */
 
 .circuit-grid-page {

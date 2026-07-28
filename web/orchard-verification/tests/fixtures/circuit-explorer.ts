@@ -10,7 +10,7 @@ export const rawCircuitExplorerFixture = {
       k: 11,
     },
     repositoryRefs: {
-      garden: "8d99eeec6860f31644aebc248d9f868026bbffd5",
+      garden: "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
       halo2: "6fcb5136",
       orchard: "8da8641",
     },
@@ -428,12 +428,12 @@ export const rawCircuitExplorerFixture = {
       {
         id: "source:rocq",
         repository: "garden",
-        revision: "8d99eeec6860f31644aebc248d9f868026bbffd5",
+        revision: "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
         path: "Garden/Orchard/circuit.v",
         symbol: "Garden.Orchard.circuit.synthesize",
         line: 420,
         verification: "scanned",
-        url: "https://github.com/clarus/garden-private/blob/8d99eeec/Garden/Orchard/circuit.v#L420",
+        url: "https://github.com/formal-land/garden/blob/3d15d1a/Garden/Orchard/circuit.v#L420",
       },
       {
         id: "source:rust",

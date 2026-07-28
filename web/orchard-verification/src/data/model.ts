@@ -3,7 +3,7 @@
  *
  * The model deliberately keeps proof status, repository provenance, and URL
  * publication status separate. A locally checked theorem can therefore be
- * marked `proved` while its Garden source link remains `pending` publication.
+ * marked `proved` while its source remains local-only.
  */
 
 export type RepositoryId = "garden" | "halo2" | "orchard" | "protocol";
@@ -37,6 +37,55 @@ export type EvidenceKind =
   | "artifact"
   | "report"
   | "specification";
+
+export type WorkReferenceKind = "public-pr" | "migrated-pr" | "commit";
+
+export type WorkReferenceStatus = "merged" | "open" | "completed";
+
+export type WorkUnitScope = "verification" | "publication";
+
+export type WorkUnitStatus = "completed" | "in-progress";
+
+export interface Contributor {
+  readonly id: string;
+  readonly name: string;
+  readonly handle: string;
+  readonly url: string;
+}
+
+export interface WorkReference {
+  readonly id: string;
+  readonly kind: WorkReferenceKind;
+  readonly title: string;
+  readonly date: string;
+  readonly status: WorkReferenceStatus;
+  readonly url: string;
+  readonly number?: number;
+  readonly commitRef?: string;
+  readonly description?: string;
+}
+
+export interface WorkUnit {
+  readonly id: string;
+  readonly title: string;
+  readonly shortTitle: string;
+  readonly summary: string;
+  readonly startDate: string;
+  readonly endDate: string;
+  readonly status: WorkUnitStatus;
+  readonly scope: WorkUnitScope;
+  readonly contributorIds: readonly string[];
+  readonly referenceIds: readonly string[];
+}
+
+export interface DevelopmentRecord {
+  readonly asOf: string;
+  readonly verificationPullRequestId: string;
+  readonly websitePullRequestId: string;
+  readonly contributors: readonly Contributor[];
+  readonly references: readonly WorkReference[];
+  readonly workUnits: readonly WorkUnit[];
+}
 
 export interface RepositoryRevision {
   readonly ref: string;
@@ -108,6 +157,7 @@ export interface ProofNode {
   readonly repoIds: readonly RepositoryId[];
   readonly evidenceIds: readonly string[];
   readonly stageIds: readonly string[];
+  readonly workUnitIds: readonly string[];
   readonly position: AtlasPoint;
   readonly established: readonly string[];
   readonly carried: readonly string[];
@@ -179,6 +229,7 @@ export interface JourneyStage {
   readonly repoIds: readonly RepositoryId[];
   readonly nodeIds: readonly string[];
   readonly evidenceIds: readonly string[];
+  readonly workUnitIds: readonly string[];
   readonly established: readonly string[];
   readonly carried: readonly string[];
 }
@@ -200,6 +251,7 @@ export interface FilterOption<T extends string> {
 
 export interface OrchardVerificationData {
   readonly snapshot: EvidenceSnapshot;
+  readonly development: DevelopmentRecord;
   readonly repositories: readonly Repository[];
   readonly evidence: readonly EvidenceRef[];
   readonly clusters: readonly ProofCluster[];

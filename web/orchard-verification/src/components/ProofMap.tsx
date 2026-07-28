@@ -22,6 +22,7 @@ import type {
   RepositoryId,
 } from "../data/model";
 import { statusLabels } from "./EvidencePanel";
+import { WorkUnitChips, WorkUnitPanel } from "./WorkHistory";
 
 const NODE_WIDTH = 176;
 const NODE_HEIGHT = 78;
@@ -297,6 +298,34 @@ export function ProofMap({
     () => new Map(data.repositories.map((repository) => [repository.id, repository])),
     [data.repositories],
   );
+  const workUnitById = useMemo(
+    () => new Map(data.development.workUnits.map((workUnit) => [workUnit.id, workUnit])),
+    [data.development.workUnits],
+  );
+  const workReferenceById = useMemo(
+    () =>
+      new Map(
+        data.development.references.map((reference) => [reference.id, reference]),
+      ),
+    [data.development.references],
+  );
+  const contributorById = useMemo(
+    () =>
+      new Map(
+        data.development.contributors.map((contributor) => [
+          contributor.id,
+          contributor,
+        ]),
+      ),
+    [data.development.contributors],
+  );
+  const verificationWorkUnits = useMemo(
+    () =>
+      data.development.workUnits.filter(
+        ({ scope }) => scope === "verification",
+      ),
+    [data.development.workUnits],
+  );
 
   const focusedIds = useMemo(() => {
     const values = toIdSet(focus);
@@ -327,6 +356,7 @@ export function ProofMap({
   const [statusFilters, setStatusFilters] = useState<Set<ProofStatus>>(
     () => new Set(),
   );
+  const [workUnitFilter, setWorkUnitFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [viewMode, setViewMode] = useState<AtlasViewMode>(
@@ -396,7 +426,12 @@ export function ProofMap({
         node.repoIds.some((repoId) => repositoryFilters.has(repoId));
       const statusMatch =
         statusFilters.size === 0 || statusFilters.has(node.status);
+      const workUnitMatch =
+        !workUnitFilter || node.workUnitIds.includes(workUnitFilter);
       const cluster = clusterById.get(node.clusterId);
+      const nodeWorkUnits = node.workUnitIds
+        .map((id) => workUnitById.get(id))
+        .filter((workUnit) => workUnit !== undefined);
       const searchMatch =
         normalizedQuery.length === 0 ||
         [
@@ -409,6 +444,28 @@ export function ProofMap({
           ...node.tags,
           cluster?.title,
           cluster?.summary,
+          ...nodeWorkUnits.flatMap((workUnit) => [
+            workUnit.title,
+            workUnit.shortTitle,
+            workUnit.summary,
+            ...workUnit.contributorIds.flatMap((contributorId) => {
+              const contributor = contributorById.get(contributorId);
+              return contributor
+                ? [contributor.name, contributor.handle]
+                : [contributorId];
+            }),
+            ...workUnit.referenceIds.flatMap((referenceId) => {
+              const reference = workReferenceById.get(referenceId);
+              return reference
+                ? [
+                    reference.title,
+                    reference.number === undefined
+                      ? reference.commitRef
+                      : `${reference.kind === "migrated-pr" ? "Migrated " : ""}PR ${reference.number}`,
+                  ]
+                : [referenceId];
+            }),
+          ]),
           ...node.repoIds.flatMap((repoId) => {
             const repository = repositoryById.get(repoId);
             return repository
@@ -422,17 +479,21 @@ export function ProofMap({
           .includes(normalizedQuery);
       result.set(
         node.id,
-        repositoryMatch && statusMatch && searchMatch,
+        repositoryMatch && statusMatch && workUnitMatch && searchMatch,
       );
     }
     return result;
   }, [
     clusterById,
+    contributorById,
     data.nodes,
     repositoryById,
     repositoryFilters,
     searchQuery,
     statusFilters,
+    workReferenceById,
+    workUnitById,
+    workUnitFilter,
   ]);
 
   const resultNodes = useMemo(
@@ -512,6 +573,7 @@ export function ProofMap({
   const resetFilters = useCallback(() => {
     setRepositoryFilters(new Set());
     setStatusFilters(new Set());
+    setWorkUnitFilter("");
     setSearchQuery("");
   }, []);
 
@@ -544,6 +606,7 @@ export function ProofMap({
   const filtersAreActive =
     repositoryFilters.size > 0 ||
     statusFilters.size > 0 ||
+    Boolean(workUnitFilter) ||
     searchQuery.trim().length > 0;
   const compactPositionById = useMemo(() => {
     const positions = new Map<string, AtlasPoint>();
@@ -686,7 +749,7 @@ export function ProofMap({
           >
             Filter nodes
             {filtersAreActive
-              ? ` (${repositoryFilters.size + statusFilters.size + (searchQuery.trim() ? 1 : 0)})`
+              ? ` (${repositoryFilters.size + statusFilters.size + (workUnitFilter ? 1 : 0) + (searchQuery.trim() ? 1 : 0)})`
               : ""}
           </button>
 
@@ -711,6 +774,21 @@ export function ProofMap({
               onToggle={(id) => toggleSelection(setStatusFilters, id)}
               onClear={() => setStatusFilters(new Set())}
             />
+            <label className="proof-map__work-filter">
+              <span>Work unit</span>
+              <select
+                aria-label="Filter by work unit"
+                value={workUnitFilter}
+                onChange={(event) => setWorkUnitFilter(event.currentTarget.value)}
+              >
+                <option value="">All work units</option>
+                {verificationWorkUnits.map((workUnit) => (
+                  <option key={workUnit.id} value={workUnit.id}>
+                    {workUnit.shortTitle}
+                  </option>
+                ))}
+              </select>
+            </label>
           </div>
 
           <label className="proof-map__search">
@@ -719,7 +797,7 @@ export function ProofMap({
               type="search"
               value={searchQuery}
               aria-label="Search the atlas"
-              placeholder="Claims, sources, repositories…"
+              placeholder="Claims, PRs, contributors…"
               onChange={(event) => setSearchQuery(event.currentTarget.value)}
             />
           </label>
@@ -1312,6 +1390,7 @@ export function ProofMap({
                                 </span>
                                 <span>{node.summary}</span>
                               </button>
+                              <WorkUnitChips data={data} workUnitIds={node.workUnitIds} />
                             </li>
                           ))}
                         </ul>
@@ -1412,6 +1491,14 @@ export function ProofMap({
                   ))}
                 </dl>
               ) : null}
+
+              <div className="proof-map__inspector-section proof-map__work-history">
+                <WorkUnitPanel
+                  data={data}
+                  heading="Development history"
+                  workUnitIds={selectedNode.workUnitIds}
+                />
+              </div>
 
               <section className="proof-map__inspector-section proof-map__evidence">
                 <h3>Supporting evidence</h3>

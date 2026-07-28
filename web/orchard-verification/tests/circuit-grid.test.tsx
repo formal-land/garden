@@ -48,7 +48,7 @@ const rawCircuitGridFixture = {
       synthesis: "equal",
     },
     repositoryRefs: {
-      garden: "8d99eeec",
+      garden: "3d15d1a",
       halo2: "6fcb5136",
       orchard: "8da86412",
     },

@@ -119,8 +119,9 @@ function AtlasView() {
           <p>
             Trace the evidence chain from implementation capture to protocol
             claims. Inspect any node to see its proof state, sources,
-            dependencies, and open assumptions. Boundary nodes make the
-            remaining trust assumptions explicit.
+            development work units, pull-request history, dependencies, and
+            open assumptions. Boundary nodes make the remaining trust
+            assumptions explicit.
           </p>
         </div>
       </section>

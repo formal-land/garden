@@ -4,6 +4,7 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 import { orchardVerificationData as data } from "../src/data/content";
+import { validateOrchardVerificationData } from "../src/data/validation";
 import type {
   EvidenceRef,
   ProofEdge,
@@ -85,6 +86,10 @@ function evidenceFor(ids: readonly string[]): EvidenceRef[] {
 }
 
 describe("Orchard verification evidence model", () => {
+  it("passes runtime content validation", () => {
+    expect(validateOrchardVerificationData(data)).toEqual([]);
+  });
+
   it("uses unique IDs in every addressable collection", () => {
     expectUnique("repositories", data.repositories.map(({ id }) => id));
     expectUnique("evidence", data.evidence.map(({ id }) => id));
@@ -92,6 +97,18 @@ describe("Orchard verification evidence model", () => {
     expectUnique("nodes", data.nodes.map(({ id }) => id));
     expectUnique("edges", data.edges.map(({ id }) => id));
     expectUnique("stages", data.stages.map(({ id }) => id));
+    expectUnique(
+      "contributors",
+      data.development.contributors.map(({ id }) => id),
+    );
+    expectUnique(
+      "work references",
+      data.development.references.map(({ id }) => id),
+    );
+    expectUnique(
+      "work units",
+      data.development.workUnits.map(({ id }) => id),
+    );
 
     for (const repository of data.repositories) {
       expectUnique(
@@ -161,6 +178,13 @@ describe("Orchard verification evidence model", () => {
     const clusterIds = new Set(data.clusters.map(({ id }) => id));
     const nodeIds = new Set(data.nodes.map(({ id }) => id));
     const stageIds = new Set(data.stages.map(({ id }) => id));
+    const contributorIds = new Set(
+      data.development.contributors.map(({ id }) => id),
+    );
+    const workReferenceIds = new Set(
+      data.development.references.map(({ id }) => id),
+    );
+    const workUnitIds = new Set(data.development.workUnits.map(({ id }) => id));
 
     for (const evidence of data.evidence) {
       expect(repositoryIds.has(evidence.repoId), evidence.id).toBe(true);
@@ -186,6 +210,9 @@ describe("Orchard verification evidence model", () => {
       for (const stageId of node.stageIds) {
         expect(stageIds.has(stageId), `${node.id} -> stage ${stageId}`).toBe(true);
       }
+      for (const workUnitId of node.workUnitIds) {
+        expect(workUnitIds.has(workUnitId), `${node.id} -> work unit ${workUnitId}`).toBe(true);
+      }
     }
     for (const edge of data.edges) {
       expect(nodeIds.has(edge.from), `${edge.id} -> from ${edge.from}`).toBe(true);
@@ -208,6 +235,19 @@ describe("Orchard verification evidence model", () => {
       for (const evidenceId of stage.evidenceIds) {
         expect(evidenceIds.has(evidenceId), `${stage.id} -> evidence ${evidenceId}`).toBe(true);
       }
+      for (const workUnitId of stage.workUnitIds) {
+        expect(workUnitIds.has(workUnitId), `${stage.id} -> work unit ${workUnitId}`).toBe(true);
+      }
+    }
+    for (const workUnit of data.development.workUnits) {
+      for (const contributorId of workUnit.contributorIds) {
+        expect(contributorIds.has(contributorId), `${workUnit.id} -> contributor ${contributorId}`)
+          .toBe(true);
+      }
+      for (const referenceId of workUnit.referenceIds) {
+        expect(workReferenceIds.has(referenceId), `${workUnit.id} -> reference ${referenceId}`)
+          .toBe(true);
+      }
     }
   });
 
@@ -224,16 +264,22 @@ describe("Orchard verification evidence model", () => {
       expect(stage.evidenceIds.length, `${stage.id} evidence`).toBeGreaterThan(0);
       expect(stage.established.length, `${stage.id} established facts`).toBeGreaterThan(0);
       expect(stage.carried.length, `${stage.id} carried facts`).toBeGreaterThan(0);
+      expect(stage.workUnitIds.length, `${stage.id} work units`).toBeGreaterThan(0);
       expect(stage.date, `${stage.id} date`).not.toHaveLength(0);
     }
 
     for (const node of data.nodes) {
       expect(node.stageIds.length, `${node.id} stage coverage`).toBeGreaterThan(0);
+      if (node.status !== "wip") {
+        expect(node.workUnitIds.length, `${node.id} work units`).toBeGreaterThan(0);
+      }
     }
   });
 
   it("pins the evidence snapshot and upstream exporter revisions", () => {
-    expect(data.snapshot.repositoryRefs.garden).toMatch(/^8d99eee[0-9a-f]*$/);
+    expect(data.snapshot.asOf).toBe("2026-07-28");
+    expect(data.development.asOf).toBe("2026-07-28");
+    expect(data.snapshot.repositoryRefs.garden).toMatch(/^3d15d1a[0-9a-f]*$/);
     expect(data.snapshot.repositoryRefs.halo2).toMatch(/^6fcb5136[0-9a-f]*$/);
     expect(data.snapshot.repositoryRefs.orchard).toMatch(/^8da8641[0-9a-f]*$/);
 
@@ -247,6 +293,49 @@ describe("Orchard verification evidence model", () => {
     expect(revisions.get("halo2")).toContain(data.snapshot.repositoryRefs.halo2);
     expect(revisions.get("orchard")).toContain(data.snapshot.repositoryRefs.orchard);
     expect(revisions.get("orchard")).toContain("5b9b5c7");
+  });
+
+  it("records the public verification and publication work through 28 July", () => {
+    const verificationUnits = data.development.workUnits.filter(
+      ({ scope }) => scope === "verification",
+    );
+    const publicationUnits = data.development.workUnits.filter(
+      ({ scope }) => scope === "publication",
+    );
+    expect(verificationUnits).toHaveLength(10);
+    expect(publicationUnits).toHaveLength(4);
+
+    const referenceById = new Map(
+      data.development.references.map((reference) => [reference.id, reference]),
+    );
+    expect(referenceById.get(data.development.verificationPullRequestId)).toMatchObject({
+      number: 88,
+      status: "merged",
+      url: "https://github.com/formal-land/garden/pull/88",
+    });
+    expect(referenceById.get(data.development.websitePullRequestId)).toMatchObject({
+      number: 89,
+      status: "open",
+      commitRef: "202b30026a21bc66258a830a59046df2e10db056",
+      url: "https://github.com/formal-land/garden/pull/89",
+    });
+
+    expect(
+      data.development.references
+        .filter(({ kind }) => kind === "migrated-pr")
+        .map(({ number }) => number),
+    ).toEqual([1, 3, 4, 6, 7, 10, 13, 14, 15, 16, 17, 18, 19, 20, 21, 27, 28, 29]);
+
+    for (const reference of data.development.references) {
+      expect(reference.url, reference.id).toMatch(
+        /^https:\/\/github\.com\/formal-land\/garden\//,
+      );
+      if (reference.kind === "migrated-pr") {
+        expect(reference.url, reference.id).toMatch(
+          /^https:\/\/github\.com\/formal-land\/garden\/commit\/[0-9a-f]+$/,
+        );
+      }
+    }
   });
 
   it("keeps publication state explicit and local work out of established claims", () => {
@@ -322,22 +411,32 @@ describe("Orchard verification evidence model", () => {
     }
   });
 
-  it("routes Garden repository and evidence links through the selected private repository", () => {
-    const privateGardenRoot = "https://github.com/clarus/garden-private";
+  it("routes public Garden evidence through formal-land and keeps local WIP unlinked", () => {
+    const publicGardenRoot = "https://github.com/formal-land/garden";
     const gardenRepository = data.repositories.find(({ id }) => id === "garden")!;
-    expect(gardenRepository.url).toBe(privateGardenRoot);
+    expect(gardenRepository.url).toBe(publicGardenRoot);
     for (const revision of gardenRepository.revisions) {
-      expect(revision.url, revision.ref).toMatch(
-        /^https:\/\/github\.com\/clarus\/garden-private\//,
-      );
+      if (revision.publication === "public") {
+        expect(revision.url, revision.ref).toMatch(
+          /^https:\/\/github\.com\/formal-land\/garden\//,
+        );
+      } else {
+        expect(revision.publication, revision.ref).toBe("local");
+        expect(revision.url, revision.ref).toBeUndefined();
+      }
     }
 
     const gardenEvidence = data.evidence.filter(({ repoId }) => repoId === "garden");
     expect(gardenEvidence.length).toBeGreaterThan(0);
     for (const evidence of gardenEvidence) {
-      expect(evidence.url, evidence.id).toMatch(
-        /^https:\/\/github\.com\/clarus\/garden-private\//,
-      );
+      if (evidence.publication === "public") {
+        expect(evidence.url, evidence.id).toMatch(
+          /^https:\/\/github\.com\/formal-land\/garden\//,
+        );
+      } else {
+        expect(evidence.publication, evidence.id).toBe("local");
+        expect(evidence.url, evidence.id).toBeUndefined();
+      }
     }
   });
 });

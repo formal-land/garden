@@ -12,6 +12,7 @@ import {
   statusLabels,
 } from "./EvidencePanel";
 import { ProofMap } from "./ProofMap";
+import { DevelopmentSummary, WorkUnitPanel } from "./WorkHistory";
 
 const BASE_STAGE_DURATION = 9_000;
 
@@ -280,6 +281,8 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
         </p>
       </section>
 
+      <DevelopmentSummary data={data} />
+
       <section className="transport" aria-label="Journey controls">
         <div className="transport__buttons">
           <button
@@ -354,6 +357,9 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             <span className="stage-step__number">Stage {index + 1}</span>
             <span className="stage-step__label">{item.title}</span>
             <span className="stage-step__date">{item.date}</span>
+            <span className="stage-step__work">
+              {item.workUnitIds.length} {item.workUnitIds.length === 1 ? "work unit" : "work units"}
+            </span>
           </button>
         ))}
       </nav>
@@ -384,6 +390,9 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
             <blockquote>{stage.claim}</blockquote>
             <p>{stage.narrative}</p>
           </section>
+        </div>
+        <div className="stage-story__work">
+          <WorkUnitPanel data={data} workUnitIds={stage.workUnitIds} />
         </div>
         <details
           className="stage-story__evidence"

@@ -65,7 +65,7 @@ describe("journey application", () => {
     expect(screen.getByRole("button", { name: "Next stage" })).toBeDisabled();
   });
 
-  it("links Journey evidence to the selected private Garden repository", () => {
+  it("links Journey evidence and migrated work history through public Garden", () => {
     const stage = data.stages[0];
     const gardenEvidence = stage.evidenceIds
       .map((id) => data.evidence.find((item) => item.id === id))
@@ -74,11 +74,28 @@ describe("journey application", () => {
 
     render(<JourneyView data={data} />);
 
-    const evidenceLink = screen.getByText(gardenEvidence!.label).closest("a");
+    expect(screen.getByRole("link", { name: /PR #88 · Add Orchard circuit verification/i }))
+      .toHaveAttribute("href", "https://github.com/formal-land/garden/pull/88");
+    expect(screen.getByRole("link", { name: /PR #89 · Add Journey Pages/i }))
+      .toHaveAttribute("href", "https://github.com/formal-land/garden/pull/89");
+
+    const stageArticle = screen.getByRole("article", {
+      name: data.stages[0].title,
+    });
+    const evidencePanel = stageArticle.querySelector<HTMLElement>(".stage-story__evidence")!;
+    const evidenceLink = within(evidencePanel).getByRole("link", {
+      name: new RegExp(gardenEvidence!.label),
+    });
     expect(evidenceLink).toHaveAttribute("href", gardenEvidence!.url);
     expect(evidenceLink?.getAttribute("href")).toMatch(
-      /^https:\/\/github\.com\/clarus\/garden-private\//,
+      /^https:\/\/github\.com\/formal-land\/garden\//,
     );
+
+    const workPanel = within(stageArticle).getByLabelText("Work delivered");
+    expect(within(workPanel).getByText("Framework and circuit capture")).toBeVisible();
+    fireEvent.click(within(workPanel).getAllByText(/Pull requests and commits/)[0]);
+    expect(within(workPanel).getByRole("link", { name: /Migrated PR #6/i }))
+      .toHaveAttribute("href", "https://github.com/formal-land/garden/commit/7ca385f");
   });
 
   it("starts manually, stops at the end, and replays from stage one", () => {
@@ -136,6 +153,7 @@ describe("journey application", () => {
     render(<App />);
     expect(screen.getByRole("heading", { name: "Orchard Verification Atlas", level: 1 })).toBeVisible();
     expect(screen.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
+    expect(screen.getByLabelText("Filter by work unit")).toBeVisible();
     expect(screen.queryByRole("link", { name: /Open guided journey/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /theme/i })).not.toBeInTheDocument();
   });
@@ -193,6 +211,7 @@ describe("proof atlas interactions", () => {
     expect(screen.getByRole("group", { name: /^Repositories/ })).toBeVisible();
     expect(screen.getByRole("group", { name: /^Proof status/ })).toBeVisible();
     expect(screen.getByLabelText("Trust boundary")).toBeVisible();
+    expect(screen.getByLabelText("Filter by work unit")).toBeVisible();
     expect(screen.queryByRole("group", { name: /^Work stream/ })).not.toBeInTheDocument();
     const repositoryFilter = screen.getByLabelText(data.filters.repositories[0].label);
     fireEvent.click(repositoryFilter);
@@ -220,6 +239,11 @@ describe("proof atlas interactions", () => {
     expect(related).toHaveAttribute("aria-pressed", "false");
 
     const inspector = screen.getByRole("complementary", { name: "Proof node details" });
+    expect(within(inspector).getByText("Development history")).toBeVisible();
+    for (const workUnitId of selectedNode.workUnitIds) {
+      const workUnit = data.development.workUnits.find(({ id }) => id === workUnitId)!;
+      expect(within(inspector).getByText(workUnit.title)).toBeVisible();
+    }
     inspector.scrollTop = 480;
 
     fireEvent.click(screen.getByRole("tab", { name: "List" }));
@@ -243,8 +267,36 @@ describe("proof atlas interactions", () => {
     });
     expect(gardenEvidenceLink).toHaveAttribute("href", gardenEvidence!.url);
     expect(gardenEvidenceLink?.getAttribute("href")).toMatch(
-      /^https:\/\/github\.com\/clarus\/garden-private\//,
+      /^https:\/\/github\.com\/formal-land\/garden\//,
     );
+  });
+
+  it("filters and searches nodes by development provenance", () => {
+    const workUnit = data.development.workUnits.find(
+      ({ id }) => id === "work-operational-soundness",
+    )!;
+    const matchingNodes = data.nodes.filter(({ workUnitIds }) =>
+      workUnitIds.includes(workUnit.id)
+    );
+    render(<ProofMap data={data} />);
+
+    fireEvent.change(screen.getByLabelText("Filter by work unit"), {
+      target: { value: workUnit.id },
+    });
+    expect(screen.getByText(`${matchingNodes.length} of ${data.nodes.length} nodes`))
+      .toBeVisible();
+
+    fireEvent.change(screen.getByRole("searchbox", { name: "Search the atlas" }), {
+      target: { value: "Migrated PR 29" },
+    });
+    expect(screen.getByText(`${matchingNodes.length} of ${data.nodes.length} nodes`))
+      .toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Reset" }));
+    expect(screen.getByLabelText("Filter by work unit")).toHaveValue("");
+    expect(screen.getByRole("searchbox", { name: "Search the atlas" })).toHaveValue("");
+    expect(screen.getByText(`${data.nodes.length} of ${data.nodes.length} nodes`))
+      .toBeVisible();
   });
 
   it("collapses and expands clusters from the keyboard", () => {

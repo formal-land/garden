@@ -12,8 +12,8 @@
     {
       "id": "garden",
       "label": "Garden",
-      "revision": "8d99eeec6860f31644aebc248d9f868026bbffd5",
-      "base_url": "https://github.com/clarus/garden-private"
+      "revision": "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
+      "base_url": "https://github.com/formal-land/garden"
     },
     {
       "id": "halo2",

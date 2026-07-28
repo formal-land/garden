@@ -51,6 +51,9 @@ export function validateOrchardVerificationData(
     ["nodes", data.nodes],
     ["edges", data.edges],
     ["stages", data.stages],
+    ["development.contributors", data.development.contributors],
+    ["development.references", data.development.references],
+    ["development.workUnits", data.development.workUnits],
   ];
 
   for (const [name, values] of collections) {
@@ -64,6 +67,15 @@ export function validateOrchardVerificationData(
   const clusters = new Map(data.clusters.map((cluster) => [cluster.id, cluster]));
   const nodes = new Map(data.nodes.map((node) => [node.id, node]));
   const stages = new Set(data.stages.map((stage) => stage.id));
+  const contributors = new Map(
+    data.development.contributors.map((contributor) => [contributor.id, contributor]),
+  );
+  const workReferences = new Map(
+    data.development.references.map((reference) => [reference.id, reference]),
+  );
+  const workUnits = new Map(
+    data.development.workUnits.map((workUnit) => [workUnit.id, workUnit]),
+  );
 
   const checkRepoIds = (path: string, ids: readonly RepositoryId[]) => {
     for (const id of ids) {
@@ -94,6 +106,53 @@ export function validateOrchardVerificationData(
         "only the selected Garden publication target should use pending URLs",
       );
     }
+    if (item.publication === "local" && item.url) {
+      report(`evidence.${item.id}.url`, "local evidence must not expose a repository URL");
+    }
+  }
+
+  for (const reference of data.development.references) {
+    const path = `development.references.${reference.id}`;
+    if (!reference.url.startsWith("https://github.com/formal-land/garden/")) {
+      report(`${path}.url`, "work references must use the public formal-land/garden repository");
+    }
+    if (
+      reference.kind === "migrated-pr" &&
+      !/^https:\/\/github\.com\/formal-land\/garden\/commit\/[0-9a-f]+$/.test(
+        reference.url,
+      )
+    ) {
+      report(`${path}.url`, "migrated PRs must link to their preserved public commit");
+    }
+    if (reference.kind === "migrated-pr" && reference.number === undefined) {
+      report(`${path}.number`, "migrated PRs require their historical number");
+    }
+  }
+
+  for (const workUnit of data.development.workUnits) {
+    const path = `development.workUnits.${workUnit.id}`;
+    for (const contributorId of workUnit.contributorIds) {
+      if (!contributors.has(contributorId)) {
+        report(`${path}.contributorIds`, `unknown contributor: ${contributorId}`);
+      }
+    }
+    for (const referenceId of workUnit.referenceIds) {
+      if (!workReferences.has(referenceId)) {
+        report(`${path}.referenceIds`, `unknown work reference: ${referenceId}`);
+      }
+    }
+    if (workUnit.scope === "verification" && workUnit.status !== "completed") {
+      report(`${path}.status`, "published verification work units must be completed");
+    }
+  }
+
+  for (const referenceId of [
+    data.development.verificationPullRequestId,
+    data.development.websitePullRequestId,
+  ]) {
+    if (!workReferences.has(referenceId)) {
+      report("development", `unknown pull-request reference: ${referenceId}`);
+    }
   }
 
   for (const cluster of data.clusters) {
@@ -117,6 +176,16 @@ export function validateOrchardVerificationData(
     checkRepoIds(`${path}.repoIds`, node.repoIds);
     checkEvidenceIds(`${path}.evidenceIds`, node.evidenceIds);
     checkStageIds(`${path}.stageIds`, node.stageIds);
+    for (const workUnitId of node.workUnitIds) {
+      const workUnit = workUnits.get(workUnitId);
+      if (!workUnit) report(`${path}.workUnitIds`, `unknown work unit: ${workUnitId}`);
+      else if (workUnit.scope !== "verification") {
+        report(`${path}.workUnitIds`, `proof nodes cannot use publication unit: ${workUnitId}`);
+      }
+    }
+    if (node.status !== "wip" && node.workUnitIds.length === 0) {
+      report(`${path}.workUnitIds`, "non-WIP proof nodes require development provenance");
+    }
 
     if (node.status !== "wip") {
       for (const evidenceId of node.evidenceIds) {
@@ -159,13 +228,23 @@ export function validateOrchardVerificationData(
     }
     checkRepoIds(`${path}.repoIds`, stage.repoIds);
     checkEvidenceIds(`${path}.evidenceIds`, stage.evidenceIds);
+    for (const workUnitId of stage.workUnitIds) {
+      const workUnit = workUnits.get(workUnitId);
+      if (!workUnit) report(`${path}.workUnitIds`, `unknown work unit: ${workUnitId}`);
+      else if (workUnit.scope !== "verification") {
+        report(`${path}.workUnitIds`, `journey stages cannot use publication unit: ${workUnitId}`);
+      }
+    }
+    if (stage.workUnitIds.length === 0) {
+      report(`${path}.workUnitIds`, "journey stages require development provenance");
+    }
     for (const nodeId of stage.nodeIds) {
       if (!nodes.has(nodeId)) report(`${path}.nodeIds`, `unknown node: ${nodeId}`);
     }
   });
 
   const requiredRefs: Readonly<Record<"garden" | "halo2" | "orchard", string>> = {
-    garden: "8d99eeec6860f31644aebc248d9f868026bbffd5",
+    garden: "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
     halo2: "6fcb5136a9ad1a4ee452e233d65558fe1f572665",
     orchard: "8da86412a213bc6681ad7ac54daa4bd2c23c45c5",
   };
@@ -173,6 +252,29 @@ export function validateOrchardVerificationData(
     const actual = data.snapshot.repositoryRefs[repoId as keyof typeof requiredRefs];
     if (actual !== expected) {
       report(`snapshot.repositoryRefs.${repoId}`, `expected pinned ref ${expected}, found ${actual}`);
+    }
+  }
+
+  if (data.snapshot.asOf !== "2026-07-28") {
+    report("snapshot.asOf", `expected 2026-07-28, found ${data.snapshot.asOf}`);
+  }
+  if (data.development.asOf !== "2026-07-28") {
+    report("development.asOf", `expected 2026-07-28, found ${data.development.asOf}`);
+  }
+
+  const usedVerificationUnits = new Set([
+    ...data.nodes.flatMap((node) => node.workUnitIds),
+    ...data.stages.flatMap((stage) => stage.workUnitIds),
+  ]);
+  for (const workUnit of data.development.workUnits) {
+    if (
+      workUnit.scope === "verification" &&
+      !usedVerificationUnits.has(workUnit.id)
+    ) {
+      report(
+        `development.workUnits.${workUnit.id}`,
+        "verification work unit is not mapped to the Journey or Atlas",
+      );
     }
   }
 
