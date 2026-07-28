@@ -1,0 +1,4 @@
+**
+!rocq-garden.opam
+!rocq-ci.Dockerfile
+!rocq-ci.Dockerfile.dockerignore

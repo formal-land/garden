@@ -48,6 +48,37 @@ opam install -y --deps-only Garden/rocq-garden.opam
 rocq -v
 ```
 
+## Rocq CI Dependency Image
+
+CI prebuilds the dependencies from `Garden/rocq-garden.opam` in
+`ghcr.io/formal-land/garden-rocq-ci:rocq-9.0.1`. The image publication
+workflow runs after relevant changes reach `main`, and it can also be started
+manually. Each build publishes the stable Rocq-version tag and a
+commit-specific `sha-<commit>` tag. BuildKit's GitHub Actions cache speeds up
+subsequent image rebuilds.
+
+The first publication uses a strict two-stage rollout:
+
+1. Merge the Dockerfile and publication workflow while Rocq CI still uses the
+   upstream `rocq/rocq-prover` image.
+2. Wait for the `Rocq dependency image` workflow to finish.
+3. In the GitHub package settings for `garden-rocq-ci`, change the package
+   visibility to **Public**.
+4. Verify anonymous access:
+
+   ```sh
+   docker manifest inspect ghcr.io/formal-land/garden-rocq-ci:rocq-9.0.1
+   ```
+
+5. Only after that command succeeds, change `custom_image` in
+   `.github/workflows/rocq.yml` to
+   `ghcr.io/formal-land/garden-rocq-ci:rocq-9.0.1`.
+
+Keep `opam install -y --deps-only Garden/rocq-garden.opam` in the Rocq
+workflow after switching images. It is normally a fast consistency check, and
+it installs any dependency delta introduced by a pull request before the image
+is rebuilt from `main`.
+
 ## Setting Up Circom
 
 We start from the main repository.
