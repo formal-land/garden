@@ -163,19 +163,24 @@ ceiling and the spec-anchored pipeline coefficients).
   implies the existence of a satisfying assignment is a property of the
   proving system, not of the circuit, and is not claimed here.
 
-- **Operational checker boundary.** `Holds` is the relational interpreter's
-  satisfaction predicate. The bridge in `docs/operational-soundness.md`
-  connects it to the faithful operational lowering of synthesis
-  (`serialize.v`, the raw event grid) in both directions at the whole Orchard
-  circuit: `orchard_operational_sound` carries acceptance by the ideal
-  `mock_prover_accepts` checker back to `Holds`,
+- **Operational and compilation boundaries.** `Holds` is the relational
+  interpreter's satisfaction predicate. The bridge in
+  `docs/operational-soundness.md` connects it to the faithful operational
+  lowering of synthesis (`serialize.v`, the raw event grid) in both directions
+  at the whole Orchard circuit: `orchard_operational_sound` carries acceptance
+  by the ideal `mock_prover_accepts` checker back to `Holds`,
   `orchard_action_statement_operational` composes that result with the Action
   statement above, and `orchard_operational_complete` carries an honest
-  witness forward to the checker. The remaining idealization is the checker
-  itself: it quantifies over all integer rows rather than the `2^k` cyclic
-  domain and is not the deployed cryptographic prover. Configure and synthesis
-  snapshot comparisons tie its serialized inputs to Rust Halo 2, but those
-  comparisons are checked build artifacts rather than a Rocq theorem.
+  witness forward to the checker. The checker itself remains an idealization:
+  it quantifies over all integer rows and is not the deployed cryptographic
+  prover. Below it, the same Action conclusion is available from the compiled
+  system Halo 2 keygen produces and from the polynomial identities checked
+  over the cyclic domain. The modelled keygen is bracketed by
+  configure/synthesis snapshot comparisons at its input and byte-exact
+  `vk.pinned()` parity at its output; the former are checked build artifacts,
+  not Rocq theorems. The exact trust split and remaining L0 boundary are
+  documented in
+  [`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
 
 ## Model caveats inherited by the theorems
 

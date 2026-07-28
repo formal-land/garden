@@ -43,8 +43,9 @@ interpreter's gate layer only. This document is about that relational model.
 - **Fixed assignment and selector enabling** as reified pinning facts
   (`Fact.FixedIs → … = value`, `Fact.SelectorOn → … = 1`, interpreted at
   `proof.v:349-352`): faithful. Lookup-table loading is reified the same way
-  (`Fact.LookupTableLoaded`, `proof.v:45`), pinning each table column to its
-  `value_at_row` — see [Tying lookups to the loaded
+  (`Fact.LookupTableLoaded`, `proof.v:46`), pinning each table column to its
+  `value_at_row` on the assigned rows `[0, length values)` — see [Tying
+  lookups to the loaded
   table](#tying-lookups-to-the-loaded-table-initlookuptables).
 - **Layouter-level constant pinning** (`𝓡.ConstrainConstant`, reified as
   `Fact.CellIsConstant → eval_cell Γ cell = value`) — see [The constants
@@ -117,17 +118,17 @@ interpreter's gate layer only. This document is about that relational model.
    `RangeTable.word_sound` with `GeneratorTable.loaded` at
    `Lookup.TableIdx`) and the `α_0'` canonicity lookup
    (`Orchard/circuit_proof/base_field_canonicity.v`,
-   `alpha_lookup_word_range`, same pattern). **On this branch the idealized
-   membership semantics remains a modeling choice.** The polynomial layer
-   that closes this `Prop` model's loop from above lives on
-   `valerii-huhnin@compilation-correctness`, not here: there `lookup_sound` /
-   `lookup_complete` (`Halo2/plonkish/lookup_poly.v`) prove the
-   set-membership reading of `eval_lookup_argument` equivalent, for all
-   θ, β, γ, to the five lookup grand-product rules the deployed verifier
-   checks on the cyclic domain, with the tables-as-fixed-prefix coherence
-   discharged as a `vm_compute` certificate on the pinned instance
-   (`Orchard/circuit_compiled_algebraic.v`). Neither `Halo2/plonkish/` nor
-   `Orchard/circuit_compiled*.v` is part of this branch's build.
+   `alpha_lookup_word_range`, same pattern). The polynomial layer closes
+   this `Prop` model's loop from above: `lookup_sound` / `lookup_complete`
+   (`Halo2/plonkish/lookup_poly.v`) prove the set-membership reading of
+   `eval_lookup_argument` equivalent, for all θ, β, γ, to the five lookup
+   grand-product rules the deployed verifier checks on the cyclic domain,
+   with the tables-as-fixed-prefix coherence discharged as a `vm_compute`
+   certificate on the pinned instance
+   (`Orchard/compiled/algebraic.v`) — so the idealized membership
+   semantics is no longer a modeling choice but a proved consequence of
+   the polynomial identities (see `docs/operational-soundness.md`, "The
+   polynomial-identity layer").
 
 3. **No cyclic domain, no usable-row distinction.** Rows are plain integers
    and `rotated_row = row + offset` (`proof.v:58-62`); there is no `nb_rows`
@@ -201,19 +202,26 @@ Both are derived from the program:
   `LookupTableColumn`, `values : list Z` and `default_value`; the generator
   table loads `values := map sinsemilla_s_x generator_table_indexes` (length
   `2 ^ sinsemilla_k = 1024`) padded with `default_value := sinsemilla_s0_x`.
-- The relational interpreter consumes it: `value_at_row` (`proof.v:68`)
-  mirrors `serialize.v`'s fill (the `row`-th entry of `values`, else
-  `default_value`); `Fact.LookupTableLoaded column values default_value`
-  (`proof.v:45`) is emitted by `layouter_facts` for each entry (`proof.v:306`)
-  and interpreted as `forall row, 0 <= row -> Γ.(Assignment.lookup) column row
-  = value_at_row row values default_value` — exactly the rows a replay of the
-  serializer's events (which write rows `>= 0` only) can establish; a
-  `layouter_table_rows` fixpoint (`proof.v:319`) returns the loaded row
-  count, so `circuit_holds` computes `nb_table_rows` from the program
-  (`proof.v:489`) — a program with no table (e.g. `add`) gets `0`.
+- The relational interpreter consumes it: `value_at_row` (`proof.v:73`)
+  mirrors `serialize.v`'s per-row assignment (the `row`-th entry of `values`,
+  else `default_value`); `Fact.LookupTableLoaded column values default_value`
+  (`proof.v:46`) is emitted by `layouter_facts` for each entry and interpreted
+  as `forall row, 0 <= row < Z.of_nat (length values) ->
+  Γ.(Assignment.lookup) column row = value_at_row row values default_value`
+  (`proof.v:366-377`) — exactly the *assigned* rows. Past `length values` the
+  column is no longer program-determined relationally: the default band and
+  the zero tail are pinned operationally by the fill-replay lemmas
+  (`realize/facts.v`), which is where the row bounds live. A
+  `layouter_table_rows` fixpoint returns the loaded row count, so
+  `circuit_holds` computes `nb_table_rows` from the program — a program with
+  no table (e.g. `add`) gets `0`.
 - The operational interpreter uses the same data: `serialize.v` emits the
-  per-row fixed assignments plus a fill carrying `length values` and
-  `default_value` (`fill_lookup_entries`, `serialize.v:399-409`).
+  per-row fixed assignments plus a fill carrying `length values`, the
+  usable-row bound, and `default_value` (`fill_lookup_entries`,
+  `serialize.v:408-422`). The fill is half-open — `[length values,
+  usable_rows)` — mirroring Halo2 keygen's `fill_from_row`, which iterates
+  over `usable_rows` only, so the `l_last` and blinding rows stay at `0` as
+  the deployed verifying key commits them.
 - `GeneratorTable.sound` (`sinsemilla/chip_proof.v`) takes the synthesis
   facts of running `load_generator_table` instead of a free `Htable`;
   `GeneratorTable.loaded` derives that the carried table agrees with the
@@ -226,12 +234,17 @@ One known refinement remains:
 
 - Faithfully, a lookup table is not a separate `Assignment.lookup` address
   space: it is ordinary fixed columns occupying `[0, nb_table_rows) ⊆
-  [0, nb_rows)`, with the `default_value` padding coinciding with the
-  unusable/blinding rows — concretely, `sinsemilla_s0_x` is exactly the
-  `(1 - q_s1) ● sinsemilla_s0_x` padding term in `generator_table_argument`.
-  Making `nb_table_rows`, the fill default, and the gate padding mutually
-  coherent is finite-domain bookkeeping deferred with the cyclic-domain gap
-  (item 3).
+  [0, nb_rows)`, with the `default_value` padding running to `usable_rows`
+  and the `l_last`/blinding tail left at `0` — concretely, `sinsemilla_s0_x`
+  is exactly the `(1 - q_s1) ● sinsemilla_s0_x` padding term in
+  `generator_table_argument`. The operational side is keygen-faithful on
+  this point (the bounded fill above), and `plonkish/mock.v` states the
+  tables-as-prefix coherence as computable side conditions
+  (`tables_prefix_b`, `table_default_pinned_b`). What remains is the
+  relational reading: `Assignment.lookup` is still a distinct address space
+  from the fixed planes, so `nb_table_rows`, the fill default, and the gate
+  padding are made mutually coherent only one layer down — finite-domain
+  bookkeeping tracked with the cyclic-domain gap (item 3).
 
 ## The constants mechanism: `constrain_constant`
 
@@ -330,8 +343,10 @@ The floor planner's trailing constants block enters `operational_sound` as
 an explicit extra event input with the `constants_materialized`
 correspondence (vacuous for `ConstrainConstant`-free chips,
 `operational_sound_no_tail`). The layout idealizations are thereby a
-per-placement computation (replay success, by `vm_compute`) rather than
-trusted hypotheses. Both instantiation layers are proved:
+per-placement computation (replay success, by `vm_compute` — see the
+whole-circuit instance `orchard_replay_ok` in
+`Orchard/circuit_operational.v`) rather than trusted hypotheses. Both
+instantiation layers are proved:
 
 - `Halo2/realize/disjoint.v` — placement-generic sufficient conditions:
   `replay_is_ok` equals the decidable `conflict_free` verdict at every
@@ -413,29 +428,25 @@ trusted hypotheses. Both instantiation layers are proved:
   inherits the ideal checker's own limits (all integer rows rather than the
   `2^k` cyclic domain, blinding rows unmodelled). The model idealizations
   listed elsewhere in this file remain in force.
-- **Cyclic-domain refinement** (item 3) — *open on this branch; partially
-  discharged on `valerii-huhnin@compilation-correctness`.* There the finite
-  domain exists one layer below the relational model: `Halo2/plonkish/main.v`'s
-  `Domain` carries `n = 2^k` rows, `usable_rows = n - (blinding_factors + 1)`,
-  and the `l_0`/`l_last`/`l_blind` row predicates, and `compile_correct` /
-  `plonkish_of_mock_prover` (`Halo2/plonkish/`) connect it upward:
-  compiled-gate satisfaction on the cyclic domain ↔ selector-gated
-  satisfaction on usable rows, and `mock_prover_accepts` ↔ compiled-plonkish
-  satisfaction restricted to `[0, n)`, with the blinding-row vacuity and the
-  finite-domain layout as computable side conditions (`finite_domain_ok_b`),
-  instantiated on the concrete Orchard domain (k = 11, n = 2048) in
-  `Orchard/circuit_compiled.v`. None of that is part of this branch's build,
-  where the relational model is the bottom of the stack below
-  `Halo2/realize/`.
-  What remains even there: the relational `proof.v` model *itself* still uses
-  plain integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap,
-  no `nb_rows`), and `satisfies_gates` still quantifies over all
-  `(region, row)` rather than each region's actual extent; folding the finite
-  domain back into the relational reading — and the
-  tables-as-fixed-column-prefixes coherence of the lookup-table work (the
-  refinement noted at the end of [Tying lookups to the loaded
-  table](#tying-lookups-to-the-loaded-table-initlookuptables)) — is still
-  open.
+- **Cyclic-domain refinement** (item 3) — *partially discharged at the
+  compiled level.* The finite domain now exists one layer below the relational
+  model: `Halo2/plonkish/main.v`'s `Domain` carries `n = 2^k` rows,
+  `usable_rows = n - (blinding_factors + 1)`, and the `l_0`/`l_last`/`l_blind`
+  row predicates, and `compile_correct` / `plonkish_of_mock_prover`
+  (`Halo2/plonkish/`) connect it upward: compiled-gate satisfaction on the
+  cyclic domain ↔ selector-gated satisfaction on usable rows, and
+  `mock_prover_accepts` ↔ compiled-plonkish satisfaction restricted to
+  `[0, n)`, with the blinding-row vacuity and the finite-domain layout as
+  computable side conditions (`finite_domain_ok_b`), instantiated on the
+  concrete Orchard domain (k = 11, n = 2048) in `Orchard/compiled/main.v`.
+  What remains: the relational `proof.v` model *itself* still uses plain
+  integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap, no
+  `nb_rows`), and `satisfies_gates` still quantifies over all `(region, row)`
+  rather than each region's actual extent; folding the finite domain back into
+  the relational reading — and the tables-as-fixed-column-prefixes coherence
+  of the lookup-table work (the refinement noted at the end of [Tying lookups
+  to the loaded table](#tying-lookups-to-the-loaded-table-initlookuptables)) —
+  is still open. See `docs/operational-soundness.md` (the compiled plonkish layer).
 - **Selector-off closure for short lookups** (item 2). The range-check
   chip's `LookupArgument` is now consumed (`RangeTable.word_sound` /
   `short_word_sound`, used by the var-base-mul overflow and base-field

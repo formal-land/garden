@@ -1221,7 +1221,7 @@ Definition synthesize
     + 1)] for [n = 2^k = 2048] ([k = 11]) and [blinding_factors = 5], so the
     lookup-table default fill stops at row [2042], leaving the [l_last] row and
     the five blinding rows at [0] — matching the keygen-stored fixed column.
-    The domain lives downstream ([Domain.usable_rows] in [circuit_compiled.v]),
+    The domain lives downstream ([Domain.usable_rows] in [compiled/main.v]),
     so the literal is introduced here and tied to the domain by a parity fact at
     that layer. *)
 Definition orchard_usable_rows : Z := 2042.
