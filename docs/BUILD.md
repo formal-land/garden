@@ -5,8 +5,8 @@ This document provides an introduction to how to build the `garden` project for 
 Before starting, make sure you have `Rust` and `opam` installed.
 
 The Orchard verification visualization is a separate frontend and requires
-[Node.js 22](https://nodejs.org/) and npm. Its checked-in Rocq structure and
-parity snapshots let the website data regenerate without the Rocq toolchain.
+[Node.js 22](https://nodejs.org/) and npm. The website data is generated from
+the Rocq structure and parity snapshots rather than committed.
 
 ## Setting Up Dependency Submodules
 
@@ -122,8 +122,17 @@ Circuit Grid lives in `web/orchard-verification`. The production bundle is
 generated in the ignored `web/orchard-verification/dist` directory. It is
 uploaded directly to GitHub Pages by CI and must not be committed.
 
-Install the pinned dependencies and start the development server from the
-repository root:
+On a fresh checkout, first generate the ignored raw structure snapshot using
+the Rocq environment described above:
+
+```sh
+cd Garden
+make orchard-structure-json-from-model
+cd ..
+```
+
+Then install the pinned frontend dependencies and start the development server
+from the repository root:
 
 ```sh
 cd web/orchard-verification
@@ -150,8 +159,9 @@ make orchard-structure-json-from-model
 cd ..
 ```
 
-Changes limited to source mapping, the functional-flow manifest, or the
-frontend do not require Rocq; `npm run generate:data` is sufficient.
+Once the raw structure snapshot exists locally, changes limited to source
+mapping, the functional-flow manifest, or the frontend do not require another
+Rocq build; `npm run generate:data` is sufficient.
 
 The Circuit Grid combines the parsed-equal Rocq-model and Rust-implementation
 configure/synthesis snapshots with the source-enriched Circuit Explorer
@@ -184,10 +194,11 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
-In CI, Playwright installs Chromium together with its system dependencies.
-Pull requests regenerate the website data and run all validation without
-publishing. A successful build on `main` uploads `dist` as a GitHub Pages
-artifact and deploys it.
+In CI, the Rocq job regenerates the raw structure and passes it to the website
+job as a short-lived Actions artifact. The website job regenerates its derived
+data and installs Chromium together with its system dependencies. Pull
+requests run all validation without publishing. A successful build on `main`
+uploads `dist` as a GitHub Pages artifact and deploys it.
 
 To inspect the production bundle locally after `npm run build`, serve it from
 the repository root:

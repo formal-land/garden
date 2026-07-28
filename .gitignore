@@ -11,6 +11,7 @@ CLAUDE.local.md
 .claude/
 
 # Orchard verification visualization build/test caches
+Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json
 web/orchard-verification/node_modules/
 web/orchard-verification/.vite/
 web/orchard-verification/dist/

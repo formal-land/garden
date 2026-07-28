@@ -37,32 +37,32 @@ ORCHARD_CIRCUIT_GRID_GENERATOR := ../scripts/generate_orchard_circuit_grid.py
 ORCHARD_SYNTHESIS_EXTRACT := Orchard/circuit_synthesis_json_extract.v
 ORCHARD_SYNTHESIS_EXTRACTED_ML := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.ml
 ORCHARD_SYNTHESIS_EXTRACTED_MLI := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.mli
-ORCHARD_SYNTHESIS_MODEL_CMX := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.cmx
-ORCHARD_SYNTHESIS_DRIVER_CMX := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_json_driver.cmx
+ORCHARD_SYNTHESIS_MODEL_CMO := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_model.cmo
+ORCHARD_SYNTHESIS_DRIVER_CMO := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_json_driver.cmo
 ORCHARD_SYNTHESIS_EXE := $(ORCHARD_SYNTHESIS_JSON_BUILD)/orchard_synthesis_json
 
 $(ORCHARD_SYNTHESIS_EXTRACTED_ML): $(VFILES) $(ORCHARD_SYNTHESIS_EXTRACT) CoqMakefile
 	mkdir -p $(ORCHARD_SYNTHESIS_JSON_BUILD)
 	rocq compile -impredicative-set -R . Garden $(ORCHARD_SYNTHESIS_EXTRACT)
 
-$(ORCHARD_SYNTHESIS_MODEL_CMX): $(ORCHARD_SYNTHESIS_EXTRACTED_ML) $(ORCHARD_SYNTHESIS_EXTRACTED_MLI)
-	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith \
+$(ORCHARD_SYNTHESIS_MODEL_CMO): $(ORCHARD_SYNTHESIS_EXTRACTED_ML) $(ORCHARD_SYNTHESIS_EXTRACTED_MLI)
+	ocamlfind ocamlc -package rocq-runtime.kernel,zarith \
 	  -I $(ORCHARD_SYNTHESIS_JSON_BUILD) \
 	  -c $(ORCHARD_SYNTHESIS_EXTRACTED_MLI)
-	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith \
+	ocamlfind ocamlc -package rocq-runtime.kernel,zarith \
 	  -I $(ORCHARD_SYNTHESIS_JSON_BUILD) \
 	  -c $(ORCHARD_SYNTHESIS_EXTRACTED_ML)
 
-$(ORCHARD_SYNTHESIS_DRIVER_CMX): $(ORCHARD_SYNTHESIS_MODEL_CMX) ../scripts/orchard_synthesis_json.ml
-	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith \
+$(ORCHARD_SYNTHESIS_DRIVER_CMO): $(ORCHARD_SYNTHESIS_MODEL_CMO) ../scripts/orchard_synthesis_json.ml
+	ocamlfind ocamlc -package rocq-runtime.kernel,zarith \
 	  -I $(ORCHARD_SYNTHESIS_JSON_BUILD) \
 	  -c -o $@ ../scripts/orchard_synthesis_json.ml
 
-$(ORCHARD_SYNTHESIS_EXE): $(ORCHARD_SYNTHESIS_MODEL_CMX) $(ORCHARD_SYNTHESIS_DRIVER_CMX)
-	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith -linkpkg \
+$(ORCHARD_SYNTHESIS_EXE): $(ORCHARD_SYNTHESIS_MODEL_CMO) $(ORCHARD_SYNTHESIS_DRIVER_CMO)
+	ocamlfind ocamlc -package rocq-runtime.kernel,zarith -linkpkg \
 	  -I $(ORCHARD_SYNTHESIS_JSON_BUILD) \
-	  $(ORCHARD_SYNTHESIS_MODEL_CMX) \
-	  $(ORCHARD_SYNTHESIS_DRIVER_CMX) \
+	  $(ORCHARD_SYNTHESIS_MODEL_CMO) \
+	  $(ORCHARD_SYNTHESIS_DRIVER_CMO) \
 	  -o $@
 
 orchard-json-from-model: $(ORCHARD_SYNTHESIS_EXE)
