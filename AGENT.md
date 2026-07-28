@@ -38,6 +38,14 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   (checker-lemma shape, leaf closures, table literals, memory limits), the
   `-vos`/`-vok` fast dev loop, and the current cost map of the certificate
   leaves.
+- `web/orchard-verification/`: the Orchard Verification Journey, Atlas,
+  Circuit Explorer, and Circuit Grid source, tests, and data-generation hooks.
+  The ignored raw structure snapshot, `public/data/` website data, and `dist/`
+  production bundle are regenerated and validated through
+  `.github/workflows/rocq.yml`. Pages releases are produced locally by
+  `scripts/publish_orchard_pages.sh` and stored only on the dedicated
+  `gh-pages` branch; build, validation, and publishing commands are documented
+  in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.
@@ -54,6 +62,13 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 - Update `docs/halo2-proof.md` whenever proof statements, semantics, tactics,
   or Poseidon proof status changes.
 - Update this map whenever a documentation file is added, renamed, or removed.
+- Treat `Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json`,
+  `web/orchard-verification/public/data/`, and `dist/` as ephemeral generated
+  output: edit the source or evidence model, run its checks and build, and
+  never commit those artifacts to the source branch. GitHub Actions regenerates
+  and validates the raw and derived website data. The local Pages publisher
+  puts only the validated static bundle on the force-replaced `gh-pages`
+  deployment branch.
 
 ## Proof iteration workflow
 

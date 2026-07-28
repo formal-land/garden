@@ -1,10 +1,14 @@
 name: Coq
 
 on:
+  workflow_dispatch:
   push:
     branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -15,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Download Git submodules
       run: git submodule update --init --recursive
     - uses: coq-community/docker-coq-action@v1
@@ -49,8 +53,59 @@ jobs:
             cd Garden
             make
             make snapshot
+            make orchard-structure-json-from-model
             cd ..
           endGroup
           startGroup "Check that the diff is empty (excluding submodules)"
             git -c color.ui=always diff --exit-code --ignore-submodules=dirty
           endGroup
+    - name: Upload generated Orchard structure
+      uses: actions/upload-artifact@v4
+      with:
+        name: orchard-circuit-structure
+        path: Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json
+        if-no-files-found: error
+        retention-days: 1
+
+  website:
+    needs: build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web/orchard-verification
+
+    steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
+    - name: Download generated Orchard structure
+      uses: actions/download-artifact@v4
+      with:
+        name: orchard-circuit-structure
+        path: Garden/Orchard/Snapshots
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: 22
+        cache: npm
+        cache-dependency-path: web/orchard-verification/package-lock.json
+    - name: Install dependencies
+      run: npm ci
+    - name: Build static bundle and generate circuit data
+      run: npm run build
+    - name: Validate generated circuit data
+      working-directory: .
+      run: |
+        python3 -m unittest scripts.tests.test_generate_orchard_circuit_explorer
+        python3 scripts/generate_orchard_circuit_explorer.py --check
+        python3 scripts/generate_orchard_circuit_explorer.py --validate web/orchard-verification/public/data/orchard-circuit-highlevel.v1.json
+        python3 -m unittest scripts.tests.test_generate_orchard_circuit_grid
+        python3 scripts/generate_orchard_circuit_grid.py --check
+    - name: Type-check and run component tests
+      run: npm run check
+    - name: Install Playwright Chromium
+      run: npx playwright install --with-deps chromium
+    - name: Run browser tests
+      run: npm run test:e2e
+    - name: Check that validation left tracked files unchanged
+      working-directory: .
+      run: git diff --exit-code

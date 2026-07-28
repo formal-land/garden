@@ -156,11 +156,17 @@ ceiling and the spec-anchored pipeline coefficients).
   do not exhibit an accepted assignment for every input. In particular the
   witness-honesty hypotheses have no in-Rocq satisfiability proof — their
   non-vacuity argument is meta-level.
-- **Relational–operational consistency.** `Holds` is the *relational*
-  interpreter's satisfaction predicate. The faithful operational lowering
-  of synthesis (`serialize.v`, raw event grid) exists, and the two
-  interpreters agree on everything audited so far, but no theorem yet
-  relates them.
+- **Operational checker boundary.** Relational–operational consistency is now
+  proved. `Orchard/circuit_operational.v` instantiates `operational_sound` on
+  the full serialized Orchard circuit and its concrete placement:
+  `orchard_operational_sound` derives the relational `circuit_holds` predicate
+  from successful event replay and `mock_prover_accepts`, and
+  `orchard_action_statement_operational` composes that result with the Action
+  statement above. The remaining boundary is that `mock_prover_accepts` is an
+  ideal in-model checker, not the deployed cryptographic prover; configure and
+  synthesis snapshot comparisons tie its serialized inputs to Rust Halo 2 but
+  are checked build artifacts rather than a Rocq theorem. See
+  `docs/operational-soundness.md` for the precise claim and its caveats.
 
 ## Model caveats inherited by the theorems
 

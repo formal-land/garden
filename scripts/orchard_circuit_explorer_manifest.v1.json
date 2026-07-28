@@ -1,0 +1,362 @@
+{
+  "schema": "garden.orchard.circuit-highlevel.manifest.v1",
+  "generator_version": "1.0.0",
+  "circuit": {
+    "name": "Orchard Action Circuit",
+    "version": "FixedPostNu6_2",
+    "field": "pallas::Base",
+    "k": 11,
+    "witness_values": "omitted"
+  },
+  "repositories": [
+    {
+      "id": "garden",
+      "label": "Garden",
+      "revision": "3d15d1a71b450b1c9b417c4a46b50ecdef02cc71",
+      "base_url": "https://github.com/formal-land/garden"
+    },
+    {
+      "id": "halo2",
+      "label": "Halo2",
+      "revision": "6fcb5136a9ad1a4ee452e233d65558fe1f572665",
+      "base_url": "https://github.com/formal-land/halo2"
+    },
+    {
+      "id": "orchard",
+      "label": "Orchard",
+      "revision": "8da86412a213bc6681ad7ac54daa4bd2c23c45c5",
+      "base_url": "https://github.com/formal-land/orchard"
+    }
+  ],
+  "source_scan": {
+    "rocq": {
+      "repository": "garden",
+      "includes": [
+        "Garden/Orchard/circuit.v",
+        "Garden/Orchard/circuit_synthesis_layout.v",
+        "Garden/Orchard/circuit/**/*.v",
+        "Garden/Halo2/halo2_gadgets/**/*.v"
+      ],
+      "exclude_suffixes": [
+        "_proof.v"
+      ],
+      "exclude_path_parts": [
+        "provenance"
+      ]
+    },
+    "rust": [
+      {
+        "repository": "orchard",
+        "root_option": "orchard_root",
+        "includes": [
+          "src/circuit.rs",
+          "src/circuit/**/*.rs"
+        ]
+      },
+      {
+        "repository": "halo2",
+        "root_option": "halo2_root",
+        "includes": [
+          "halo2_gadgets/src/**/*.rs"
+        ]
+      }
+    ],
+    "configure_entrypoints": [
+      {
+        "repository": "garden",
+        "path": "Garden/Orchard/circuit.v",
+        "symbol": "Garden.Orchard.circuit.configure"
+      },
+      {
+        "repository": "orchard",
+        "path": "src/circuit.rs",
+        "symbol": "Circuit::configure"
+      }
+    ],
+    "rust_path_maps": [
+      {
+        "rocq_path": "Garden/Orchard/circuit.v",
+        "repository": "orchard",
+        "rust_path": "src/circuit.rs"
+      },
+      {
+        "rocq_prefix": "Garden/Orchard/circuit/",
+        "repository": "orchard",
+        "rust_prefix": "src/circuit/"
+      },
+      {
+        "rocq_prefix": "Garden/Halo2/halo2_gadgets/",
+        "repository": "halo2",
+        "rust_prefix": "halo2_gadgets/src/"
+      }
+    ]
+  },
+  "flow": {
+    "bounds": {
+      "width": 1280,
+      "height": 900
+    },
+    "nodes": [
+      {
+        "id": "lookup-tables",
+        "kind": "resource",
+        "title": "Lookup tables",
+        "short_title": "Tables",
+        "summary": "Fixed generator and range-check tables loaded before circuit synthesis.",
+        "position": { "x": 90, "y": 80 },
+        "proof_node_ids": ["gadgets-poseidon-range", "capture-synthesis-model"],
+        "match": [
+          { "region_names": ["generator_table"] }
+        ]
+      },
+      {
+        "id": "private-inputs",
+        "kind": "input",
+        "title": "Private Action witnesses",
+        "short_title": "Witnesses",
+        "summary": "Old-note data, keys, values, and newly witnessed output-note fields.",
+        "position": { "x": 90, "y": 340 },
+        "proof_node_ids": ["action-valid-inputs", "gadgets-ecc", "capture-synthesis-model"],
+        "match": [
+          {
+            "root_names": [
+              "witness psi_old",
+              "witness rho_old",
+              "cm_old",
+              "gd_old",
+              "witness ak_P",
+              "witness nk",
+              "witness v_old",
+              "witness v_new",
+              "witness g_d_new_star",
+              "witness pk_d_new",
+              "witness psi_new"
+            ]
+          }
+        ]
+      },
+      {
+        "id": "merkle-path",
+        "kind": "component",
+        "title": "Merkle path",
+        "short_title": "Merkle",
+        "summary": "Reconstructs the note-commitment root through 32 Sinsemilla Merkle layers.",
+        "position": { "x": 350, "y": 80 },
+        "proof_node_ids": ["gadgets-sinsemilla-merkle", "capture-synthesis-model"],
+        "match": [
+          { "root_names": ["Merkle path"] }
+        ]
+      },
+      {
+        "id": "value-commitment",
+        "kind": "component",
+        "title": "Net value commitment",
+        "short_title": "Value commit",
+        "summary": "Range-checks the signed net value and computes ValueCommit(v_net, rcv).",
+        "position": { "x": 350, "y": 200 },
+        "proof_node_ids": ["gadgets-ecc", "gadgets-poseidon-range", "capture-synthesis-model"],
+        "match": [
+          { "root_names": ["v_net magnitude", "v_net sign"] },
+          { "root_prefixes": ["cv_net = ValueCommit"] }
+        ]
+      },
+      {
+        "id": "nullifier",
+        "kind": "component",
+        "title": "Nullifier derivation",
+        "short_title": "Nullifier",
+        "summary": "Combines Poseidon, scalar addition, fixed-base multiplication, and the old commitment.",
+        "position": { "x": 350, "y": 320 },
+        "proof_node_ids": ["gadgets-poseidon-range", "gadgets-ecc", "capture-synthesis-model"],
+        "match": [
+          { "root_prefixes": ["nf_old = DeriveNullifier"] }
+        ]
+      },
+      {
+        "id": "spend-authority",
+        "kind": "component",
+        "title": "Spend authority randomization",
+        "short_title": "Spend auth",
+        "summary": "Computes rk = ak + [alpha] SpendAuthG and exposes its coordinates.",
+        "position": { "x": 350, "y": 440 },
+        "proof_node_ids": ["gadgets-ecc", "capture-synthesis-model"],
+        "match": [
+          { "root_names": ["[alpha] SpendAuthG", "rk"] }
+        ]
+      },
+      {
+        "id": "commit-ivk",
+        "kind": "component",
+        "title": "Incoming-viewing-key commitment",
+        "short_title": "CommitIvk",
+        "summary": "Hashes and commits ak and nk, with canonicity checks for ivk.",
+        "position": { "x": 350, "y": 560 },
+        "proof_node_ids": ["gadgets-sinsemilla-merkle", "gadgets-ecc", "capture-synthesis-model"],
+        "match": [
+          { "root_names": ["CommitIvk"] }
+        ]
+      },
+      {
+        "id": "address-integrity",
+        "kind": "component",
+        "title": "Diversified-address integrity",
+        "short_title": "Address",
+        "summary": "Checks pk_d_old = [ivk] g_d_old using variable-base multiplication.",
+        "position": { "x": 620, "y": 560 },
+        "proof_node_ids": ["gadgets-ecc", "action-valid-inputs", "capture-synthesis-model"],
+        "match": [
+          { "root_names": ["[ivk] g_d_old", "witness pk_d_old", "pk_d_old equality"] }
+        ]
+      },
+      {
+        "id": "old-note-commitment",
+        "kind": "component",
+        "title": "Old note commitment",
+        "short_title": "Old note",
+        "summary": "Recomputes the spent note commitment and constrains it equal to cm_old.",
+        "position": { "x": 620, "y": 690 },
+        "proof_node_ids": ["gadgets-sinsemilla-merkle", "gadgets-ecc", "action-valid-inputs", "capture-synthesis-model"],
+        "match": [
+          {
+            "root_name": "g★_d || pk★_d || i2lebsp_{64}(v) || i2lebsp_{255}(rho) || i2lebsp_{255}(psi)",
+            "root_occurrences": [1]
+          },
+          { "root_names": ["cm_old equality"] }
+        ]
+      },
+      {
+        "id": "new-note-commitment",
+        "kind": "component",
+        "title": "New note commitment",
+        "short_title": "New note",
+        "summary": "Constructs the output note commitment and exposes its x-coordinate.",
+        "position": { "x": 620, "y": 810 },
+        "proof_node_ids": ["gadgets-sinsemilla-merkle", "gadgets-ecc", "action-seven-outputs", "capture-synthesis-model"],
+        "match": [
+          {
+            "root_name": "g★_d || pk★_d || i2lebsp_{64}(v) || i2lebsp_{255}(rho) || i2lebsp_{255}(psi)",
+            "root_occurrences": [2]
+          }
+        ]
+      },
+      {
+        "id": "action-checks",
+        "kind": "check",
+        "title": "Orchard Action checks",
+        "short_title": "Action gate",
+        "summary": "Connects value balance, anchor equality, and spend/output enable flags.",
+        "position": { "x": 890, "y": 320 },
+        "proof_node_ids": ["action-valid-inputs", "action-seven-outputs", "action-theorem", "capture-synthesis-model"],
+        "match": [
+          { "region_names": ["Orchard circuit checks"] }
+        ]
+      },
+      {
+        "id": "instance-anchor",
+        "kind": "public-input",
+        "title": "Anchor instance",
+        "short_title": "ANCHOR · row 0",
+        "summary": "Public anchor against which the reconstructed Merkle root is checked.",
+        "position": { "x": 1160, "y": 80 },
+        "match": [{ "instance_rows": [0] }]
+      },
+      {
+        "id": "instance-cv-net-x",
+        "kind": "instance",
+        "title": "Net value commitment x",
+        "short_title": "CV_NET_X · row 1",
+        "summary": "Public x-coordinate of cv_net.",
+        "position": { "x": 1160, "y": 170 },
+        "match": [{ "instance_rows": [1] }]
+      },
+      {
+        "id": "instance-cv-net-y",
+        "kind": "instance",
+        "title": "Net value commitment y",
+        "short_title": "CV_NET_Y · row 2",
+        "summary": "Public y-coordinate of cv_net.",
+        "position": { "x": 1160, "y": 250 },
+        "match": [{ "instance_rows": [2] }]
+      },
+      {
+        "id": "instance-nf-old",
+        "kind": "instance",
+        "title": "Old nullifier",
+        "short_title": "NF_OLD · row 3",
+        "summary": "Public nullifier derived from the old note and incoming viewing key.",
+        "position": { "x": 1160, "y": 330 },
+        "match": [{ "instance_rows": [3] }]
+      },
+      {
+        "id": "instance-rk-x",
+        "kind": "instance",
+        "title": "Randomized verification key x",
+        "short_title": "RK_X · row 4",
+        "summary": "Public x-coordinate of the randomized spend-authority key.",
+        "position": { "x": 1160, "y": 410 },
+        "match": [{ "instance_rows": [4] }]
+      },
+      {
+        "id": "instance-rk-y",
+        "kind": "instance",
+        "title": "Randomized verification key y",
+        "short_title": "RK_Y · row 5",
+        "summary": "Public y-coordinate of the randomized spend-authority key.",
+        "position": { "x": 1160, "y": 490 },
+        "match": [{ "instance_rows": [5] }]
+      },
+      {
+        "id": "instance-cmx",
+        "kind": "instance",
+        "title": "New note commitment x",
+        "short_title": "CMX · row 6",
+        "summary": "Public x-coordinate of the new note commitment.",
+        "position": { "x": 1160, "y": 570 },
+        "match": [{ "instance_rows": [6] }]
+      },
+      {
+        "id": "instance-enable-spend",
+        "kind": "instance-flag",
+        "title": "Spend-enable flag",
+        "short_title": "ENABLE_SPEND · row 7",
+        "summary": "Public control flag used by the Action gate; it is a statement input, not a circuit-derived output.",
+        "position": { "x": 1160, "y": 680 },
+        "match": [{ "instance_rows": [7] }]
+      },
+      {
+        "id": "instance-enable-output",
+        "kind": "instance-flag",
+        "title": "Output-enable flag",
+        "short_title": "ENABLE_OUTPUT · row 8",
+        "summary": "Public control flag used by the Action gate; it is a statement input, not a circuit-derived output.",
+        "position": { "x": 1160, "y": 780 },
+        "match": [{ "instance_rows": [8] }]
+      }
+    ],
+    "edges": [
+      { "id": "flow-inputs-merkle", "from": "private-inputs", "to": "merkle-path", "label": "cm_old + path", "kind": "data", "summary": "Supplies the spent note commitment and its authentication path for reconstruction of the note-commitment tree root." },
+      { "id": "flow-inputs-value", "from": "private-inputs", "to": "value-commitment", "label": "v_old, v_new", "kind": "data", "summary": "Carries the old and new note values into the signed net-value calculation." },
+      { "id": "flow-inputs-nullifier", "from": "private-inputs", "to": "nullifier", "label": "nk, rho_old, psi_old, cm_old", "kind": "data", "summary": "Provides the nullifier key and old-note material used by Poseidon and the nullifier derivation." },
+      { "id": "flow-inputs-spend", "from": "private-inputs", "to": "spend-authority", "label": "ak + alpha", "kind": "data", "summary": "Provides the authorization key and randomizer used to derive the randomized verification key." },
+      { "id": "flow-inputs-ivk", "from": "private-inputs", "to": "commit-ivk", "label": "ak, nk", "kind": "data", "summary": "Carries the authorization and nullifier keys into the incoming-viewing-key commitment." },
+      { "id": "flow-ivk-address", "from": "commit-ivk", "to": "address-integrity", "label": "ivk", "kind": "data", "summary": "Uses the committed incoming viewing key to check ownership of the diversified address." },
+      { "id": "flow-inputs-address", "from": "private-inputs", "to": "address-integrity", "label": "g_d_old, pk_d_old", "kind": "data", "summary": "Supplies the old diversified base and transmission key for the address-integrity check." },
+      { "id": "flow-address-old-note", "from": "address-integrity", "to": "old-note-commitment", "label": "validated pk_d_old", "kind": "constraint", "summary": "Passes the ownership-checked transmission key into reconstruction of the spent note commitment." },
+      { "id": "flow-inputs-old-note", "from": "private-inputs", "to": "old-note-commitment", "label": "old note fields", "kind": "data", "summary": "Carries the old note fields into the Sinsemilla note-commitment computation." },
+      { "id": "flow-nullifier-new-note", "from": "nullifier", "to": "new-note-commitment", "label": "rho_new", "kind": "data", "summary": "Reuses the derived nullifier as the rho input of the new note commitment." },
+      { "id": "flow-inputs-new-note", "from": "private-inputs", "to": "new-note-commitment", "label": "new note fields", "kind": "data", "summary": "Carries the newly witnessed note fields into the output note-commitment computation." },
+      { "id": "flow-merkle-action", "from": "merkle-path", "to": "action-checks", "label": "root", "kind": "constraint", "summary": "Feeds the reconstructed Merkle root to the Action gate for comparison with the public anchor." },
+      { "id": "flow-value-action", "from": "value-commitment", "to": "action-checks", "label": "magnitude + sign", "kind": "constraint", "summary": "Feeds the signed net-value decomposition to the Action gate's balance constraint." },
+      { "id": "flow-inputs-action", "from": "private-inputs", "to": "action-checks", "label": "v_old, v_new", "kind": "constraint", "summary": "Lets the Action gate relate old and new values to the net-value magnitude and sign." },
+      { "id": "flow-action-anchor", "from": "instance-anchor", "to": "action-checks", "label": "anchor", "kind": "constraint", "summary": "Supplies the public ANCHOR statement input against which the reconstructed root is checked when a spend is enabled." },
+      { "id": "flow-value-cv-x", "from": "value-commitment", "to": "instance-cv-net-x", "label": "cv_net.x", "kind": "public", "summary": "Exposes the x-coordinate of the computed net value commitment as a public instance." },
+      { "id": "flow-value-cv-y", "from": "value-commitment", "to": "instance-cv-net-y", "label": "cv_net.y", "kind": "public", "summary": "Exposes the y-coordinate of the computed net value commitment as a public instance." },
+      { "id": "flow-nullifier-instance", "from": "nullifier", "to": "instance-nf-old", "label": "nf_old", "kind": "public", "summary": "Exposes the derived old-note nullifier as the NF_OLD public instance." },
+      { "id": "flow-spend-rk-x", "from": "spend-authority", "to": "instance-rk-x", "label": "rk.x", "kind": "public", "summary": "Exposes the x-coordinate of the randomized spend-authority key." },
+      { "id": "flow-spend-rk-y", "from": "spend-authority", "to": "instance-rk-y", "label": "rk.y", "kind": "public", "summary": "Exposes the y-coordinate of the randomized spend-authority key." },
+      { "id": "flow-new-note-cmx", "from": "new-note-commitment", "to": "instance-cmx", "label": "cm_new.x", "kind": "public", "summary": "Exposes the x-coordinate of the newly constructed note commitment." },
+      { "id": "flow-enable-spend-action", "from": "instance-enable-spend", "to": "action-checks", "label": "enable_spends", "kind": "constraint", "summary": "Supplies the public spend-enable flag that activates the spend-side Action requirements." },
+      { "id": "flow-enable-output-action", "from": "instance-enable-output", "to": "action-checks", "label": "enable_outputs", "kind": "constraint", "summary": "Supplies the public output-enable flag that activates the output-side Action requirements." }
+    ]
+  }
+}

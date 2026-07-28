@@ -4,6 +4,10 @@ This document provides an introduction to how to build the `garden` project for 
 
 Before starting, make sure you have `Rust` and `opam` installed.
 
+The Orchard verification visualization is a separate frontend and requires
+[Node.js 22](https://nodejs.org/) and npm. The website data is generated from
+the Rocq structure and parity snapshots rather than committed.
+
 ## Setting Up Dependency Submodules
 
 Fetch the necessary codes from submodule repositories:
@@ -110,6 +114,127 @@ cd Garden
 make snapshot
 cd ..
 ```
+
+## Orchard Verification Visualization
+
+The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and
+Circuit Grid lives in `web/orchard-verification`. The production bundle is
+generated in the ignored `web/orchard-verification/dist` directory. It is
+validated in CI and published from the dedicated `gh-pages` branch. Generated
+website files must not be committed to the source branch.
+
+On a fresh checkout, first generate the ignored raw structure snapshot using
+the Rocq environment described above:
+
+```sh
+cd Garden
+make orchard-structure-json-from-model
+cd ..
+```
+
+Then install the pinned frontend dependencies and start the development server
+from the repository root:
+
+```sh
+cd web/orchard-verification
+npm ci
+npm run dev
+```
+
+The `predev` hook regenerates the ignored website data in `public/data` before
+Vite starts. `npm run build` does the same through its `prebuild` hook before
+writing the ignored production bundle to `dist`. Run `npm run generate:data`
+directly when only the derived JSON needs refreshing.
+
+Open the URL printed by Vite for the Journey. Add `/proof-map.html` for the
+Atlas, `/circuit.html` for the generated high-level Rocq circuit explorer, or
+`/circuit-grid.html` for the parity-backed circuit layout grid.
+
+The Circuit Explorer loads its generated JSON from `public/data`. When the Rocq
+circuit or free-monad evaluator changes, first refresh the tracked raw
+structure snapshot from `Garden/`:
+
+```sh
+cd Garden
+make orchard-structure-json-from-model
+cd ..
+```
+
+Once the raw structure snapshot exists locally, changes limited to source
+mapping, the functional-flow manifest, or the frontend do not require another
+Rocq build; `npm run generate:data` is sufficient.
+
+The Circuit Grid combines the parsed-equal Rocq-model and Rust-implementation
+configure/synthesis snapshots with the source-enriched Circuit Explorer
+artifact. Regenerate it only after exact parity succeeds:
+
+```sh
+cd Garden
+make orchard-configure-json-compare
+make orchard-synthesis-json-compare
+cd ..
+npm --prefix web/orchard-verification run generate:data
+python3 -m unittest scripts.tests.test_generate_orchard_circuit_grid
+```
+
+The generated `garden.halo2.circuit-grid.v1` data records V1 placement,
+selector activations, fixed assignments, fill ranges, and copy endpoints. It
+does not contain witness values or omitted ordinary advice assignments; its
+metadata states those coverage limits explicitly.
+
+The generation step requires the Rocq/OCaml environment described above. It
+does not modify or build the sibling Halo2 and Orchard repositories.
+
+Before committing a change, run the type checks and component tests, build the
+production bundle, and run the browser tests:
+
+```sh
+npm run check
+npm run build
+npx playwright install chromium
+npm run test:e2e
+```
+
+In CI, the Rocq job regenerates the raw structure and passes it to the website
+job as a short-lived Actions artifact. The website job regenerates its derived
+data and installs Chromium together with its system dependencies. Pull
+requests and pushes to `main` run all validation without publishing, so a slow
+Rocq job cannot block an independent Pages release.
+
+To validate and publish the current committed revision from a developer
+machine, run this command from a clean worktree:
+
+```sh
+./scripts/publish_orchard_pages.sh
+```
+
+The command regenerates the raw and derived circuit data, installs the pinned
+frontend dependencies, runs the Python, TypeScript, component, and Playwright
+checks, and builds the production bundle. It then creates a temporary,
+parentless deployment commit containing only `dist` plus `.nojekyll` and
+force-pushes it with a lease to `origin/gh-pages`. The source branch is never
+switched, and each release leaves only one reachable deployment commit.
+
+The publishing machine needs the Rocq/OCaml, Python, Node.js 22, npm, and
+Playwright prerequisites described above, configured Git author information,
+and push access to `origin`. In the GitHub repository settings, configure Pages
+to **Deploy from a branch**, select `gh-pages`, and select `/(root)`. This is a
+one-time setting; subsequent authenticated developer pushes publish the
+prebuilt static files without waiting for the Rocq CI job.
+
+To inspect the production bundle locally after `npm run build`, serve it from
+the repository root:
+
+```sh
+python3 -m http.server 4173 --directory web/orchard-verification/dist
+```
+
+Then open `http://localhost:4173/` for the Journey,
+`http://localhost:4173/proof-map.html` for the Atlas, or
+`http://localhost:4173/circuit.html` for the Circuit Explorer, or
+`http://localhost:4173/circuit-grid.html` for the Circuit Grid. Do not open the
+HTML files directly with a `file:` URL; an HTTP server matches the way their
+relative assets and circuit JSON are deployed.
 
 ## If Using VsRocq
 
