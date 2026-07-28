@@ -1140,7 +1140,6 @@ help, but do NOT retry swapping the `cbn` for `lazy` — `lazy` inlines the
 `Z.add` fixpoint at stuck symbolic applications (`row + 1`), breaking every
 later rewrite pattern; `cbn`'s refolding is load-bearing there.
 
-
 ### Leaves of the vk-commitment MSM and Vesta SRS layers (not on this branch)
 
 The entries below measure files that live on `valerii-huhnin@msm-stretch`
@@ -1194,6 +1193,33 @@ relying on the numbers.
   reference vector), the sixteen `Orchard/vk_srs_data_*.v` literal files
   ≈ 2.5 s each (see the literal-table sharding pitfall above),
   `EllipticCurve/Vesta.v` and `Orchard/vk_srs_entry.v` < 1 s.
+
+### Standalone Action bridge (2026-07-28)
+
+- `Orchard/IronwoodGardenActionBridge/action_garden_constants.v` stores 64
+  Poseidon states and 1,024 Sinsemilla points in primitive arrays. This avoids
+  the tens-of-gigabytes module-sealing/list behavior observed in the first
+  rendering.
+- Its signed-`Z` accessor checks the array length before converting the index
+  to `uint63`; negative indices select zero and oversized indices return the
+  fallback, so speed does not change source semantics.
+- The current Post-NU6.3 proof has five files: generated constants, generated
+  declarations, the representation/arithmetic bridge, the Poseidon bridge,
+  and the direct native equivalence. The former internal Core and alternate
+  NU6.2 equivalence files have been removed.
+- Redirect development outputs and `TMPDIR` to
+  `/home/fedora/Zcash/tmp/action-garden`. Use `-vos` for the edit/compile loop
+  and produce `.vo` only for final validation. A low virtual-memory `ulimit`
+  is counterproductive here because the OCaml runtime reserves its heap up
+  front; the primitive-array rendering is what prevents the former
+  tens-of-gigabytes list/module-sealing behavior.
+- Keep recursive message encoders, Sinsemilla folds, and Merkle layers opaque
+  after proving their pointwise correspondence. Letting final `reflexivity`
+  unfold a symbolic 109-round fold caused multi-minute conversion and high
+  memory use.
+- For the two concrete tables, one `vm_compute` Boolean checker plus a
+  membership lemma gives a compact certificate. Do not generate 1,024
+  separate theorem applications.
 
 ## History: the big cost cliffs
 
