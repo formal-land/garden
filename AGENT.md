@@ -41,9 +41,11 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `web/orchard-verification/`: the Orchard Verification Journey, Atlas,
   Circuit Explorer, and Circuit Grid source, tests, and data-generation hooks.
   The ignored raw structure snapshot, `public/data/` website data, and `dist/`
-  production bundle are regenerated in CI, which deploys the bundle to GitHub
-  Pages through `.github/workflows/rocq.yml`; build and validation commands are
-  documented in `docs/BUILD.md`.
+  production bundle are regenerated and validated through
+  `.github/workflows/rocq.yml`. Pages releases are produced locally by
+  `scripts/publish_orchard_pages.sh` and stored only on the dedicated
+  `gh-pages` branch; build, validation, and publishing commands are documented
+  in `docs/BUILD.md`.
 
 Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 (gitignored), which loads alongside this file.
@@ -63,9 +65,10 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
 - Treat `Garden/Orchard/Snapshots/circuit_structure_generated_from_model.json`,
   `web/orchard-verification/public/data/`, and `dist/` as ephemeral generated
   output: edit the source or evidence model, run its checks and build, and
-  never commit those artifacts. GitHub Actions regenerates the raw and derived
-  website data and publishes the validated bundle to GitHub Pages after
-  changes reach `main`.
+  never commit those artifacts to the source branch. GitHub Actions regenerates
+  and validates the raw and derived website data. The local Pages publisher
+  puts only the validated static bundle on the force-replaced `gh-pages`
+  deployment branch.
 
 ## Proof iteration workflow
 

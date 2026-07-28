@@ -120,7 +120,8 @@ cd ..
 The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and
 Circuit Grid lives in `web/orchard-verification`. The production bundle is
 generated in the ignored `web/orchard-verification/dist` directory. It is
-uploaded directly to GitHub Pages by CI and must not be committed.
+validated in CI and published from the dedicated `gh-pages` branch. Generated
+website files must not be committed to the source branch.
 
 On a fresh checkout, first generate the ignored raw structure snapshot using
 the Rocq environment described above:
@@ -197,8 +198,29 @@ npm run test:e2e
 In CI, the Rocq job regenerates the raw structure and passes it to the website
 job as a short-lived Actions artifact. The website job regenerates its derived
 data and installs Chromium together with its system dependencies. Pull
-requests run all validation without publishing. A successful build on `main`
-uploads `dist` as a GitHub Pages artifact and deploys it.
+requests and pushes to `main` run all validation without publishing, so a slow
+Rocq job cannot block an independent Pages release.
+
+To validate and publish the current committed revision from a developer
+machine, run this command from a clean worktree:
+
+```sh
+./scripts/publish_orchard_pages.sh
+```
+
+The command regenerates the raw and derived circuit data, installs the pinned
+frontend dependencies, runs the Python, TypeScript, component, and Playwright
+checks, and builds the production bundle. It then creates a temporary,
+parentless deployment commit containing only `dist` plus `.nojekyll` and
+force-pushes it with a lease to `origin/gh-pages`. The source branch is never
+switched, and each release leaves only one reachable deployment commit.
+
+The publishing machine needs the Rocq/OCaml, Python, Node.js 22, npm, and
+Playwright prerequisites described above, configured Git author information,
+and push access to `origin`. In the GitHub repository settings, configure Pages
+to **Deploy from a branch**, select `gh-pages`, and select `/(root)`. This is a
+one-time setting; subsequent authenticated developer pushes publish the
+prebuilt static files without waiting for the Rocq CI job.
 
 To inspect the production bundle locally after `npm run build`, serve it from
 the repository root:

@@ -50,10 +50,10 @@ Explore the work through four complementary views:
   parity-backed, row-and-column view of the V1 circuit placement before
   selector compression.
 
-The pages are built and deployed to GitHub Pages from the source in this
-repository. See
+The pages are built from the source in this repository and published from its
+dedicated `gh-pages` deployment branch. See
 [BUILD.md](docs/BUILD.md#orchard-verification-visualization) for local viewing,
-development, and verification commands.
+development, verification, and publishing commands.
 
 ## Keccak in Plonky3
 
