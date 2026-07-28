@@ -24,14 +24,14 @@ import {
   createCircuitGridProjection,
   type CircuitGridProjection,
 } from "../circuit-grid/projector";
+import { type DataLoader, useLoadableData } from "../hooks/useLoadableData";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 
 const ROW_HEIGHT = 32;
 const OVERSCAN_ROWS = 8;
 const DEFAULT_VIEWPORT_HEIGHT = 620;
 const REGION_COLUMN_WIDTH_REM = 10.5;
 const ROW_NUMBER_COLUMN_WIDTH_REM = 3.5;
-
-type DataLoader = () => Promise<CircuitGridData>;
 
 interface HoverPreview {
   readonly cell: CircuitGridCellProjection;
@@ -51,24 +51,6 @@ function titleCase(value: string): string {
     .replace(/[_-]+/g, " ")
     .trim()
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function useNarrowViewport(): boolean {
-  const query = "(max-width: 760px)";
-  const [narrow, setNarrow] = useState(() =>
-    typeof window !== "undefined" && typeof window.matchMedia === "function"
-      ? window.matchMedia(query).matches
-      : false
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const media = window.matchMedia(query);
-    const update = () => setNarrow(media.matches);
-    update();
-    media.addEventListener?.("change", update);
-    return () => media.removeEventListener?.("change", update);
-  }, []);
-  return narrow;
 }
 
 export function parseCircuitGridHash(
@@ -697,11 +679,16 @@ function GridError({
   );
 }
 
-export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?: DataLoader }) {
-  const narrow = useNarrowViewport();
-  const [data, setData] = useState<CircuitGridData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+export function CircuitGrid({
+  loader = loadCircuitGridData,
+}: {
+  readonly loader?: DataLoader<CircuitGridData>;
+}) {
+  const narrow = useMediaQuery("(max-width: 760px)");
+  const { data, error: loadError, retry } = useLoadableData(
+    loader,
+    "Unknown grid data error",
+  );
   const [selection, setSelection] = useState<CircuitGridSelection | null>(
     () => parseCircuitGridHash(),
   );
@@ -711,23 +698,6 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
   const [query, setQuery] = useState("");
   const [preview, setPreview] = useState<HoverPreview | null>(null);
   const selectionOriginRef = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    setLoadError(null);
-    loader()
-      .then((loaded) => {
-        if (!cancelled) setData(loaded);
-      })
-      .catch((error: unknown) => {
-        if (!cancelled) {
-          setLoadError(error instanceof Error ? error.message : "Unknown grid data error");
-        }
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [loader, attempt]);
 
   useEffect(() => {
     const restore = () => {
@@ -793,8 +763,7 @@ export function CircuitGrid({ loader = loadCircuitGridData }: { readonly loader?
         message={loadError}
         onRetry={() => {
           clearCircuitGridDataCache();
-          setData(null);
-          setAttempt((current) => current + 1);
+          retry();
         }}
       />
     );

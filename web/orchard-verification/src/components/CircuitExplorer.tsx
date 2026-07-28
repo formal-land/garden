@@ -13,9 +13,10 @@ import {
   clearCircuitExplorerDataCache,
   loadCircuitExplorerData,
 } from "../circuit/loader";
+import { type DataLoader, useLoadableData } from "../hooks/useLoadableData";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import type {
   CircuitCell,
-  CircuitComponent,
   CircuitConstraint,
   CircuitExplorerData,
   CircuitExplorerLevel,
@@ -43,7 +44,6 @@ import {
 const EXACT_PAGE_SIZE = 60;
 const RELATIONSHIP_PREVIEW_SIZE = 8;
 
-type DataLoader = () => Promise<CircuitExplorerData>;
 type EntryOrigin = "flow" | "component" | "detail";
 
 interface ExplorerEntry {
@@ -2022,17 +2022,20 @@ function ExplorerError({ message, onRetry }: { message: string; onRetry: () => v
   );
 }
 
-export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?: DataLoader }) {
-  const [data, setData] = useState<CircuitExplorerData | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [attempt, setAttempt] = useState(0);
+export function CircuitExplorer({
+  loader = loadCircuitExplorerData,
+}: {
+  loader?: DataLoader<CircuitExplorerData>;
+}) {
+  const { data, error: loadError, retry } = useLoadableData(
+    loader,
+    "Unknown data-loading error",
+  );
   const [route, setRoute] = useState<CircuitExplorerRoute>(defaultRoute);
   const [notice, setNotice] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [visibleLimit, setVisibleLimit] = useState(EXACT_PAGE_SIZE);
-  const [narrowInspector, setNarrowInspector] = useState(
-    () => window.matchMedia("(max-width: 1160px)").matches,
-  );
+  const narrowInspector = useMediaQuery("(max-width: 1160px)");
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
   const layerRef = useRef<HTMLDivElement>(null);
@@ -2040,28 +2043,8 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
   const focusedRouteRef = useRef(`${route.level}:${route.itemId ?? ""}:${route.focusId ?? ""}`);
 
   useEffect(() => {
-    let active = true;
-    setLoadError(null);
-    loader().then(
-      (loaded) => {
-        if (active) setData(loaded);
-      },
-      (error: unknown) => {
-        if (active) setLoadError(error instanceof Error ? error.message : "Unknown data-loading error");
-      },
-    );
-    return () => { active = false; };
-  }, [attempt, loader]);
-
-  useEffect(() => {
-    const query = window.matchMedia("(max-width: 1160px)");
-    const onChange = (event: MediaQueryListEvent) => {
-      setNarrowInspector(event.matches);
-      if (!event.matches) setMobileInspectorOpen(false);
-    };
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    if (!narrowInspector) setMobileInspectorOpen(false);
+  }, [narrowInspector]);
 
   useEffect(() => {
     setMobileInspectorOpen(false);
@@ -2143,8 +2126,7 @@ export function CircuitExplorer({ loader = loadCircuitExplorerData }: { loader?:
         message={loadError}
         onRetry={() => {
           clearCircuitExplorerDataCache();
-          setData(null);
-          setAttempt((current) => current + 1);
+          retry();
         }}
       />
     );

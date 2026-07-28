@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useRef } from "react";
 import gardenLogo from "../../../garden.svg?url";
 import { orchardVerificationData } from "./data/content";
 import { JourneyView } from "./components/JourneyView";
@@ -7,6 +7,13 @@ import { CircuitExplorer } from "./components/CircuitExplorer";
 import { CircuitGrid } from "./components/CircuitGrid";
 
 type View = "journey" | "atlas" | "circuit" | "grid";
+
+function currentView(): View {
+  const view = document.documentElement.dataset.view;
+  return view === "atlas" || view === "circuit" || view === "grid"
+    ? view
+    : "journey";
+}
 
 function formatSnapshotDate(value: string): string {
   return new Intl.DateTimeFormat("en-GB", {
@@ -145,15 +152,7 @@ function SiteFooter() {
 }
 
 export function App() {
-  const view = useMemo<View>(
-    () => {
-      if (document.documentElement.dataset.view === "atlas") return "atlas";
-      if (document.documentElement.dataset.view === "circuit") return "circuit";
-      if (document.documentElement.dataset.view === "grid") return "grid";
-      return "journey";
-    },
-    [],
-  );
+  const view = currentView();
   return (
     <div className="site-shell">
       <SiteHeader view={view} />

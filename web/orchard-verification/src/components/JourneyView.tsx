@@ -5,6 +5,7 @@ import {
   useState,
 } from "react";
 import type { JourneyStage, OrchardVerificationData } from "../data/model";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import {
   EvidencePanel,
   RepositoryBadges,
@@ -31,19 +32,17 @@ function stageFromHash(stages: readonly JourneyStage[]) {
 }
 
 export function JourneyView({ data }: { data: OrchardVerificationData }) {
-  const initialIndex = Math.max(0, stageFromHash(data.stages));
-  const [stageIndex, setStageIndex] = useState(initialIndex);
+  const [stageIndex, setStageIndex] = useState(() =>
+    Math.max(0, stageFromHash(data.stages)),
+  );
   const [progress, setProgress] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [progressive, setProgressive] = useState(false);
   const [ended, setEnded] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [reducedMotion, setReducedMotion] = useState(
-    () => window.matchMedia("(prefers-reduced-motion: reduce)").matches,
-  );
-  const [evidenceOpen, setEvidenceOpen] = useState(
-    () => !window.matchMedia("(max-width: 760px)").matches,
-  );
+  const reducedMotion = useMediaQuery("(prefers-reduced-motion: reduce)");
+  const narrowViewport = useMediaQuery("(max-width: 760px)");
+  const [evidenceOpen, setEvidenceOpen] = useState(() => !narrowViewport);
   const shellRef = useRef<HTMLElement | null>(null);
   const frameRef = useRef<number | null>(null);
   const startedAtRef = useRef(0);
@@ -96,21 +95,12 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
   }, [reducedMotion, stageIndex]);
 
   useEffect(() => {
-    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
-    const onChange = (event: MediaQueryListEvent) => {
-      setReducedMotion(event.matches);
-      if (event.matches) setProgressive(false);
-    };
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    if (reducedMotion) setProgressive(false);
+  }, [reducedMotion]);
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 760px)");
-    const onChange = (event: MediaQueryListEvent) => setEvidenceOpen(!event.matches);
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    setEvidenceOpen(!narrowViewport);
+  }, [narrowViewport]);
 
   useEffect(() => {
     if (!playing) return undefined;

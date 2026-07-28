@@ -21,6 +21,7 @@ import type {
   ProofStatus,
   RepositoryId,
 } from "../data/model";
+import { useMediaQuery } from "../hooks/useMediaQuery";
 import { statusLabels } from "./EvidencePanel";
 import { WorkUnitChips, WorkUnitPanel } from "./WorkHistory";
 
@@ -273,6 +274,7 @@ export function ProofMap({
   focusNodeIds = [],
   revealedNodeIds,
 }: ProofMapProps) {
+  const narrowViewport = useMediaQuery("(max-width: 760px)");
   const inspectorRef = useRef<HTMLElement>(null);
   const rawId = useId();
   const markerPrefix = rawId.replace(/:/g, "");
@@ -359,23 +361,15 @@ export function ProofMap({
   const [workUnitFilter, setWorkUnitFilter] = useState("");
   const [searchQuery, setSearchQuery] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<AtlasViewMode>(
-    () =>
-      typeof window !== "undefined" &&
-      window.matchMedia("(max-width: 760px)").matches
-        ? "list"
-        : "graph",
+  const [viewMode, setViewMode] = useState<AtlasViewMode>(() =>
+    narrowViewport ? "list" : "graph",
   );
   const [graphViewBox, setGraphViewBox] = useState<ViewBox | null>(null);
   const [showRelatedOnly, setShowRelatedOnly] = useState(false);
 
   useEffect(() => {
-    const query = window.matchMedia("(max-width: 760px)");
-    const onChange = (event: MediaQueryListEvent) =>
-      setViewMode(event.matches ? "list" : "graph");
-    query.addEventListener("change", onChange);
-    return () => query.removeEventListener("change", onChange);
-  }, []);
+    setViewMode(narrowViewport ? "list" : "graph");
+  }, [narrowViewport]);
 
   useEffect(() => {
     if (!selectedNodeId) setShowRelatedOnly(false);

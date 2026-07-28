@@ -17,51 +17,20 @@ import {
   type CircuitSourceConfidence,
   type CircuitSourceResolutionCandidate,
 } from "./model";
-
-type JsonRecord = Record<string, unknown>;
+import {
+  numberValue,
+  optionalNumber,
+  pick,
+  record,
+  text,
+  type JsonRecord,
+} from "../shared/json";
 
 const DATA_FILE = "data/orchard-circuit-highlevel.v1.json";
 let cachedLoad: Promise<CircuitExplorerData> | null = null;
 
-function record(value: unknown): JsonRecord {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    ? value as JsonRecord
-    : {};
-}
-
 function array(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
-}
-
-function pick(target: JsonRecord, ...keys: readonly string[]): unknown {
-  for (const key of keys) {
-    if (target[key] !== undefined) return target[key];
-  }
-  return undefined;
-}
-
-function text(target: JsonRecord, keys: readonly string[], fallback = ""): string {
-  const value = pick(target, ...keys);
-  return typeof value === "string" || typeof value === "number"
-    ? String(value)
-    : fallback;
-}
-
-function numberValue(
-  target: JsonRecord,
-  keys: readonly string[],
-  fallback = 0,
-): number {
-  const value = pick(target, ...keys);
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function optionalNumber(target: JsonRecord, keys: readonly string[]): number | undefined {
-  const value = pick(target, ...keys);
-  if (value === undefined || value === null || value === "") return undefined;
-  const parsed = typeof value === "number" ? value : Number(value);
-  return Number.isFinite(parsed) ? parsed : undefined;
 }
 
 function stringList(value: unknown): string[] {
