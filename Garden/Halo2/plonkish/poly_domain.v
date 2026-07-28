@@ -3,7 +3,7 @@
     The deployed verifying key evaluates polynomials over the cyclic group
     [H = <omega>] of order [n = 2^k] in the Pallas base field, with [k = 11]
     ([n = 2048]) per the pinned dump
-    [orchard/src/circuit_data/circuit_description_fixed]
+    [orchard/src/circuit_data/circuit_description_post_nu6_3]
     ([PinnedEvaluationDomain { k: 11, extended_k: 14, omega: 0x181b...7813 }]).
 
     This file pins that [omega] as a Rocq literal and certifies, by two
@@ -25,7 +25,7 @@ Global Open Scope Z_scope.
 
 Module PolyDomain.
 
-  (** The pinned [omega] of [circuit_description_fixed], as a canonical
+  (** The pinned [omega] of [circuit_description_post_nu6_3], as a canonical
       residue mod [Primes.pallas_p] (decimal
       [10903770050551191186451481744535548418731134600017891582826719412432433936403]). *)
   Definition omega : Z :=

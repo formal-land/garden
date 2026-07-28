@@ -6,8 +6,8 @@
     [vk/data.v], to the byte string of Rust's [Debug] rendering of
     [vk.pinned()].  The printer is parameterized on the alternate-form flag
     [alt], mirroring [core::fmt]: [alt = true] yields the pretty [{:#?}]
-    rendering (the in-tree dump [circuit_description_fixed], the T1 parity
-    target), [alt = false] the compact [{:?}] rendering (the string [s]
+    rendering (the in-tree dump [circuit_description_post_nu6_3], the T1
+    parity target), [alt = false] the compact [{:?}] rendering (the string [s]
     hashed into [transcript_repr] by [keygen_vk],
     [halo2_proofs/src/plonk.rs]).
 

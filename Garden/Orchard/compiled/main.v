@@ -13,8 +13,8 @@
     [Compile.compile] on [orchard_indexed_system] with the activations of
     the serialized events and the pinned permutation-column and constants
     data of [compiled/pinned.v].  The parity certificates of
-    [compiled/check.v] identify this object with the deployed
-    description [circuit_description_fixed] component by component — the
+    [compiled/check.v] identify this object with the Post-NU6.3
+    description [circuit_description_post_nu6_3] component by component — the
     193 gate polynomials (indicator factors included), the query tables,
     the lookup arguments, the constants column — so the acceptance
     hypothesis below reads on the deployed compiled circuit, not merely on
@@ -663,7 +663,7 @@ Definition orchard_copies : list (Raw.Cell.t * Raw.Cell.t) :=
 
 Definition orchard_n_rows : nat := Z.to_nat (Domain.n orchard_domain).
 
-(** The closed assembly of the 2 964 copy obligations over the pinned
+(** The closed assembly of the 3 004 copy obligations over the pinned
     permutation columns. *)
 Definition orchard_sigma : Sigma.t :=
   option_default
@@ -800,7 +800,7 @@ Proof.
         | column' row' annotation value | left_cell right_cell
         | column' from_row to_row value ];
         (* [discriminate] is targeted at [Hcheck]: the bare form scans the
-           whole context and whnf-normalizes [Hin], forcing the 19,617-event
+           whole context and whnf-normalizes [Hin], forcing the 19,679-event
            stream on the lazy machine. *)
         try discriminate Hcheck.
       apply Bool.andb_true_iff in Hcheck.

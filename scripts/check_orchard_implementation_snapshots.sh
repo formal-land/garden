@@ -23,6 +23,7 @@ cargo test generate_action_circuit_highlevel_json -- --ignored --nocapture
 cargo test generate_action_circuit_configure_json -- --ignored --nocapture
 cargo test generate_action_circuit_synthesis_json -- --ignored --nocapture
 cargo test generate_action_circuit_selector_compression_json -- --ignored --nocapture
+cargo test round_trip_post_nu6_3 -- --nocapture
 
 cd "${GARDEN_REPOSITORY}"
 
@@ -45,3 +46,5 @@ if test -n "$(git status --porcelain -- \
   echo "Garden's Orchard implementation snapshots are stale." >&2
   exit 1
 fi
+
+python3 scripts/generate_vk_pinned.py --check

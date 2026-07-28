@@ -47,17 +47,18 @@ scalar's `copy_decompose` since 2021-07-10 (zcash/halo2 `a8bd2d6a`), and
 `constrain_constant(z_last, 0)` is in the helper's original commit
 (`ee062bae`, 2021-07-09), years before this translation (2026-06).
 
-In total the action circuit exercises **166** such constant bindings (the site
-table below), including the Poseidon initial state, every Sinsemilla domain
-point `x_Q`, all short-range-check `2^{-n}` pins, the Merkle layer constant,
-and both strict running-sum tails.
+In total the Post-NU6.3 action circuit exercises **182** such constant bindings
+(the site table below): the former 166 plus 16 zero/one pins in the four
+cross-address-check rows. They also include the Poseidon initial state, every
+Sinsemilla domain point `x_Q`, all short-range-check `2^{-n}` pins, the Merkle
+layer constant, and both strict running-sum tails.
 
 ## The affected sites (halo2_gadgets 0.5.0)
 
 Per-site emission status, from the floor-planner constant tail of the
 implementation dump. Attribution used the floor planner's FIFO discipline: the
 trailing block's order mirrors synthesis order, so aligning it with the region
-sequence assigns every one of the 166 bindings to a source site.
+sequence assigns every one of the 182 bindings to a source site.
 
 | Rust site | What it pins | Consumer in this development | Emission |
 |---|---|---|---|
@@ -68,6 +69,7 @@ sequence assigns every one of the 166 bindings to a source site.
 | `sinsemilla/chip/hash_to_point.rs:163` | the domain point's `x_Q` into the initial `x_a` (35 hashes: 32 Merkle, 2 note commits, 1 commit_ivk; `y_Q` goes through the already-modeled `fixed y_q` `AssignFixed`) | the ANCHOR and CMX public outputs | emitted: the three `hash_to_point` region functions in `sinsemilla/chip.v` pin `x_a[0] = q_x` |
 | `sinsemilla/chip/hash_to_point.rs:140` | `variable y_q` (init-from-private-point branch) | — | not exercised by the action circuit (absent from the dump); not emitted |
 | `sinsemilla/merkle/chip.rs:349` | the layer constant `l` | ANCHOR | emitted: `circuit.v` `synthesize_merkle_decomposition_instance` pins `right_col[1] = layer` |
+| `orchard/src/circuit.rs` `synthesize_cross_address_checks` | zero in A1 and one in A3/A6/A7 on each of four rows | the Post-NU6.3 `disableCrossAddress · (old_coord − new_coord) = 0` checks, with the other reused `q_orchard` constraints neutralized | emitted: `circuit.v` `synthesize_cross_address_checks` (16 bindings total) |
 | `ecc/chip/witness_point.rs:112,115` | constant-point variant | — (no point-coordinate constants in the dump) | not exercised by the action circuit; not emitted |
 | `ecc/chip/mul.rs:201` | variable-base `z_init = 0` | address integrity (`[ivk] g_d_old`) | emitted: `mul.v` variable-base region pins `A9[1] = 0` |
 | `ecc/chip/mul_fixed/short.rs:262` | `u = 0` in the sign row | none (upstream comments it irrelevant) | not exercised by the action circuit (absent from the dump); not emitted |
@@ -89,7 +91,7 @@ the faithfulness check looks, cemented by a repair at the wrong layer:
 2. **The synthesis JSON recorder sits below the floor planner.** The Rust dump
    (`SynthesisJsonRecorder`, formal-land/orchard `src/circuit.rs`) instruments
    the `Assignment` trait, where the desugared trailing block *is* visible —
-   the implementation snapshot contains all 166 bindings as raw events.
+   the implementation snapshot contains all 182 bindings as raw events.
 
 3. **The parity gap was patched at the artifact level.** When the model-side
    and implementation-side JSON first diverged by exactly that trailing block,

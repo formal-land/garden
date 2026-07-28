@@ -155,7 +155,7 @@ messages).
 
 `generator/certificates.v` instantiates the three checkers at the Orchard
 circuit — `selector_guarded_certificate`, `no_conflicting_writes_certificate`
-over the 14,773 `layouter_facts`, and `lookup_defaults_certificate` — together
+over the 14,813 `layouter_facts`, and `lookup_defaults_certificate` — together
 with `layouter_table_rows_eq` (= 1024 = `2^sinsemilla_k`).
 
 ## The concrete instance
@@ -171,8 +171,8 @@ Theorem orchard_completeness_instance :
   read_action_inputs Γtest = inputs_of test_input.
 ```
 
-with `Γtest = honest_assignment test_input`. All 4,858 enabled gate points,
-all 2,964 witness facts and the reader side of the read-back are verified by
+with `Γtest = honest_assignment test_input`. All 4,862 enabled gate points,
+all 3,004 witness facts and the reader side of the read-back are verified by
 `vm_compute` in `instance/certs.v` — together, because they share one
 evaluation of `Γtest` — with the domain and nondegeneracy certificates in
 `instance/domain.v` and the specification side of the read-back in
@@ -268,7 +268,7 @@ coverage is total, so the family hypothesis is never needed and the obligation
 holds at `all_families` — every family index `0..42`, including the vacuous
 `41`. The three lanes stated at a family index need the converse fact, that an
 enabled point guarded by one of their selectors lies in one of their families,
-supplied by a single input-independent scan over the 4,858 enabled points.
+supplied by a single input-independent scan over the 4,862 enabled points.
 
 ## The operational layer
 

@@ -160,6 +160,19 @@ with Garden's configure, synthesis, and selector-compression snapshots. The
 Rocq synthesis layout is intentionally not overwritten: Garden extends that
 file with typed `RegionId` mappings used by the proofs.
 
+It also checks Orchard's Post-NU6.3 pinned verifying-key description against
+the Rust keygen and runs `scripts/generate_vk_pinned.py --check`. That generator
+keeps the Rocq dump shards, commitment literals, BLAKE2b checkpoint states, and
+Fiat–Shamir binding scalar synchronized with
+`circuit_description_post_nu6_3`. To regenerate those Rocq artifacts directly:
+
+```sh
+cd Garden
+make orchard-vk-pinned
+make orchard-vk-pinned-check
+cd ..
+```
+
 ## Orchard Verification Visualization
 
 The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and

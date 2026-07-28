@@ -210,7 +210,7 @@ grid, which `orchard_operational_sound` (this bridge) turns into
 `orchard_compiled_action_statement` then compose down to the § 4.18.4 surface.
 Every computable side condition is a `vm_compute` certificate on the concrete
 instance (k = 11, n = 2048): the four-way-sharded indicator certificate, the
-σ-construction certificate over the 2 964 copies on 15 × 2048 cells, and
+σ-construction certificate over the 3 004 copies on 15 × 2048 cells, and
 `finite_domain_ok_b`. The replay-plane links (`compile_correct`'s selector- and
 fixed-plane hypotheses) are discharged by structural replay lemmas over
 `orchard_events`, not by symbolic-grid `vm_compute`.
@@ -220,8 +220,9 @@ The compiled system is anchored to the deployed verifying key by parity:
 certificates that `Compile.compile` applied to the model's `ConstraintSystem.t`
 makes byte-identical choices to the deployed keygen — gate polynomials and
 counts, the 56-selector → combination-column assignment, query tables,
-permutation columns, constants column — against `circuit_description_fixed`, the
-in-tree Debug dump of `vk.pinned()`. Assumption audit on every new theorem:
+permutation columns, constants column — against
+`circuit_description_post_nu6_3`, the in-tree Debug dump of `vk.pinned()`.
+Assumption audit on every new theorem:
 exactly `PrimString.string` + impredicative `Set` (the two `sigma.v`/`orbit.v`
 orbit theorems are cleaner still — impredicative `Set` only).
 
@@ -335,7 +336,7 @@ transcription to certified bytes (`Orchard/vk/*.v`,
   literals (moduli strings, `extended_k`, the 44 commitment coordinate
   pairs, `minimum_degree`) emits the pretty rendering, proved
   primitive-string-equal to all 1,285,701 bytes of the in-tree
-  `circuit_description_fixed` (the Debug dump of `vk.pinned()`). This
+  `circuit_description_post_nu6_3` (the Debug dump of `vk.pinned()`). This
   retires the offline-transcription trust of `compiled/pinned.v` —
   the fingerprint literals stay as the checkers' interface, now backed by
   certified bytes.
@@ -425,5 +426,5 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
 | `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |
 | `Orchard/vk/print.v` / `vk/data.v` / `vk/bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
-| `Orchard/vk/parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_fixed`, all 1,285,701 bytes) |
+| `Orchard/vk/parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_post_nu6_3`, all 1,285,701 bytes) |
 | `Orchard/vk/transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |

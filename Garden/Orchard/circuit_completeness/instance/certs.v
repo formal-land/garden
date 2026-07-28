@@ -115,7 +115,7 @@ End OrchardCompletenessInstanceShardsBlocked.
 
     The synthesis program's witness facts ([CellsEqual] / [InstanceIs] /
     [CellIsConstant]) hold on the generated assignment — the copy/constant
-    obligations of [Complete.circuit_holds_intro], over all 2 964 facts. *)
+    obligations of [Complete.circuit_holds_intro], over all 3 004 facts. *)
 Module OrchardCompletenessInstanceWitness.
   Import OrchardCompletenessInstanceDefs.
 

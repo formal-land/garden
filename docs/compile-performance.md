@@ -311,7 +311,7 @@ cell ≈ 10 s (the leaf recomputes `cm_old`, a 109-word Sinsemilla hash) plus
 `canonical_us_for` forces all 85 `field_sqrt`s); any variable-base-mul
 accumulator cell ≈ 20 s (one full `Pallas.mul`); the Orchard-checks
 `A4`/`A5` cells ≈ 161 s each (`anchor_root`, the 32-layer Merkle fold).
-Summed over the 4 858 enabled selector points × their gate reads this is
+Summed over the 4 862 enabled selector points × their gate reads this is
 days of VM time.
 
 The implemented architecture
@@ -326,7 +326,7 @@ and `honest_assignment` binds `tables_of w` in a `let` outside the per-cell
 lambdas.  Since global constants are evaluated once per `vm_compute` run
 and closure environments are built strictly, one run forces the record once
 (≈ 3–4 min for the whole circuit at the test input) and every cell read is
-a list lookup; the whole 4 858-point truth table evaluates in ≈ 9.5 min.
+a list lookup; the whole 4 862-point truth table evaluates in ≈ 9.5 min.
 The `field_sqrt` wall disappeared without pasted literals: the fixed-base
 square-root witnesses are read from the window-sign certificates' pasted
 `root_table`s (`circuit_proof/<base>/sign_cert.v`, one root per
@@ -795,13 +795,13 @@ Two related traps recorded from the same file set (2026-07-26/27):
 - **`region_start_of` is a linear scan** of the 395-entry placement list
   (`circuit_synthesis_layout.v` `region_start_of_list` over `region_starts`,
   after a `region_index_of` traversal of the nested `RegionId`). Calling it in the
-  inner loop of a per-point scan is quadratic-times-linear: a 4,858 × 4,858
+  inner loop of a per-point scan is quadratic-times-linear: a 4,862 × 4,862
   certificate that recomputed it did not finish in 12 minutes, and fell to
   31.8 s once absolute rows were precomputed once into a global.
 - **`Complete.enabled_memb` / `fixed_lookup` / `table_lookup` re-extract from
   the fact list on every call.** With `facts` spelled as the *application*
   `layouter_facts circuit.synthesize`, the VM re-runs the whole
-  14,773-fact synthesis reification per call. Hoist `enabled` / the fixed
+  14,813-fact synthesis reification per call. Hoist `enabled` / the fixed
   writes / the table entries into global `Definition`s and scan those.
 
 ### Generalize every compound atom before stripping `mod`s with `setoid_rewrite`
@@ -959,13 +959,14 @@ predates the completeness-instance layer entirely. Heavy leaves:
   rows through `combination_view` costs ≈ 78 s in one scan, so it is sharded
   into four 14-assignment `forallb` windows (25 / 13 / 20 / 21 s,
   reassembled by `forallb_chunk4`); the σ-construction certificate
-  (`orchard_sigma_some`, union-find closure of the 2 964 copies over
+  (`orchard_sigma_some`, union-find closure of the 3 004 copies over
   15 × 2048 cells) is 3.3 s, the first certificate pays the ≈ 3.5 s
   `compiled` global build (shared by every later `vm_compute` sentence in
   the file), `orchard_compiled_eq` is 1.5 s, and everything else —
   `finite_domain_ok_b` included — is < 0.2 s.
 - `Orchard/compiled/check.v` (2026-07-17): ≈ 4.7 s — the twelve
-  pinned-vk parity certificates against `circuit_description_fixed`, each a
+  pinned-vk parity certificates against
+  `circuit_description_post_nu6_3`, each a
   `vm_cast_no_check` of an `eq_refl` comparing a projection of
   `OrchardCompiledCheck.compiled` (the compiled Orchard system) with the
   pinned literal; the first sentence pays the one-time `compiled` global
@@ -1022,7 +1023,7 @@ predates the completeness-instance layer entirely. Heavy leaves:
   file totals remeasured 2026-07-27 inside the 32-way parallel clean build,
   so they run a little above their isolated cost:
   `instance/certs.v` — every certificate whose subject is `Γtest`: the
-  enabled-point shards of all region families, the 2 964 copy/constant
+  enabled-point shards of all region families, the 3 004 copy/constant
   witness facts, and the reader side of the read-back. 791.6 s, of which the
   one-and-only `tables_of` record build is the bulk; the second and later
   certificates in the file cost no measurable time. This is now the critical
@@ -1063,7 +1064,7 @@ predates the completeness-instance layer entirely. Heavy leaves:
   share it and neither pays a `tables_of` record build.
 - `Orchard/circuit_completeness/generator/certificates.v`: ≈ 8.7 s total — three
   `vm_cast_no_check` certificates over `layouter_facts circuit.synthesize`
-  (14,773 facts, built by the VM in ≈ 0.07 s). The
+  (14,813 facts, built by the VM in ≈ 0.07 s). The
   `no_conflicting_writes` certificate dominates at ≈ 7.9 s: a first-match
   scan quadratic in the 6,948 fixed writes. The `selector_guarded`
   (configured system only) and `lookup_defaults_ok` (three lookup

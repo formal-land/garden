@@ -13,7 +13,7 @@
     — computed over the compact rendering [VkPinnedPrint.vk_pinned_compact]
     of the verified printer, whose pretty rendering the T1 certificate
     ([vk/parity.v]) pins byte-for-byte to the deployed dump
-    [circuit_description_fixed].  [C = vesta::Affine], so [C::Scalar] is
+    [circuit_description_post_nu6_3].  [C = vesta::Affine], so [C::Scalar] is
     the Pallas base field [Primes.pallas_p] (the circuit's own field; the
     dump's [scalar_modulus] string), and [from_uniform_bytes] reads the
     64-byte digest as a little-endian 512-bit integer reduced mod
@@ -278,10 +278,10 @@ Definition t2_h3 : list Z :=
    8755878182933753706; 1762945789985778675].
 
 Definition t2_h4 : list Z :=
-  [17744594930357705393; 14011888567529858938;
-   9839058526026674889; 13708995408678266895;
-   3676873481295735552; 10577513954919524068;
-   3720147958025806575; 16677615118707860199].
+  [6099454401866688620; 2201486108421959204;
+   5878290918218800041; 10878959484608854348;
+   8243567614332380643; 10556978643618101693;
+   8829104744884452751; 6854090578315733063].
 
 Definition t2_last_block : list Z :=
   [52; 98; 101; 98; 102; 98; 98; 52; 52; 53; 51; 102; 44; 32; 48; 120;
@@ -321,7 +321,7 @@ Proof. vm_cast_no_check (@eq_refl (list (list Z)) [t2_last_block]). Qed.
 (** ** The binding scalar *)
 
 Definition transcript_repr : Z :=
-  0x0bf7d48f59be0bbef33c558826dffee0032deccb9a6d2ea23daf3812d32d5271.
+  0x0522f7b7ed9fb95b2d017363ccd287622001e220169cbabb721fbf2954fab499.
 
 (** The final compression (final flag, total byte length 285,142) and
     the [from_uniform_bytes] reduction of the 64-byte digest. *)
