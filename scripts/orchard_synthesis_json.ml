@@ -341,7 +341,7 @@ let json_event = function
       Printf.sprintf "{\"tag\":\"Copy\",\"left\":%s,\"right\":%s}"
         (json_cell left)
         (json_cell right)
-  | M.Raw.Event.FillFromRow (column, from_row, value) ->
+  | M.Raw.Event.FillFromRow (column, from_row, _to_row, value) ->
       Printf.sprintf
         "{\"tag\":\"FillFromRow\",\"column\":%s,\"from_row\":%s,\"value\":%s}"
         (json_z column)
