@@ -270,6 +270,12 @@ Module GeneratorTable.
     assert (Hk : (Z.to_nat i <
         Z.to_nat (2 ^ Garden.Halo2.halo2_gadgets.sinsemilla.chip.sinsemilla_k))%nat).
     { apply Z2Nat.inj_lt; [lia | apply Z.pow_nonneg; lia | lia]. }
+    assert (Hib : 0 <= i < Z.of_nat (List.length
+        Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes)).
+    { unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
+      rewrite List.length_map, List.length_seq.
+      rewrite Z2Nat.id by (apply Z.pow_nonneg; lia).
+      exact Hi. }
     unfold Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table
       in Hload.
     cbn [layouter_facts List.map interpret_facts
@@ -279,16 +285,16 @@ Module GeneratorTable.
     destruct Hload as (Hidx & Hx & Hy & _).
     cbn [interpret_fact] in Hidx, Hx, Hy.
     destruct col; cbn [lookup].
-    - rewrite Hidx by lia. unfold value_at_row,
+    - rewrite Hidx by (rewrite ?List.length_map; exact Hib). unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite nth_map_seq by exact Hk.
       apply Z2Nat.id; lia.
-    - rewrite Hx by lia. unfold value_at_row,
+    - rewrite Hx by (rewrite ?List.length_map; exact Hib). unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite List.map_map.
       rewrite nth_map_seq by exact Hk.
       now rewrite Z2Nat.id by lia.
-    - rewrite Hy by lia. unfold value_at_row,
+    - rewrite Hy by (rewrite ?List.length_map; exact Hib). unfold value_at_row,
         Garden.Halo2.halo2_gadgets.sinsemilla.chip.generator_table_indexes.
       rewrite List.map_map.
       rewrite nth_map_seq by exact Hk.

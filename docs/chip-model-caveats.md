@@ -117,7 +117,17 @@ interpreter's gate layer only. This document is about that relational model.
    `RangeTable.word_sound` with `GeneratorTable.loaded` at
    `Lookup.TableIdx`) and the `α_0'` canonicity lookup
    (`Orchard/circuit_proof/base_field_canonicity.v`,
-   `alpha_lookup_word_range`, same pattern).
+   `alpha_lookup_word_range`, same pattern). **On this branch the idealized
+   membership semantics remains a modeling choice.** The polynomial layer
+   that closes this `Prop` model's loop from above lives on
+   `valerii-huhnin@compilation-correctness`, not here: there `lookup_sound` /
+   `lookup_complete` (`Halo2/plonkish/lookup_poly.v`) prove the
+   set-membership reading of `eval_lookup_argument` equivalent, for all
+   θ, β, γ, to the five lookup grand-product rules the deployed verifier
+   checks on the cyclic domain, with the tables-as-fixed-prefix coherence
+   discharged as a `vm_compute` certificate on the pinned instance
+   (`Orchard/circuit_compiled_algebraic.v`). Neither `Halo2/plonkish/` nor
+   `Orchard/circuit_compiled*.v` is part of this branch's build.
 
 3. **No cyclic domain, no usable-row distinction.** Rows are plain integers
    and `rotated_row = row + offset` (`proof.v:58-62`); there is no `nb_rows`
@@ -167,8 +177,13 @@ interpreter's gate layer only. This document is about that relational model.
    `OrchardAction.deterministic` in
    `Garden/Orchard/circuit_proof/main.v`) build on this gluing; see
    `docs/orchard-soundness-proof.md` where present. The **completeness**
-   direction — an honestly synthesized Γ satisfies `circuit_holds` — remains
-   open (see [Open gaps](#open-gaps)).
+   direction — an honestly synthesized Γ satisfies `circuit_holds` — is now
+   supplied generically by `Complete.circuit_holds_intro` (`Halo2/complete.v`)
+   and instantiated for the add chip and, constructively, for the whole Orchard
+   circuit; see
+   [`orchard-completeness-proof.md`](orchard-completeness-proof.md) for the
+   theorem surface and [Open gaps](#open-gaps) for what is proved and what
+   remains.
 
 ## Tying lookups to the loaded table (`InitLookupTables`)
 
@@ -315,9 +330,8 @@ The floor planner's trailing constants block enters `operational_sound` as
 an explicit extra event input with the `constants_materialized`
 correspondence (vacuous for `ConstrainConstant`-free chips,
 `operational_sound_no_tail`). The layout idealizations are thereby a
-per-placement computation (replay success, by `vm_compute` — see the
-add-chip instance in `Halo2/realize/smoke.v`) rather than trusted
-hypotheses. Both instantiation layers are proved:
+per-placement computation (replay success, by `vm_compute`) rather than
+trusted hypotheses. Both instantiation layers are proved:
 
 - `Halo2/realize/disjoint.v` — placement-generic sufficient conditions:
   `replay_is_ok` equals the decidable `conflict_free` verdict at every
@@ -341,26 +355,101 @@ hypotheses. Both instantiation layers are proved:
 
 ## Open gaps
 
-- **Completeness of `circuit_holds`.** The gluing (item 4) is used in the
-  soundness direction only: assume a successful proof and derive functional
-  correctness. The dual — that an honestly synthesized Γ *satisfies*
-  `circuit_holds` — needs a well-formedness fact the model does not track:
-  selectors are 0 except where the synthesis program enables them. The
-  synthesis facts assert only the `= 1` points, so `satisfies_gates` (which
-  quantifies over all `(region, row)`) cannot yet be discharged from a
-  synthesized Γ.
-- **Cyclic-domain refinement** (item 3): restore `nb_rows`, the `Z / 2^k Z`
-  row domain, and the blinding-row distinction; refine `satisfies_gates` to
-  quantify over each region's actual extent; and fold in the
-  tables-as-fixed-column-prefixes layer of the lookup-table work.
+- **Completeness of `circuit_holds`.** The gluing (item 4) was originally used
+  in the soundness direction only. The dual — an honestly synthesized Γ
+  *satisfies* `circuit_holds` — is now addressed (full account in
+  [`orchard-completeness-proof.md`](orchard-completeness-proof.md)). The
+  well-formedness
+  fact the model did not track — selectors are 0 except where the synthesis
+  program enables them — is now supplied as the selector plane of the
+  `honest_planes` predicate (the enabled-point indicator), which makes
+  `satisfies_gates` (quantified over all `(region, row)`) vacuous off the
+  enabled points. On that basis:
+  - `Complete.circuit_holds_intro` (`Halo2/complete.v`, `Qed`, clean audit)
+    reduces `circuit_holds` to finite per-enabled-point gate/lookup/witness
+    obligations plus three `vm_compute` Boolean checkers.
+  - `CompleteAdditionCompleteness.completeness` (`ecc/chip/add_complete.v`,
+    `Qed`, clean audit) is the add-chip instance.
+  - `OrchardCompletenessInstance.orchard_completeness_instance`
+    (`Orchard/circuit_completeness/instance/cert.v`, `Qed`, clean audit) is
+    the constructive whole-circuit concrete instance
+    (`Holds (honest_assignment test_input)` plus read-back for one concrete
+    valid input): all 4,858 enabled gate points and all 2,964 witness facts
+    are machine-verified by `vm_compute`.
+
+  - `OrchardCompletenessAssembly.orchard_completeness`
+    (`Orchard/circuit_completeness/forward/assembly.v`, `Qed`) is the
+    universally quantified completeness theorem
+    `OrchardHonestAssignment.orchard_completeness_statement` — every valid,
+    nondegenerate honest input yields a satisfying Γ that reads back to the
+    input. It composes, through `forward/api.v`'s
+    `completeness_statement_of_families`, the whole-circuit gate side
+    (`gates_all : family_gates_ok all_families`, a total case analysis over
+    the 56 gate selectors into the per-family `forward/` lanes), the lookup
+    side (`lookups_forward_ok`), the read-back (`read_back_forward`) and the
+    witness-fact side (`witness_facts_ok`).
+
+  Remaining: nothing. `orchard_completeness`'s assumption audit is exactly the
+  repo baseline, so the universal whole-circuit completeness claim is
+  unconditional, and the concrete instance is a special case of it. The last
+  leaf, the 97 witness facts whose two cell addresses the generator fills
+  through *different* derivations
+  of one value, closed as the five group files of
+  `forward/witness/`. There is no `Admitted`, `Axiom` or `admit` anywhere
+  under `Garden/Orchard/` or `Garden/Halo2/` (per-file account in
+  [`orchard-completeness-proof.md`](orchard-completeness-proof.md)).
+
+  - `OrchardOperationalAgreement.orchard_operational_complete`
+    (`Orchard/circuit_completeness/operational/main.v`, `Qed`, clean audit)
+    carries that statement across the event-replay bridge (item 6): with the
+    advice and instance planes chosen from the honest generator, the replayed
+    grid of the serialized Orchard stream is accepted by the ideal
+    `mock_prover_accepts` checker, for every valid, nondegenerate input. The
+    relational-model idealization is therefore no longer load-bearing in the
+    completeness direction either.
+
+  Completeness is a non-vacuity result in both readings: it says the honest
+  witness is accepted, not that nothing else is, and the operational layer
+  inherits the ideal checker's own limits (all integer rows rather than the
+  `2^k` cyclic domain, blinding rows unmodelled). The model idealizations
+  listed elsewhere in this file remain in force.
+- **Cyclic-domain refinement** (item 3) — *open on this branch; partially
+  discharged on `valerii-huhnin@compilation-correctness`.* There the finite
+  domain exists one layer below the relational model: `Halo2/plonkish/main.v`'s
+  `Domain` carries `n = 2^k` rows, `usable_rows = n - (blinding_factors + 1)`,
+  and the `l_0`/`l_last`/`l_blind` row predicates, and `compile_correct` /
+  `plonkish_of_mock_prover` (`Halo2/plonkish/`) connect it upward:
+  compiled-gate satisfaction on the cyclic domain ↔ selector-gated
+  satisfaction on usable rows, and `mock_prover_accepts` ↔ compiled-plonkish
+  satisfaction restricted to `[0, n)`, with the blinding-row vacuity and the
+  finite-domain layout as computable side conditions (`finite_domain_ok_b`),
+  instantiated on the concrete Orchard domain (k = 11, n = 2048) in
+  `Orchard/circuit_compiled.v`. None of that is part of this branch's build,
+  where the relational model is the bottom of the stack below
+  `Halo2/realize/`.
+  What remains even there: the relational `proof.v` model *itself* still uses
+  plain integer rows (`rotated_row = row + offset`, no `row mod nb_rows` wrap,
+  no `nb_rows`), and `satisfies_gates` still quantifies over all
+  `(region, row)` rather than each region's actual extent; folding the finite
+  domain back into the relational reading — and the
+  tables-as-fixed-column-prefixes coherence of the lookup-table work (the
+  refinement noted at the end of [Tying lookups to the loaded
+  table](#tying-lookups-to-the-loaded-table-initlookuptables)) — is still
+  open.
 - **Selector-off closure for short lookups** (item 2). The range-check
   chip's `LookupArgument` is now consumed (`RangeTable.word_sound` /
   `short_word_sound`, used by the var-base-mul overflow and base-field
   canonicity lookups — see item 2), but the short-lookup form needs an
   explicit `q_running = 0` hypothesis because the fact model asserts only
-  the `SelectorOn` points. A `SelectorOff`/default-0 selector model (the
-  same well-formedness fact as the completeness gap above) would discharge
-  the named short-lookup witness-honesty conditions.
+  the `SelectorOn` points. The default-0 selector model — the same
+  well-formedness fact as the completeness gap above — now exists in the
+  completeness direction as the `honest_planes` selector plane (the
+  enabled-point indicator, 0 off the enabled points), consumed by
+  `Complete.circuit_holds_intro`. It is not yet propagated back into the
+  soundness lemmas: the short-lookup form still carries its `q_running = 0`
+  hypothesis explicitly, and folding the default-0 model into the soundness
+  side (so the named short-lookup witness-honesty conditions discharge
+  automatically) remains open.
 
 ## Bottom line
 

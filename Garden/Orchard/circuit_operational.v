@@ -61,6 +61,7 @@ Global Open Scope Z_scope.
 Definition orchard_synthesis_events : list Raw.Event.t :=
   snd
     (V1.eval_layouter Index.indices region_start_of
+      Garden.Orchard.circuit.orchard_usable_rows
       Garden.Orchard.circuit.synthesize).
 
 (** The floor planner's trailing constants block: the constants-column
@@ -97,6 +98,7 @@ Proof.
     Garden.Orchard.circuit.synthesize_events, V1.run_with_region_start.
   destruct
     (V1.eval_layouter Index.indices region_start_of
+      Garden.Orchard.circuit.orchard_usable_rows
       Garden.Orchard.circuit.synthesize)
     as [value events].
   reflexivity.
@@ -476,25 +478,26 @@ Section OperationalSoundEvents.
 
   Lemma operational_sound_events
       {A : Set} (program : 𝓛 columns RegionId A)
-      (idx : Indices.t columns) (rs : RegionId -> Z)
+      (idx : Indices.t columns) (rs : RegionId -> Z) (usable_rows : Z)
       (system : ConstraintSystem.t columns)
       (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t)
       (constants_events : list Raw.Event.t) :
     instance_free system ->
     flattening_ok system ->
     constants_materialized idx rs (layouter_facts program)
-      (snd (V1.eval_layouter idx rs program) ++ constants_events) ->
-    apply_events (snd (V1.eval_layouter idx rs program) ++ constants_events)
+      (snd (V1.eval_layouter idx rs usable_rows program) ++ constants_events) ->
+    apply_events
+      (snd (V1.eval_layouter idx rs usable_rows program) ++ constants_events)
       (initial_grid advice instance_) = Some grid ->
     mock_prover_accepts (Configure.to_indexed idx system)
-      (snd (V1.eval_layouter idx rs program) ++ constants_events) grid
+      (snd (V1.eval_layouter idx rs usable_rows program) ++ constants_events) grid
       (layouter_table_rows program) ->
     circuit_holds (realize idx rs grid) program system.
   Proof.
     intros Hinstance_free Hflattening_ok.
-    pose proof (operational_sound program idx rs system advice instance_ grid
-      constants_events Hinstance_free Hflattening_ok) as Hsound.
-    destruct (V1.eval_layouter idx rs program) as [v_op evts].
+    pose proof (operational_sound program idx rs usable_rows system advice
+      instance_ grid constants_events Hinstance_free Hflattening_ok) as Hsound.
+    destruct (V1.eval_layouter idx rs usable_rows program) as [v_op evts].
     cbn [snd].
     intros Hconstants Hreplay Hmock.
     exact (proj2 (proj2 (Hsound Hconstants Hreplay)) Hmock).
@@ -524,7 +527,8 @@ Theorem orchard_operational_sound
     orchard_system.
 Proof.
   exact (operational_sound_events Garden.Orchard.circuit.synthesize
-    Index.indices region_start_of orchard_system advice instance_ grid
+    Index.indices region_start_of Garden.Orchard.circuit.orchard_usable_rows
+    orchard_system advice instance_ grid
     Garden.Orchard.circuit_synthesis_constants.events
     orchard_instance_free orchard_flattening_ok
     orchard_constants_materialized Hreplay Hmock).

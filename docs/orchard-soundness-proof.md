@@ -152,21 +152,30 @@ ceiling and the spec-anchored pipeline coefficients).
   functions of its witnessed inputs; the security of the protocol built on
   those functions is a separate question, and the balance corollary names
   its two computational boundaries explicitly.
-- **Completeness.** The theorems constrain every accepted assignment; they
-  do not exhibit an accepted assignment for every input. In particular the
-  witness-honesty hypotheses have no in-Rocq satisfiability proof — their
-  non-vacuity argument is meta-level.
-- **Operational checker boundary.** Relational–operational consistency is now
-  proved. `Orchard/circuit_operational.v` instantiates `operational_sound` on
-  the full serialized Orchard circuit and its concrete placement:
-  `orchard_operational_sound` derives the relational `circuit_holds` predicate
-  from successful event replay and `mock_prover_accepts`, and
+- **Satisfiability of the witness-honesty hypotheses.** The completeness
+  direction (`docs/orchard-completeness-proof.md`) exhibits an accepted
+  assignment for every valid, non-degenerate input, so `Holds` is not
+  vacuous. It does not discharge the four witness-honesty premises at that
+  assignment: the honest generator's non-degeneracy clauses are shaped to
+  imply them, but the implications are not proved, so the non-vacuity
+  argument for these four hypotheses specifically remains meta-level.
+- **Proving-system soundness.** That a verifier accepting a Halo 2 proof
+  implies the existence of a satisfying assignment is a property of the
+  proving system, not of the circuit, and is not claimed here.
+
+- **Operational checker boundary.** `Holds` is the relational interpreter's
+  satisfaction predicate. The bridge in `docs/operational-soundness.md`
+  connects it to the faithful operational lowering of synthesis
+  (`serialize.v`, the raw event grid) in both directions at the whole Orchard
+  circuit: `orchard_operational_sound` carries acceptance by the ideal
+  `mock_prover_accepts` checker back to `Holds`,
   `orchard_action_statement_operational` composes that result with the Action
-  statement above. The remaining boundary is that `mock_prover_accepts` is an
-  ideal in-model checker, not the deployed cryptographic prover; configure and
-  synthesis snapshot comparisons tie its serialized inputs to Rust Halo 2 but
-  are checked build artifacts rather than a Rocq theorem. See
-  `docs/operational-soundness.md` for the precise claim and its caveats.
+  statement above, and `orchard_operational_complete` carries an honest
+  witness forward to the checker. The remaining idealization is the checker
+  itself: it quantifies over all integer rows rather than the `2^k` cyclic
+  domain and is not the deployed cryptographic prover. Configure and synthesis
+  snapshot comparisons tie its serialized inputs to Rust Halo 2, but those
+  comparisons are checked build artifacts rather than a Rocq theorem.
 
 ## Model caveats inherited by the theorems
 
