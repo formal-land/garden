@@ -414,7 +414,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     cbn [List.app List.filter List.map List.existsb fst snd];
     try exact IH.
   destruct (selector' =? s) eqn:Hsel.
@@ -449,7 +449,7 @@ Proof.
   destruct event as
     [ name | name | name | name | selector' row' annotation
     | column' row' annotation value | left_cell right_cell
-    | column' from_row value ];
+    | column' from_row to_row value ];
     try discriminate Hcheck.
   apply Bool.andb_true_iff in Hcheck.
   destruct Hcheck as [Hselector _].
@@ -798,7 +798,7 @@ Proof.
       destruct event as
         [ name | name | name | name | selector' row' annotation
         | column' row' annotation value | left_cell right_cell
-        | column' from_row value ];
+        | column' from_row to_row value ];
         (* [discriminate] is targeted at [Hcheck]: the bare form scans the
            whole context and whnf-normalizes [Hin], forcing the 19,617-event
            stream on the lazy machine. *)

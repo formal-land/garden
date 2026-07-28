@@ -1,0 +1,544 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://formal.land/schemas/garden.halo2.circuit-grid.v1.json",
+  "title": "Garden Halo2 circuit grid v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "metadata",
+    "columns",
+    "selectors",
+    "regions",
+    "events",
+    "rows",
+    "targets",
+    "summary"
+  ],
+  "properties": {
+    "schema": {
+      "const": "garden.halo2.circuit-grid.v1"
+    },
+    "metadata": {
+      "$ref": "#/$defs/metadata"
+    },
+    "columns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/column"
+      }
+    },
+    "selectors": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/selector"
+      }
+    },
+    "regions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/region"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/event"
+      }
+    },
+    "rows": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/row"
+      }
+    },
+    "targets": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/target"
+      }
+    },
+    "summary": {
+      "$ref": "#/$defs/summary"
+    }
+  },
+  "$defs": {
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "stringArray": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "title",
+        "href"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": [
+            "component",
+            "region",
+            "operation",
+            "gate",
+            "lookup",
+            "constraint",
+            "other"
+          ]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "href": {
+          "type": "string",
+          "pattern": "^circuit\\.html#level=detail&item="
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "generator",
+        "circuit",
+        "capabilities",
+        "inputs",
+        "parity",
+        "repositoryRefs"
+      ],
+      "properties": {
+        "generator": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version"
+          ],
+          "properties": {
+            "name": {
+              "const": "scripts/generate_orchard_circuit_grid.py"
+            },
+            "version": {
+              "type": "string"
+            }
+          }
+        },
+        "circuit": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "id",
+            "name",
+            "version",
+            "field",
+            "k",
+            "rowCount",
+            "floorPlanner",
+            "stage"
+          ],
+          "properties": {
+            "id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1
+            },
+            "version": {
+              "type": "string"
+            },
+            "field": {
+              "type": "string"
+            },
+            "k": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "rowCount": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "floorPlanner": {
+              "type": "string",
+              "minLength": 1
+            },
+            "stage": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "adviceAssignments",
+            "witnessValues",
+            "selectors",
+            "permutation"
+          ],
+          "properties": {
+            "adviceAssignments": {
+              "type": "string"
+            },
+            "witnessValues": {
+              "type": "string"
+            },
+            "selectors": {
+              "type": "string"
+            },
+            "permutation": {
+              "type": "string"
+            }
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "minItems": 5,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "id",
+              "path",
+              "sha256"
+            ],
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "path": {
+                "type": "string",
+                "minLength": 1
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "parity": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "required": [
+            "configure",
+            "synthesis",
+            "comparison"
+          ]
+        },
+        "repositoryRefs": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "column": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "index",
+        "name"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^(instance|advice|fixed):[0-9]+$"
+        },
+        "kind": {
+          "enum": [
+            "instance",
+            "advice",
+            "fixed"
+          ]
+        },
+        "index": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string"
+        },
+        "circuitTarget": {
+          "$ref": "#/$defs/target"
+        }
+      }
+    },
+    "selector": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "index",
+        "name",
+        "gateIds",
+        "lookupIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^selector:[0-9]+$"
+        },
+        "index": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gateIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "lookupIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "circuitTarget": {
+          "$ref": "#/$defs/target"
+        }
+      }
+    },
+    "region": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "regionIndex",
+        "startRow",
+        "name",
+        "namespace",
+        "selectorIds",
+        "gateIds",
+        "lookupIds",
+        "operationIds"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^region:[0-9]+$"
+        },
+        "regionIndex": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "startRow": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "endRow": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "namespace": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "componentId": {
+          "type": "string"
+        },
+        "selectorIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "gateIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "lookupIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "operationIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "circuitTarget": {
+          "$ref": "#/$defs/target"
+        }
+      }
+    },
+    "endpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "columnId",
+        "row"
+      ],
+      "properties": {
+        "columnId": {
+          "type": "string"
+        },
+        "row": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "sourceIndex",
+        "sourceTag"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^trace-event:[0-9]+$"
+        },
+        "kind": {
+          "enum": [
+            "assign-fixed",
+            "enable-selector",
+            "copy",
+            "fill",
+            "constrain-constant",
+            "constrain-instance",
+            "advice-reference",
+            "region-start",
+            "other"
+          ]
+        },
+        "sourceIndex": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "sourceTag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "row": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "columnId": {
+          "type": "string"
+        },
+        "selectorId": {
+          "type": "string"
+        },
+        "annotation": {
+          "type": "string"
+        },
+        "value": {
+          "type": "string"
+        },
+        "fromRow": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "toRow": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "endpoints": {
+          "type": "array",
+          "maxItems": 2,
+          "items": {
+            "$ref": "#/$defs/endpoint"
+          }
+        },
+        "peerEventIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "regionId": {
+          "type": "string"
+        },
+        "namespace": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "gateIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "lookupIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "operationIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "circuitTarget": {
+          "$ref": "#/$defs/target"
+        }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "row",
+        "eventIds",
+        "regionIds",
+        "selectorIds",
+        "columnIds"
+      ],
+      "properties": {
+        "row": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "eventIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "regionIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "selectorIds": {
+          "$ref": "#/$defs/stringArray"
+        },
+        "columnIds": {
+          "$ref": "#/$defs/stringArray"
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "columnCount",
+        "selectorCount",
+        "regionCount",
+        "eventCount",
+        "populatedRowCount",
+        "counts"
+      ],
+      "properties": {
+        "columnCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "selectorCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "regionCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "eventCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "populatedRowCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "counts": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/nonNegativeInteger"
+          }
+        }
+      }
+    }
+  }
+}

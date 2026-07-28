@@ -163,21 +163,24 @@ ceiling and the spec-anchored pipeline coefficients).
   implies the existence of a satisfying assignment is a property of the
   proving system, not of the circuit, and is not claimed here.
 
-`Holds` is the *relational* interpreter's satisfaction predicate. It is
-related to the faithful operational lowering of synthesis (`serialize.v`, the
-raw event grid) by the bridge of `docs/operational-soundness.md`, in both
-directions at the whole Orchard circuit: `orchard_operational_sound` carries
-acceptance by the ideal `mock_prover_accepts` checker back to `Holds`, and
-`orchard_operational_complete` carries an honest witness forward to it. The
-residual idealization is in the checker itself — it quantifies over all
-integer rows rather than the `2^k` cyclic domain.
-
-Below that checker the same conclusion is available from the *compiled*
-system Halo 2's keygen produces, and from the polynomial identities the
-deployed verifier checks over the cyclic domain; that layer, and the
-translation-validation argument tying the compiled Rocq circuit to the
-deployed verifying key byte for byte, are documented in
-[`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
+- **Operational and compilation boundaries.** `Holds` is the relational
+  interpreter's satisfaction predicate. The bridge in
+  `docs/operational-soundness.md` connects it to the faithful operational
+  lowering of synthesis (`serialize.v`, the raw event grid) in both directions
+  at the whole Orchard circuit: `orchard_operational_sound` carries acceptance
+  by the ideal `mock_prover_accepts` checker back to `Holds`,
+  `orchard_action_statement_operational` composes that result with the Action
+  statement above, and `orchard_operational_complete` carries an honest
+  witness forward to the checker. The checker itself remains an idealization:
+  it quantifies over all integer rows and is not the deployed cryptographic
+  prover. Below it, the same Action conclusion is available from the compiled
+  system Halo 2 keygen produces and from the polynomial identities checked
+  over the cyclic domain. The modelled keygen is bracketed by
+  configure/synthesis snapshot comparisons at its input and byte-exact
+  `vk.pinned()` parity at its output; the former are checked build artifacts,
+  not Rocq theorems. The exact trust split and remaining L0 boundary are
+  documented in
+  [`orchard-compilation-correctness.md`](orchard-compilation-correctness.md).
 
 ## Model caveats inherited by the theorems
 

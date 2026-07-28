@@ -236,7 +236,7 @@ vanishing quotient for the gate plane, and the permutation and lookup grand
 products. That layer is proved in the all-challenge reading — every
 equivalence quantifies the challenges (y, β, γ, θ) universally, so no
 probabilistic reasoning enters the statements; the random-challenge gap is
-isolated as the counting lemmas of the R4 package (pending):
+isolated as the counting lemmas of the R4 package:
 
 - `Halo2/plonkish/poly.v` / `poly_domain.v` / `poly_smoke.v` — the
   univariate polynomial library over the `Field/Field.v` mod-p arithmetic:

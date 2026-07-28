@@ -930,7 +930,7 @@ worker in its own transient systemd scope; sum the per-file `TIMED=1` times
 instead.
 
 That figure was measured over the 399 files of
-`valerii-huhnin@orchard-completeness`, so it excludes the 23 compiled-plonkish,
+`valerii-huhnin@orchard-completeness`, so it excludes the 24 compiled-plonkish,
 pinned-vk and transcript-repr files this branch adds; those are listed
 individually among the heavy leaves below, and the whole-branch total has not
 been re-measured since they landed. The vk-commitment MSM and Vesta SRS layers

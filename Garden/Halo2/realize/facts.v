@@ -658,28 +658,6 @@ Proof.
     apply IH; [lia | exact Hevent].
 Qed.
 
-Lemma fill_lookup_entries_in {columns : Columns.t}
-    (idx : Indices.t columns) (usable_rows : Z)
-    (entries : list (LookupTableColumn.t columns))
-    (entry : LookupTableColumn.t columns) :
-  List.In entry entries ->
-  List.In
-    (Raw.Event.FillFromRow
-      (idx.(Indices.lookup) (LookupTableColumn.lookup entry))
-      (Z.of_nat (List.length (LookupTableColumn.values entry)))
-      usable_rows
-      (LookupTableColumn.default_value entry))
-    (V1.fill_lookup_entries idx usable_rows entries).
-Proof.
-  induction entries as [| entry' entries IH]; intros Hentry;
-    [contradiction |].
-  destruct Hentry as [-> | Hentry]; cbn.
-  - left.
-    reflexivity.
-  - right.
-    apply IH, Hentry.
-Qed.
-
 Lemma max_entry_length_bound {columns : Columns.t}
     (entries : list (LookupTableColumn.t columns))
     (entry : LookupTableColumn.t columns) :
