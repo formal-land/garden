@@ -10,7 +10,7 @@ This directory contains the [Rocq](https://rocq-prover.org/) formal verification
 | `Circom/` | Formalization of [Circom](https://github.com/iden3/circom) circuits and Circomlib gadgets |
 | `EllipticCurve/` | Elliptic-curve primitives over the Pallas curve |
 | `Field/` | Finite-field arithmetic lemmas (Fermat, square roots, primality, …) |
-| `GroupHash/` | Group-hash (Sinsemilla / Pederesen) formalization |
+| `GroupHash/` | Group-hash (Sinsemilla / Pedersen) formalization |
 | `Halo2/` | Halo 2 proof-system model — relational circuit semantics, serialization / deserialization, plonkish compilation layer, and the operational-soundness bridge |
 | `LLZK/` | Formalization of the [LLZK](https://github.com/Veridise/llzk-lib) language and example verified translations |
 | `OpenVM/` | Formal verification of [OpenVM](https://github.com/openvm-org/openvm) chips (BranchEq, Sha256) |
