@@ -279,7 +279,7 @@ describe("Orchard verification evidence model", () => {
   it("pins the evidence snapshot and upstream exporter revisions", () => {
     expect(data.snapshot.asOf).toBe("2026-07-28");
     expect(data.development.asOf).toBe("2026-07-28");
-    expect(data.snapshot.repositoryRefs.garden).toMatch(/^938af2a[0-9a-f]*$/);
+    expect(data.snapshot.repositoryRefs.garden).toMatch(/^7309cff[0-9a-f]*$/);
     expect(data.snapshot.repositoryRefs.halo2).toMatch(/^cca1dd70[0-9a-f]*$/);
     expect(data.snapshot.repositoryRefs.orchard).toMatch(/^05d8992[0-9a-f]*$/);
 

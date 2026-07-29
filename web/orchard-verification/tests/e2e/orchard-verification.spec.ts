@@ -7,7 +7,9 @@ function observeRuntime(page: Page) {
   const consoleErrors: string[] = [];
   const pageErrors: string[] = [];
   const externalRequests: string[] = [];
-  const allowedOrigin = process.env.ORCHARD_E2E_ORIGIN ?? "http://127.0.0.1:4173";
+  const allowedOrigin = new URL(
+    process.env.ORCHARD_E2E_ORIGIN ?? "http://127.0.0.1:4173/",
+  ).origin;
 
   page.on("console", (message) => {
     if (message.type() === "error") consoleErrors.push(message.text());
@@ -57,11 +59,60 @@ async function openCircuitInspector(page: Page) {
   return inspector;
 }
 
+test.describe("Pages relocation", () => {
+  test("preserves legacy root links when redirecting into Orchard", async ({
+    page,
+    baseURL,
+  }) => {
+    test.skip(
+      process.env.ORCHARD_E2E_STAGED_DEPLOYMENT !== "1",
+      "Legacy redirect pages exist only in the staged Pages deployment.",
+    );
+
+    expect(baseURL).toBeDefined();
+    const legacyRoot = new URL("../", baseURL!);
+    const cases = [
+      {
+        legacyPage: "index.html",
+        destination: "orchard/",
+        hash: "#stage=stage-1-groundwork",
+      },
+      {
+        legacyPage: "proof-map.html",
+        destination: "orchard/proof-map.html",
+        hash: "#node=action-theorem",
+      },
+      {
+        legacyPage: "circuit.html",
+        destination: "orchard/circuit.html",
+        hash: "#level=detail&item=gate%3A0",
+      },
+      {
+        legacyPage: "circuit-grid.html",
+        destination: "orchard/circuit-grid.html",
+        hash: "#row=1758&column=selector%3A5",
+      },
+    ] as const;
+
+    for (const redirect of cases) {
+      const legacyUrl = new URL(redirect.legacyPage, legacyRoot);
+      legacyUrl.search = "?relocation=1";
+      legacyUrl.hash = redirect.hash;
+      await page.goto(legacyUrl.href);
+
+      const expected = new URL(redirect.destination, legacyRoot);
+      expected.search = legacyUrl.search;
+      expected.hash = redirect.hash;
+      await expect(page).toHaveURL(expected.href);
+    }
+  });
+});
+
 test.describe("Orchard verification journey", () => {
   test("supports deep links, manual navigation, and discrete tour controls", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     const initial = data.stages[1];
-    await page.goto(`/index.html#stage=${initial.id}`);
+    await page.goto(`./index.html#stage=${initial.id}`);
 
     await expect(page.getByRole("heading", { name: "Orchard Verification Journey" })).toBeVisible();
     await expect(page.getByRole("heading", { name: initial.title })).toBeVisible();
@@ -94,7 +145,7 @@ test.describe("Orchard verification journey", () => {
     const gardenEvidence = stage.evidenceIds
       .map((id) => data.evidence.find((item) => item.id === id))
       .find((item) => item?.repoId === "garden" && item.url)!;
-    await page.goto(`/index.html#stage=${stage.id}`);
+    await page.goto(`./index.html#stage=${stage.id}`);
 
     await expect(page.getByRole("navigation", { name: "Visualization views" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Journey controls" })).toBeVisible();
@@ -140,7 +191,7 @@ test.describe("Orchard verification atlas", () => {
       ? relatedEdge.to
       : relatedEdge.from;
     const otherStatus = data.filters.statuses.find(({ id }) => id !== pinned.status)!;
-    await page.goto(`/proof-map.html#node=${pinned.id}`);
+    await page.goto(`./proof-map.html#node=${pinned.id}`);
 
     const inspector = page.getByRole("complementary", { name: "Proof node details" });
     await expect(page.getByRole("heading", { name: "Orchard Verification Atlas" })).toBeVisible();
@@ -205,7 +256,7 @@ test.describe("Orchard verification atlas", () => {
 
   test("has an accessible, self-contained responsive page", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
-    await page.goto("/proof-map.html");
+    await page.goto("./proof-map.html");
 
     await expect(page.getByRole("searchbox", { name: "Search the atlas" })).toBeVisible();
     await expect(page.getByRole("group", { name: /^Work stream/ })).toHaveCount(0);
@@ -238,7 +289,7 @@ test.describe("Orchard circuit explorer", () => {
     const dataResponse = page.waitForResponse((response) =>
       new URL(response.url()).pathname.endsWith("/data/orchard-circuit-highlevel.v1.json")
     );
-    await page.goto("/circuit.html");
+    await page.goto("./circuit.html");
     await expect(page.getByRole("heading", { name: "Orchard Circuit Explorer" })).toBeVisible();
     await expect((await dataResponse).ok()).toBe(true);
     await expect(page.getByRole("searchbox", { name: "Search circuit structure" })).toBeVisible();
@@ -316,7 +367,7 @@ test.describe("Orchard circuit explorer", () => {
 
   test("canonicalizes legacy gate links and renders inline constraints accessibly", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
-    await page.goto("/circuit.html#level=detail&item=gate%3A0&mode=exact");
+    await page.goto("./circuit.html#level=detail&item=gate%3A0&mode=exact");
 
     const canvas = page.locator(".circuit-canvas");
     await expect(canvas.getByRole("heading", { name: "Orchard circuit checks" })).toBeVisible();
@@ -340,7 +391,7 @@ test.describe("Orchard circuit explorer", () => {
   test("keeps deep region provenance readable with short source labels", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
     await page.goto(
-      "/circuit.html#level=detail&item=region-group%3Acomponent-nullifier%3Acomplete-point-addition-257b3ed2",
+      "./circuit.html#level=detail&item=region-group%3Acomponent-nullifier%3Acomplete-point-addition-257b3ed2",
     );
 
     const inspector = await openCircuitInspector(page);
@@ -382,7 +433,7 @@ test.describe("Orchard circuit grid", () => {
     const dataResponse = page.waitForResponse((response) =>
       new URL(response.url()).pathname.endsWith("/data/orchard-circuit-grid.v1.json")
     );
-    await page.goto("/circuit-grid.html");
+    await page.goto("./circuit-grid.html");
 
     await expect(page.getByRole("heading", { name: "Orchard Circuit Grid" })).toBeVisible();
     await expect((await dataResponse).ok()).toBe(true);
@@ -431,7 +482,7 @@ test.describe("Orchard circuit grid", () => {
 
   test("provides an accessible self-contained grid at every viewport", async ({ page }) => {
     const assertRuntimeClean = observeRuntime(page);
-    await page.goto("/circuit-grid.html");
+    await page.goto("./circuit-grid.html");
 
     await expect(page.getByRole("tablist")).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Circuit grid", exact: true })).toBeVisible();

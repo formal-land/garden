@@ -110,6 +110,8 @@ jobs:
       run: npx playwright install --with-deps chromium
     - name: Run browser tests
       run: npm run test:e2e
+      env:
+        ORCHARD_E2E_ORIGIN: http://127.0.0.1:4173/orchard/
     - name: Check that validation left tracked files unchanged
       working-directory: .
       run: git diff --exit-code

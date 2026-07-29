@@ -244,7 +244,7 @@ export function validateOrchardVerificationData(
   });
 
   const requiredRefs: Readonly<Record<"garden" | "halo2" | "orchard", string>> = {
-    garden: "938af2a12433e420ec9da9918b0863fb99970b90",
+    garden: "7309cff35ac3020058d49f3554db5ac14466947e",
     halo2: "cca1dd70c5ac76daa7d9773eb9a26e33ceea9a6a",
     orchard: "05d899241b7a907d9c47dc5d3d7b3aa1361d785c",
   };

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://formal-land.github.io/garden/schema/orchard-circuit-highlevel.v1.json",
+  "$id": "https://formal-land.github.io/garden/orchard/schema/orchard-circuit-highlevel.v1.json",
   "title": "Garden Orchard circuit explorer data",
   "description": "Deterministic, source-enriched configure and synthesis structure for the Orchard Action circuit.",
   "type": "object",

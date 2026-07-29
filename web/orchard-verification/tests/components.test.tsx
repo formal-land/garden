@@ -25,7 +25,7 @@ function useMediaPreference(reducedMotion: boolean): void {
 
 beforeEach(() => {
   useMediaPreference(true);
-  window.history.replaceState(null, "", "/index.html");
+  window.history.replaceState(null, "", "/garden/orchard/index.html");
   document.documentElement.dataset.view = "journey";
 });
 
@@ -56,7 +56,11 @@ describe("journey application", () => {
 
   it("opens directly at a valid stage hash", () => {
     const requested = data.stages.at(-1)!;
-    window.history.replaceState(null, "", `/index.html#stage=${requested.id}`);
+    window.history.replaceState(
+      null,
+      "",
+      `/garden/orchard/index.html#stage=${requested.id}`,
+    );
 
     render(<JourneyView data={data} />);
 
@@ -163,7 +167,11 @@ describe("proof atlas interactions", () => {
   it("opens a hash-selected node and retains its inspector outside later filters", () => {
     const node = data.nodes[0];
     const otherStatus = data.filters.statuses.find(({ id }) => id !== node.status)!;
-    window.history.replaceState(null, "", `/proof-map.html#node=${node.id}`);
+    window.history.replaceState(
+      null,
+      "",
+      `/garden/orchard/proof-map.html#node=${node.id}`,
+    );
     render(<ProofMap data={data} />);
 
     expect(screen.getByRole("heading", { name: node.title, level: 2 })).toBeVisible();

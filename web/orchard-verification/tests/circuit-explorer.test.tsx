@@ -19,7 +19,7 @@ import {
 } from "./fixtures/circuit-explorer";
 
 beforeEach(() => {
-  window.history.replaceState(null, "", "/circuit.html");
+  window.history.replaceState(null, "", "/garden/orchard/circuit.html");
 });
 
 afterEach(() => {
@@ -414,7 +414,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=region%3A0&mode=exact",
+      "/garden/orchard/circuit.html#level=detail&item=region%3A0&mode=exact",
     );
     const { unmount } = render(
       <CircuitExplorer loader={async () => circuitExplorerFixture} />,
@@ -429,7 +429,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=constraint%3Amerkle-equality&mode=exact",
+      "/garden/orchard/circuit.html#level=detail&item=constraint%3Amerkle-equality&mode=exact",
     );
     const constraintView = render(
       <CircuitExplorer loader={async () => circuitExplorerFixture} />,
@@ -455,7 +455,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=region%3A0%2Fop%3A2&mode=exact",
+      "/garden/orchard/circuit.html#level=detail&item=region%3A0%2Fop%3A2&mode=exact",
     );
     const operationView = render(
       <CircuitExplorer loader={async () => circuitExplorerFixture} />,
@@ -479,7 +479,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=region%3Amissing&mode=exact",
+      "/garden/orchard/circuit.html#level=detail&item=region%3Amissing&mode=exact",
     );
     render(<CircuitExplorer loader={async () => circuitExplorerFixture} />);
     expect(await screen.findByText(/linked circuit item “region:missing” is not present/)).toBeVisible();
@@ -491,7 +491,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=lookup-tables%3A0&mode=exact",
+      "/garden/orchard/circuit.html#level=detail&item=lookup-tables%3A0&mode=exact",
     );
     const { unmount } = render(
       <CircuitExplorer loader={async () => circuitExplorerFixture} />,
@@ -516,7 +516,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=lookup-argument%3A0",
+      "/garden/orchard/circuit.html#level=detail&item=lookup-argument%3A0",
     );
     render(<CircuitExplorer loader={async () => circuitExplorerFixture} />);
     const pairs = await screen.findByRole("table", { name: "Lookup input and table pairs" });
@@ -550,7 +550,7 @@ describe("circuit explorer interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit.html#level=detail&item=region-group%3Amerkle-layer",
+      "/garden/orchard/circuit.html#level=detail&item=region-group%3Amerkle-layer",
     );
     const { container } = render(
       <CircuitExplorer loader={async () => pagedFixture} />,

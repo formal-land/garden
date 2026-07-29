@@ -16,7 +16,7 @@ import type {
   WorkUnit,
 } from "./model";
 
-const GARDEN_REF = "938af2a12433e420ec9da9918b0863fb99970b90";
+const GARDEN_REF = "7309cff35ac3020058d49f3554db5ac14466947e";
 const HALO2_REF = "cca1dd70c5ac76daa7d9773eb9a26e33ceea9a6a";
 const ORCHARD_REF = "05d899241b7a907d9c47dc5d3d7b3aa1361d785c";
 const HALO2_CONFIG_EXPORT_REF = "c221cd295c660912a7aaaeda2ae8803d5e572dc2";
@@ -41,7 +41,7 @@ export const REPOSITORIES: readonly Repository[] = [
     revisions: [
       {
         ref: GARDEN_REF,
-        shortRef: "938af2a",
+        shortRef: "7309cff",
         label: "Post-NU6.3 verification artifacts",
         date: "2026-07-28",
         publication: "public",

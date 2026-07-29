@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <meta http-equiv="refresh" content="0; url=./orchard/" />
+    <link rel="canonical" href="https://formal-land.github.io/garden/orchard/" />
+    <title>Orchard Verification moved · Garden</title>
+    <script>
+      (() => {
+        const page = window.location.pathname.split("/").pop();
+        const legacyPages = new Set([
+          "proof-map.html",
+          "circuit.html",
+          "circuit-grid.html",
+        ]);
+        const destination = new URL(
+          `./orchard/${legacyPages.has(page) ? page : ""}`,
+          window.location.href,
+        );
+        destination.search = window.location.search;
+        destination.hash = window.location.hash;
+        window.location.replace(destination);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>
+      Orchard Verification moved to
+      <a href="./orchard/">formal-land.github.io/garden/orchard/</a>.
+    </p>
+  </body>
+</html>

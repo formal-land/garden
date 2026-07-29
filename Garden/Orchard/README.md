@@ -59,11 +59,11 @@ The circuit-level proofs stay on top of the Garden Halo 2 monad (`Garden/Halo2/`
 
 ## Interactive visualizations
 
-Three generated views are published from this repository:
+Four generated views are published from this repository:
 
-- [Orchard Verification Journey](https://formal-land.github.io/garden/) — an animated, guided account of how the proof developed.
-- [Orchard Verification Atlas](https://formal-land.github.io/garden/proof-map.html) — an interactive map of proof dependencies, evidence, assumptions, and remaining boundaries.
-- [Orchard Circuit Explorer](https://formal-land.github.io/garden/circuit.html) — an interactive view of the high-level Rocq circuit, from functional components down to free-monad regions, gates, and source definitions.
-- [Orchard Circuit Grid](https://formal-land.github.io/garden/circuit-grid.html) — a parity-backed row-and-column view of the V1 circuit placement.
+- [Orchard Verification Journey](https://formal-land.github.io/garden/orchard/) — an animated, guided account of how the proof developed.
+- [Orchard Verification Atlas](https://formal-land.github.io/garden/orchard/proof-map.html) — an interactive map of proof dependencies, evidence, assumptions, and remaining boundaries.
+- [Orchard Circuit Explorer](https://formal-land.github.io/garden/orchard/circuit.html) — an interactive view of the high-level Rocq circuit, from functional components down to free-monad regions, gates, and source definitions.
+- [Orchard Circuit Grid](https://formal-land.github.io/garden/orchard/circuit-grid.html) — a parity-backed row-and-column view of the V1 circuit placement.
 
 See [BUILD.md](../../docs/BUILD.md#orchard-verification-visualization) for local viewing and development commands.

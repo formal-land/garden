@@ -197,7 +197,7 @@ const rawCircuitGridFixture = {
 const circuitGridFixture = normalizeCircuitGridData(rawCircuitGridFixture);
 
 beforeEach(() => {
-  window.history.replaceState(null, "", "/circuit-grid.html");
+  window.history.replaceState(null, "", "/garden/orchard/circuit-grid.html");
 });
 
 afterEach(() => {
@@ -273,7 +273,7 @@ describe("circuit grid interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit-grid.html#row=1758&column=selector%3A5",
+      "/garden/orchard/circuit-grid.html#row=1758&column=selector%3A5",
     );
     const { container } = render(
       <CircuitGrid loader={async () => circuitGridFixture} />,
@@ -338,7 +338,7 @@ describe("circuit grid interactions", () => {
     window.history.replaceState(
       null,
       "",
-      "/circuit-grid.html#row=1758&column=selectors%3Acollapsed",
+      "/garden/orchard/circuit-grid.html#row=1758&column=selectors%3Acollapsed",
     );
     render(<CircuitGrid loader={async () => dataWithStackedSelectors} />);
 
