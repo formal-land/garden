@@ -57,7 +57,7 @@ The circuit-level proofs stay on top of the Garden Halo 2 monad (`Garden/Halo2/`
 - **Protocol specification**: `protocol_spec.v`
 - **Pallas generator facts**: `Pallas/Generators.v`, `Pallas/GeneratorsOrder.v`
 
-## Interactive visualisations
+## Interactive visualizations
 
 Three generated views are published from this repository:
 
