@@ -1,4 +1,5 @@
 Require Import Garden.Halo2.main.
+Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Halo2.proof.
 Require Import Garden.Halo2.lemmas.
 Require Import Garden.Orchard.columns.
@@ -50,6 +51,8 @@ Global Open Scope Z_scope.
     - [ValidActionInputs] / [valid_action_inputs_of_holds] — the umbrella
       predicate conjoining the input-side conditions;
     - [enable_spend_flag] / [enable_output_flag] — the two flag clauses;
+    - [cross_address_restriction] — the post-NU6.3 conditional equality of
+      the old and new expanded receivers;
     - [old_note_commit_integrity] — the witnessed old-note fields open the
       witnessed [cm_old], delegated to
       [OldNoteOpen.old_note_commit_integrity]
@@ -323,6 +326,93 @@ Module OrchardValidActionInputs.
     - right. symmetry. exact He.
   Qed.
 
+  (** ** Post-NU6.3 cross-address restriction
+
+      The final synthesis region enables [QOrchard] on four rows, one for
+      each coordinate of [(g_d, pk_d)].  On those rows the first gate
+      constraint is neutralized as [d - 0 = d * 1], the enable constraints
+      are neutralized with ones, and the Merkle product becomes
+      [d * (old - new) = 0].  The public API supplies [d] as a Boolean, but
+      the circuit proves the stronger field statement below for every
+      nonzero value. *)
+  Lemma cross_address_coordinate_from_row
+      (Γ : Assignment.t columns RegionId.t)
+      (row : Z)
+      (old_coordinate new_coordinate : Cell.t columns RegionId.t)
+      (Hrow :
+        interpret_facts Γ
+          (region_facts RegionId.PostNu63CrossAddressChecks
+            (Garden.Orchard.circuit.synthesize_cross_address_check_row
+              RegionId.PostNu63CrossAddressChecks row
+              old_coordinate new_coordinate)))
+      (Hgates :
+        satisfies_gates Γ
+          (𝓒.run_unit
+            Garden.Orchard.circuit.configure ConstraintSystem.empty)) :
+    UnOp.from
+      (Γ.(Assignment.instance_) Instance_.Primary
+        Garden.Orchard.circuit.DISABLE_CROSS_ADDRESS) = 0 \/
+    UnOp.from (eval_cell Γ old_coordinate) =
+      UnOp.from (eval_cell Γ new_coordinate).
+  Proof.
+    pose proof Hrow as Hcopy_disable.
+    unfold Garden.Orchard.circuit.synthesize_cross_address_check_row
+      in Hcopy_disable.
+    apply interpret_region_facts_bind_left in Hcopy_disable.
+    cbn [region_facts interpret_facts interpret_fact eval_cell]
+      in Hcopy_disable.
+    destruct Hcopy_disable as [Hcopy_disable _].
+    cbn in Hcopy_disable.
+
+    pose proof Hrow as Hcopy_old.
+    unfold Garden.Orchard.circuit.synthesize_cross_address_check_row
+      in Hcopy_old.
+    do 4 apply interpret_region_facts_bind_right in Hcopy_old.
+    apply interpret_region_facts_bind_left in Hcopy_old.
+    cbn [region_facts interpret_facts interpret_fact eval_cell] in Hcopy_old.
+    destruct Hcopy_old as [Hcopy_old _].
+    cbn in Hcopy_old.
+
+    pose proof Hrow as Hcopy_new.
+    unfold Garden.Orchard.circuit.synthesize_cross_address_check_row
+      in Hcopy_new.
+    do 5 apply interpret_region_facts_bind_right in Hcopy_new.
+    apply interpret_region_facts_bind_left in Hcopy_new.
+    cbn [region_facts interpret_facts interpret_fact eval_cell] in Hcopy_new.
+    destruct Hcopy_new as [Hcopy_new _].
+    cbn in Hcopy_new.
+
+    pose proof Hrow as Hselector_fact.
+    unfold Garden.Orchard.circuit.synthesize_cross_address_check_row
+      in Hselector_fact.
+    do 10 apply interpret_region_facts_bind_right in Hselector_fact.
+    cbn [region_facts interpret_facts interpret_fact] in Hselector_fact.
+    destruct Hselector_fact as [Hselector_fact _].
+    pose proof
+      (enabled_nonzero Γ Selector.QOrchard
+        RegionId.PostNu63CrossAddressChecks row Hselector_fact) as Hselector.
+
+    pose proof
+      (satisfies_gates_at Γ
+        (𝓒.run_unit Garden.Orchard.circuit.configure ConstraintSystem.empty)
+        Garden.Orchard.circuit.orchard_circuit_checks_gate
+        RegionId.PostNu63CrossAddressChecks row
+        ltac:(cbn; repeat (first [left; reflexivity | right]))
+        Hgates) as Hgate.
+    cbn [eval_gate Garden.Orchard.circuit.orchard_circuit_checks_gate
+      Gate.constraints Constraints.with_selector eval_constraints
+      eval_named_constraint eval_constraint eval_selector eval_expression
+      rotated_row Rotation.cur] in Hgate.
+    cbn in Hgate.
+    destruct Hgate as (_ & Hsame & _ & _).
+    specialize (Hsame Hselector).
+    unfold rotated_row, Rotation.cur in Hsame.
+    cbn [Rotation.offset] in Hsame.
+    rewrite Z.add_0_r in Hsame.
+    rewrite Hcopy_disable, Hcopy_old, Hcopy_new in Hsame.
+    exact Hsame.
+  Qed.
+
   (** ** Ownership-track readers
 
       The witnesses the input-side conditions below constrain.  They are
@@ -335,6 +425,100 @@ Module OrchardValidActionInputs.
   Definition read_pk_d_old (Γ : Assignment.t columns RegionId.t) : Point.t :=
     read_point Γ
       (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD).
+
+  (** The complete post-NU6.3 input relation enforced by the four final
+      coordinate rows.  The zero branch permits ordinary cross-address
+      actions.  Every nonzero field value forces equality of both expanded
+      receiver points; no Booleanity claim is made at circuit level. *)
+  Theorem cross_address_restriction
+      (Γ : Assignment.t columns RegionId.t)
+      (Hcircuit : Holds Γ) :
+    read_public_instance Γ
+      Garden.Orchard.circuit.DISABLE_CROSS_ADDRESS = 0 \/
+    (OrchardSpec.in_g_d_old (read_action_inputs Γ) =
+       OrchardSpec.in_g_d_new (read_action_inputs Γ) /\
+     read_pk_d_old Γ =
+       OrchardSpec.in_pk_d_new (read_action_inputs Γ)).
+  Proof.
+    destruct Hcircuit as [Hfacts HSatisfies].
+    destruct HSatisfies as [Hgates Hlookups].
+    pose proof Hfacts as Hcross.
+    unfold Garden.Orchard.circuit.synthesize in Hcross.
+    do 11 apply interpret_layouter_facts_bind_right in Hcross.
+    unfold Garden.Orchard.circuit.synthesize_cross_address_checks in Hcross.
+    apply interpret_layouter_facts_add_region in Hcross.
+
+    pose proof Hcross as Hrow0.
+    apply interpret_region_facts_bind_left in Hrow0.
+    pose proof Hcross as Hrow1.
+    apply interpret_region_facts_bind_right in Hrow1.
+    apply interpret_region_facts_bind_left in Hrow1.
+    pose proof Hcross as Hrow2.
+    do 2 apply interpret_region_facts_bind_right in Hrow2.
+    apply interpret_region_facts_bind_left in Hrow2.
+    pose proof Hcross as Hrow3.
+    do 3 apply interpret_region_facts_bind_right in Hrow3.
+
+    pose proof
+      (cross_address_coordinate_from_row Γ 0
+        (Cell.advice
+          (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A0 0)
+        (Cell.advice RegionId.NoteCommitNewWitnessGD Advice.A0 0)
+        Hrow0 Hgates) as Hgd_x.
+    pose proof
+      (cross_address_coordinate_from_row Γ 1
+        (Cell.advice
+          (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A1 0)
+        (Cell.advice RegionId.NoteCommitNewWitnessGD Advice.A1 0)
+        Hrow1 Hgates) as Hgd_y.
+    pose proof
+      (cross_address_coordinate_from_row Γ 2
+        (Cell.advice
+          (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A0 0)
+        (Cell.advice RegionId.NoteCommitNewWitnessPkD Advice.A0 0)
+        Hrow2 Hgates) as Hpk_x.
+    pose proof
+      (cross_address_coordinate_from_row Γ 3
+        (Cell.advice
+          (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A1 0)
+        (Cell.advice RegionId.NoteCommitNewWitnessPkD Advice.A1 0)
+        Hrow3 Hgates) as Hpk_y.
+
+    destruct Hgd_x as [Hdisabled | Hgd_x].
+    { left.
+      unfold read_public_instance.
+      cbn [eval_expression rotated_row Rotation.cur].
+      exact Hdisabled. }
+    destruct Hgd_y as [Hdisabled | Hgd_y].
+    { left.
+      unfold read_public_instance.
+      cbn [eval_expression rotated_row Rotation.cur].
+      exact Hdisabled. }
+    destruct Hpk_x as [Hdisabled | Hpk_x].
+    { left.
+      unfold read_public_instance.
+      cbn [eval_expression rotated_row Rotation.cur].
+      exact Hdisabled. }
+    destruct Hpk_y as [Hdisabled | Hpk_y].
+    { left.
+      unfold read_public_instance.
+      cbn [eval_expression rotated_row Rotation.cur].
+      exact Hdisabled. }
+    right.
+    split.
+    - unfold read_action_inputs, read_action_inputs_with_anchor.
+      cbn [OrchardSpec.in_g_d_old OrchardSpec.in_g_d_new].
+      unfold read_point, read, read1, read_advice.
+      cbn [eval_expression eval_cell rotated_row Rotation.cur] in *.
+      f_equal; assumption.
+    - unfold read_pk_d_old, read_action_inputs, read_action_inputs_with_anchor.
+      cbn [OrchardSpec.in_pk_d_new].
+      unfold read_point, read, read1, read_advice.
+      cbn [eval_expression eval_cell rotated_row Rotation.cur] in *.
+      f_equal; assumption.
+  Qed.
 
   (** The old-note commitment randomness, reconstructed from its 85 witnessed
       windows (the old-note [NoteCommitR] fixed-base leg). *)
@@ -456,8 +640,9 @@ Module OrchardValidActionInputs.
       is the domain).  The first conjunct is §4.18.4's input-typing MUST at
       circuit granularity; the second is the value-balance binding (the
       circuit's realization of the [v_old − v_new] argument of 'Value
-      commitment integrity'); then the two enable-flag clauses and the two
-      ownership clauses (honest branches).
+      commitment integrity'); then the two enable-flag clauses, the
+      post-NU6.3 cross-address restriction, and the two ownership clauses
+      (honest branches).
 
       [OrchardAction.action_statement] ([circuit_proof/main.v]) conjoins
       this with [satisfies_specification]: together they are the in-model
@@ -472,6 +657,12 @@ Module OrchardValidActionInputs.
      read_public_instance Γ Garden.Orchard.circuit.ENABLE_SPEND = 1) /\
     (OrchardSpec.in_v_new (read_action_inputs Γ) = 0 \/
      read_public_instance Γ Garden.Orchard.circuit.ENABLE_OUTPUT = 1) /\
+    (read_public_instance Γ
+       Garden.Orchard.circuit.DISABLE_CROSS_ADDRESS = 0 \/
+      (OrchardSpec.in_g_d_old (read_action_inputs Γ) =
+         OrchardSpec.in_g_d_new (read_action_inputs Γ) /\
+       read_pk_d_old Γ =
+         OrchardSpec.in_pk_d_new (read_action_inputs Γ))) /\
     (OrchardProtocolSpec.note_commit orchard_circuit_params
        (OrchardSpec.in_g_d_old (read_action_inputs Γ)) (read_pk_d_old Γ)
        (OrchardSpec.in_v_old (read_action_inputs Γ))
@@ -508,7 +699,8 @@ Module OrchardValidActionInputs.
       (conj (value_balance_gate Γ Hcircuit)
       (conj (enable_spend_flag Γ Hcircuit)
       (conj (enable_output_flag Γ Hcircuit)
+      (conj (cross_address_restriction Γ Hcircuit)
       (conj (old_note_commit_integrity Γ Hcircuit Hold_note_ok)
-            (diversified_address_integrity Γ Hcircuit Hivk_ok)))))).
+            (diversified_address_integrity Γ Hcircuit Hivk_ok))))))).
   Qed.
 End OrchardValidActionInputs.

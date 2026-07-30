@@ -146,13 +146,41 @@ make snapshot
 cd ..
 ```
 
+To regenerate and verify the Orchard Rust implementation snapshots from the
+pinned `third-party/halo2` and `third-party/orchard` submodules:
+
+```sh
+git submodule update --init --recursive
+scripts/check_orchard_implementation_snapshots.sh
+```
+
+The script keeps Rust build artifacts and temporary files under
+`third-party/orchard/target`. It checks the high-level Orchard JSON together
+with Garden's configure, synthesis, and selector-compression snapshots. The
+Rocq synthesis layout is intentionally not overwritten: Garden extends that
+file with typed `RegionId` mappings used by the proofs.
+
+It also checks Orchard's Post-NU6.3 pinned verifying-key description against
+the Rust keygen and runs `scripts/generate_vk_pinned.py --check`. That generator
+keeps the Rocq dump shards, commitment literals, BLAKE2b checkpoint states, and
+Fiat–Shamir binding scalar synchronized with
+`circuit_description_post_nu6_3`. To regenerate those Rocq artifacts directly:
+
+```sh
+cd Garden
+make orchard-vk-pinned
+make orchard-vk-pinned-check
+cd ..
+```
+
 ## Orchard Verification Visualization
 
 The source for the Orchard Verification Journey, Atlas, Circuit Explorer, and
 Circuit Grid lives in `web/orchard-verification`. The production bundle is
 generated in the ignored `web/orchard-verification/dist` directory. It is
-validated in CI and published from the dedicated `gh-pages` branch. Generated
-website files must not be committed to the source branch.
+validated in CI and published at
+`https://formal-land.github.io/garden/orchard/` from the dedicated `gh-pages`
+branch. Generated website files must not be committed to the source branch.
 
 On a fresh checkout, first generate the ignored raw structure snapshot using
 the Rocq environment described above:
@@ -242,9 +270,10 @@ machine, run this command from a clean worktree:
 The command regenerates the raw and derived circuit data, installs the pinned
 frontend dependencies, runs the Python, TypeScript, component, and Playwright
 checks, and builds the production bundle. It then creates a temporary,
-parentless deployment commit containing only `dist` plus `.nojekyll` and
-force-pushes it with a lease to `origin/gh-pages`. The source branch is never
-switched, and each release leaves only one reachable deployment commit.
+parentless deployment commit containing `dist` under `orchard/`, root redirect
+pages for the previous URLs, and `.nojekyll`, then force-pushes it with a lease
+to `origin/gh-pages`. The source branch is never switched, and each release
+leaves only one reachable deployment commit.
 
 The publishing machine needs the Rocq/OCaml, Python, Node.js 22, npm, and
 Playwright prerequisites described above, configured Git author information,

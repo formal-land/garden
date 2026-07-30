@@ -31,6 +31,7 @@ Definition RK_Y : Z := 5.
 Definition CMX : Z := 6.
 Definition ENABLE_SPEND : Z := 7.
 Definition ENABLE_OUTPUT : Z := 8.
+Definition DISABLE_CROSS_ADDRESS : Z := 9.
 
 Definition witness_input_region (region : RegionId.WitnessInput.t) : RegionId.t :=
   RegionId.WitnessInput region.
@@ -65,6 +66,19 @@ Module AssignedPoint.
     y : Cell.t columns RegionId.t;
   }.
 End AssignedPoint.
+
+(** The four address points retained by the shared Action synthesis.  Orchard
+    versions before NU6.3 did not use these cells after note commitment and
+    ownership checks.  The post-NU6.3 circuit reuses them in the final
+    cross-address restriction region. *)
+Module AddressPoints.
+  Record t : Set := {
+    g_d_old : AssignedPoint.t;
+    pk_d_old : AssignedPoint.t;
+    g_d_new : AssignedPoint.t;
+    pk_d_new : AssignedPoint.t;
+  }.
+End AddressPoints.
 
 Module ShortFixedResult.
   Record t : Set := {
@@ -204,11 +218,11 @@ Definition orchard_circuit_checks_gate : Gate.t columns := {|
         Constraint.Either
           (Constraint.EqualZeroToPrecise v_old)
           (Constraint.Equal root anchor));
-      (Some "v_old = 0 or enable_spends = 1",
+      (Some "v_old = 0 or enable_spend = 1",
         Constraint.Either
           (Constraint.EqualZeroToPrecise v_old)
           (Constraint.Equal (Expression.Constant 1) enable_spends));
-      (Some "v_new = 0 or enable_outputs = 1",
+      (Some "v_new = 0 or enable_output = 1",
         Constraint.Either
           (Constraint.EqualZeroToPrecise v_new)
           (Constraint.Equal (Expression.Constant 1) enable_outputs))
@@ -1132,7 +1146,7 @@ Definition synthesize_note_commit_old
 
 Definition synthesize_note_commit_new
     (v_new rho_new : Cell.t columns RegionId.t)
-    : 𝓛 columns RegionId.t unit :=
+    : 𝓛 columns RegionId.t (AssignedPoint.t * AssignedPoint.t) :=
   let🞵 g_d_new_star :=
     witness_non_identity_point
       RegionId.NoteCommitNewWitnessGD
@@ -1165,7 +1179,7 @@ Definition synthesize_note_commit_new
       cm_new.(Garden.Orchard.circuit.note_commit.AssignedPoint.x)
       Instance_.Primary
       CMX in
-  return🞵 tt.
+  return🞵 (g_d_new_star, pk_d_new).
 
 Definition synthesize_orchard_gate
     (v_old v_new magnitude sign root : Cell.t columns RegionId.t)
@@ -1194,6 +1208,72 @@ Definition synthesize_orchard_gate
     do🞵 𝓡.Copy enable_outputs_target enable_outputs_instance in
     𝓡.EnableSelector Selector.QOrchard 0 "").
 
+(** One coordinate row of the post-NU6.3 cross-address restriction.
+
+    The existing [QOrchard] gate is deliberately reused.  Setting
+    [A1 = 0], [A2 = disableCrossAddress], and [A3 = 1] makes its value-balance
+    equation tautological.  Setting [A6 = A7 = 1] neutralizes the two enable
+    checks.  Its remaining product is therefore
+
+      [disableCrossAddress * (old_coordinate - new_coordinate) = 0].
+
+    [A8] and [A9] are occupied with copies of the flag exactly as in Rust so
+    that the V1 floor planner cannot overlap another selector-enabled region
+    with these rows. *)
+Definition synthesize_cross_address_check_row
+    (region : RegionId.t)
+    (offset : Z)
+    (old_coordinate new_coordinate : Cell.t columns RegionId.t)
+    : 𝓡 columns RegionId.t unit :=
+  let disable_cross_address := Cell.advice region Advice.A0 offset in
+  let disable_cross_address_instance :=
+    Cell.instance region Instance_.Primary DISABLE_CROSS_ADDRESS in
+  do🞵 𝓡.Copy disable_cross_address disable_cross_address_instance in
+  do🞵
+    𝓡.ConstrainConstant (Cell.advice region Advice.A1 offset) 0 in
+  do🞵
+    𝓡.Copy (Cell.advice region Advice.A2 offset) disable_cross_address in
+  do🞵
+    𝓡.ConstrainConstant (Cell.advice region Advice.A3 offset) 1 in
+  do🞵
+    𝓡.Copy (Cell.advice region Advice.A4 offset) old_coordinate in
+  do🞵
+    𝓡.Copy (Cell.advice region Advice.A5 offset) new_coordinate in
+  do🞵
+    𝓡.ConstrainConstant (Cell.advice region Advice.A6 offset) 1 in
+  do🞵
+    𝓡.ConstrainConstant (Cell.advice region Advice.A7 offset) 1 in
+  do🞵
+    𝓡.Copy (Cell.advice region Advice.A8 offset) disable_cross_address in
+  do🞵
+    𝓡.Copy (Cell.advice region Advice.A9 offset) disable_cross_address in
+  𝓡.EnableSelector Selector.QOrchard offset "".
+
+(** The four coordinate checks are ordered exactly like Orchard's Rust
+    implementation: [g_d.x], [g_d.y], [pk_d.x], [pk_d.y]. *)
+Definition synthesize_cross_address_checks
+    (addresses : AddressPoints.t)
+    : 𝓛 columns RegionId.t unit :=
+  𝓛.AddRegion
+    RegionId.PostNu63CrossAddressChecks
+    "post-NU 6.3 cross-address checks"
+    (fun region =>
+      do🞵
+        synthesize_cross_address_check_row region 0
+          addresses.(AddressPoints.g_d_old).(AssignedPoint.x)
+          addresses.(AddressPoints.g_d_new).(AssignedPoint.x) in
+      do🞵
+        synthesize_cross_address_check_row region 1
+          addresses.(AddressPoints.g_d_old).(AssignedPoint.y)
+          addresses.(AddressPoints.g_d_new).(AssignedPoint.y) in
+      do🞵
+        synthesize_cross_address_check_row region 2
+          addresses.(AddressPoints.pk_d_old).(AssignedPoint.x)
+          addresses.(AddressPoints.pk_d_new).(AssignedPoint.x) in
+      synthesize_cross_address_check_row region 3
+        addresses.(AddressPoints.pk_d_old).(AssignedPoint.y)
+        addresses.(AddressPoints.pk_d_new).(AssignedPoint.y)).
+
 Definition synthesize
     : 𝓛 columns RegionId.t unit :=
   do🞵 Garden.Halo2.halo2_gadgets.sinsemilla.chip.load_generator_table in
@@ -1213,9 +1293,14 @@ Definition synthesize
       rho_old
       psi_old
       cm_old in
-  do🞵 synthesize_note_commit_new v_new rho_new in
+  let🞵 '(g_d_new, pk_d_new) := synthesize_note_commit_new v_new rho_new in
   do🞵 synthesize_orchard_gate v_old v_new magnitude sign root in
-  return🞵 tt.
+  synthesize_cross_address_checks {|
+    AddressPoints.g_d_old := g_d_old;
+    AddressPoints.pk_d_old := pk_d_old;
+    AddressPoints.g_d_new := g_d_new;
+    AddressPoints.pk_d_new := pk_d_new;
+  |}.
 
 (** The usable-row bound of the Orchard proving system: [n - (blinding_factors
     + 1)] for [n = 2^k = 2048] ([k = 11]) and [blinding_factors = 5], so the

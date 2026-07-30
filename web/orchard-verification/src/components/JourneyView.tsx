@@ -265,7 +265,7 @@ export function JourneyView({ data }: { data: OrchardVerificationData }) {
         <p className="eyebrow">Garden · Rocq · Evidence snapshot {data.snapshot.asOf}</p>
         <h1 id="journey-title">Orchard Verification Journey</h1>
         <p>
-          A {data.stages.length}-stage account of how the post-NU6.2 Orchard Action
+          A {data.stages.length}-stage account of how the post-NU6.3 Orchard Action
           implementation was captured in Rocq and connected to public-output and
           balance arguments.
         </p>

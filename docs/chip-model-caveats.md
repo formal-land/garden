@@ -264,9 +264,10 @@ materializes constants as a trailing block after all regions, and that block
 is replayed verbatim from the Rust-generated table
 (`circuit_synthesis_constants.v`).
 
-Emission covers every site the action circuit exercises — 166 bindings across
-nine sites; two further sites are unexercised and documented, not emitted —
-and the standalone certificate
+Emission covers every site the Post-NU6.3 action circuit exercises — 182
+bindings, including the 16 zero/one pins in the four cross-address-check rows;
+the unexercised constant-assignment cases are documented but not emitted — and
+the standalone certificate
 `Garden/Orchard/circuit_synthesis_constants_check.v` proves by `vm_compute`
 that the program's `ConstrainConstant` ops, resolved through the serializer's
 placement, equal the replay table as a multiset of (absolute cell, value)
@@ -361,7 +362,7 @@ instantiation layers are proved:
 - `Orchard/circuit_operational.v` — the whole-circuit Orchard
   instantiation: `orchard_operational_sound` discharges every decidable
   premise of `operational_sound` by `vm_compute` certificates on the
-  19,617-event stream (replay success on symbolic witness planes,
+  19,679-event stream (replay success on symbolic witness planes,
   `instance_free`/`flattening_ok`, and the `constants_materialized`
   coverage of the concrete constants tail), so the `Holds` hypothesis of
   the Orchard action surface follows from mock acceptance of the
@@ -389,7 +390,7 @@ instantiation layers are proved:
     (`Orchard/circuit_completeness/instance/cert.v`, `Qed`, clean audit) is
     the constructive whole-circuit concrete instance
     (`Holds (honest_assignment test_input)` plus read-back for one concrete
-    valid input): all 4,858 enabled gate points and all 2,964 witness facts
+    valid input): all 4,862 enabled gate points and all 3,004 witness facts
     are machine-verified by `vm_compute`.
 
   - `OrchardCompletenessAssembly.orchard_completeness`

@@ -1182,7 +1182,7 @@ Module OrchardForwardRunningSums.
     apply Z.eqb_eq in Hrow; subst row.
     destruct region as
       [ wr | layer mr | pr | vr | nr | sar | ar | cr | which ncr
-      | | | | | | gr ];
+      | | | | | | | gr ];
       try discriminate Hsr;
       [ destruct mr; try discriminate Hsr
       | destruct cr; try discriminate Hsr
@@ -1224,7 +1224,7 @@ Module OrchardForwardRunningSums.
     pose proof (qmulfixedrs_dom region row Hin) as Hdom.
     destruct region as
       [ wr | layer mr | pr | vr | nr | sar | ar | cr | which ncr
-      | | | | | | gr ];
+      | | | | | | | gr ];
       try discriminate Hdom;
       [ destruct vr; try discriminate Hdom
       | destruct nr; try discriminate Hdom ].
@@ -1264,7 +1264,7 @@ Module OrchardForwardRunningSums.
     intros Hdom Hql Hqr.
     destruct region as
       [ wr | layer mr | pr | vr | nr | sar | ar | cr | which ncr
-      | | | | | | gr ];
+      | | | | | | | gr ];
       try discriminate Hdom;
       [ destruct nr; try discriminate Hdom
       | destruct ar as [ msub | | ]; try discriminate Hdom;
@@ -1334,7 +1334,7 @@ Module OrchardForwardRunningSums.
       destruct Hdom as [Hrow Hsr].
     destruct region as
       [ wr | layer mr | pr | vr | nr | sar | ar | cr | which ncr
-      | | | | | | gr ];
+      | | | | | | | gr ];
       try discriminate Hsr;
       [ destruct mr; try discriminate Hsr
       | destruct cr; try discriminate Hsr

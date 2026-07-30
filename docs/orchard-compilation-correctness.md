@@ -19,7 +19,7 @@ Two questions motivate it, and each gets its own section below.
 2. **Why should anyone believe the circuit in Rocq is the circuit in Rust?**
    Short answer: not because the translation was verified — it was not — but
    because the modelled keygen is bracketed at both ends. Its *inputs* (the
-   configure system and the 19,617-event synthesis trace) are compared with
+   configure system and the 19,679-event synthesis trace) are compared with
    the Rust implementation as JSON, and its *output* reproduces the deployed
    verifying key's description byte for byte. See
    [Why the Rocq circuit is the Rust circuit](#why-the-rocq-circuit-is-the-rust-circuit),
@@ -117,8 +117,8 @@ choices — which is what makes them meaningful rather than circular.
 Equality constraints are `Copy` obligations in the event stream.
 `Sigma.sigma_of_copies` closes them into an explicit permutation of the
 equality-enabled cell set, by weighted union with an explicit cycle-relabeling
-walk — the port of `Assembly::copy`. Orchard replays **19,617 events**, of
-which **2,964** are copies, over **15 permutation columns** × 2048 rows.
+walk — the port of `Assembly::copy`. Orchard replays **19,679 events**, of
+which **3,004** are copies, over **15 permutation columns** × 2048 rows.
 
 The construction maintains an invariant (`assembly_inv`) recording that the
 result is an injective self-map of the cell domain, constant on orbits. Grid
@@ -261,7 +261,7 @@ The chain has three links:
    Rust synthesis   ≟   synthesize_events ───────┘          │
         (byte-identical JSON)                               │  vk/print.v
                                                             ▼
-                                          printed vk.pinned()  ≟  circuit_description_fixed
+                                          printed vk.pinned()  ≟  circuit_description_post_nu6_3
                                                        (T1, byte-exact, in-kernel)
 ```
 
@@ -275,8 +275,8 @@ compared against snapshots the Rust side emits from two ignored Orchard tests:
 
 | | Rocq object | Rust snapshot | Result |
 |---|---|---|---|
-| configure | `model_configure` — 55 gates, 3 lookups | `circuit_configure_generated_from_implementation.json` | **structurally identical**; the files differ in whitespace only (121,962 vs 118,362 bytes), and compare equal as JSON |
-| synthesis | `model_synthesis_events` — 19,617 events | `circuit_synthesis_generated_from_implementation.json` | **byte-identical**, 2,468,622 bytes each |
+| configure | `model_configure` — 55 gates, 3 lookups | `circuit_configure_generated_from_implementation.json` | **structurally identical**; the files differ in whitespace only (121,960 vs 118,360 bytes), and compare equal as JSON |
+| synthesis | `model_synthesis_events` — 19,679 events | `circuit_synthesis_generated_from_implementation.json` | **byte-identical**, 2,477,271 bytes each |
 
 Run by `make orchard-configure-json-compare` and
 `make orchard-synthesis-json-compare`, whose comparators
@@ -292,8 +292,8 @@ objects the extraction exports are the objects the compilation stack compiles:
   `Configure.to_indexed Index.indices (𝓒.run_unit circuit.configure
   ConstraintSystem.empty)` — syntactically the extraction's `model_configure`;
 - `orchard_events`, the stream the selector activations and copies are read
-  off, is `orchard_synthesis_events ++ orchard_constants_events` (19,285 +
-  332), and `orchard_events_synthesize_events` — a `Qed` lemma in
+  off, is `orchard_synthesis_events ++ orchard_constants_events` (19,315 +
+  364), and `orchard_events_synthesize_events` — a `Qed` lemma in
   `circuit_operational.v` — proves it equal to
   `circuit.synthesize_events Index.indices`, the extraction's
   `model_synthesis_events`.
@@ -312,7 +312,7 @@ reasons about; it is not evidence about a parallel artifact.
   under [The component certificates](#the-component-certificates));
 - the vk describes the constraint system only. `vk.pinned()` says nothing
   about *synthesis*, so no amount of byte-parity there can witness that the
-  Rocq circuit writes the cells the Rust circuit writes. The 19,617-event
+  Rocq circuit writes the cells the Rust circuit writes. The 19,679-event
   synthesis snapshot is the only direct evidence of that, and it is exact.
 
 **Trust status differs sharply between the two ends, and the difference
@@ -384,7 +384,7 @@ the transcription itself as trusted input. `Orchard/vk/` removes that:
 
 - **T1, `vk_pinned_dump_parity`** — a verified in-model printer, run over the
   compiled system and the pinned literals, reproduces
-  `orchard/src/circuit_data/circuit_description_fixed` — the
+  `orchard/src/circuit_data/circuit_description_post_nu6_3` — the
   `format!("{:#?}\n", vk.pinned())` dump the Orchard test suite asserts
   against the deployed key — **byte for byte, all 1,285,701 bytes**. Since the
   printed bytes are *produced from the model's compiled system*, this certifies
@@ -401,8 +401,8 @@ the transcription itself as trusted input. `Orchard/vk/` removes that:
 So the trust chain for faithfulness reads:
 
 ```
-Rocq circuit --compile--> printed description  ==  circuit_description_fixed  ==  deployed vk
-                          \_______ T1, machine-checked _______/   \__ Orchard's own test __/
+Rocq circuit --compile--> printed description  ==  circuit_description_post_nu6_3  ==  Post-NU6.3 vk
+                          \____________ T1, machine-checked _____________/   \__ Orchard's own test __/
 ```
 
 We discharge the first link. The second is asserted by the Orchard repository's
@@ -429,7 +429,7 @@ as strong as the provenance of what is printed, and that splits in two:
 
 - **The witness side.** `vk.pinned()` describes the constraint system, not
   synthesis. That the Rocq synthesis writes the cells the Rust one writes is
-  carried by the other end of the chain — the byte-identical 19,617-event
+  carried by the other end of the chain — the byte-identical 19,679-event
   synthesis snapshot of
   [the JSON link](#the-refinement-from-the-json-comparison-to-the-vk), which
   is *not* kernel-checked — together with the in-kernel event-replay bridge of

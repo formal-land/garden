@@ -55,8 +55,8 @@ Module OrchardCompletenessInstanceShardsMisc.
   Import OrchardCompletenessInstanceDefs.
 
   (** Families 0 ([WitnessInput]), 33 ([Poseidon]), 41 ([GadgetLocal],
-      empty) and 42 (the [QOrchard] checks row and the new-note witness
-      rows). *)
+      empty) and 42 (the [QOrchard] checks row, the four post-NU6.3
+      cross-address rows, and the new-note witness rows). *)
   Lemma misc_shards_ok :
     List.forallb check_point (shard_in [0; 33; 41; 42]) = true.
   Proof. vm_cast_no_check (@eq_refl bool true). Qed.
@@ -115,7 +115,7 @@ End OrchardCompletenessInstanceShardsBlocked.
 
     The synthesis program's witness facts ([CellsEqual] / [InstanceIs] /
     [CellIsConstant]) hold on the generated assignment — the copy/constant
-    obligations of [Complete.circuit_holds_intro], over all 2 964 facts. *)
+    obligations of [Complete.circuit_holds_intro], over all 3 004 facts. *)
 Module OrchardCompletenessInstanceWitness.
   Import OrchardCompletenessInstanceDefs.
 

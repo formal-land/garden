@@ -747,8 +747,8 @@ def validate_generated_data(data: Mapping[str, Any]) -> None:
         raise GenerationError("generated grid must contain 25 physical columns")
     if len(selectors) != 56:
         raise GenerationError("generated grid must contain 56 virtual selectors")
-    if len(regions) != 394:
-        raise GenerationError("generated grid must contain 394 exact regions")
+    if len(regions) != 395:
+        raise GenerationError("generated grid must contain 395 exact regions")
     for label, records in (
         ("column", columns),
         ("selector", selectors),

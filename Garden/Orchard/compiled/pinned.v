@@ -1,10 +1,10 @@
 (** * Pinned compiled Orchard circuit description (parity witness input).
 
     Rocq literals transcribed offline from the pinned verifying-key dump
-    [orchard/src/circuit_data/circuit_description_fixed.json] (the Debug
-    serialization of [vk.pinned()] for the post-NU6.2 Orchard action
+    [orchard/src/circuit_data/circuit_description_post_nu6_3.json] (the
+    Debug serialization of [vk.pinned()] for the Post-NU6.3 Orchard action
     circuit), the compiled/post-[compress_selectors] constraint system the
-    deployed verifier keys against.  These literals are untrusted witness
+    implementation verifier keys against.  These literals are untrusted witness
     input: [compiled/check.v] runs in-model checkers that compare
     them against [Plonkish.Compile.compile] applied to the model's own
     [orchard_indexed_system], component by component.

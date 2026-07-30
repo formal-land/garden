@@ -3,6 +3,7 @@
 .PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare orchard-synthesis-json-compare-normalized
 .PHONY: orchard-structure-json-from-model orchard-circuit-visualization-json orchard-circuit-visualization-check
 .PHONY: orchard-circuit-grid-json orchard-circuit-grid-check orchard-circuit-grid-test
+.PHONY: orchard-vk-pinned orchard-vk-pinned-check
 
 VFILES := $(shell find -L . -name "*.v" | grep -v -f blacklist.txt | sort)
 
@@ -125,6 +126,12 @@ orchard-circuit-grid-check: orchard-configure-json-compare orchard-synthesis-jso
 
 orchard-circuit-grid-test:
 	python3 ../scripts/tests/test_generate_orchard_circuit_grid.py
+
+orchard-vk-pinned:
+	python3 ../scripts/generate_vk_pinned.py
+
+orchard-vk-pinned-check:
+	python3 ../scripts/generate_vk_pinned.py --check
 
 # Detect OS and set appropriate commands
 UTILHEADNAME_S := $(shell uname -s)

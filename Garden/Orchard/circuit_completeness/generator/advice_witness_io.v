@@ -6,6 +6,7 @@ Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_completeness.generator.witness_input.
 Require Garden.Orchard.circuit.
 Require Import Stdlib.ZArith.ZArith.
+Require Import Stdlib.Bool.Bool.
 
 Global Open Scope Z_scope.
 
@@ -15,8 +16,9 @@ Global Open Scope Z_scope.
     the regions the whole-action witness inputs live in: the eight
     [WitnessInput] regions (the free advice / witnessed points of
     [synthesize_witness_inputs]), the [OrchardCircuitChecks] copy row (the
-    [QOrchard] gate's eight read cells), and the public [Instance_.Primary]
-    rows the gate's copies and the [ConstrainInstance] sites pin.
+    [QOrchard] gate's eight read cells), the four post-NU6.3 cross-address
+    rows, and the public [Instance_.Primary] rows their copies and the
+    [ConstrainInstance] sites pin.
 
     This file supplies *values* only; it does not build a full
     [Assignment.t] and proves no gate-satisfaction facts (that is the
@@ -121,6 +123,45 @@ Module OrchardAdviceWitnessIo.
       end
     else 0.
 
+  (** ** Post-NU6.3 cross-address rows
+
+      Rows 0..3 compare [g_d.x], [g_d.y], [pk_d.x], and [pk_d.y].
+      [A0]/[A2]/[A8]/[A9] carry the public disable flag,
+      [A1]/[A3]/[A6]/[A7] carry the neutralizing constants, and [A4]/[A5]
+      carry the corresponding old/new coordinates. *)
+  Definition cross_address_checks_advice (w : HonestInput)
+      (column : Advice.t) (row : Z) : Z :=
+    let old_coordinate :=
+      match row with
+      | 0 => Point.x (hi_g_d_old w)
+      | 1 => Point.y (hi_g_d_old w)
+      | 2 => Point.x (hi_pk_d_old w)
+      | 3 => Point.y (hi_pk_d_old w)
+      | _ => 0
+      end in
+    let new_coordinate :=
+      match row with
+      | 0 => Point.x (hi_g_d_new w)
+      | 1 => Point.y (hi_g_d_new w)
+      | 2 => Point.x (hi_pk_d_new w)
+      | 3 => Point.y (hi_pk_d_new w)
+      | _ => 0
+      end in
+    if (0 <=? row) && (row <? 4) then
+      match column with
+      | Advice.A0
+      | Advice.A2
+      | Advice.A8
+      | Advice.A9 => hi_disable_cross_address w
+      | Advice.A1 => 0
+      | Advice.A3
+      | Advice.A6
+      | Advice.A7 => 1
+      | Advice.A4 => old_coordinate
+      | Advice.A5 => new_coordinate
+      end
+    else 0.
+
   (** ** The advice plane
 
       The generator on the full [RegionId.t]: the region families above,
@@ -132,6 +173,8 @@ Module OrchardAdviceWitnessIo.
     match region with
     | RegionId.WitnessInput r => witness_input_advice w column r row
     | RegionId.OrchardCircuitChecks => orchard_checks_advice w column row
+    | RegionId.PostNu63CrossAddressChecks =>
+        cross_address_checks_advice w column row
     | RegionId.NoteCommitNewWitnessGD =>
         note_commit_new_witness_advice w (hi_g_d_new w) column row
     | RegionId.NoteCommitNewWitnessPkD =>
@@ -150,10 +193,11 @@ Module OrchardAdviceWitnessIo.
 
       The primary-input column, indexed by the row constants of [circuit.v].
       Rows [ANCHOR] / [ENABLE_SPEND] / [ENABLE_OUTPUT] are copied into the
-      [OrchardCircuitChecks] row; [CV_NET_*] / [NF_OLD] / [RK_*] / [CMX] are
-      the [ConstrainInstance] targets of the value-commitment, nullifier,
-      spend-authority and new-note-commitment gadgets.  This is the [x] side
-      of the §4.1.13 statement — the public instance the honest proof
+      [OrchardCircuitChecks] row, and [DISABLE_CROSS_ADDRESS] is copied into
+      every post-NU6.3 coordinate-check row.  [CV_NET_*] / [NF_OLD] / [RK_*]
+      / [CMX] are the [ConstrainInstance] targets of the value-commitment,
+      nullifier, spend-authority and new-note-commitment gadgets.  This is the
+      [x] side of the §4.1.13 statement — the public instance the honest proof
       satisfies — and the [Assignment.instance_] field of
       [honest_assignment]. *)
   Definition public_instance_row (w : HonestInput) (row : Z) : Z :=
@@ -167,6 +211,7 @@ Module OrchardAdviceWitnessIo.
     | 6 => cmx w                    (* CMX *)
     | 7 => hi_enable_spends w       (* ENABLE_SPEND *)
     | 8 => hi_enable_outputs w      (* ENABLE_OUTPUT *)
+    | 9 => hi_disable_cross_address w (* DISABLE_CROSS_ADDRESS *)
     | _ => 0
     end.
 

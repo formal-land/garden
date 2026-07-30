@@ -1,7 +1,10 @@
 import { defineConfig, devices } from "@playwright/test";
 
-const e2eOrigin = process.env.ORCHARD_E2E_ORIGIN ?? "http://127.0.0.1:4173";
-const e2ePort = new URL(e2eOrigin).port || "4173";
+const e2eBaseUrl = new URL(
+  process.env.ORCHARD_E2E_ORIGIN ?? "http://127.0.0.1:4173/",
+);
+if (!e2eBaseUrl.pathname.endsWith("/")) e2eBaseUrl.pathname += "/";
+const e2ePort = e2eBaseUrl.port || "4173";
 
 export default defineConfig({
   testDir: "./tests/e2e",
@@ -11,7 +14,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   reporter: process.env.CI ? "github" : "list",
   use: {
-    baseURL: e2eOrigin,
+    baseURL: e2eBaseUrl.href,
     trace: "retain-on-failure",
   },
   projects: [
@@ -25,8 +28,12 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `npm run dev -- --host 127.0.0.1 --port ${e2ePort}`,
-    url: e2eOrigin,
-    reuseExistingServer: !process.env.CI,
+    command:
+      `npm run preview -- --host 127.0.0.1 --port ${e2ePort} --strictPort ` +
+      `--base ${e2eBaseUrl.pathname}`,
+    url: e2eBaseUrl.href,
+    reuseExistingServer:
+      process.env.ORCHARD_E2E_REUSE_EXISTING_SERVER === "1" ||
+      !process.env.CI,
   },
 });

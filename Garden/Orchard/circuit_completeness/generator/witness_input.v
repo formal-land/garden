@@ -63,7 +63,8 @@ Module OrchardWitnessInput.
       the value-commitment trapdoor [rcv] — plus the primary-input
       passthroughs the circuit reads but §4.18.4 treats as public: the
       public anchor row (consumed verbatim on dummy spends, [v_old = 0]) and
-      the [enableSpends] / [enableOutputs] flags.
+      the [enableSpends] / [enableOutputs] flags, plus the post-NU6.3
+      [disableCrossAddress] flag.
 
       All numeric fields are plain [Z]; the type/range envelope is the
       separate predicate [valid] below.  [magnitude], [sign], [cm_old],
@@ -95,6 +96,7 @@ Module OrchardWitnessInput.
     hi_anchor_public : Z;
     hi_enable_spends : Z;
     hi_enable_outputs : Z;
+    hi_disable_cross_address : Z;
   }.
 
   (** ** Derived values: the honest prover's computations
@@ -628,7 +630,9 @@ Module OrchardWitnessInput.
     List.Forall (fun s => 0 <= s < Primes.pallas_p) (hi_path w) /\
     0 <= hi_pos w < 2 ^ 32 /\
     (hi_enable_spends w = 0 \/ hi_enable_spends w = 1) /\
-    (hi_enable_outputs w = 0 \/ hi_enable_outputs w = 1).
+    (hi_enable_outputs w = 0 \/ hi_enable_outputs w = 1) /\
+    (hi_disable_cross_address w = 0 \/
+     hi_disable_cross_address w = 1).
 
   (** [valid]: the type envelope plus the input-side §4.18.4 conditions the
       circuit checks against free witness fields — the two enable-flag
@@ -638,11 +642,16 @@ Module OrchardWitnessInput.
       derived values only, so they hold by construction: old and new note
       commitment integrity ([cm_old] / [cmx] are computed), nullifier
       integrity, spend authority, value-commitment integrity, and Merkle
-      path validity via [anchor_public_row]. *)
+      path validity via [anchor_public_row].  The final clause is the
+      post-NU6.3 cross-address restriction: a nonzero canonical flag requires
+      the old and new expanded receivers to agree. *)
   Definition valid (w : HonestInput) : Prop :=
     well_typed w /\
     (hi_v_old w = 0 \/ hi_enable_spends w = 1) /\
     (hi_v_new w = 0 \/ hi_enable_outputs w = 1) /\
+    (hi_disable_cross_address w = 0 \/
+      (hi_g_d_old w = hi_g_d_new w /\
+       hi_pk_d_old w = hi_pk_d_new w)) /\
     hi_pk_d_old w =
       PallasModel.repr
         (Pallas.mul (ivk w) (PallasModel.unrepr (hi_g_d_old w))).

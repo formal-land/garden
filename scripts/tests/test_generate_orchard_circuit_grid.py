@@ -66,7 +66,7 @@ class ParityTests(unittest.TestCase):
             self.synthesis_model,
             self.synthesis_implementation,
         )
-        self.assertEqual(len(events), 19617)
+        self.assertEqual(len(events), 19679)
         self.assertEqual(len(configure["gates"]), 55)
 
     def test_configure_mismatch_fails_before_generation(self) -> None:
@@ -142,7 +142,7 @@ class GeneratedArtifactTests(unittest.TestCase):
             {
                 "id": "orchard-action",
                 "name": "Orchard Action Circuit",
-                "version": "FixedPostNu6_2",
+                "version": "PostNu6_3",
                 "field": "pallas::Base",
                 "k": 11,
                 "rowCount": 2048,
@@ -159,8 +159,8 @@ class GeneratedArtifactTests(unittest.TestCase):
             {"instance": 1, "advice": 10, "fixed": 14},
         )
         self.assertEqual(len(self.artifact["selectors"]), 56)
-        self.assertEqual(len(self.artifact["regions"]), 394)
-        self.assertEqual(len(self.artifact["events"]), 19617)
+        self.assertEqual(len(self.artifact["regions"]), 395)
+        self.assertEqual(len(self.artifact["events"]), 19679)
         self.assertEqual(len(self.artifact["rows"]), 2048)
 
     def test_capabilities_and_input_hashes_are_explicit(self) -> None:
@@ -205,19 +205,19 @@ class GeneratedArtifactTests(unittest.TestCase):
             selector["circuitTarget"]["href"],
             "circuit.html#level=detail&item=gate%3A3",
         )
-        row = next(item for item in self.artifact["rows"] if item["row"] == 1758)
+        row = next(item for item in self.artifact["rows"] if item["row"] == 1762)
         self.assertEqual(
             row["selectorIds"],
             ["selector:2", "selector:4", "selector:5"],
         )
         self.assertEqual(
             row["regionIds"],
-            ["region:2", "region:288"],
+            ["region:138", "region:2"],
         )
         event = next(
             item
             for item in self.artifact["events"]
-            if item.get("selectorId") == "selector:5" and item.get("row") == 1758
+            if item.get("selectorId") == "selector:5" and item.get("row") == 1762
         )
         self.assertEqual(event["id"], "trace-event:3087")
         self.assertEqual(event["regionId"], "region:2")
@@ -242,7 +242,7 @@ class GeneratedArtifactTests(unittest.TestCase):
             )
         )
         copies = [event for event in self.artifact["events"] if event["kind"] == "copy"]
-        self.assertEqual(len(copies), 2964)
+        self.assertEqual(len(copies), 3004)
         self.assertTrue(all(len(event["endpoints"]) == 2 for event in copies))
         self.assertTrue(
             any(
@@ -262,8 +262,8 @@ class GeneratedArtifactTests(unittest.TestCase):
         witness_point = next(
             region for region in self.artifact["regions"] if region["id"] == "region:2"
         )
-        self.assertEqual(witness_point["startRow"], 1758)
-        self.assertEqual(witness_point["endRow"], 1758)
+        self.assertEqual(witness_point["startRow"], 1762)
+        self.assertEqual(witness_point["endRow"], 1762)
         # Copy peers must not inflate a region's span across the circuit.
         self.assertLess(
             max(

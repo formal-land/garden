@@ -5,7 +5,7 @@ export const rawCircuitExplorerFixture = {
   metadata: {
     circuit: {
       name: "Fixture Orchard Action circuit",
-      version: "FixedPostNu6_2",
+      version: "PostNu6_3",
       field: "pallas::Base",
       k: 11,
     },

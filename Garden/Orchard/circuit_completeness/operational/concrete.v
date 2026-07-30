@@ -3,7 +3,7 @@
     The completeness mirror of [Orchard/circuit_operational.v]: the honest
     Orchard witness of the C1 instance ([circuit_completeness/instance/cert.v])
     is accepted by the ideal checker [mock_prover_accepts] that mirrors Rust
-    Halo2's [MockProver] over the serialized 19,617-event stream.  This is the
+    Halo2's [MockProver] over the serialized 19,679-event stream.  This is the
     operational non-vacuity certificate of the whole soundness surface: the
     accepted set of the ideal checker is inhabited by a real honest witness.
 

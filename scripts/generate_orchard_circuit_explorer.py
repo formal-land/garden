@@ -1620,6 +1620,7 @@ INSTANCE_ROW_LABELS = {
     6: "CMX",
     7: "ENABLE_SPEND",
     8: "ENABLE_OUTPUT",
+    9: "DISABLE_CROSS_ADDRESS",
 }
 
 
@@ -1647,7 +1648,7 @@ def build_instance_rows(
 
 
 def default_instance_proof_nodes(row: int) -> list[str]:
-    if row in {0, 7, 8}:
+    if row in {0, 7, 8, 9}:
         return ["action-valid-inputs", "action-theorem", "capture-synthesis-model"]
     return ["action-seven-outputs", "action-theorem", "capture-synthesis-model"]
 
@@ -2219,8 +2220,8 @@ def validate_generated_data(data: Mapping[str, Any]) -> None:
         require_known(
             node["id"], node.get("layoutOperationIds", []), operation_ids, "operations"
         )
-    if [row.get("row") for row in synthesis["instanceRows"]] != list(range(9)):
-        raise GenerationError("instanceRows must explicitly cover rows 0 through 8")
+    if [row.get("row") for row in synthesis["instanceRows"]] != list(range(10)):
+        raise GenerationError("instanceRows must explicitly cover rows 0 through 9")
     if data["diagnostics"].get("errors"):
         raise GenerationError("generated diagnostics contains errors")
 

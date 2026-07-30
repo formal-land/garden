@@ -85,7 +85,7 @@ Module OrchardCompletenessInstance.
     intros Hin.
     destruct region as
       [wi | layer mr | pr | vr | nr | sr | ar | cr | wh ncr
-      | | | | | | gr].
+      | | | | | | | gr].
     - exact (check_point_shard_in _ _ _ _
         OrchardCompletenessInstanceShardsMisc.misc_shards_ok Hin eq_refl).
     - destruct layer;
@@ -109,6 +109,8 @@ Module OrchardCompletenessInstance.
           OrchardCompletenessInstanceShardsBlocked.shard_39_ok Hin eq_refl).
       + exact (check_point_shard_in _ _ _ _
           OrchardCompletenessInstanceShardsBlocked.shard_40_ok Hin eq_refl).
+    - exact (check_point_shard_in _ _ _ _
+        OrchardCompletenessInstanceShardsMisc.misc_shards_ok Hin eq_refl).
     - exact (check_point_shard_in _ _ _ _
         OrchardCompletenessInstanceShardsMisc.misc_shards_ok Hin eq_refl).
     - exact (check_point_shard_in _ _ _ _

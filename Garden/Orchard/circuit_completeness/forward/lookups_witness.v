@@ -3549,6 +3549,70 @@ Module OrchardForwardLookupsWitness.
     Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A2; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |};
     Fact.CellsEqual {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.CompletePointAdd; Cell.row_offset := 0 |} {| Cell.column := ColumnRef.Advice Advice.A3; Cell.region := RegionId.NoteCommit RegionId.NoteCommit.Which.New RegionId.NoteCommit.FixedBaseLast; Cell.row_offset := 1 |}].
 
+  (** The 40 nontrivial witness facts introduced by the four post-NU6.3
+      cross-address rows: six copies and four constants per coordinate.
+      Keeping the four rows generated from one small template makes their
+      relationship to [circuit.synthesize_cross_address_check_row] explicit
+      and avoids four nearly identical literal blocks. *)
+  Definition cross_cell (column : Advice.t) (row : Z)
+      : Cell.t columns RegionId.t :=
+    Cell.advice RegionId.PostNu63CrossAddressChecks column row.
+
+  Definition cross_old_coordinate_cell (row : Z)
+      : Cell.t columns RegionId.t :=
+    match row with
+    | 0 =>
+        Cell.advice
+          (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A0 0
+    | 1 =>
+        Cell.advice
+          (RegionId.WitnessInput RegionId.WitnessInput.GDOld) Advice.A1 0
+    | 2 =>
+        Cell.advice
+          (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A0 0
+    | 3 =>
+        Cell.advice
+          (RegionId.AddressIntegrity RegionId.AddressIntegrity.WitnessPkD)
+          Advice.A1 0
+    | _ => cross_cell Advice.A4 row
+    end.
+
+  Definition cross_new_coordinate_cell (row : Z)
+      : Cell.t columns RegionId.t :=
+    match row with
+    | 0 => Cell.advice RegionId.NoteCommitNewWitnessGD Advice.A0 0
+    | 1 => Cell.advice RegionId.NoteCommitNewWitnessGD Advice.A1 0
+    | 2 => Cell.advice RegionId.NoteCommitNewWitnessPkD Advice.A0 0
+    | 3 => Cell.advice RegionId.NoteCommitNewWitnessPkD Advice.A1 0
+    | _ => cross_cell Advice.A5 row
+    end.
+
+  Definition cross_row_facts (row : Z)
+      : list (Fact.t columns RegionId.t) := [
+    Fact.CellsEqual
+      (cross_cell Advice.A0 row)
+      (Cell.instance RegionId.PostNu63CrossAddressChecks
+        Instance_.Primary Garden.Orchard.circuit.DISABLE_CROSS_ADDRESS);
+    Fact.CellIsConstant (cross_cell Advice.A1 row) 0;
+    Fact.CellsEqual
+      (cross_cell Advice.A2 row) (cross_cell Advice.A0 row);
+    Fact.CellIsConstant (cross_cell Advice.A3 row) 1;
+    Fact.CellsEqual
+      (cross_cell Advice.A4 row) (cross_old_coordinate_cell row);
+    Fact.CellsEqual
+      (cross_cell Advice.A5 row) (cross_new_coordinate_cell row);
+    Fact.CellIsConstant (cross_cell Advice.A6 row) 1;
+    Fact.CellIsConstant (cross_cell Advice.A7 row) 1;
+    Fact.CellsEqual
+      (cross_cell Advice.A8 row) (cross_cell Advice.A0 row);
+    Fact.CellsEqual
+      (cross_cell Advice.A9 row) (cross_cell Advice.A0 row)
+  ].
+
+  Definition wf_cross_0 : list (Fact.t columns RegionId.t) :=
+    List.flat_map cross_row_facts [0; 1; 2; 3].
+
   Definition nt_closed : list (Fact.t columns RegionId.t) :=
     wf_mnode_0 ++
     wf_mech_0 ++
@@ -3568,9 +3632,10 @@ Module OrchardForwardLookupsWitness.
     wf_mech_14 ++
     wf_mech_15 ++
     wf_minit_0 ++
-    wf_shape_0.
+    wf_shape_0 ++
+    wf_cross_0.
 
-  (** The residue of the 888 non-self-copy facts: the facts whose two sides
+  (** The residue of the 928 non-self-copy facts: the facts whose two sides
       are distinct derivations of one value.  Each group is pinned and proved
       in its own file under [forward/witness/]; regrouping is sound because
       [nt_cover] is an order-insensitive [existsb] scan over the same
@@ -3720,6 +3785,21 @@ Module OrchardForwardLookupsWitness.
          OrchardCompletenessTables.advice_t];
     rewrite ?t_nco_pt_shape, ?t_ncn_pt_shape;
     cbn [OrchardAdviceEccMuls.cadd_advice Z.eqb Pos.eqb];
+    reflexivity.
+
+  (** The cross-address copies are definitionally equal except for the two
+      old-[pk_d] coordinate rows.  The optimized advice table stores the
+      variable-base ladder result at [WitnessPkD], while the cross-address
+      reader uses the honest input field; [valid] identifies those points. *)
+  Ltac wf_cross :=
+    wf_head;
+    cbn [Assignment.advice Assignment.instance_
+         OrchardHonestAssignment.honest_assignment];
+    cbn;
+    try match goal with
+    | Hv : valid ?w |- _ =>
+        rewrite (OrchardWitnessVarBase.pkd_result w Hv)
+    end;
     reflexivity.
 
   (** The initial accumulator abscissa of a Merkle hash region is the
@@ -3875,6 +3955,19 @@ Module OrchardForwardLookupsWitness.
       first [ exact I | wf_shape ].
   Qed.
 
+  Lemma wf_cross_0_ok (w : HonestInput) (Hv : valid w)
+      (Hnd : nondegenerate w) : interpret_facts (Γw w) wf_cross_0.
+  Proof.
+    unfold wf_cross_0.
+    cbn [List.flat_map cross_row_facts cross_cell
+      cross_old_coordinate_cell cross_new_coordinate_cell interpret_facts].
+    repeat apply conj; first [exact I | wf_cross].
+  Qed.
+
+  (** Keep the assembly tactic from unfolding the row template into its
+      internal [flat_map]; coverage above has already computed through it. *)
+  #[local] Opaque wf_cross_0.
+
   Lemma nt_closed_ok (w : HonestInput) (Hv : valid w)
       (Hnd : nondegenerate w) : interpret_facts (Γw w) nt_closed.
   Proof.
@@ -3899,7 +3992,8 @@ Module OrchardForwardLookupsWitness.
         | exact (wf_mech_14_ok w Hv Hnd)
         | exact (wf_mech_15_ok w Hv Hnd)
         | exact (wf_minit_0_ok w Hv Hnd)
-        | exact (wf_shape_0_ok w Hv Hnd) ].
+        | exact (wf_shape_0_ok w Hv Hnd)
+        | exact (wf_cross_0_ok w Hv Hnd) ].
   Qed.
 
   (** The open residue: the facts whose two sides are distinct

@@ -956,13 +956,15 @@ Module OrchardCompletenessTables.
           | _ => 0
           end
         else 0
+    | RegionId.PostNu63CrossAddressChecks =>
+        OrchardAdviceWitnessIo.cross_address_checks_advice w column row
     | RegionId.GadgetLocal _ => 0
     end.
 
   (** ** The public-instance rows over the tables
 
-      [public_instance_row] semantics: the nine §4.18.4 public rows, each a
-      hoisted value. *)
+      [public_instance_row] semantics: the ten post-NU6.3 §4.18.4 public
+      rows, each a hoisted value. *)
   Definition instance_t (w : HonestInput) (tb : t) (row : Z) : Z :=
     match row with
     | 0 => t_anchor_row tb
@@ -974,6 +976,7 @@ Module OrchardCompletenessTables.
     | 6 => t_cmx_spec tb
     | 7 => hi_enable_spends w
     | 8 => hi_enable_outputs w
+    | 9 => hi_disable_cross_address w
     | _ => 0
     end.
 

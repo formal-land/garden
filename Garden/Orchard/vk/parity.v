@@ -3,9 +3,9 @@
     The dump-parity certificate of the [transcript_repr] byte channel: the
     in-model printer ([vk/print.v]), run in pretty mode over the
     compiled Orchard system and the pinned literals, reproduces
-    [orchard/src/circuit_data/circuit_description_fixed] — the
+    [orchard/src/circuit_data/circuit_description_post_nu6_3] — the
     [format!("{:#?}\n", vk.pinned())] Debug dump the orchard test suite
-    asserts against the deployed verifying key
+    asserts against the Post-NU6.3 verifying key
     ([orchard/src/circuit.rs], the pinned-description test) —
     byte-for-byte, all 1,285,701 bytes.
 
