@@ -3,10 +3,10 @@
 
     Lean source SHA-256: 731cb3b1ee03ad1a3f35e327aa0bc45078d551eaaff611610158719295131198
 
-    The Lean source deliberately uses ordinary lists.  This generated Rocq
+    The Lean source deliberately uses ordinary lists. This generated Rocq
     target stores the same rows in immutable primitive arrays so lookup is
     constant-time and the 1,024-entry table has no list spine for Rocq to
-    reduce or serialize.  Array indices are an implementation detail: the
+    reduce or serialize. Array indices are an implementation detail: the
     generated public accessor still accepts [Z] and checks bounds before
     converting to Rocq's primitive index type. *)
 
@@ -16,7 +16,7 @@ Open Scope Z_scope.
 Record ActionGardenState3Data : Type := {
   ActionGardenZ_x0 : BinNums.Z;
   ActionGardenZ_x1 : BinNums.Z;
-  ActionGardenZ_x2 : BinNums.Z;
+  ActionGardenZ_x2 : BinNums.Z
 }.
 
 Definition actionGardenPoseidonRoundConstantsData
@@ -90,7 +90,7 @@ Definition actionGardenPoseidonRoundConstantsData
 
 Record ActionGardenPointData : Type := {
   actionGardenPointX : BinNums.Z;
-  actionGardenPointY : BinNums.Z;
+  actionGardenPointY : BinNums.Z
 }.
 
 Definition actionGardenSinsemillaGeneratorsData
@@ -1123,7 +1123,7 @@ Definition actionGardenSinsemillaGeneratorsData
 | Build_ActionGardenPointData 0 0 |].
 
 (** Keep aliases in the main generated file from unfolding the complete
-    payload while Rocq serializes them.  Auditing proofs may locally use
+    payload while Rocq serializes them. Auditing proofs may locally use
     [Transparent] because these are ordinary definitions, not axioms. *)
 Global Opaque
   actionGardenPoseidonRoundConstantsData

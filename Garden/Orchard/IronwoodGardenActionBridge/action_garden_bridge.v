@@ -101,6 +101,34 @@ Module ActionGardenBridge.
     ActionGardenZ_pallasScalarModulus = Primes.pallas_q.
   Proof. vm_compute. reflexivity. Qed.
 
+  (** Lean's [Int.ediv]/[Int.emod] use a nonnegative Euclidean remainder
+      even when the divisor is negative.  These examples pin the signed and
+      zero-divisor cases that differ from applying Rocq's [Z.div]/[Z.modulo]
+      directly to a negative divisor. *)
+  Example z_div_mod_positive_negative :
+    (ActionGardenZ_zDiv 5 (-2), ActionGardenZ_zMod 5 (-2)) = (-2, 1).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Example z_div_mod_negative_negative :
+    (ActionGardenZ_zDiv (-5) (-2), ActionGardenZ_zMod (-5) (-2)) = (3, 1).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Example z_div_mod_negative_positive :
+    (ActionGardenZ_zDiv (-5) 2, ActionGardenZ_zMod (-5) 2) = (-3, 1).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Example z_div_mod_exact_negative :
+    (ActionGardenZ_zDiv 4 (-2), ActionGardenZ_zMod 4 (-2)) = (-2, 0).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Example z_div_mod_positive_zero :
+    (ActionGardenZ_zDiv 5 0, ActionGardenZ_zMod 5 0) = (0, 5).
+  Proof. vm_compute. reflexivity. Qed.
+
+  Example z_div_mod_negative_zero :
+    (ActionGardenZ_zDiv (-5) 0, ActionGardenZ_zMod (-5) 0) = (0, -5).
+  Proof. vm_compute. reflexivity. Qed.
+
   Lemma base_normalize_eq (value : Z) :
     ActionGardenZ_baseNormalize value = UnOp.from value.
   Proof.

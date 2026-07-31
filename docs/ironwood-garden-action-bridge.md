@@ -91,21 +91,35 @@ It proves equality of all five outputs produced by the standalone function and
 the integer encodings of the outputs fixed by Ironwood's post-synthesis
 assumptions.
 
-## Mechanical Lean-to-Rocq boundary
+## Generated Lean-to-Rocq boundary
 
-The generator checks the restricted 120-declaration source inventory and
-emits:
+There is no hand-maintained Rocq body mirror. A Lean frontend parses and
+elaborates one immutable source snapshot without `.olean` reuse, then emits a
+schema-versioned syntax representation. A closed, fail-closed Rocq emitter
+resolves and translates every supported declaration body, including the
+target-side primitive-array storage; no `.v.in` semantic template remains.
+
+The translator consumes all 119 declarations in source order and emits:
 
 - `Garden/Orchard/IronwoodGardenActionBridge/action_garden_constants.v`,
   containing primitive arrays for 64 Poseidon rows and 1,024 Sinsemilla points;
 - `Garden/Orchard/IronwoodGardenActionBridge/action_garden_generated.v`,
-  containing the flattened declaration mirror;
+  containing the generated flattened declarations;
 - `ironwood/Zcash/Circuits/Action/IronwoodGardenActionBridge/ActionGarden.lean-rocq.diff`,
   the complete review diff.
 
 Both generated files carry the exact Lean SHA-256. The checker rejects stale
-files, unsupported Lean constructs, proof shortcuts, and declaration-order
-drift.
+files, unsupported Lean constructs, proof shortcuts, extra imports, unresolved
+names, unconsumed syntax, and declaration-order drift. Ordinary declaration
+bodies and the two large constant tables are translated from the parsed
+source, so changing a body changes the corresponding Rocq output or fails
+before any output is written; updating only the stamped hash cannot make a
+stale translation pass.
+
+The translation preserves the established `ActionGardenZ_*` names and record
+selectors while making its representation lowerings explicit: `Point` and
+`State3` use generated data records, the large tables use primitive arrays,
+and path triples use Garden's left-nested Rocq product layout.
 
 Primitive-array lookup preserves the source's signed-index semantics:
 negative `Z` indices become zero and oversized indices return the declared
@@ -193,6 +207,12 @@ extensionality already used by Garden, with no bridge-specific axiom.
 From `ironwood`:
 
 ```sh
+TMPDIR=/home/fedora/Zcash/tmp/action-garden \
+python3 Zcash/Circuits/Action/IronwoodGardenActionBridge/lean_to_rocq.py \
+  Zcash/Circuits/Action/IronwoodGardenActionBridge/ActionGarden.lean \
+  ../garden/Garden/Orchard/IronwoodGardenActionBridge/action_garden_generated.v \
+  --diff Zcash/Circuits/Action/IronwoodGardenActionBridge/ActionGarden.lean-rocq.diff
+
 TMPDIR=/home/fedora/Zcash/tmp/action-garden \
 python3 Zcash/Circuits/Action/IronwoodGardenActionBridge/lean_to_rocq.py \
   Zcash/Circuits/Action/IronwoodGardenActionBridge/ActionGarden.lean \
