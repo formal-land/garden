@@ -77,6 +77,9 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
   (checker-lemma shape, leaf closures, table literals, memory limits), the
   `-vos`/`-vok` fast dev loop, and the current cost map of the certificate
   leaves.
+- `docs/ironwood-garden-action-bridge.md`: the checked Lean-to-Rocq Action
+  translation, deployed-constant audits, and the direct refinement from
+  Garden's native PostNU6.3 Action statement.
 - `web/orchard-verification/`: the Orchard Verification Journey, Atlas,
   Circuit Explorer, and Circuit Grid source, tests, and data-generation hooks.
   The ignored raw structure snapshot, `public/data/` website data, and `dist/`
