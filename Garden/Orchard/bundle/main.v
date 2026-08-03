@@ -67,17 +67,15 @@ Module OrchardBundle.
 
       Each action's net value [v_old - v_new] lies in the open interval
       [(-(2^64), 2^64)]: both note values are 64-bit under the action's
-      hypothesis package (the old-note range through the old-note short
-      lookups, the new-note range through the short-lookup conjunct of
-      the new-note commitment package). *)
+      hypothesis package, each through its lane's short-lookup range
+      family. *)
   Lemma action_net_value_range (Γ : Assignment.t columns RegionId.t)
       (Hok : action_ok Γ) :
     - 2 ^ 64 < action_net_value Γ < 2 ^ 64.
   Proof.
-    destruct Hok as (Hcircuit & _ & Hnote & Hold).
+    destruct Hok as (Hcircuit & Hnew & Hold).
     pose proof (TypedInputsValue64.in_v_old_64 Γ Hcircuit Hold) as Hvold.
-    pose proof (TypedInputsValue64.in_v_new_64 Γ Hcircuit (proj2 Hnote))
-      as Hvnew.
+    pose proof (TypedInputsValue64.in_v_new_64 Γ Hcircuit Hnew) as Hvnew.
     unfold action_net_value.
     clear -Hvold Hvnew; lia.
   Qed.

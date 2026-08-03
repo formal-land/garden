@@ -43,6 +43,7 @@ Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.merkle.
 Require Import Garden.Orchard.circuit_proof.note_commit.cmx.
+Require Import Garden.Orchard.circuit_proof.note_commit.words.
 Require Import Garden.Orchard.circuit_proof.old_note.words.
 Require Import Garden.Field.Field.
 Require Import Garden.Plonky3.M.
@@ -159,17 +160,24 @@ Module OrchardBundleSpec.
   (** ** Per-action hypothesis package
 
       Exactly the hypothesis set of
-      [CvNetValue.cv_net_commits_net_value_Z]: the assignment satisfies
-      the circuit, and the three witness-honesty predicates of the
-      relational selector model hold (the Merkle-path layers, the new-note
-      commitment nondegeneracy and short lookups, and the old-note short
-      lookups — the last two feed the 64-bit ranges of [v_old]/[v_new]). *)
+      [CvNetValue.cv_net_commits_net_value_Z]: the assignment satisfies the
+      circuit, and the two short-lookup range families of the relational
+      selector model hold — the residue that feeds the 64-bit ranges of
+      [v_old]/[v_new].  Neither is an assumption about the witness: the
+      deployed circuit enforces both through its range-check lookup
+      argument, and they are discharged from acceptance of the pinned
+      circuit ([circuit_proof/lookup_closure.v],
+      [circuit_proof/lookup_closure_old_note.v]).
+
+      The [CV_NET] row is ⊥-free (complete addition and total group
+      multiples only), so the package carries no Merkle package and no
+      Sinsemilla nondegeneracy: those belong to the anchor and [CMX] rows,
+      which the balance argument never reads. *)
   Definition action_ok (Γ : Assignment.t columns RegionId.t) : Prop :=
     circuit_holds Γ
       Garden.Orchard.circuit.synthesize
       (𝓒.run_unit Garden.Orchard.circuit.configure ConstraintSystem.empty) /\
-    OrchardActionMerkle.merkle_witness_ok Γ /\
-    NoteCommitNewCmx.note_commit_witness_ok Γ /\
+    NoteCommitNewWords.note_commit_new_short_lookup_ok Γ /\
     OldNoteWords.old_note_short_lookup_ok Γ.
 
   (** All actions of the bundle satisfy the per-action package. *)

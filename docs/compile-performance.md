@@ -33,13 +33,22 @@ rocq compile -vok -impredicative-set -R . Garden -w -stdlib-vector \
   Orchard/circuit_proof/ladder/main.v   # checks THIS file vs .vos deps
 ```
 
-**Adding, moving or renaming a `.v` file rebuilds the whole tree.** `Garden/`'s
-top-level `Makefile` computes `VFILES` by `find`, regenerates `CoqMakefile`
-whenever that set changes, and declares `%.vo: CoqMakefile %.v` — so every
-`.vo` in the project is older than the regenerated makefile and is rebuilt,
-including the multi-hour certificate leaves. Deleting `CoqMakefile` by hand
-has the same effect. Batch file moves into a single change and budget a full
-rebuild for it; editing a file *in place* costs only its own dependents.
+**Adding, moving or renaming a `.v` file rebuilds the whole tree — but only
+through the top-level `%.vo` route.** `Garden/`'s top-level `Makefile`
+computes `VFILES` by `find`, regenerates `CoqMakefile` whenever that set
+changes, and declares `%.vo: CoqMakefile %.v` — so asking the *top-level*
+makefile for any `.vo` (`make Orchard/foo.vo`) after the file set changed
+finds it older than the regenerated makefile and rebuilds it, and the same
+holds for deleting `CoqMakefile` by hand. `make` / `make all` does **not**
+take that route: it regenerates `CoqMakefile` and then delegates to
+`make -f CoqMakefile all`, whose own rule is `$(VOFILES): %.vo: %.v |
+$(VDFILE)` — no makefile prerequisite — so an added file costs only itself
+and its dependents (verified 2026-08-03: adding four leaves and running
+`make -j32` reported `Nothing to be done for 'real-all'` once the new files
+had been compiled directly). Batch file moves into a single change anyway,
+and never request an individual `.vo` from the top-level makefile after
+changing the file set; editing a file *in place* always costs only its own
+dependents.
 
 **Honesty constraint.** `.vos`/`-vok`-against-`.vos` trusts the skipped
 dependency proofs. It is a development accelerator only. Any "closed /
@@ -942,6 +951,20 @@ The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
 predates the completeness-instance layer entirely. Heavy leaves:
 
+- The short-lookup closure leaves (2026-08-03), all cheap:
+  `Orchard/circuit_proof/lookup_closure.v` 4.0 s,
+  `lookup_closure_old_note.v` 1.7 s, `lookup_closure_ivk.v` 1.6 s. Each
+  site inventory is four raw
+  `List.forallb … = true` certificates closed with `vm_cast_no_check`, and
+  their whole cost is forcing the two heavy globals *once per file*: the
+  19,679-event `orchard_events` (≈ 0.5 s, in the `q_running`-absence scan)
+  and the 14,817-fact `layouter_facts circuit.synthesize` (≈ 0.1–0.2 s, in
+  the fact-presence scan). The eleven / eleven / three sites themselves add
+  ≈ 0.01 s of checking. Splitting the three families across files therefore
+  costs ≈ 0.7 s of duplicated forcing each against the merge-by-heavy-global
+  rule above — paid to keep the three families in separate files;
+  merging them is a pure move of definitions and certificates. No
+  sharding is needed at this scale.
 - `Orchard/circuit_operational.v` (2026-07-14): 17.8 s / 1.66 GB peak —
   dominated by `orchard_replay_ok`, a single `vm_cast_no_check` VM run of
   `replay_is_ok` on the 19,679-event Orchard stream (12.3 s before the

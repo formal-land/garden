@@ -119,12 +119,49 @@ the ANCHOR and CMX outputs would be refutable; naming them keeps this
 model gap visible in the statement. They are the exact residue of the
 selector idealization listed under the model caveats.
 
+The decomposition half of that residue is a property of the relational
+model only, and it is discharged one level down — see *The short-lookup
+conjuncts are discharged at the acceptance levels* below.
+
 **Input typing.** The range envelope under which the circuit-structured
 and protocol layers coincide (full-width scalars in `[0, 8⁸⁵)`, magnitude
 in `[0, 8²²)`, a genuine sign bit) is enforced by the circuit:
 `protocol_typed_inputs_of_holds` derives it from `Holds Γ` alone. The
 theorem therefore carries exactly `Hcircuit` plus the four witness-honesty
 conditions.
+
+## The short-lookup conjuncts are discharged at the acceptance levels
+
+Three of the four witness-honesty packages split into a Sinsemilla or
+variable-base nondegeneracy conjunct and a short-lookup range conjunct:
+
+- `note_commit_witness_ok` = nondegeneracy ∧
+  `NoteCommitNewWords.note_commit_new_short_lookup_ok` (eleven cells);
+- `old_note_witness_ok` = nondegeneracy ∧
+  `OldNoteWords.old_note_short_lookup_ok` (the same eleven at `Which.Old`);
+- `commit_ivk_witness_ok` = nondegeneracy ∧
+  `CommitIvkHash.commit_ivk_short_lookup_ok` (three cells) ∧
+  `VarBaseMul.mul_nondegenerate`.
+
+The twenty-five short-lookup cells are enforced by the deployed circuit and
+are unprovable only in the relational model, where `q_running` is free at
+the firing rows. Operational acceptance closes the gap: the ideal checker
+evaluates the circuit's real range-check lookup argument over the replayed
+grid, and the pinned Orchard event stream enables `q_running` at none of
+the twenty-five rows, so the selector is the initial grid's zero there and
+the lookup input collapses to a bare cell read against `table_idx` (rows
+`0..1023` holding `0..1023`).
+
+`Garden/Orchard/circuit_proof/lookup_closure.v` carries the extraction and
+the width-tightening lemma, one `ShortSite` inventory per family, and four
+`forallb` certificates over the event stream, the region placement, the
+reified synthesis facts and the pinned inverse constants;
+`lookup_closure_old_note.v` and `lookup_closure_ivk.v` are the two further
+site inventories. Each family theorem —
+`note_commit_new_short_lookup_ok_operational`,
+`old_note_short_lookup_ok_operational`,
+`commit_ivk_short_lookup_ok_operational` — takes exactly the premises of
+`orchard_operational_sound`.
 
 ## Corollary: transaction-level balance
 
@@ -206,7 +243,10 @@ how to read these theorems:
 - **Selector freedom at inactive rows.** Where real Halo2 fixes a selector
   column globally, the model constrains it only at rows the synthesis
   program touches. The `q_running` freedom behind the witness-honesty
-  hypotheses is the one place this surfaces in the final statements.
+  hypotheses is the one place this surfaces in the final statements, and
+  it surfaces only in the relational one: at the operational and algebraic
+  levels the whole selector plane is pinned data, and the short-lookup
+  conjuncts it made unprovable are derived there.
 - **Lookup model.** Lookups assert membership in the loaded table with a
   bounded witness row; the table loading and the bound are part of the
   model.

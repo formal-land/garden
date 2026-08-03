@@ -6,10 +6,10 @@
     [v_old - v_new].
 
     - [CvNetValue.cv_net_value_balance_sound]: the [CV_NET] projection of
-      [OrchardAction.satisfies_specification] conjoined with the extracted
-      balance gate ([OrchardValidActionInputs.value_balance_gate]) — a
-      composed no-inflation statement inside the relational model:
-      the public [CV_NET] is the deterministic value commitment to the same
+      functional correctness conjoined with the extracted balance gate
+      ([OrchardValidActionInputs.value_balance_gate]) — a composed
+      no-inflation statement inside the relational model: the public
+      [CV_NET] is the deterministic value commitment to the same
       magnitude/sign pair the Orchard gate equates with [v_old - v_new].
     - [CvNetValue.cv_net_commits_net_value]: the §4.18.4 'Value commitment
       integrity' shape — [cv_net = ValueCommit^Orchard_rcv(v)] for the
@@ -22,11 +22,17 @@
       [cv_net = ValueCommit^Orchard_rcv(v_old - v_new)] over ℤ, with the
       64-bit ranges of the [v_old]/[v_new] cells circuit-derived
       ([TypedInputsValue64], via the note-commit value-slot decompositions)
-      under the two short-lookup honesty predicates: the new-note one is
-      the second conjunct of the [note_commit_witness_ok] hypothesis the
-      theorem already carries, and the old-note one
-      ([OldNoteWords.old_note_short_lookup_ok]) is the second conjunct of
-      [OrchardValidActionInputs.old_note_witness_ok]. *)
+      under the two short-lookup honesty predicates
+      ([NoteCommitNewWords.note_commit_new_short_lookup_ok] and
+      [OldNoteWords.old_note_short_lookup_ok]).
+
+    The [CV_NET] row is one of the five ⊥-free public outputs: it uses
+    complete addition and total group multiples only, so none of the three
+    theorems carries a Merkle or nondegeneracy hypothesis — acceptance and
+    the two short-lookup families are the whole premise set, and both
+    families are discharged from acceptance of the pinned circuit
+    ([circuit_proof/lookup_closure.v],
+    [circuit_proof/lookup_closure_old_note.v]). *)
 
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.
@@ -37,8 +43,11 @@ Require Import Garden.Orchard.protocol_spec.
 Require Import Garden.Orchard.circuit_proof.inputs.
 Require Import Garden.Orchard.circuit_proof.merkle.
 Require Import Garden.Orchard.circuit_proof.note_commit.cmx.
+Require Import Garden.Orchard.circuit_proof.note_commit.words.
 Require Import Garden.Orchard.circuit_proof.old_note.words.
 Require Import Garden.Orchard.circuit_proof.typed_inputs.value64.
+Require Import Garden.Orchard.circuit_proof.protocol_equiv.
+Require Import Garden.Orchard.circuit_proof.us_free.nullifier_k.
 Require Import Garden.Orchard.circuit_proof.valid_action_inputs.
 Require Import Garden.Orchard.circuit_proof.protocol_mul.signed.
 Require Import Garden.Orchard.circuit_proof.main.
@@ -79,18 +88,64 @@ Module CvNetValue.
       (OrchardSpec.in_rcv inp).
   Proof. reflexivity. Qed.
 
+  (** ** The [CV_NET] output from acceptance alone
+
+      [OrchardAction.satisfies_specification] carries the whole output
+      record and therefore the Merkle and new-note witness-honesty
+      conditions of the anchor and [CMX] rows.  The value-commitment row
+      needs neither: [OrchardAction.cv_net_{x,y}_correct] are
+      [Holds]-only, and the protocol reading of the circuit-structured spec
+      is the same composition [satisfies_specification] performs
+      internally — the square-root witness elimination followed by the
+      protocol equivalence, whose typing premise is itself circuit-derived. *)
+
+  Lemma point_eta (P : Point.t) :
+    {| Point.x := Point.x P; Point.y := Point.y P |} = P.
+  Proof. destruct P; reflexivity. Qed.
+
+  Lemma out_cv_net_read (Γ : Assignment.t columns RegionId.t) :
+    OrchardSpec.out_cv_net (read_action_outputs Γ) =
+      {| Point.x := read_public_instance Γ Garden.Orchard.circuit.CV_NET_X;
+         Point.y := read_public_instance Γ Garden.Orchard.circuit.CV_NET_Y |}.
+  Proof. reflexivity. Qed.
+
+  Lemma action_spec_protocol
+      (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
+    OrchardAction.action_spec_of Γ =
+    OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
+      (read_action_inputs Γ).
+  Proof.
+    exact (eq_trans
+      (OrchardActionUsFreeNullifierK.action_spec_us_free Γ Hcircuit)
+      (OrchardProtocolEquiv.output_protocol_eq (read_action_inputs Γ)
+        (OrchardValidActionInputs.protocol_typed_inputs_of_holds
+          Γ Hcircuit))).
+  Qed.
+
+  Lemma cv_net_output_of_holds
+      (Γ : Assignment.t columns RegionId.t) (Hcircuit : Holds Γ) :
+    OrchardSpec.out_cv_net (read_action_outputs Γ) =
+      OrchardSpec.out_cv_net
+        (OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
+          (read_action_inputs Γ)).
+  Proof.
+    rewrite out_cv_net_read.
+    rewrite (OrchardAction.cv_net_x_correct Γ Hcircuit).
+    rewrite (OrchardAction.cv_net_y_correct Γ Hcircuit).
+    rewrite (action_spec_protocol Γ Hcircuit).
+    apply point_eta.
+  Qed.
+
   (** The composition of [CV_NET] functional correctness with the balance
       gate: the public [CV_NET] output is the protocol value commitment of
       the witnessed magnitude/sign pair, and that same pair is equated with
       [v_old - v_new] by the [QOrchard] gate (field arithmetic).  Pure
       composition: the [out_cv_net] projection of
-      [OrchardAction.satisfies_specification] and
+      [cv_net_output_of_holds] and
       [OrchardValidActionInputs.value_balance_gate]. *)
   Theorem cv_net_value_balance_sound
       (Γ : Assignment.t columns RegionId.t)
-      (Hcircuit : Holds Γ)
-      (Hmerkle_ok : OrchardActionMerkle.merkle_witness_ok Γ)
-      (Hnote_ok : NoteCommitNewCmx.note_commit_witness_ok Γ) :
+      (Hcircuit : Holds Γ) :
     OrchardSpec.out_cv_net (read_action_outputs Γ) =
       OrchardSpec.out_cv_net
         (OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
@@ -101,9 +156,7 @@ Module CvNetValue.
       OrchardSpec.in_sign (read_action_inputs Γ).
   Proof.
     split.
-    - rewrite (OrchardAction.satisfies_specification
-        Γ Hcircuit Hmerkle_ok Hnote_ok).
-      reflexivity.
+    - exact (cv_net_output_of_holds Γ Hcircuit).
     - exact (OrchardValidActionInputs.value_balance_gate Γ Hcircuit).
   Qed.
 
@@ -119,9 +172,7 @@ Module CvNetValue.
       through [SignedValueAlgebra]'s [signed_net_value] evaluations. *)
   Theorem cv_net_commits_net_value
       (Γ : Assignment.t columns RegionId.t)
-      (Hcircuit : Holds Γ)
-      (Hmerkle_ok : OrchardActionMerkle.merkle_witness_ok Γ)
-      (Hnote_ok : NoteCommitNewCmx.note_commit_witness_ok Γ) :
+      (Hcircuit : Holds Γ) :
     let inp := read_action_inputs Γ in
     let v :=
       OrchardProtocolSpec.signed_net_value
@@ -142,8 +193,7 @@ Module CvNetValue.
     unfold BinOp.sub, BinOp.mul in Hgate.
     refine (conj _ (conj _ _)).
     - (* cv_net = value_commit (signed_net_value magnitude sign) rcv *)
-      rewrite (OrchardAction.satisfies_specification
-        Γ Hcircuit Hmerkle_ok Hnote_ok).
+      rewrite (cv_net_output_of_holds Γ Hcircuit).
       exact
         (out_cv_net_spec_proj orchard_circuit_params (read_action_inputs Γ)).
     - (* signed_net_value magnitude sign ≡ v_old - v_new (mod pallas_p) *)
@@ -184,17 +234,15 @@ Module CvNetValue.
       witness cell, so the bound follows from [Holds Γ] plus the
       short-lookup honesty predicate of the corresponding note-commit lane
       (the selector-plane idealization of the relational model; see the
-      [old_note/words.v] file header).  The new-note predicate is the
-      second conjunct of [Hnote_ok]
-      ([NoteCommitNewCmx.note_commit_witness_ok]); the old-note one enters
-      as the explicit [Hold_short] hypothesis — it is the second conjunct
-      of [OrchardValidActionInputs.old_note_witness_ok], the predicate the
-      old-note integrity track already carries. *)
+      [old_note/words.v] file header).  Both enter as explicit hypotheses,
+      and both are discharged from acceptance of the pinned circuit by the
+      lookup-closure files ([circuit_proof/lookup_closure.v],
+      [circuit_proof/lookup_closure_old_note.v]).  No nondegeneracy or
+      Merkle condition is needed: the [CV_NET] row is ⊥-free. *)
   Theorem cv_net_commits_net_value_Z
       (Γ : Assignment.t columns RegionId.t)
       (Hcircuit : Holds Γ)
-      (Hmerkle_ok : OrchardActionMerkle.merkle_witness_ok Γ)
-      (Hnote_ok : NoteCommitNewCmx.note_commit_witness_ok Γ)
+      (Hnew_short : NoteCommitNewWords.note_commit_new_short_lookup_ok Γ)
       (Hold_short : OldNoteWords.old_note_short_lookup_ok Γ) :
     OrchardSpec.out_cv_net (read_action_outputs Γ) =
       OrchardProtocolSpec.value_commit
@@ -205,10 +253,9 @@ Module CvNetValue.
     pose proof
       (TypedInputsValue64.in_v_old_64 Γ Hcircuit Hold_short) as Hv_old_64.
     pose proof
-      (TypedInputsValue64.in_v_new_64 Γ Hcircuit (proj2 Hnote_ok))
+      (TypedInputsValue64.in_v_new_64 Γ Hcircuit Hnew_short)
       as Hv_new_64.
-    pose proof
-      (cv_net_commits_net_value Γ Hcircuit Hmerkle_ok Hnote_ok) as H.
+    pose proof (cv_net_commits_net_value Γ Hcircuit) as H.
     cbv zeta in H.
     destruct H as (Hcv & Hmod & Habs).
     assert (Hp :

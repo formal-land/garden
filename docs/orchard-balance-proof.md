@@ -38,7 +38,7 @@ Theorem balanced_or_dlog (b : t) (bsk : Z)
 ```
 
 For a bundle whose actions were all accepted by the circuit (with the
-per-action witness-honesty package of the Action-statement theorem), whose
+per-action package `action_ok`), whose
 shape respects the consensus rules — at most `2¹⁶ − 1` actions,
 `value_balance` in the signed 64-bit range — and for which a
 binding-signature opening `bvk = [bsk]·R` is known: **either the hidden
@@ -106,9 +106,15 @@ the audit below).
 ## The hypothesis surface
 
 - **`actions_ok`** — each action satisfies the circuit (`Holds Γ`) plus
-  the witness-honesty package of the Action-statement theorem
-  (`docs/orchard-soundness-proof.md`). The 64-bit value ranges used by the
-  integer lift are derived from circuit satisfaction under that package.
+  the two short-lookup range families that yield the 64-bit `v_old`/`v_new`
+  bounds the integer lift needs. Nothing else: the `cv_net` row is one of
+  the five ⊥-free outputs, so the package carries neither the Merkle
+  package nor any Sinsemilla nondegeneracy. Both families are model
+  artifacts of the relational selector plane and are discharged from
+  acceptance of the pinned circuit
+  (`Garden/Orchard/circuit_proof/lookup_closure.v`,
+  `lookup_closure_old_note.v`), so an accepted action satisfies
+  the package outright.
 - **`side_conditions`** — the two consensus rules used by the lift:
   `n ≤ 2¹⁶ − 1` and `value_balance ∈ [−2⁶³, 2⁶³)`. Both are enforced by
   Zcash consensus outside the circuit.
