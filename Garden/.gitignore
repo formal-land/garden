@@ -1,6 +1,7 @@
 .lia.cache
 .nia.cache
 _build/
+/Orchard/vk/provenance/generated/
 .CoqMakefile.d
 _CoqProject
 CoqMakefile

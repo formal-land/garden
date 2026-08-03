@@ -420,10 +420,15 @@ as strong as the provenance of what is printed, and that splits in two:
   swapped constant — changes a gate polynomial and therefore changes the dump.
 - **Pinned literals passed through the printer**: the permutation column
   list, the 44 commitment coordinate pairs, the moduli strings, `extended_k`
-  and `minimum_degree`. For these, T1 certifies that the transcription into
-  `vk/data.v` is faithful to the dump — worth having, since it retires the
-  offline-transcription trust — but it is not evidence that the model would
-  *derive* the same values.
+  and `minimum_degree`. T1 itself certifies only that their transcription into
+  `vk/data.v` is faithful to the dump. The 44 points now have an additional,
+  independent provenance layer under `Orchard/vk/provenance/`: it derives the
+  fixed and permutation evaluations, performs the inverse FFT and
+  `Params::new(11)` MSM, adds the default blind, and checks the resulting
+  affine coordinates against those literals in an optimized executable Rocq
+  model. The permutation derivation is conditional on the existing pinned
+  permutation-column list and ordering. The other pass-through fields remain
+  exactly that.
 
 **Does not reach:**
 
@@ -435,11 +440,19 @@ as strong as the provenance of what is printed, and that splits in two:
   is *not* kernel-checked — together with the in-kernel event-replay bridge of
   [`operational-soundness.md`](operational-soundness.md) over the imported
   floor-planner placement.
-- **Fixed-column contents.** The dump carries the 44 commitment coordinate
-  pairs (29 fixed columns + 15 permutation columns) as *values*, and T1 pins
-  those values. It does not verify that they are the multi-scalar
-  multiplications of the model's own fixed columns; recomputing them from the
-  column contents is not done on this branch.
+- **The commitment computation is a separate certificate graph.** T1 still
+  does not derive commitments merely by printing them. The new provenance
+  graph supplies that missing evidence: `ModelColumnsCorrect` connects the
+  fast fixed-plane evaluator to replay plus `with_combinations`; sharded sigma
+  checks connect the permutation evaluations to the model; domain-table and
+  inverse-FFT checks derive the scalar vectors; and exact low/high Jacobian
+  Pippenger equalities reassemble to each pinned point. See
+  [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
+  The arithmetic refinement currently reaches modular correctness of the
+  primitive five-limb Montgomery multiplier and canonical hash-to-curve SRS
+  points; abstract inverse-FFT, Jacobian-group, and MSM refinement theorems
+  remain future work, so this is presently an executable-model provenance
+  result rather than a full library-level `commit_lagrange` semantics theorem.
 - **Anything the dump omits.** Two circuits agreeing on `vk.pinned()` agree on
   everything a verifier is configured by, but the dump is a description, not a
   denotation — it is evidence of agreement, not a proof of it.
@@ -460,3 +473,11 @@ axioms at all. There is no `Admitted`, `Axiom` or `admit` under
 The named L0 hypotheses (`IPABinding`, `MultiopenReduction`,
 `FiatShamirChallengeGood`) are `Definition`s taken as explicit premises where
 used, so they correctly do *not* appear in any audit.
+
+The commitment-provenance certificates add Rocq's standard `PrimInt63` and
+`PrimArray` primitive operations to their assumption cone. They use five-word
+Montgomery arithmetic and linearly threaded primitive arrays so that the 44
+inverse FFTs and MSMs are executable at all; there is no project-specific
+`Axiom` or `Admitted` in that layer. Generated coefficients, SRS roots,
+projective partial sums, and domain tables remain untrusted inputs until their
+corresponding sharded `vm_compute` certificates close.
