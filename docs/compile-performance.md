@@ -249,6 +249,33 @@ projection-of-`permute` against a constant-applied-to-`permute`:
 `rewrite <- Hchain` first, so the `permute` application is gone from the
 goal, then `reflexivity`.
 
+**Composing as a term is not an escape when the composed step is a record
+projection.** Elsewhere this file recommends `eq_trans`/`eq_sym`/`f_equal`
+term composition over `rewrite` around heavy constants; that advice stops at
+`f_equal <primitive projection>`. Measured 2026-08-03 in
+`Orchard/circuit_proof/note_commit_bot.v`: closing a `cmx` bridge by
+`exact (eq_trans … (eq_trans (f_equal OrchardSpec.out_cmx (eq_sym Hspec)) …))`
+did not terminate (killed at 600 s wall clock, every other sentence of the
+file at 0.000 s under `-time`). `Primitive Projections` is set globally in
+`Plonky3/M.v`, so `f_equal proj H` hands unification a `Proj` node against a
+projection *application* and it falls back to normalizing the shared
+`orchard_action_spec` argument — the 109-step Sinsemilla fold. Rewriting the
+record equality **inside the hypothesis** first (`rewrite Hspec in Hcmx`,
+then the projection lemma, then `exact (eq_sym Hcmx)`) makes the same step
+0.000 s. Same family, from `merkle_bot.v` the same day:
+`exact (f_equal Point.x Hpoint)` against a goal spelling
+`EccSpec.extract_x (sinsemilla_hash_to_point …)` ran > 100 s before being
+killed; `unfold EccSpec.extract_x; rewrite <- Hpoint; cbn [Point.x];
+reflexivity` — i.e. remove the fold application from the goal before any
+conversion — is instant.
+
+One ordering trap around the same fix: after `with_strategy opaque
+[UnOp.from] cbn` on a goal, `rewrite H` for a hypothesis `H` mentioning the
+same `UnOp.from` term fails with "found no subterm" — the two spellings
+print identically, but `cbn` has normalized the implicit `Prime` instance
+argument. Do every hypothesis rewrite *before* the `cbn`, and use
+`setoid_rewrite` for facts reached through the ring morphisms.
+
 ### Never hand unification sides that differ under a big fold
 
 Never give unification an equation whose sides differ *underneath* a
@@ -953,8 +980,8 @@ predates the completeness-instance layer entirely. Heavy leaves:
 
 - The short-lookup closure leaves (2026-08-03), all cheap:
   `Orchard/circuit_proof/lookup_closure.v` 4.0 s,
-  `lookup_closure_old_note.v` 1.7 s, `lookup_closure_ivk.v` 1.6 s. Each
-  site inventory is four raw
+  `lookup_closure_old_note.v` 1.7 s, `lookup_closure_ivk.v` 1.6 s,
+  `Orchard/circuit_adversarial.v` 1.0 s. Each site inventory is four raw
   `List.forallb … = true` certificates closed with `vm_cast_no_check`, and
   their whole cost is forcing the two heavy globals *once per file*: the
   19,679-event `orchard_events` (≈ 0.5 s, in the `q_running`-absence scan)
@@ -964,7 +991,25 @@ predates the completeness-instance layer entirely. Heavy leaves:
   costs ≈ 0.7 s of duplicated forcing each against the merge-by-heavy-global
   rule above — paid to keep the three families in separate files;
   merging them is a pure move of definitions and certificates. No
-  sharding is needed at this scale.
+  sharding is needed at this scale. `circuit_adversarial.v` computes
+  nothing: it is term composition only.
+- The exceptional-branch (⊥-disjunctive Action statement) leaves
+  (2026-08-03), also cheap: `Orchard/circuit_proof/protocol_spec_bot.v` and
+  `adversarial_api.v` ≈ 1 s each (pure list/`Z` algebra and statements),
+  `note_commit_bot.v` 1.1 s, `ownership_bot.v` 7.5 s (the two duplicated
+  ~120-line half-ladder navigations of the ladder-nondegeneracy
+  derivation),
+  `merkle_bot.v` 8.0 s (the 64 Merkle `b1`/`b2` `ShortSite` certificates
+  cost < 2.5 s of it; the rest is the duplicated per-layer region
+  navigation), `circuit_proof/adversarial.v` 2.5 s and the extended
+  `circuit_adversarial.v` 2.8 s — both term composition plus the five
+  `QWitnessPointNonId` layouter-fact navigations. None carries an
+  input-dependent `vm_compute`. The whole incremental cone of the change
+  (the `valid_action_inputs.v` comment update plus the `cv_net_value.v` /
+  `bundle/` weakening, hence `circuit_operational`, `compiled/*`, `vk/*`,
+  the operational-completeness leaves and the closure files) was 151 s wall
+  / 363 s CPU on a 32-core machine — the low end of the 350–400 s CPU
+  estimate for a touch of that cone.
 - `Orchard/circuit_operational.v` (2026-07-14): 17.8 s / 1.66 GB peak —
   dominated by `orchard_replay_ok`, a single `vm_cast_no_check` VM run of
   `replay_is_ok` on the 19,679-event Orchard stream (12.3 s before the

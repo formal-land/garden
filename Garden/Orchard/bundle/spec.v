@@ -166,8 +166,8 @@ Module OrchardBundleSpec.
       [v_old]/[v_new].  Neither is an assumption about the witness: the
       deployed circuit enforces both through its range-check lookup
       argument, and they are discharged from acceptance of the pinned
-      circuit ([circuit_proof/lookup_closure.v],
-      [circuit_proof/lookup_closure_old_note.v]).
+      circuit ([OrchardAdversarialAction.action_ok_operational],
+      [circuit_adversarial.v]).
 
       The [CV_NET] row is ⊥-free (complete addition and total group
       multiples only), so the package carries no Merkle package and no

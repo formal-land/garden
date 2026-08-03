@@ -163,6 +163,146 @@ site inventories. Each family theorem —
 `commit_ivk_short_lookup_ok_operational` — takes exactly the premises of
 `orchard_operational_sound`.
 
+`Garden/Orchard/circuit_adversarial.v` (module `OrchardAdversarialAction`)
+restates the two acceptance-level Action statements with those conjuncts
+gone:
+
+```
+Corollary orchard_action_statement_operational_short_closed
+    (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t)
+    (Hreplay : apply_events orchard_events (initial_grid advice instance_)
+                 = Some grid)
+    (Hmock : mock_prover_accepts orchard_indexed_system orchard_events grid
+               orchard_table_rows)
+    (Hmerkle_ok : OrchardActionMerkle.merkle_witness_ok Γ)
+    (Hnote_nd : note_commit_nondegenerate Γ)
+    (Hold_note_nd : old_note_nondegenerate Γ)
+    (Hivk_nd : commit_ivk_nondegenerate Γ) :
+  (read_action_outputs Γ =
+   OrchardProtocolSpec.orchard_action_spec orchard_circuit_params
+     (read_action_inputs Γ)) /\
+  OrchardValidActionInputs.ValidActionInputs Γ.
+```
+
+(with `Γ` for `realize Index.indices region_start_of grid`), and
+`orchard_algebraic_action_statement_short_closed` for the
+polynomial-identity level, whose premises are replay success,
+`orchard_perm_values_canonical`, `orchard_algebraic_accepts` and the same
+four residues. The residues are named one predicate per package
+(`note_commit_nondegenerate`, `old_note_nondegenerate`,
+`commit_ivk_nondegenerate`), so a statement that carries the exceptional
+branches as disjuncts of the conclusion replaces the hypotheses and leaves
+the derivations untouched — which is what the next section does.
+
+What remains hypothesized at these levels is therefore the exceptional-case
+residue only: incomplete-addition nondegeneracy of the three hashed folds,
+plus `merkle_witness_ok`. The variable-base ladder is not among them:
+`OrchardOwnershipBot.mul_nondegenerate_of_holds`
+(`Garden/Orchard/circuit_proof/ownership_bot.v`) derives
+`VarBaseMul.mul_nondegenerate` from the gates, so
+`commit_ivk_nondegenerate` is the Sinsemilla conjunct alone. The Merkle
+package is not narrowed here: its `merkle_layer_canonical` conjunct bounds
+255-bit reconstructions rather than piece ranges, and the deployed
+decomposition gate checks the sum modulo the field prime only.
+
+## The adversarial statement: the clauses as the protocol states them
+
+The equality-shaped conclusion above is the protocol's *non-⊥* branch.
+§4.18.4 does not state four of its clauses as equalities: `NoteCommit` for
+the old and the new note lands in `{cm, ⊥}`, `Commit^ivk` gives
+`ivk = ⊥ ∨ pk_d^old = [ivk] g_d^old`, and Merkle path validity is granted
+the §4.9 escape ("the validity check is permitted to be implemented in
+such a way that it can pass if any hash value on the path, including the
+root, is 0"). The ⊥ member is the exceptional case of the incomplete
+addition `⊞` of §5.4.1.9, which the circuit's gates leave unconstrained by
+design. Unconditional output-equality determinism is therefore *false* of
+the deployed circuit, not merely unproven; the strongest true
+unconditional statement is the disjunctive one.
+
+`Garden/Orchard/circuit_proof/protocol_spec_bot.v` adds ⊥-carrying
+(option-valued) variants of the affected specification functions —
+`round_bot` is `SinsemillaSpec.round` with the two exceptional guards
+returning `None`, and `hash_to_point_bot_iff` proves the fold is defined
+exactly when `SinsemillaHash.nondegenerate` holds, so every existing
+nondegeneracy-conditioned theorem is reused verbatim on the tracking
+branch. `protocol_spec.v` and `internal_spec.v` keep their total
+functions; the variants live alongside them.
+
+`OrchardAdversarialApi` (`circuit_proof/adversarial_api.v`) states the
+four disjunctive obligations, the three exact ⊥-free output clauses, the
+conjoined typing surface `typed_inputs_extended`, and the external premise
+`WellTypedInstance`. Each ⊥ disjunct is a concrete equation
+(`sinsemilla_hash_to_point_bot Q <witnessed words> = None`), never a
+trivial branch. The three track files discharge the obligations from
+`Holds` with no witness-honesty hypothesis at all:
+
+- `note_commit_bot.v` — the two note-commitment clauses;
+- `ownership_bot.v` — 'Diversified address integrity', together with the
+  derivation of `VarBaseMul.mul_nondegenerate` from the gates (§4.18.4
+  grants the multiplication no exceptional escape, and its non-normative
+  note *requires* the `ivk` decomposition to be canonical, so the ladder gets
+  no ⊥ branch);
+- `merkle_bot.v` — the anchor clause as the three-way disjunction "either
+  `v_old = 0`; or some layer's fold is ⊥; or the fold over the witnessed
+  per-layer messages runs from `Extract_P(cm_old)` to the anchor row".
+  The witnessed reading is §4.18.4's own note that "each layer does not
+  check that its input bit sequence is a canonical encoding (in
+  {0 .. q_P − 1}) of the integer from the previous layer"; the middle
+  conjunct of `merkle_layer_canonical` is not slack and is derived
+  outright, the `b_1`/`b_2` pieces being 5-bit short-lookup sites.
+
+`OrchardAdversarial.action_statement_adversarial`
+(`circuit_proof/adversarial.v`) assembles them. Its premises are `Holds`,
+`WellTypedInstance`, and four short-lookup range families;
+`OrchardAdversarialAction.orchard_action_statement_adversarial_operational`
+and `…_algebraic` (`circuit_adversarial.v`) discharge all four families
+from acceptance of the pinned circuit, leaving
+
+```
+Corollary orchard_action_statement_adversarial_operational
+    (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t)
+    (Hreplay : apply_events orchard_events (initial_grid advice instance_)
+                 = Some grid)
+    (Hmock : mock_prover_accepts orchard_indexed_system orchard_events grid
+               orchard_table_rows)
+    (Hwti : OrchardAdversarialApi.WellTypedInstance Γ) :
+  OrchardAdversarialApi.adversarial_action_conclusion Γ.
+```
+
+(again with `Γ` for `realize Index.indices region_start_of grid`).
+
+`WellTypedInstance` has four members, each a fact belonging to transaction
+decoding or consensus rather than to the circuit: Boolean `enableSpends`
+and `enableOutputs` (the gate forces the flag to 1 only when the
+corresponding note value is nonzero), `rk ≠ 𝒪_P` (the §4.6 consensus
+rule, cited by §4.18.4's own note), and reducedness of the decoded
+instance rows. Everything else §4.18.4 asks for is *proved*, not assumed,
+and conjoined by `typed_inputs_extended`: the 64-bit `v_old`/`v_new`
+bounds, the `8²²` magnitude bound and the sign condition, the
+`α`/`rcv`/`rcm^new`/`rcm^old`/`rivk` window ranges, on-curve and
+non-identity for the five points §4.18.4 names (they go through the
+unconditional `QWitnessPointNonId` curve-equation gate, and no Pallas
+point has `x = 0`), on-curve-or-identity for `cm^old`, `[q_P] g_d^old =
+𝒪`, and booleanity of the 32 Merkle position bits.
+
+`OrchardAdversarial.deterministic_adversarial` recovers determinism
+conditioned on inputs alone: two accepted assignments agreeing on
+`read_action_inputs`, on which the ⊥-carrying new-note commitment *of
+those inputs* is defined, agree on every public output row. Definedness is
+a predicate on the input record, not on the witness; on the exceptional
+branch §4.18.4 lets the prover choose `cm_x`, so no determinism statement
+can hold there. `orchard_deterministic_adversarial_operational` and
+`…_algebraic` are the acceptance-level forms.
+
+Two cryptographic readings are *stated and not proved*, as named reduction
+hypotheses in the style of the balance proof's discrete-log reduction:
+`SinsemillaCollisionReduction` (Theorem 5.4.3) and
+`SinsemillaExceptionalDlogReduction` (Theorem 5.4.4), with
+`anchor_exceptional_or_dlog_claim` converting the anchor clause's §4.9
+escape into an explicit discrete-logarithm disjunct. They are `Definition`s
+of statements, never `Admitted` lemmas, and nothing in the development
+consumes them.
+
 ## Corollary: transaction-level balance
 
 Because every accepted action provably commits to exactly
@@ -201,7 +341,11 @@ ceiling and the spec-anchored pipeline coefficients).
   vacuous. It does not discharge the four witness-honesty premises at that
   assignment: the honest generator's non-degeneracy clauses are shaped to
   imply them, but the implications are not proved, so the non-vacuity
-  argument for these four hypotheses specifically remains meta-level.
+  argument for these four hypotheses specifically remains meta-level. At
+  the operational and algebraic levels the short-lookup halves are not
+  hypotheses at all, so this concerns the nondegeneracy residue and
+  the Merkle package there — and the adversarial statement carries neither,
+  at the cost of a disjunctive conclusion.
 - **Proving-system soundness.** That a verifier accepting a Halo 2 proof
   implies the existence of a satisfying assignment is a property of the
   proving system, not of the circuit, and is not claimed here.
@@ -213,7 +357,9 @@ ceiling and the spec-anchored pipeline coefficients).
   at the whole Orchard circuit: `orchard_operational_sound` carries acceptance
   by the ideal `mock_prover_accepts` checker back to `Holds`,
   `orchard_action_statement_operational` composes that result with the Action
-  statement above, and `orchard_operational_complete` carries an honest
+  statement above (with the short-lookup conjuncts removed in
+  `orchard_action_statement_operational_short_closed`), and
+  `orchard_operational_complete` carries an honest
   witness forward to the checker. The checker itself remains an idealization:
   it quantifies over all integer rows and is not the deployed cryptographic
   prover. Below it, the same Action conclusion is available from the compiled

@@ -31,8 +31,7 @@
     theorems carries a Merkle or nondegeneracy hypothesis — acceptance and
     the two short-lookup families are the whole premise set, and both
     families are discharged from acceptance of the pinned circuit
-    ([circuit_proof/lookup_closure.v],
-    [circuit_proof/lookup_closure_old_note.v]). *)
+    ([circuit_adversarial.v]). *)
 
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.proof.

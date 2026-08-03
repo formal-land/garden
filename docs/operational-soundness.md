@@ -148,7 +148,7 @@ The headline theorems:
   replay success, mock acceptance, and the four witness-honesty side
   conditions of `docs/orchard-soundness-proof.md`.
 
-### Closing the short-lookup side conditions (`Orchard/circuit_proof/lookup_closure.v`)
+### Closing the short-lookup side conditions (`Orchard/circuit_adversarial.v`)
 
 Three of those four side conditions are a nondegeneracy conjunct paired
 with a short-lookup range conjunct, and the short-lookup halves are
@@ -171,7 +171,22 @@ site's width by the companion bitshift gate.
 - `Orchard/circuit_proof/lookup_closure_old_note.v`,
   `Orchard/circuit_proof/lookup_closure_ivk.v` — the eleven `Which.Old`
   sites and the three `Commit^ivk` sites, each four `forallb` certificates
-  plus a composition through `site_short_bound`.
+  plus a composition through `site_short_bound`;
+- `Orchard/circuit_adversarial.v` — `OrchardAdversarialAction`, the two
+  acceptance-level Action statements restated without those conjuncts:
+  `orchard_action_statement_operational_short_closed` here and
+  `orchard_algebraic_action_statement_short_closed` at the
+  polynomial-identity layer below. The residual hypotheses are named one
+  predicate per package (`note_commit_nondegenerate`,
+  `old_note_nondegenerate`, `commit_ivk_nondegenerate`) plus
+  `merkle_witness_ok`, which is not narrowed there: its
+  `merkle_layer_canonical` conjunct bounds 255-bit reconstructions that no
+  acceptance level derives. The same file also carries the adversarial
+  statement — the §4.18.4 clauses in the protocol's own disjunctive form —
+  where none of those residues survives at all
+  (`orchard_action_statement_adversarial_operational` /
+  `…_algebraic`, under `WellTypedInstance` alone); see
+  `docs/orchard-soundness-proof.md`.
 
 ## What this strengthens
 
@@ -420,10 +435,12 @@ distance to a deployed prover is recorded, not hidden:
   the one remaining byte-level stretch, still deferred.
 - The witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged, with
-  one narrowing: at the operational and algebraic levels the short-lookup
+  two narrowings: at the operational and algebraic levels the short-lookup
   halves of three of the four packages are derived rather than assumed
-  (`Orchard/circuit_proof/lookup_closure.v`), leaving the incomplete-add
-  nondegeneracy residue and `merkle_witness_ok`.
+  (`Orchard/circuit_adversarial.v`), leaving the incomplete-add
+  nondegeneracy residue and `merkle_witness_ok`; and the adversarial
+  statement in the same file carries no witness-honesty side condition at
+  all, at the cost of the protocol's own disjunctive conclusion.
 
 ## Theorem index
 
@@ -453,6 +470,11 @@ distance to a deployed prover is recorded, not hidden:
 | `Orchard/compiled/algebraic.v` | `orchard_algebraic_sound`, `orchard_algebraic_complete`, `orchard_algebraic_action_statement` |
 | `Orchard/circuit_proof/lookup_closure.v` | `replay_selector_unset`, `ten_bit_bound_at`, `short_range_bound`, `site_short_bound`, `note_commit_new_short_lookup_ok_operational` |
 | `Orchard/circuit_proof/lookup_closure_old_note.v` / `lookup_closure_ivk.v` | `old_note_short_lookup_ok_operational`, `commit_ivk_short_lookup_ok_operational` |
+| `Orchard/circuit_proof/protocol_spec_bot.v` | ⊥-carrying spec variants; `hash_to_point_bot_iff`, the `option_map` commitment shells |
+| `Orchard/circuit_proof/adversarial_api.v` | the four disjunctive §4.18.4 obligations, `typed_inputs_extended`, `WellTypedInstance`, the named Sinsemilla dlog reductions |
+| `Orchard/circuit_proof/note_commit_bot.v` / `ownership_bot.v` / `merkle_bot.v` | `cmx_obligation_of_holds`, `old_note_obligation_of_holds`, `diversified_address_obligation_of_holds`, `mul_nondegenerate_of_holds`, `anchor_obligation_of_holds`, `merkle_b_range_ok_operational` |
+| `Orchard/circuit_proof/adversarial.v` | `action_statement_adversarial`, `deterministic_adversarial`, `typed_inputs_extended_of_holds` |
+| `Orchard/circuit_adversarial.v` | `orchard_action_statement_operational_short_closed`, `orchard_algebraic_action_statement_short_closed`, `orchard_action_statement_adversarial_operational` / `…_algebraic`, `orchard_deterministic_adversarial_operational` / `…_algebraic`, `action_ok_operational` |
 | `Orchard/circuit_completeness/algebraic.v` | `orchard_honest_algebraic_accepts`, `orchard_honest_algebraic_accepts_ex` (L1 non-vacuity) |
 | `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
 | `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |

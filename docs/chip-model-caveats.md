@@ -467,8 +467,8 @@ instantiation layers are proved:
   short-range rows as a certificate over the event stream, and
   `short_word_sound` then applies. That is the derivation of
   `Orchard/circuit_proof/lookup_closure.v` (with the two companion site
-  inventories `lookup_closure_old_note.v` and `lookup_closure_ivk.v`).
-  What stays open is the
+  inventories `lookup_closure_old_note.v` and `lookup_closure_ivk.v`),
+  consumed by `Orchard/circuit_adversarial.v`. What stays open is the
   relational-level closure: the idealization is real in `proof.v`, and the
   discharge is available only for grid-accepted assignments.
 
@@ -496,7 +496,10 @@ with its concrete placement and constants tail
 (`Orchard/circuit_operational.v`), so the action surface's `Holds`
 hypothesis follows from mock-prover acceptance of the serialized circuit —
 and, at that level, so do the short-lookup halves of the witness-honesty
-hypotheses (`Orchard/circuit_proof/lookup_closure.v` and its companion
-site inventories), leaving the incomplete-add nondegeneracy residue and
-the Merkle package. The remaining open gaps above are the exact trust
-boundary.
+hypotheses (`Orchard/circuit_adversarial.v`), leaving the incomplete-add
+nondegeneracy residue and the Merkle package. That residue is a hypothesis
+only of the equality-shaped statement: the adversarial Action statement of
+the same file states the four affected §4.18.4 clauses disjunctively, as
+the protocol does, and carries no witness-honesty hypothesis at all — so
+the selector-freedom caveat does not reach the strongest statement of the
+surface. The remaining open gaps above are the exact trust boundary.

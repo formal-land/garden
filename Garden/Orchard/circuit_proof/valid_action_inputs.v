@@ -637,16 +637,33 @@ Module OrchardValidActionInputs.
       The conjunction of the Action statement's input-side conditions, as a
       Γ-level predicate (the ownership conditions constrain witnesses
       [read_action_inputs] pins to constants, so Γ — not the input record —
-      is the domain).  The first conjunct is §4.18.4's input-typing MUST at
-      circuit granularity; the second is the value-balance binding (the
-      circuit's realization of the [v_old − v_new] argument of 'Value
-      commitment integrity'); then the two enable-flag clauses, the
-      post-NU6.3 cross-address restriction, and the two ownership clauses
-      (honest branches).
+      is the domain).  The first conjunct is
+      [OrchardProtocolEquiv.ProtocolTypedInputs] — the part of §4.18.4's
+      input-typing MUST the protocol equivalence consumes, namely the three
+      full-width scalar ranges ([α], [rcv], [rcm^new] under [8^85]), the
+      [8^22] magnitude bound and the sign condition.  It is *not* the whole
+      §4.18.4 typing surface: the 64-bit bounds on [v_old]/[v_new], the
+      [rcm^old]/[rivk] ranges, the non-identity and on-curve typing of the
+      witnessed points, and the Boolean reading of the enable flags at zero
+      note values are all outside it.  Those facts are assembled — the
+      circuit-derived ones proved, the decoding/consensus ones named — by
+      [OrchardAdversarialApi.typed_inputs_extended] and
+      [OrchardAdversarialApi.WellTypedInstance]
+      ([circuit_proof/adversarial_api.v]).
+
+      The second conjunct is the value-balance binding (the circuit's
+      realization of the [v_old − v_new] argument of 'Value commitment
+      integrity'); then the two enable-flag clauses, the post-NU6.3
+      cross-address restriction, and the two ownership clauses (honest
+      branches).
 
       [OrchardAction.action_statement] ([circuit_proof/main.v]) conjoins
       this with [satisfies_specification]: together they are the in-model
-      formalization of §4.18.4. *)
+      formalization of §4.18.4 on the protocol's non-⊥ branch.  The
+      disjunctive reading, with the exceptional branches in the conclusion
+      and the full typing surface conjoined, is
+      [OrchardAdversarial.action_statement_adversarial]
+      ([circuit_proof/adversarial.v]). *)
   Definition ValidActionInputs (Γ : Assignment.t columns RegionId.t) : Prop :=
     OrchardProtocolEquiv.ProtocolTypedInputs (read_action_inputs Γ) /\
     (OrchardSpec.in_v_old (read_action_inputs Γ) -F

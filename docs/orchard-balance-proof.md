@@ -112,8 +112,8 @@ the audit below).
   package nor any Sinsemilla nondegeneracy. Both families are model
   artifacts of the relational selector plane and are discharged from
   acceptance of the pinned circuit
-  (`Garden/Orchard/circuit_proof/lookup_closure.v`,
-  `lookup_closure_old_note.v`), so an accepted action satisfies
+  (`OrchardAdversarialAction.action_ok_operational`,
+  `Garden/Orchard/circuit_adversarial.v`), so an accepted action satisfies
   the package outright.
 - **`side_conditions`** — the two consensus rules used by the lift:
   `n ≤ 2¹⁶ − 1` and `value_balance ∈ [−2⁶³, 2⁶³)`. Both are enforced by
