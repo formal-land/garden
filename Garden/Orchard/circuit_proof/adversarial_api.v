@@ -32,6 +32,7 @@
 
 Require Import Stdlib.Lists.List.
 Require Import Stdlib.ZArith.ZArith.
+Require Import Stdlib.micromega.Lia.
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Import Garden.Halo2.proof.
@@ -514,27 +515,80 @@ Module OrchardAdversarialApi.
       never an injectivity or independence axiom.  Nothing here is proved
       or assumed by the adversarial statement itself. *)
 
+  (** The Sinsemilla generator domain: the [sinsemilla_s] table carries
+      one generator [S(j)] per [k]-bit word, [0 <= j < 2^k].  Outside
+      this range the total lookup reads the [(0, 0)] sentinel, which
+      [PallasModel.unrepr] maps to the group identity — so an
+      out-of-range index names no generator at all. *)
+  Definition sinsemilla_generator_count : Z :=
+    2 ^ SinsemillaSpec.sinsemilla_k.
+  #[local] Arguments sinsemilla_generator_count : simpl never.
+
   (** A linear combination of the Sinsemilla domain point and table
-      generators: [c0]·[Q] plus [Σ c·S(j)] over the listed [(j, c)]
-      pairs, in the Pallas group. *)
+      generators, in canonical form: [c0]·[Q] plus [Σ c(j)·S(j)] over
+      the whole generator domain, in the Pallas group.  The coefficient
+      function assigns each generator exactly one aggregate coefficient,
+      and indices outside the domain contribute nothing. *)
   Definition sinsemilla_generator_combination
-      (Q : Point.t) (c0 : Z) (cs : list (Z * Z)) : Pallas.point :=
+      (Q : Point.t) (c0 : Z) (c : Z -> Z) : Pallas.point :=
     Stdlib.Lists.List.fold_left
-      (fun acc jc =>
+      (fun acc j =>
         Pallas.add acc
-          (Pallas.mul (snd jc)
-            (PallasModel.unrepr (SinsemillaSpec.generator (fst jc)))))
-      cs
+          (Pallas.mul (c j)
+            (PallasModel.unrepr (SinsemillaSpec.generator j))))
+      (List.map Z.of_nat (List.seq 0 (Z.to_nat sinsemilla_generator_count)))
       (Pallas.mul c0 (PallasModel.unrepr Q)).
 
   (** A nontrivial discrete-logarithm relation among [Q] and the [S(j)]:
-      the combination vanishes while not every coefficient vanishes
-      mod the group order. *)
+      the combination vanishes while some canonical coefficient — [c0],
+      or [c j] with [j] in the generator domain — is nonzero mod the
+      group order.  Nontriviality quantifies over the canonical
+      coefficients only, so a coefficient supported outside the domain
+      neither feeds the combination nor counts as nontrivial, and
+      cancelling contributions to one generator carry no weight: the
+      relation holds exactly when a genuinely nontrivial linear identity
+      among [Q] and the [2^k] distinct generators is exhibited. *)
   Definition sinsemilla_dlog_relation
-      (Q : Point.t) (c0 : Z) (cs : list (Z * Z)) : Prop :=
-    sinsemilla_generator_combination Q c0 cs = Pallas.identity /\
+      (Q : Point.t) (c0 : Z) (c : Z -> Z) : Prop :=
+    sinsemilla_generator_combination Q c0 c = Pallas.identity /\
     ~ (c0 mod Pallas.pallas_q = 0 /\
-       List.Forall (fun jc => snd jc mod Pallas.pallas_q = 0) cs).
+       forall j : Z, 0 <= j < sinsemilla_generator_count ->
+         c j mod Pallas.pallas_q = 0).
+
+  (** Aggregate coefficient view of a sparse [(index, coefficient)] pair
+      list: the summed coefficient a generator index receives.  The
+      regression lemmas below state the relation through this view on
+      the two degenerate sparse witnesses — an out-of-table index and a
+      cancelling pair — and reject both. *)
+  Definition sparse_coefficient (cs : list (Z * Z)) (j : Z) : Z :=
+    Stdlib.Lists.List.fold_left
+      (fun s jc => if fst jc =? j then s + snd jc else s) cs 0.
+
+  (** A coefficient placed at the out-of-table index [2^k] aggregates to
+      the zero coefficient function on the generator domain, hence
+      exhibits no relation. *)
+  Lemma sparse_out_of_range_rejected (Q : Point.t) :
+    ~ sinsemilla_dlog_relation Q 0
+        (sparse_coefficient [(sinsemilla_generator_count, 1)]).
+  Proof.
+    intros [_ Hnontrivial].
+    apply Hnontrivial; split; [reflexivity |].
+    intros j Hj; unfold sparse_coefficient; cbn.
+    destruct (Z.eqb_spec sinsemilla_generator_count j);
+      [exfalso; lia | reflexivity].
+  Qed.
+
+  (** Two occurrences of one generator with cancelling coefficients
+      aggregate to the zero coefficient function, hence exhibit no
+      relation. *)
+  Lemma sparse_cancellation_rejected (Q : Point.t) (j : Z) :
+    ~ sinsemilla_dlog_relation Q 0 (sparse_coefficient [(j, 1); (j, -1)]).
+  Proof.
+    intros [_ Hnontrivial].
+    apply Hnontrivial; split; [reflexivity |].
+    intros k _; unfold sparse_coefficient; cbn.
+    destruct (Z.eqb_spec j k); reflexivity.
+  Qed.
 
   (** Theorem 5.4.3 as a named reduction hypothesis: a fixed-length
       collision of the ⊥-carrying hash-to-point yields a relation. *)
@@ -545,8 +599,8 @@ Module OrchardAdversarialApi.
       sinsemilla_hash_to_point_bot Q ws =
         sinsemilla_hash_to_point_bot Q ws' ->
       sinsemilla_hash_to_point_bot Q ws <> None ->
-      exists (c0 : Z) (cs : list (Z * Z)),
-        sinsemilla_dlog_relation Q c0 cs.
+      exists (c0 : Z) (c : Z -> Z),
+        sinsemilla_dlog_relation Q c0 c.
 
   (** Theorem 5.4.4 as a named reduction hypothesis: a ⊥ output of the
       hash-to-point yields a relation (the exceptional operand pair is a
@@ -555,8 +609,8 @@ Module OrchardAdversarialApi.
   Definition SinsemillaExceptionalDlogReduction : Prop :=
     forall (Q : Point.t) (ws : list Z),
       sinsemilla_hash_to_point_bot Q ws = None ->
-      exists (c0 : Z) (cs : list (Z * Z)),
-        sinsemilla_dlog_relation Q c0 cs.
+      exists (c0 : Z) (c : Z -> Z),
+        sinsemilla_dlog_relation Q c0 c.
 
   (** Statement only — no proof is attempted in this development.  Under
       the Theorem 5.4.4 reduction, [anchor_obligation]'s §4.9 escape
@@ -575,8 +629,8 @@ Module OrchardAdversarialApi.
       Holds Γ ->
       merkle_b_range_ok Γ ->
       OrchardSpec.in_v_old (read_action_inputs Γ) = 0 \/
-      (exists (c0 : Z) (cs : list (Z * Z)),
-         sinsemilla_dlog_relation OrchardActionMerkle.merkle_Q c0 cs) \/
+      (exists (c0 : Z) (c : Z -> Z),
+         sinsemilla_dlog_relation OrchardActionMerkle.merkle_Q c0 c) \/
       anchor_path_tracks Γ.
 
 End OrchardAdversarialApi.

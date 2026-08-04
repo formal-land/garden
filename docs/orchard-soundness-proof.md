@@ -301,7 +301,13 @@ hypotheses in the style of the balance proof's discrete-log reduction:
 `anchor_exceptional_or_dlog_claim` converting the anchor clause's §4.9
 escape into an explicit discrete-logarithm disjunct. They are `Definition`s
 of statements, never `Admitted` lemmas, and nothing in the development
-consumes them.
+consumes them. The underlying relation `sinsemilla_dlog_relation` is
+canonical — one aggregate coefficient per table generator, with
+nontriviality stated on those aggregates — so a witness supported outside
+the table (where the total lookup reads the identity sentinel) or with
+cancelling occurrences of one generator exhibits no relation;
+`sparse_out_of_range_rejected` and `sparse_cancellation_rejected` are the
+regression lemmas for those two degenerate shapes.
 
 ## Corollary: transaction-level balance
 

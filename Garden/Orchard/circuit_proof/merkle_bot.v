@@ -1644,6 +1644,6 @@ Module OrchardMerkleBot.
       Holds Γ ->
       merkle_b_range_ok Γ ->
       (forall i : Z, 0 <= i < 32 -> merkle_layer_canonical Γ i) \/
-      (exists (c0 : Z) (cs : list (Z * Z)),
-         sinsemilla_dlog_relation merkle_Q c0 cs).
+      (exists (c0 : Z) (c : Z -> Z),
+         sinsemilla_dlog_relation merkle_Q c0 c).
 End OrchardMerkleBot.
