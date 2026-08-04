@@ -894,7 +894,9 @@ Module VkJacobianRefinement.
     pose proof (double_x3_canonical p Hp) as Hx3.
     pose proof (double_yyyy_canonical p Hp) as Hyyyy.
     pose proof (R.sub_canonical _ _ Hs Hx3) as Hsx.
-    pose proof (R.mul_canonical _ _ Hsx) as Hmul.
+    pose proof
+      (R.mul_canonical (double_m p)
+        (F.sub (double_s p) (double_x3 p)) Hsx) as Hmul.
     pose proof (eight_times_canonical _ Hyyyy) as Height.
     unfold double_y3, zdouble_y3.
     rewrite (R.sub_denote _ _ Hmul Height).

@@ -24,6 +24,9 @@ Local Open Scope nat_scope.
 Module VkDomainRefinement.
   Include VkDomainPowerRefinement.
 
+  Lemma pallas_p_nonzero : Primes.pallas_p <> 0%Z.
+  Proof. pose proof Primes.pallas_p_pos. lia. Qed.
+
   (** ** Array/list denotation used by the executable FFT refinement *)
 
   Definition tabulate (value : nat -> Z) : list Z :=
@@ -47,27 +50,33 @@ Module VkDomainRefinement.
     cbn. reflexivity.
   Qed.
 
-  Record array_denotes (array : PrimArray.array F.t)
+  Lemma some_Z_injective (left right : Z) :
+    Some left = Some right -> left = right.
+  Proof.
+    intros H. injection H. trivial.
+  Qed.
+
+  Record array_denotes (array : VkIFFT.field_array)
       (values : list Z) : Prop := {
     array_denotes_values_length :
       List.length values = VkIFFT.size_nat;
     array_denotes_length :
-      PrimArray.length array = ArrayLinear.vector_size;
+      PrimArray.length@{VkIFFT.array_u} array = ArrayLinear.vector_size;
     array_denotes_entry : forall (index : nat) (value : Z),
       List.nth_error values index = Some value ->
-      F.canonical (PrimArray.get array (ArrayLinear.index index)) /\
-      F.denote (PrimArray.get array (ArrayLinear.index index)) = value;
+      F.canonical (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) /\
+      F.denote (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) = value;
   }.
 
   Arguments array_denotes_values_length {_ _} _.
   Arguments array_denotes_length {_ _} _.
   Arguments array_denotes_entry {_ _} _ _ _ _.
 
-  Lemma array_denotes_nth (array : PrimArray.array F.t)
+  Lemma array_denotes_nth (array : VkIFFT.field_array)
       (values : list Z) (Hdenotes : array_denotes array values)
       (index : nat) (Hindex : index < VkIFFT.size_nat) :
-    F.canonical (PrimArray.get array (ArrayLinear.index index)) /\
-    F.denote (PrimArray.get array (ArrayLinear.index index)) =
+    F.canonical (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) /\
+    F.denote (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) =
       List.nth index values 0%Z.
   Proof.
     apply (array_denotes_entry Hdenotes).
@@ -76,20 +85,52 @@ Module VkDomainRefinement.
     exact Hindex.
   Qed.
 
-  Lemma fill_vector_spec {A : Type} (default : A) (value : nat -> A) :
-    PrimArray.length (VkIFFT.fill default value) =
-      ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get (VkIFFT.fill default value)
-        (ArrayLinear.index index) = value index.
+  Definition normalized_values (values : list Z) : Prop :=
+    List.Forall
+      (fun value => (value mod Primes.pallas_p)%Z = value)
+      values.
+
+  Lemma array_denotes_normalized (array : VkIFFT.field_array)
+      (values : list Z) :
+    array_denotes array values -> normalized_values values.
   Proof.
-    unfold VkIFFT.fill.
-    set (Inv := fun (next : nat) (array : PrimArray.array A) =>
-      PrimArray.length array = ArrayLinear.vector_size /\
+    intros Hdenotes.
+    unfold normalized_values.
+    apply List.Forall_forall.
+    intros value Hvalue.
+    destruct (List.In_nth_error values value Hvalue) as [index Hindex].
+    pose proof (array_denotes_entry Hdenotes index value Hindex)
+      as [_ Hdenotation].
+    rewrite <- Hdenotation.
+    unfold F.denote.
+    apply Z.mod_mod.
+    exact pallas_p_nonzero.
+  Qed.
+
+  Definition filled_vector_spec (value : nat -> VkIFFT.F.t)
+      (output : VkIFFT.field_array) : Prop :=
+    PrimArray.length@{VkIFFT.array_u} output = ArrayLinear.vector_size /\
+    forall index : nat, index < VkIFFT.size_nat ->
+      PrimArray.get@{VkIFFT.array_u}
+        output (ArrayLinear.index index) = value index.
+
+  Lemma fill_vector_spec (default : VkIFFT.F.t)
+      (value : nat -> VkIFFT.F.t) :
+    filled_vector_spec value (VkIFFT.fill default value).
+  Proof.
+    unfold filled_vector_spec.
+    set (Inv := fun (next : nat)
+      (array : VkIFFT.field_array) =>
+      PrimArray.length@{VkIFFT.array_u} array =
+        ArrayLinear.vector_size /\
       forall index : nat, index < next ->
-        PrimArray.get array (ArrayLinear.index index) = value index).
+        PrimArray.get@{VkIFFT.array_u}
+          array (ArrayLinear.index index) = value index).
+    change (Inv VkIFFT.size_nat (VkIFFT.fill default value)).
+    rewrite VkIFFT.fill_unfold.
     assert (Hinitial : Inv O
-      (PrimArray.make ArrayLinear.vector_size default)).
+      (PrimArray.make@{VkIFFT.array_u}
+        ArrayLinear.vector_size default)).
     { split.
       - apply ArrayLinear.make_vector_length.
       - intros index Hindex. lia. }
@@ -97,7 +138,8 @@ Module VkDomainRefinement.
       O <= index < O + VkIFFT.size_nat ->
       Inv index current ->
       Inv (S index)
-        (PrimArray.set current (ArrayLinear.index index) (value index))).
+        (PrimArray.set@{VkIFFT.array_u}
+          current (ArrayLinear.index index) (value index))).
     { intros index current Hindex [Hlength Hprevious].
       assert (Hindex_bound : index < ArrayLinear.vector_size_nat)
         by exact (proj2 Hindex).
@@ -121,99 +163,131 @@ Module VkDomainRefinement.
                   ArrayLinear.vector_size_nat); [exact Hindex_bound |].
                exact ArrayLinear.vector_size_fits_word.
             -- symmetry. exact Hequal. }
-    pose proof (Prim63Loop.foldi_from_invariant Inv
-      VkIFFT.size_nat O
+    change (Inv (O + VkIFFT.size_nat)
+      (Prim63Loop.foldi_from VkIFFT.size_nat O
+        (fun index array =>
+          PrimArray.set@{VkIFFT.array_u}
+            array (ArrayLinear.index index) (value index))
+        (PrimArray.make@{VkIFFT.array_u}
+          ArrayLinear.vector_size default))).
+    exact (@Prim63Loop.foldi_from_invariant
+      VkIFFT.field_array Inv VkIFFT.size_nat O
       (fun index array =>
-        PrimArray.set array (ArrayLinear.index index) (value index))
-      (PrimArray.make ArrayLinear.vector_size default)
-      Hinitial Hstep) as Hfinal.
-    replace (O + VkIFFT.size_nat) with VkIFFT.size_nat in Hfinal by lia.
-    exact Hfinal.
+        PrimArray.set@{VkIFFT.array_u}
+          array (ArrayLinear.index index) (value index))
+      (PrimArray.make@{VkIFFT.array_u}
+        ArrayLinear.vector_size default)
+      Hinitial Hstep).
   Qed.
 
-  Lemma fill_vector_named_spec {A : Type} (default : A)
-      (value : nat -> A) (output : PrimArray.array A) :
+  (** Transport the generic specification across an explicit array equality.
+      Keeping [output] abstract while performing the transport prevents the
+      conversion checker from unfolding a concrete 2048-entry wrapper. *)
+  Lemma fill_vector_spec_of_eq (default : VkIFFT.F.t)
+      (value : nat -> VkIFFT.F.t)
+      (output : VkIFFT.field_array) :
     output = VkIFFT.fill default value ->
-    PrimArray.length output = ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get output (ArrayLinear.index index) = value index.
+    filled_vector_spec value output.
   Proof.
-    intro Houtput. subst output.
-    exact (fill_vector_spec (A := A) default value).
+    intros ->.
+    exact (fill_vector_spec default value).
   Qed.
 
-  (** Opaque named wrappers prevent the larger semantic proofs below from
-      retaining a conversion between an anonymous [fill_vector_spec] fold
-      and the corresponding executable FFT operation. *)
-  Lemma load_evaluations_fill_spec (evaluation : nat -> Z)
-      (output : PrimArray.array VkIFFT.F.t) :
-    output = VkIFFT.load_evaluations evaluation ->
-    PrimArray.length output = ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get output (ArrayLinear.index index) =
-        VkIFFT.F.from_Z (evaluation index).
+  (** Tiny equations are captured before making the executable wrappers
+      conversion-opaque.  Clients rewrite through these propositions instead
+      of asking conversion to expose a 2048-step [fill]. *)
+  Lemma load_evaluations_fill_eq (evaluation : nat -> Z) :
+    VkIFFT.load_evaluations evaluation =
+      VkIFFT.fill VkIFFT.F.zero
+        (fun index => VkIFFT.F.from_Z (evaluation index)).
   Proof.
-    intro Houtput.
-    apply (fill_vector_named_spec VkIFFT.F.zero
+    exact (eq_refl (VkIFFT.load_evaluations evaluation)).
+  Qed.
+
+  Lemma load_field_evaluations_fill_eq
+      (evaluation : nat -> VkIFFT.F.t) :
+    VkIFFT.load_field_evaluations evaluation =
+      VkIFFT.fill VkIFFT.F.zero evaluation.
+  Proof.
+    exact (eq_refl (VkIFFT.load_field_evaluations evaluation)).
+  Qed.
+
+  Lemma bit_reverse_fill_eq
+      (table : VkIFFT.index_array)
+      (array : VkIFFT.field_array) :
+    VkIFFT.bit_reverse table array =
+      VkIFFT.fill VkIFFT.F.zero
+        (fun index =>
+          PrimArray.get@{VkIFFT.array_u} array
+            (PrimArray.get@{VkIFFT.array_u} table (ArrayLinear.index index))).
+  Proof.
+    exact (eq_refl (VkIFFT.bit_reverse table array)).
+  Qed.
+
+  Lemma scale_fill_eq (n_inverse : VkIFFT.F.t)
+      (array : VkIFFT.field_array) :
+    VkIFFT.scale n_inverse array =
+      VkIFFT.fill VkIFFT.F.zero
+        (fun index => VkIFFT.F.mul
+          (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) n_inverse).
+  Proof.
+    exact (eq_refl (VkIFFT.scale n_inverse array)).
+  Qed.
+
+  #[local] Opaque VkIFFT.fill VkIFFT.load_evaluations
+    VkIFFT.load_field_evaluations VkIFFT.bit_reverse VkIFFT.scale.
+
+  (** Direct wrapper specifications avoid transporting the large array
+      property through an equality between [output] and the named operation. *)
+  Lemma load_evaluations_fill_spec (evaluation : nat -> Z) :
+    filled_vector_spec
       (fun index => VkIFFT.F.from_Z (evaluation index))
-      output).
-    transitivity (VkIFFT.load_evaluations evaluation).
-    - exact Houtput.
-    - unfold VkIFFT.load_evaluations. reflexivity.
+      (VkIFFT.load_evaluations evaluation).
+  Proof.
+    exact (fill_vector_spec_of_eq VkIFFT.F.zero
+      (fun index => VkIFFT.F.from_Z (evaluation index))
+      (VkIFFT.load_evaluations evaluation)
+      (load_evaluations_fill_eq evaluation)).
   Qed.
 
   Lemma load_field_evaluations_fill_spec
-      (evaluation : nat -> VkIFFT.F.t)
-      (output : PrimArray.array VkIFFT.F.t) :
-    output = VkIFFT.load_field_evaluations evaluation ->
-    PrimArray.length output = ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get output (ArrayLinear.index index) = evaluation index.
+      (evaluation : nat -> VkIFFT.F.t) :
+    filled_vector_spec evaluation
+      (VkIFFT.load_field_evaluations evaluation).
   Proof.
-    intro Houtput.
-    apply (fill_vector_named_spec VkIFFT.F.zero evaluation output).
-    transitivity (VkIFFT.load_field_evaluations evaluation).
-    - exact Houtput.
-    - unfold VkIFFT.load_field_evaluations. reflexivity.
+    exact (fill_vector_spec_of_eq VkIFFT.F.zero evaluation
+      (VkIFFT.load_field_evaluations evaluation)
+      (load_field_evaluations_fill_eq evaluation)).
   Qed.
 
   Lemma bit_reverse_fill_spec
-      (table : PrimArray.array PrimInt63.int)
-      (array output : PrimArray.array VkIFFT.F.t) :
-    output = VkIFFT.bit_reverse table array ->
-    PrimArray.length output = ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get output (ArrayLinear.index index) =
-      PrimArray.get array
-        (PrimArray.get table (ArrayLinear.index index)).
+      (table : VkIFFT.index_array)
+      (array : VkIFFT.field_array) :
+    filled_vector_spec
+      (fun index => PrimArray.get@{VkIFFT.array_u} array
+        (PrimArray.get@{VkIFFT.array_u} table (ArrayLinear.index index)))
+      (VkIFFT.bit_reverse table array).
   Proof.
-    intro Houtput.
-    apply (fill_vector_named_spec VkIFFT.F.zero
+    exact (fill_vector_spec_of_eq VkIFFT.F.zero
       (fun index =>
-        PrimArray.get array
-          (PrimArray.get table (ArrayLinear.index index)))
-      output).
-    transitivity (VkIFFT.bit_reverse table array).
-    - exact Houtput.
-    - unfold VkIFFT.bit_reverse. reflexivity.
+        PrimArray.get@{VkIFFT.array_u} array
+          (PrimArray.get@{VkIFFT.array_u} table (ArrayLinear.index index)))
+      (VkIFFT.bit_reverse table array)
+      (bit_reverse_fill_eq table array)).
   Qed.
 
   Lemma scale_fill_spec (n_inverse : VkIFFT.F.t)
-      (array output : PrimArray.array VkIFFT.F.t) :
-    output = VkIFFT.scale n_inverse array ->
-    PrimArray.length output = ArrayLinear.vector_size /\
-    forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get output (ArrayLinear.index index) =
-      VkIFFT.F.mul (PrimArray.get array (ArrayLinear.index index)) n_inverse.
-  Proof.
-    intro Houtput.
-    apply (fill_vector_named_spec VkIFFT.F.zero
+      (array : VkIFFT.field_array) :
+    filled_vector_spec
       (fun index => VkIFFT.F.mul
-        (PrimArray.get array (ArrayLinear.index index)) n_inverse)
-      output).
-    transitivity (VkIFFT.scale n_inverse array).
-    - exact Houtput.
-    - unfold VkIFFT.scale. reflexivity.
+        (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) n_inverse)
+      (VkIFFT.scale n_inverse array).
+  Proof.
+    exact (fill_vector_spec_of_eq VkIFFT.F.zero
+      (fun index => VkIFFT.F.mul
+        (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) n_inverse)
+      (VkIFFT.scale n_inverse array)
+      (scale_fill_eq n_inverse array)).
   Qed.
 
   Definition evaluation_values (evaluation : nat -> Z) : list Z :=
@@ -226,8 +300,7 @@ Module VkDomainRefinement.
     array_denotes (VkIFFT.load_evaluations evaluation)
       (evaluation_values evaluation).
   Proof.
-    remember (VkIFFT.load_evaluations evaluation) as output eqn:Houtput.
-    destruct (load_evaluations_fill_spec evaluation output Houtput)
+    destruct (load_evaluations_fill_spec evaluation)
       as [Hlength Hentry].
     constructor.
     - apply tabulate_length.
@@ -241,12 +314,9 @@ Module VkDomainRefinement.
         (fun index => (evaluation index mod Primes.pallas_p)%Z)
         index Hindex) as Hexpected.
       unfold evaluation_values in Hvalue.
-      rewrite Hexpected in Hvalue. inversion Hvalue; subst value.
+      rewrite Hexpected in Hvalue.
+      injection Hvalue as Hvalue. subst value.
       pose proof (Hentry index Hindex) as Hloaded.
-      change
-        (PrimArray.get output
-          (ArrayLinear.index index) = F.from_Z (evaluation index))
-        in Hloaded.
       split.
       - exact (eq_ind_r F.canonical
           (FR.from_Z_canonical (evaluation index)) Hloaded).
@@ -261,9 +331,7 @@ Module VkDomainRefinement.
       (field_evaluation_values evaluation).
   Proof.
     intros Hcanonical.
-    remember (VkIFFT.load_field_evaluations evaluation)
-      as output eqn:Houtput.
-    destruct (load_field_evaluations_fill_spec evaluation output Houtput)
+    destruct (load_field_evaluations_fill_spec evaluation)
       as [Hlength Hentry].
     constructor.
     - apply tabulate_length.
@@ -277,11 +345,9 @@ Module VkDomainRefinement.
         (fun index => F.denote (evaluation index)) index Hindex)
         as Hexpected.
       unfold field_evaluation_values in Hvalue.
-      rewrite Hexpected in Hvalue. inversion Hvalue; subst value.
+      rewrite Hexpected in Hvalue.
+      injection Hvalue as Hvalue. subst value.
       pose proof (Hentry index Hindex) as Hloaded.
-      change
-        (PrimArray.get output
-          (ArrayLinear.index index) = evaluation index) in Hloaded.
       split.
       - exact (eq_ind_r F.canonical (Hcanonical index Hindex) Hloaded).
       - exact (f_equal F.denote Hloaded).
@@ -292,18 +358,15 @@ Module VkDomainRefinement.
       List.nth (VkDomain.reverse_nat 11 index) values 0%Z).
 
   Lemma bit_reverse_sound (certificate : VkDomain.certificate)
-      (array : PrimArray.array F.t) (values : list Z) :
+      (array : VkIFFT.field_array) (values : list Z) :
     array_denotes array values ->
     array_denotes
-      (VkIFFT.bit_reverse VkDomainData.bit_reversed_array array)
+      (VkIFFT.bit_reverse VkDomain.bit_reversed_array array)
       (bit_reverse_values values).
   Proof.
     intros Hdenotes.
-    remember
-      (VkIFFT.bit_reverse VkDomainData.bit_reversed_array array)
-      as output eqn:Houtput.
     destruct (bit_reverse_fill_spec
-      VkDomainData.bit_reversed_array array output Houtput)
+      VkDomain.bit_reversed_array array)
       as [Hlength Hentry].
     constructor.
     - apply tabulate_length.
@@ -318,22 +381,16 @@ Module VkDomainRefinement.
           List.nth (VkDomain.reverse_nat 11 index) values 0%Z)
         index Hindex) as Hexpected.
       unfold bit_reverse_values in Hvalue.
-      rewrite Hexpected in Hvalue. inversion Hvalue; subst value.
+      rewrite Hexpected in Hvalue.
+      pose proof (some_Z_injective _ _ Hvalue) as Hvalue_eq.
       pose proof (Hentry index Hindex) as Hloaded.
-      change
-        (PrimArray.get
-          output
-          (ArrayLinear.index index) =
-        PrimArray.get array
-          (PrimArray.get VkDomainData.bit_reversed_array
-            (ArrayLinear.index index))) in Hloaded.
-      rewrite bit_reversal_index in Hloaded by exact Hindex.
+      rewrite (bit_reversal_index certificate index Hindex) in Hloaded.
       assert (Hsource :
         F.canonical
-          (PrimArray.get array
+          (PrimArray.get@{VkIFFT.array_u} array
             (ArrayLinear.index (VkDomain.reverse_nat 11 index))) /\
         F.denote
-          (PrimArray.get array
+          (PrimArray.get@{VkIFFT.array_u} array
             (ArrayLinear.index (VkDomain.reverse_nat 11 index))) =
           List.nth (VkDomain.reverse_nat 11 index) values 0%Z).
       { apply (array_denotes_entry Hdenotes).
@@ -343,7 +400,8 @@ Module VkDomainRefinement.
       destruct Hsource as [Hcanonical Hdenote].
       split.
       - exact (eq_ind_r F.canonical Hcanonical Hloaded).
-      - exact (eq_trans (f_equal F.denote Hloaded) Hdenote).
+      - exact (eq_trans
+          (eq_trans (f_equal F.denote Hloaded) Hdenote) Hvalue_eq).
   Qed.
 
   (** The nested production loops write one disjoint butterfly pair at a
@@ -358,29 +416,29 @@ Module VkDomainRefinement.
   Definition stage_twiddle_index (stride offset : nat) : nat :=
     offset * stride.
 
-  Definition stage_left_word (inverse_roots : PrimArray.array F.t)
-      (input : PrimArray.array F.t) (length half stride block offset : nat)
+  Definition stage_left_word (inverse_roots : VkIFFT.field_array)
+      (input : VkIFFT.field_array) (length half stride block offset : nat)
       : F.t :=
-    let left := PrimArray.get input
+    let left := PrimArray.get@{VkIFFT.array_u} input
       (ArrayLinear.index (stage_left_index length block offset)) in
     let right := F.mul
-      (PrimArray.get input
+      (PrimArray.get@{VkIFFT.array_u} input
         (ArrayLinear.index
           (stage_right_index length half block offset)))
-      (PrimArray.get inverse_roots
+      (PrimArray.get@{VkIFFT.array_u} inverse_roots
         (ArrayLinear.index (stage_twiddle_index stride offset))) in
     F.add left right.
 
-  Definition stage_right_word (inverse_roots : PrimArray.array F.t)
-      (input : PrimArray.array F.t) (length half stride block offset : nat)
+  Definition stage_right_word (inverse_roots : VkIFFT.field_array)
+      (input : VkIFFT.field_array) (length half stride block offset : nat)
       : F.t :=
-    let left := PrimArray.get input
+    let left := PrimArray.get@{VkIFFT.array_u} input
       (ArrayLinear.index (stage_left_index length block offset)) in
     let right := F.mul
-      (PrimArray.get input
+      (PrimArray.get@{VkIFFT.array_u} input
         (ArrayLinear.index
           (stage_right_index length half block offset)))
-      (PrimArray.get inverse_roots
+      (PrimArray.get@{VkIFFT.array_u} inverse_roots
         (ArrayLinear.index (stage_twiddle_index stride offset))) in
     F.sub left right.
 
@@ -411,7 +469,7 @@ Module VkDomainRefinement.
     rewrite Nat2Z.inj_mul.
     replace (Z.of_nat offset * Z.of_nat stride)%Z with
       (Z.of_nat stride * Z.of_nat offset)%Z by ring.
-    rewrite Z.pow_mul_l.
+    rewrite Z.pow_mul_r by lia.
     symmetry.
     apply VkMsm.pow_mod_base.
     lia.
@@ -420,10 +478,10 @@ Module VkDomainRefinement.
   Lemma inverse_root_for_stage (certificate : VkDomain.certificate)
       (stride offset : nat) (Hindex : offset * stride < 1024) :
     F.canonical
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index (stage_twiddle_index stride offset))) /\
     F.denote
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index (stage_twiddle_index stride offset))) =
       (((inverse_stage_root stride) ^ Z.of_nat offset)
         mod Primes.pallas_p)%Z.
@@ -437,7 +495,7 @@ Module VkDomainRefinement.
   Qed.
 
   Lemma stage_left_word_refines (certificate : VkDomain.certificate)
-      (input : PrimArray.array F.t) (values : list Z)
+      (input : VkIFFT.field_array) (values : list Z)
       (length half stride block offset : nat)
       (Hdenotes : array_denotes input values)
       (Hleft : stage_left_index length block offset < VkIFFT.size_nat)
@@ -445,10 +503,10 @@ Module VkDomainRefinement.
         stage_right_index length half block offset < VkIFFT.size_nat)
       (Htwiddle : offset * stride < 1024) :
     F.canonical
-      (stage_left_word VkDomainData.inverse_roots_array input
+      (stage_left_word VkDomain.inverse_roots_array input
         length half stride block offset) /\
     F.denote
-      (stage_left_word VkDomainData.inverse_roots_array input
+      (stage_left_word VkDomain.inverse_roots_array input
         length half stride block offset) =
       stage_left_value (inverse_stage_root stride) values
         length half block offset.
@@ -471,16 +529,16 @@ Module VkDomainRefinement.
         (FR.mul_canonical _ _ Hroot_canonical)).
       rewrite (FR.mul_denote _ _ Hroot_canonical).
       rewrite Hleft_denote, Hright_denote, Hroot_denote.
-      unfold stage_left_value, stage_left_index, stage_right_index.
-      rewrite Z.mul_mod_idemp_r by
-        (pose proof VkMsm.scalar_p_big; lia).
-      rewrite Z.add_mod_idemp_r by
-        (pose proof VkMsm.scalar_p_big; lia).
-      f_equal. ring.
+      unfold stage_left_value, stage_right_index, stage_left_index.
+      rewrite Z.mul_mod_idemp_r by exact pallas_p_nonzero.
+      rewrite Z.add_mod_idemp_r by exact pallas_p_nonzero.
+      apply (f_equal (fun value : Z =>
+        (value mod Primes.pallas_p)%Z)).
+      ring.
   Qed.
 
   Lemma stage_right_word_refines (certificate : VkDomain.certificate)
-      (input : PrimArray.array F.t) (values : list Z)
+      (input : VkIFFT.field_array) (values : list Z)
       (length half stride block offset : nat)
       (Hdenotes : array_denotes input values)
       (Hleft : stage_left_index length block offset < VkIFFT.size_nat)
@@ -488,10 +546,10 @@ Module VkDomainRefinement.
         stage_right_index length half block offset < VkIFFT.size_nat)
       (Htwiddle : offset * stride < 1024) :
     F.canonical
-      (stage_right_word VkDomainData.inverse_roots_array input
+      (stage_right_word VkDomain.inverse_roots_array input
         length half stride block offset) /\
     F.denote
-      (stage_right_word VkDomainData.inverse_roots_array input
+      (stage_right_word VkDomain.inverse_roots_array input
         length half stride block offset) =
       stage_right_value (inverse_stage_root stride) values
         length half block offset.
@@ -514,22 +572,23 @@ Module VkDomainRefinement.
         (FR.mul_canonical _ _ Hroot_canonical)).
       rewrite (FR.mul_denote _ _ Hroot_canonical).
       rewrite Hleft_denote, Hright_denote, Hroot_denote.
-      unfold stage_right_value, stage_left_index, stage_right_index.
-      rewrite Z.mul_mod_idemp_r by
-        (pose proof VkMsm.scalar_p_big; lia).
+      unfold stage_right_value, stage_right_index, stage_left_index.
+      rewrite Z.mul_mod_idemp_r by exact pallas_p_nonzero.
       rewrite Zminus_mod_idemp_r.
-      f_equal. ring.
+      apply (f_equal (fun value : Z =>
+        (value mod Primes.pallas_p)%Z)).
+      ring.
   Qed.
 
-  Definition stage_block_done (inverse_roots : PrimArray.array F.t)
-      (input : PrimArray.array F.t) (length half stride block : nat)
-      (output : PrimArray.array F.t) : Prop :=
+  Definition stage_block_done (inverse_roots : VkIFFT.field_array)
+      (input : VkIFFT.field_array) (length half stride block : nat)
+      (output : VkIFFT.field_array) : Prop :=
     forall offset : nat, offset < half ->
-      PrimArray.get output
+      PrimArray.get@{VkIFFT.array_u} output
         (ArrayLinear.index (stage_left_index length block offset)) =
           stage_left_word inverse_roots input
             length half stride block offset /\
-      PrimArray.get output
+      PrimArray.get@{VkIFFT.array_u} output
         (ArrayLinear.index (stage_right_index length half block offset)) =
           stage_right_word inverse_roots input
             length half stride block offset.
@@ -555,46 +614,47 @@ Module VkDomainRefinement.
     stage_left_index length block offset < VkIFFT.size_nat /\
     stage_right_index length half block offset < VkIFFT.size_nat.
   Proof.
-    unfold stage_left_index, stage_right_index.
+    unfold stage_right_index, stage_left_index.
     intros Hlength Hsize Hblock Hoffset.
     nia.
   Qed.
 
   Lemma stage_block_preserves
-      (inverse_roots : PrimArray.array F.t)
-      (input output : PrimArray.array F.t)
+      (inverse_roots : VkIFFT.field_array)
+      (input output : VkIFFT.field_array)
       (length half stride blocks block : nat) :
     length = 2 * half -> 0 < half ->
     blocks * length = VkIFFT.size_nat -> block < blocks ->
-    PrimArray.length output = ArrayLinear.vector_size ->
+    PrimArray.length@{VkIFFT.array_u} output = ArrayLinear.vector_size ->
     (forall previous, previous < block ->
       stage_block_done inverse_roots input length half stride previous output) ->
     let result := VkIFFT.stage_block inverse_roots input
       length half stride block output in
-    PrimArray.length result = ArrayLinear.vector_size /\
+    PrimArray.length@{VkIFFT.array_u} result = ArrayLinear.vector_size /\
     (forall previous, previous < block ->
       stage_block_done inverse_roots input length half stride previous result) /\
     stage_block_done inverse_roots input length half stride block result.
   Proof.
     intros Hlength Hhalf Hsize Hblock Houtput Hprevious.
     cbn zeta.
-    set (Inv := fun (next : nat) (current : PrimArray.array F.t) =>
-      PrimArray.length current = ArrayLinear.vector_size /\
+    set (Inv := fun (next : nat) (current : VkIFFT.field_array) =>
+      PrimArray.length@{VkIFFT.array_u} current = ArrayLinear.vector_size /\
       (forall previous, previous < block ->
         stage_block_done inverse_roots input
           length half stride previous current) /\
       forall offset, offset < next ->
-        PrimArray.get current
+        PrimArray.get@{VkIFFT.array_u} current
           (ArrayLinear.index (stage_left_index length block offset)) =
             stage_left_word inverse_roots input
               length half stride block offset /\
-        PrimArray.get current
+        PrimArray.get@{VkIFFT.array_u} current
           (ArrayLinear.index
             (stage_right_index length half block offset)) =
             stage_right_word inverse_roots input
               length half stride block offset).
     assert (Hinitial : Inv O output).
-    { repeat split; try assumption.
+    { split; [exact Houtput |].
+      split; [exact Hprevious |].
       intros offset Hoffset. lia. }
     assert (Hstep : forall offset current,
       O <= offset < O + half ->
@@ -609,61 +669,62 @@ Module VkDomainRefinement.
       destruct Hcurrent_bounds as [Hleft_bound Hright_bound].
       unfold VkIFFT.stage_pair_at.
       cbn zeta.
-      repeat split.
+      split.
       - rewrite !ArrayLinear.length_set. exact Hcurrent.
-      - intros previous Hprevious_block previous_offset Hprevious_offset.
+      - split.
+        + intros previous Hprevious_block previous_offset Hprevious_offset.
         pose proof (Hblocks previous Hprevious_block
           previous_offset Hprevious_offset) as [Hleft Hright].
         pose proof (stage_index_bounds length half blocks previous
           previous_offset Hlength Hsize ltac:(lia) Hprevious_offset)
           as [Hprevious_left_bound Hprevious_right_bound].
         split.
-        + rewrite ArrayLinear.get_set_other.
-          2: { apply bounded_index_neq; try assumption.
-            unfold stage_left_index, stage_right_index. nia. }
-          rewrite ArrayLinear.get_set_other.
-          2: { apply bounded_index_neq; try assumption.
-            unfold stage_left_index. nia. }
-          exact Hleft.
-        + rewrite ArrayLinear.get_set_other.
+        * rewrite ArrayLinear.get_set_other.
           2: { apply bounded_index_neq; try assumption.
             unfold stage_right_index, stage_left_index. nia. }
           rewrite ArrayLinear.get_set_other.
           2: { apply bounded_index_neq; try assumption.
-            unfold stage_left_index, stage_right_index. nia. }
+            unfold stage_left_index. nia. }
+          exact Hleft.
+        * rewrite ArrayLinear.get_set_other.
+          2: { apply bounded_index_neq; try assumption.
+            unfold stage_right_index, stage_left_index. nia. }
+          rewrite ArrayLinear.get_set_other.
+          2: { apply bounded_index_neq; try assumption.
+            unfold stage_right_index, stage_left_index. nia. }
           exact Hright.
-      - intros observed Hobserved.
+        + intros observed Hobserved.
         destruct (Nat.eq_dec observed offset) as [-> | Hneq].
-        + split.
-          * rewrite ArrayLinear.get_set_other.
+        * split.
+          -- rewrite ArrayLinear.get_set_other.
             2: { apply bounded_index_neq; try assumption.
-              unfold stage_left_index, stage_right_index. nia. }
+              unfold stage_right_index, stage_left_index. nia. }
             apply ArrayLinear.get_set_same.
             unfold ArrayLinear.in_bounds.
             rewrite Hcurrent.
             apply ArrayLinear.vector_index_bound. exact Hleft_bound.
-          * apply ArrayLinear.get_set_same.
+          -- apply ArrayLinear.get_set_same.
             unfold ArrayLinear.in_bounds.
             rewrite ArrayLinear.length_set, Hcurrent.
             apply ArrayLinear.vector_index_bound. exact Hright_bound.
-        + pose proof (Hoffsets observed ltac:(lia)) as [Hleft Hright].
+        * pose proof (Hoffsets observed ltac:(lia)) as [Hleft Hright].
           pose proof (stage_index_bounds length half blocks block
             observed Hlength Hsize Hblock ltac:(lia))
             as [Hprevious_left_bound Hprevious_right_bound].
           split.
-          * rewrite ArrayLinear.get_set_other.
-            2: { apply bounded_index_neq; try assumption.
-              unfold stage_left_index, stage_right_index. nia. }
-            rewrite ArrayLinear.get_set_other.
-            2: { apply bounded_index_neq; try assumption.
-              unfold stage_left_index. nia. }
-            exact Hleft.
-          * rewrite ArrayLinear.get_set_other.
+          -- rewrite ArrayLinear.get_set_other.
             2: { apply bounded_index_neq; try assumption.
               unfold stage_right_index, stage_left_index. nia. }
             rewrite ArrayLinear.get_set_other.
             2: { apply bounded_index_neq; try assumption.
-              unfold stage_left_index, stage_right_index. nia. }
+              unfold stage_left_index. nia. }
+            exact Hleft.
+          -- rewrite ArrayLinear.get_set_other.
+            2: { apply bounded_index_neq; try assumption.
+              unfold stage_right_index, stage_left_index. nia. }
+            rewrite ArrayLinear.get_set_other.
+            2: { apply bounded_index_neq; try assumption.
+              unfold stage_right_index, stage_left_index. nia. }
             exact Hright. }
     pose proof (Prim63Loop.foldi_from_invariant Inv half O
       (fun offset current =>
@@ -672,31 +733,34 @@ Module VkDomainRefinement.
       output Hinitial Hstep) as Hfinal.
     replace (O + half) with half in Hfinal by lia.
     destruct Hfinal as [Hresult [Hblocks Hoffsets]].
-    repeat split; try assumption.
+    split; [exact Hresult |].
+    split; [exact Hblocks |].
+    unfold stage_block_done.
+    exact Hoffsets.
   Qed.
 
   Lemma stage_entries
-      (inverse_roots : PrimArray.array F.t)
-      (input : PrimArray.array F.t) (length half stride blocks : nat) :
+      (inverse_roots : VkIFFT.field_array)
+      (input : VkIFFT.field_array) (length half stride blocks : nat) :
     length = 2 * half -> 0 < half ->
     blocks * length = VkIFFT.size_nat ->
     let result :=
       Prim63Loop.foldi_from blocks O
         (VkIFFT.stage_block inverse_roots input length half stride)
-        (PrimArray.make ArrayLinear.vector_size F.zero) in
-    PrimArray.length result = ArrayLinear.vector_size /\
+        (PrimArray.make@{VkIFFT.array_u} ArrayLinear.vector_size F.zero) in
+    PrimArray.length@{VkIFFT.array_u} result = ArrayLinear.vector_size /\
     forall block, block < blocks ->
       stage_block_done inverse_roots input length half stride block result.
   Proof.
     intros Hlength Hhalf Hsize.
     cbn zeta.
-    set (Inv := fun (next : nat) (output : PrimArray.array F.t) =>
-      PrimArray.length output = ArrayLinear.vector_size /\
+    set (Inv := fun (next : nat) (output : VkIFFT.field_array) =>
+      PrimArray.length@{VkIFFT.array_u} output = ArrayLinear.vector_size /\
       forall block, block < next ->
         stage_block_done inverse_roots input
           length half stride block output).
     assert (Hinitial : Inv O
-      (PrimArray.make ArrayLinear.vector_size F.zero)).
+      (PrimArray.make@{VkIFFT.array_u} ArrayLinear.vector_size F.zero)).
     { split; [apply ArrayLinear.make_vector_length |].
       intros block Hblock. lia. }
     assert (Hstep : forall block output,
@@ -716,7 +780,7 @@ Module VkDomainRefinement.
       - apply Hprevious. lia. }
     pose proof (Prim63Loop.foldi_from_invariant Inv blocks O
       (VkIFFT.stage_block inverse_roots input length half stride)
-      (PrimArray.make ArrayLinear.vector_size F.zero)
+      (PrimArray.make@{VkIFFT.array_u} ArrayLinear.vector_size F.zero)
       Hinitial Hstep) as Hfinal.
     replace (O + blocks) with blocks in Hfinal by lia.
     exact Hfinal.
@@ -746,8 +810,8 @@ Module VkDomainRefinement.
     apply List.nth_error_nth with (x := value index).
     unfold tabulate_n.
     rewrite List.nth_error_map, List.nth_error_seq.
-    rewrite Nat.ltb_lt by exact Hindex.
-    cbn. now rewrite Nat.add_0_l.
+    rewrite (proj2 (Nat.ltb_lt index size) Hindex).
+    cbn. reflexivity.
   Qed.
 
   Definition bit_reverse_list (count : nat) (values : list Z) : list Z :=
@@ -782,8 +846,19 @@ Module VkDomainRefinement.
   Proof.
     revert values.
     induction index as [|index IH]; intros [|a [|b values]].
-    all: try reflexivity.
-    - cbn [VkMsm.evens VkMsm.odds VkMsm.deinter]. reflexivity.
+    - split; reflexivity.
+    - split; reflexivity.
+    - rewrite evens_two, odds_two. split; reflexivity.
+    - split; reflexivity.
+    - change (
+        List.nth (S index) [a] 0%Z =
+          List.nth (2 * S index) [a] 0%Z /\
+        List.nth (S index) [] 0%Z =
+          List.nth (2 * S index + 1) [a] 0%Z).
+      replace (2 * S index) with (S (S (2 * index))) by lia.
+      replace (2 * S index + 1) with (S (S (S (2 * index)))) by lia.
+      cbn [List.nth].
+      destruct index; split; reflexivity.
     - rewrite evens_two, odds_two. cbn [List.nth].
       replace (2 * S index) with (S (S (2 * index))) by lia.
       replace (2 * S index + 1) with (S (S (2 * index + 1))) by lia.
@@ -802,13 +877,14 @@ Module VkDomainRefinement.
     - intros index Hindex.
       rewrite bit_reverse_list_length in Hindex.
       cbn [Nat.pow] in Hindex.
+      unfold bit_reverse_list.
       destruct (Nat.lt_ge_cases index (2 ^ count)) as [Hlow | Hhigh].
       + rewrite (tabulate_n_nth (2 ^ S count)
           (fun index =>
             List.nth (VkDomain.reverse_nat (S count) index) values 0%Z)
           index) by (cbn [Nat.pow]; lia).
         rewrite List.app_nth1.
-        2: { rewrite bit_reverse_list_length. exact Hlow. }
+        2: { rewrite tabulate_n_length. exact Hlow. }
         rewrite (tabulate_n_nth (2 ^ count)
           (fun index => List.nth (VkDomain.reverse_nat count index)
             (VkMsm.evens values) 0%Z) index Hlow).
@@ -825,8 +901,8 @@ Module VkDomainRefinement.
             List.nth (VkDomain.reverse_nat (S count) index) values 0%Z)
           index) by (cbn [Nat.pow]; lia).
         rewrite List.app_nth2.
-        2: { rewrite bit_reverse_list_length. exact Hhigh. }
-        rewrite bit_reverse_list_length.
+        2: { rewrite tabulate_n_length. exact Hhigh. }
+        rewrite tabulate_n_length.
         fold offset.
         rewrite (tabulate_n_nth (2 ^ count)
           (fun index => List.nth (VkDomain.reverse_nat count index)
@@ -903,7 +979,9 @@ Module VkDomainRefinement.
     revert left.
     induction left_count as [|left_count IH]; intros left Hlength.
     - apply List.length_zero_iff_nil in Hlength. subst left. reflexivity.
-    - cbn [stage_blocks].
+    - replace (S left_count + right_count) with
+          (S (left_count + right_count)) by lia.
+      cbn [stage_blocks].
       assert (Hblock : 2 * half <= List.length left) by lia.
       assert (Hfirst : List.firstn half (left ++ right) =
           List.firstn half left).
@@ -920,12 +998,16 @@ Module VkDomainRefinement.
       { rewrite List.skipn_app.
         replace (2 * half - List.length left) with O by lia.
         now rewrite List.skipn_O. }
-      unfold butterfly_block at 1.
-      rewrite Hfirst, Hskip_first.
-      rewrite List.firstn_app.
-      replace (half - List.length (List.skipn half left)) with O.
-      2: { rewrite List.length_skipn. lia. }
-      rewrite List.firstn_O, List.app_nil_r, Hskip_block.
+      assert (Hbutterfly :
+        butterfly_block half root (left ++ right) =
+        butterfly_block half root left).
+      { unfold butterfly_block.
+        rewrite Hfirst, Hskip_first.
+        rewrite List.firstn_app.
+        replace (half - List.length (List.skipn half left)) with O.
+        2: { rewrite List.length_skipn. lia. }
+        now rewrite List.firstn_O, List.app_nil_r. }
+      rewrite Hbutterfly, Hskip_block.
       rewrite (IH (List.skipn (2 * half) left)).
       + rewrite List.app_assoc. reflexivity.
       + rewrite List.length_skipn, Hlength. lia.
@@ -942,9 +1024,12 @@ Module VkDomainRefinement.
     cbn [stage_blocks]. rewrite List.app_nil_r.
     unfold butterfly_block.
     rewrite List.firstn_app, Hleft, Nat.sub_diag, List.firstn_O,
-      List.app_nil_r, List.firstn_all.
-    rewrite List.skipn_app, Hleft, Nat.sub_diag, List.skipn_all,
-      List.skipn_O, List.app_nil_l, List.firstn_all.
+      List.app_nil_r.
+    rewrite (List.firstn_all2 left) by lia.
+    rewrite List.skipn_app, Hleft, Nat.sub_diag.
+    rewrite (List.skipn_all2 left) by lia.
+    rewrite List.skipn_O, List.app_nil_l.
+    rewrite (List.firstn_all2 right) by lia.
     reflexivity.
   Qed.
 
@@ -957,6 +1042,8 @@ Module VkDomainRefinement.
       stage_right_value root values (2 * half) half O offset.
   Proof.
     intros Hlength Hoffset.
+    assert (Hoffset_bool : (offset <? half) = true) by
+      (apply Nat.ltb_lt; exact Hoffset).
     set (left := List.firstn half values).
     set (right := List.firstn half (List.skipn half values)).
     assert (Hleft : List.length left = half).
@@ -984,8 +1071,9 @@ Module VkDomainRefinement.
       unfold stage_left_value.
       cbn [Nat.mul Nat.add].
       unfold left, right.
-      rewrite !List.nth_firstn, !Nat.ltb_lt by exact Hoffset.
+      rewrite !List.nth_firstn, !Hoffset_bool.
       rewrite List.nth_skipn.
+      replace (offset + half) with (half + offset) by lia.
       f_equal. ring.
     - rewrite List.app_nth2 by (rewrite Hfirst_length, Hleft; lia).
       rewrite Hfirst_length, Hleft.
@@ -994,8 +1082,9 @@ Module VkDomainRefinement.
       unfold stage_right_value.
       cbn [Nat.mul Nat.add].
       unfold left, right.
-      rewrite !List.nth_firstn, !Nat.ltb_lt by exact Hoffset.
+      rewrite !List.nth_firstn, !Hoffset_bool.
       rewrite List.nth_skipn.
+      replace (offset + half) with (half + offset) by lia.
       f_equal. ring.
   Qed.
 
@@ -1018,7 +1107,7 @@ Module VkDomainRefinement.
         List.length (butterfly_block half root values) = 2 * half)
         by (apply butterfly_block_length; lia).
       split.
-      + rewrite List.app_nth1 by (rewrite Hbutterfly; exact Hoffset).
+      + rewrite List.app_nth1 by (rewrite Hbutterfly; lia).
         exact (proj1 (butterfly_block_nth half root values offset
           ltac:(lia) Hoffset)).
       + rewrite List.app_nth1 by (rewrite Hbutterfly; lia).
@@ -1075,13 +1164,13 @@ Module VkDomainRefinement.
   Qed.
 
   Lemma stage_sound (certificate : VkDomain.certificate)
-      (input : PrimArray.array F.t) (values : list Z)
+      (input : VkIFFT.field_array) (values : list Z)
       (length half blocks : nat)
       (Hlength : length = 2 * half) (Hhalf : 0 < half)
       (Hsize : blocks * length = VkIFFT.size_nat)
       (Hdenotes : array_denotes input values) :
     array_denotes
-      (VkIFFT.stage VkDomainData.inverse_roots_array length input)
+      (VkIFFT.stage VkDomain.inverse_roots_array length input)
       (stage_blocks blocks half (inverse_stage_root blocks) values).
   Proof.
     destruct (exact_stage_divisions length half blocks
@@ -1096,7 +1185,7 @@ Module VkDomainRefinement.
         VkIFFT.size_nat).
     { rewrite stage_blocks_length by exact Hvalues_blocks.
       rewrite <- Hsize, Hlength. reflexivity. }
-    pose proof (stage_entries VkDomainData.inverse_roots_array input
+    pose proof (stage_entries VkDomain.inverse_roots_array input
       length half blocks blocks Hlength Hhalf Hsize)
       as [Houtput_length Hentries].
     unfold VkIFFT.stage.
@@ -1177,7 +1266,10 @@ Module VkDomainRefinement.
         rewrite <- Hnthvalue, Hsame.
         unfold stage_right_index, stage_left_index.
         rewrite Hlength.
-        symmetry. exact Hlist.
+        symmetry.
+        replace (block * (2 * half) + offset + half) with
+          (block * (2 * half) + half + offset) by lia.
+        exact Hlist.
   Qed.
 
   Definition stages_values (values : list Z) : list Z :=
@@ -1204,10 +1296,10 @@ Module VkDomainRefinement.
     stage_blocks 1 1024 (inverse_stage_root 1) values.
 
   Lemma stages_sound (certificate : VkDomain.certificate)
-      (input : PrimArray.array F.t) (values : list Z) :
+      (input : VkIFFT.field_array) (values : list Z) :
     array_denotes input values ->
     array_denotes
-      (VkIFFT.stages VkDomainData.inverse_roots_array input)
+      (VkIFFT.stages VkDomain.inverse_roots_array input)
       (stages_values values).
   Proof.
     intros Hdenotes.
@@ -1257,7 +1349,7 @@ Module VkDomainRefinement.
     - exact Hlength.
     - cbn [run_stages List.length] in *.
       rewrite IH.
-      + exact Hlength.
+      + cbn [Nat.pow] in Hlength |- *. nia.
       + rewrite stage_blocks_length.
         * cbn [Nat.pow] in Hlength |- *. lia.
         * cbn [Nat.pow] in Hlength |- *. lia.
@@ -1275,6 +1367,9 @@ Module VkDomainRefinement.
     induction roots as [|root roots IH]; intros half left right Hleft Hright.
     - reflexivity.
     - cbn [run_stages List.length] in *.
+      replace ((left_copies + right_copies) * 2 ^ List.length roots) with
+        (left_copies * 2 ^ List.length roots +
+          right_copies * 2 ^ List.length roots) by nia.
       rewrite stage_blocks_app.
       2: { cbn [Nat.pow] in Hleft |- *. lia. }
       rewrite IH.
@@ -1289,11 +1384,7 @@ Module VkDomainRefinement.
 
   Lemma nat_pow_add (base left right : nat) :
     base ^ (left + right) = base ^ left * base ^ right.
-  Proof.
-    induction left as [|left IH]; cbn [Nat.pow].
-    - lia.
-    - rewrite IH. ring.
-  Qed.
+  Proof. apply Nat.pow_add_r. Qed.
 
   Lemma run_stages_app (copies : nat) (left_roots right_roots : list Z)
       (half : nat) (values : list Z) :
@@ -1305,8 +1396,10 @@ Module VkDomainRefinement.
     revert copies half values.
     induction left_roots as [|root left_roots IH];
       intros copies half values.
-    - cbn [run_stages List.length Nat.pow]. reflexivity.
-    - cbn [run_stages List.length] in *.
+    - cbn [run_stages List.length Nat.pow].
+      now rewrite List.app_nil_l, Nat.mul_1_l.
+    - rewrite <- List.app_comm_cons.
+      cbn [run_stages List.length] in *.
       rewrite IH.
       cbn [Nat.pow].
       replace
@@ -1314,7 +1407,7 @@ Module VkDomainRefinement.
           2 ^ List.length left_roots)
         with
         (copies * 2 ^ List.length (left_roots ++ right_roots))
-        by (rewrite List.length_app, nat_pow_add; ring).
+        by (rewrite List.length_app, nat_pow_add; nia).
       replace (2 ^ List.length left_roots * (2 * half)) with
         (2 * 2 ^ List.length left_roots * half) by lia.
       reflexivity.
@@ -1348,11 +1441,11 @@ Module VkDomainRefinement.
   Proof.
     unfold inverse_stage_root.
     rewrite Z.mul_mod_idemp_l, Z.mul_mod_idemp_r by
-      (pose proof VkMsm.scalar_p_big; lia).
+      exact pallas_p_nonzero.
     rewrite <- Z.pow_add_r by lia.
     f_equal.
     rewrite Nat2Z.inj_mul.
-    lia.
+    f_equal. ring.
   Qed.
 
   Lemma stage_roots_from_power (count stride : nat) :
@@ -1362,7 +1455,7 @@ Module VkDomainRefinement.
     revert stride.
     induction count as [|count IH]; intros stride.
     - reflexivity.
-    - cbn [stage_roots, stage_strides].
+    - cbn [stage_roots stage_strides].
       rewrite inverse_stage_root_double, IH, List.map_app.
       reflexivity.
   Qed.
@@ -1371,7 +1464,9 @@ Module VkDomainRefinement.
     inverse_stage_root 1 = VkMsm.omega_inv.
   Proof.
     unfold inverse_stage_root.
-    rewrite Nat2Z.inj_1, Z.pow_1_r.
+    change ((VkMsm.omega_inv ^ 1) mod Primes.pallas_p =
+      VkMsm.omega_inv)%Z.
+    rewrite Z.pow_1_r.
     apply Z.mod_small.
     exact VkMsm.omega_inv_range.
   Qed.
@@ -1396,7 +1491,7 @@ Module VkDomainRefinement.
   Proof.
     rewrite stage_roots_11.
     unfold stages_values.
-    cbn only [run_stages List.length Nat.pow Nat.mul Nat.add].
+    cbn [run_stages List.length Nat.pow Nat.mul Nat.add].
     reflexivity.
   Qed.
 
@@ -1405,22 +1500,48 @@ Module VkDomainRefinement.
     run_stages 1 (stage_roots count root) 1
       (bit_reverse_list count values).
 
+  Lemma normalized_values_deinter (values : list Z) :
+    normalized_values values ->
+    normalized_values (VkMsm.evens values) /\
+    normalized_values (VkMsm.odds values).
+  Proof.
+    unfold normalized_values.
+    intros Hnormalized.
+    induction Hnormalized as [|value values Hvalue Hvalues IH].
+    - split; constructor.
+    - destruct IH as [Hevens Hodds].
+      destruct (VkMsm.deinter_cons value values) as [Heq Oeq].
+      rewrite Heq, Oeq.
+      split.
+      + constructor; assumption.
+      + exact Hevens.
+  Qed.
+
   Lemma iterative_fft_correct (count : nat) (root : Z)
       (values : list Z) :
     List.length values = 2 ^ count ->
+    normalized_values values ->
     iterative_fft count root values = VkMsm.fft count root values.
   Proof.
     revert root values.
-    induction count as [|count IH]; intros root values Hlength.
+    induction count as [|count IH]; intros root values Hlength Hnormalized.
     - unfold iterative_fft, bit_reverse_list, tabulate_n.
-      cbn [stage_roots run_stages VkDomain.reverse_nat List.seq List.map].
+      cbn [stage_roots run_stages VkDomain.reverse_nat List.seq List.map
+        Nat.pow VkMsm.fft].
       destruct values as [|value [|extra values]];
-        cbn in Hlength; try lia; reflexivity.
+        cbn in Hlength; try lia.
+      unfold normalized_values in Hnormalized.
+      inversion Hnormalized as [|? ? Hvalue _].
+      cbn [stage_roots run_stages VkDomain.reverse_nat List.seq List.map
+        List.nth List.hd Nat.pow VkMsm.fft].
+      now rewrite Hvalue.
     - assert (Hhalves :
         List.length (VkMsm.evens values) = 2 ^ count /\
         List.length (VkMsm.odds values) = 2 ^ count).
       { apply VkMsm.deinter_length.
         cbn [Nat.pow] in Hlength |- *. exact Hlength. }
+      destruct (normalized_values_deinter values Hnormalized)
+        as [Hevens_normalized Hodds_normalized].
       unfold iterative_fft at 1.
       cbn [stage_roots].
       rewrite bit_reverse_list_succ.
@@ -1433,14 +1554,19 @@ Module VkDomainRefinement.
       2: { rewrite bit_reverse_list_length, stage_roots_length. lia. }
       unfold iterative_fft in IH.
       rewrite (IH ((root * root) mod Primes.pallas_p)%Z
-        (VkMsm.evens values) (proj1 Hhalves)).
+        (VkMsm.evens values) (proj1 Hhalves) Hevens_normalized).
       rewrite (IH ((root * root) mod Primes.pallas_p)%Z
-        (VkMsm.odds values) (proj2 Hhalves)).
+        (VkMsm.odds values) (proj2 Hhalves) Hodds_normalized).
+      cbn [run_stages List.length Nat.pow Nat.mul].
       rewrite stage_blocks_one.
-      2: exact (proj1 Hhalves).
-      2: exact (proj2 Hhalves).
-      cbn [run_stages].
+      2: { rewrite VkMsm.fft_length by exact (proj1 Hhalves). lia. }
+      2: { rewrite VkMsm.fft_length by exact (proj2 Hhalves). lia. }
       cbn [VkMsm.fft].
+      destruct (VkMsm.bfly root 1
+        (VkMsm.fft count ((root * root) mod Primes.pallas_p)%Z
+          (VkMsm.evens values))
+        (VkMsm.fft count ((root * root) mod Primes.pallas_p)%Z
+          (VkMsm.odds values))).
       reflexivity.
   Qed.
 
@@ -1456,15 +1582,13 @@ Module VkDomainRefinement.
     List.length (scale_values values) = List.length values.
   Proof. apply List.length_map. Qed.
 
-  Lemma scale_sound (array : PrimArray.array F.t) (values : list Z) :
+  Lemma scale_sound (array : VkIFFT.field_array) (values : list Z) :
     array_denotes array values ->
     array_denotes (VkIFFT.scale VkDomainData.n_inverse array)
       (scale_values values).
   Proof.
     intros Hdenotes.
-    remember (VkIFFT.scale VkDomainData.n_inverse array)
-      as output eqn:Houtput.
-    destruct (scale_fill_spec VkDomainData.n_inverse array output Houtput)
+    destruct (scale_fill_spec VkDomainData.n_inverse array)
       as [Hlength Hentry].
     constructor.
     - rewrite scale_values_length.
@@ -1480,14 +1604,9 @@ Module VkDomainRefinement.
       { apply (proj1 (List.nth_error_Some values index)).
         rewrite Hinput. discriminate. }
       pose proof (Hentry index Hindex) as Hloaded.
-      change
-        (PrimArray.get output
-          (ArrayLinear.index index) =
-          F.mul (PrimArray.get array (ArrayLinear.index index))
-            VkDomainData.n_inverse) in Hloaded.
       assert (Hproduct_canonical :
         F.canonical
-          (F.mul (PrimArray.get array (ArrayLinear.index index))
+          (F.mul (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index))
             VkDomainData.n_inverse)).
       { apply FR.mul_canonical. exact n_inverse_canonical. }
       split.
@@ -1500,45 +1619,48 @@ Module VkDomainRefinement.
 
   Lemma inverse_fft_values (values : list Z) :
     List.length values = VkIFFT.size_nat ->
+    normalized_values values ->
     scale_values (stages_values (bit_reverse_values values)) =
       VkMsm.intt values.
   Proof.
-    intros Hlength.
+    intros Hlength Hnormalized.
     rewrite bit_reverse_values_spec, stages_values_run.
     fold (iterative_fft 11 VkMsm.omega_inv values).
-    rewrite iterative_fft_correct.
-    - reflexivity.
-    - exact Hlength.
+    rewrite (iterative_fft_correct 11 VkMsm.omega_inv values
+      Hlength Hnormalized).
+    reflexivity.
   Qed.
 
   Theorem inverse_fft_sound (certificate : VkDomain.certificate)
-      (array : PrimArray.array F.t) (values : list Z) :
+      (array : VkIFFT.field_array) (values : list Z) :
     array_denotes array values ->
     array_denotes
-      (VkIFFT.inverse_fft VkDomainData.bit_reversed_array
-        VkDomainData.inverse_roots_array VkDomainData.n_inverse array)
+      (VkIFFT.inverse_fft VkDomain.bit_reversed_array
+        VkDomain.inverse_roots_array VkDomainData.n_inverse array)
       (VkMsm.intt values).
   Proof.
     intros Hdenotes.
+    pose proof (array_denotes_normalized array values Hdenotes)
+      as Hnormalized.
     pose proof (bit_reverse_sound certificate array values Hdenotes)
       as Hreversed.
     pose proof (stages_sound certificate _ _ Hreversed) as Hstages.
     pose proof (scale_sound _ _ Hstages) as Hscaled.
     rewrite (inverse_fft_values values
-      (array_denotes_values_length Hdenotes)) in Hscaled.
+      (array_denotes_values_length Hdenotes) Hnormalized) in Hscaled.
     unfold VkIFFT.inverse_fft.
     exact Hscaled.
   Qed.
 
   Lemma coefficients_match_array_entries
-      (computed : PrimArray.array F.t)
+      (computed : VkIFFT.field_array)
       (expected : PrimArray.array Prim63Words.words5) :
     VkIFFT.coefficients_match_array computed expected = true ->
     forall index : nat, index < VkIFFT.size_nat ->
       F.equal
         (F.decode
-          (PrimArray.get computed (ArrayLinear.index index)))
-        (PrimArray.get expected (ArrayLinear.index index)) = true.
+          (PrimArray.get@{VkIFFT.array_u} computed (ArrayLinear.index index)))
+        (PrimArray.get@{VkIFFT.array_u} expected (ArrayLinear.index index)) = true.
   Proof.
     intros Hcheck.
     unfold VkIFFT.coefficients_match_array in Hcheck.
@@ -1549,15 +1671,15 @@ Module VkDomainRefinement.
       (fun index =>
         F.equal
           (F.decode
-            (PrimArray.get computed (ArrayLinear.index index)))
-          (PrimArray.get expected (ArrayLinear.index index)))
+            (PrimArray.get@{VkIFFT.array_u} computed (ArrayLinear.index index)))
+          (PrimArray.get@{VkIFFT.array_u} expected (ArrayLinear.index index)))
       true Hcheck) as [_ Hentries].
     intros index Hindex.
     apply Hentries. lia.
   Qed.
 
   Lemma coefficients_match_array_sound
-      (computed : PrimArray.array F.t) (values : list Z)
+      (computed : VkIFFT.field_array) (values : list Z)
       (coefficients : list Prim63Words.words5) :
     array_denotes computed values ->
     List.length coefficients = VkIFFT.size_nat ->
@@ -1604,8 +1726,8 @@ Module VkDomainRefinement.
   Theorem coefficients_match_sound
       (certificate : VkDomain.certificate) (evaluation : nat -> Z)
       (coefficients : list Prim63Words.words5) :
-    VkIFFT.coefficients_match VkDomainData.bit_reversed_array
-      VkDomainData.inverse_roots_array VkDomainData.n_inverse
+    VkIFFT.coefficients_match VkDomain.bit_reversed_array
+      VkDomain.inverse_roots_array VkDomainData.n_inverse
       evaluation coefficients = true ->
     List.map Prim63Words.eval5 coefficients =
       VkMsm.intt
@@ -1630,8 +1752,8 @@ Module VkDomainRefinement.
       (coefficients : list Prim63Words.words5) :
     (forall row : nat, row < VkIFFT.size_nat ->
       F.canonical (evaluation row)) ->
-    VkIFFT.coefficients_match_field VkDomainData.bit_reversed_array
-      VkDomainData.inverse_roots_array VkDomainData.n_inverse
+    VkIFFT.coefficients_match_field VkDomain.bit_reversed_array
+      VkDomain.inverse_roots_array VkDomainData.n_inverse
       evaluation coefficients = true ->
     List.map Prim63Words.eval5 coefficients =
       VkMsm.intt

@@ -46,9 +46,9 @@ Module VkDomainPowerRefinement.
 
   Lemma bit_reversal_check_parts :
     VkDomain.bit_reversal_check = true ->
-    PrimArray.length VkDomainData.bit_reversed_array = 2048%uint63 /\
+    PrimArray.length@{VkIFFT.array_u} VkDomain.bit_reversed_array = 2048%uint63 /\
     forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get VkDomainData.bit_reversed_array (ArrayLinear.index index) =
+      PrimArray.get@{VkIFFT.array_u} VkDomain.bit_reversed_array (ArrayLinear.index index) =
         VkDomain.reverse_11 (ArrayLinear.index index).
   Proof.
     unfold VkDomain.bit_reversal_check, VkDomain.length_is.
@@ -62,7 +62,7 @@ Module VkDomainPowerRefinement.
     destruct (foldi_from_and_true VkIFFT.size_nat O
       (fun index =>
         PrimInt63.eqb
-          (PrimArray.get VkDomainData.bit_reversed_array
+          (PrimArray.get@{VkIFFT.array_u} VkDomain.bit_reversed_array
             (ArrayLinear.index index))
           (VkDomain.reverse_11 (ArrayLinear.index index))) true Hfold)
       as [_ Hall].
@@ -73,7 +73,7 @@ Module VkDomainPowerRefinement.
 
   Lemma bit_reversal_exact (certificate : VkDomain.certificate) :
     forall index : nat, index < VkIFFT.size_nat ->
-      PrimArray.get VkDomainData.bit_reversed_array (ArrayLinear.index index) =
+      PrimArray.get@{VkIFFT.array_u} VkDomain.bit_reversed_array (ArrayLinear.index index) =
         VkDomain.reverse_11 (ArrayLinear.index index).
   Proof.
     apply bit_reversal_check_parts.
@@ -156,7 +156,7 @@ Module VkDomainPowerRefinement.
 
   Lemma bit_reversal_index (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < VkIFFT.size_nat) :
-    PrimArray.get VkDomainData.bit_reversed_array
+    PrimArray.get@{VkIFFT.array_u} VkDomain.bit_reversed_array
       (ArrayLinear.index index) =
     ArrayLinear.index (VkDomain.reverse_nat 11 index).
   Proof.
@@ -167,28 +167,28 @@ Module VkDomainPowerRefinement.
 
   (** ** Recurrence checks expose every generated power *)
 
-  Definition preceding (array : PrimArray.array F.t)
+  Definition preceding (array : VkIFFT.field_array)
       (start : nat) (initial : F.t) (offset : nat) : F.t :=
     match offset with
     | O => initial
     | S offset =>
-        PrimArray.get array (ArrayLinear.index (start + offset))
+        PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index (start + offset))
     end.
 
-  Lemma powers_fold_true (array : PrimArray.array F.t) (ratio : F.t)
+  Lemma powers_fold_true (array : VkIFFT.field_array) (ratio : F.t)
       (count start : nat) (ok : bool) (previous : F.t) :
     fst
       (Prim63Loop.foldi_from count start
         (fun index state =>
           let previous := snd state in
           let current :=
-            PrimArray.get array (ArrayLinear.index index) in
+            PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index) in
           (fst state && F.equal current (F.mul previous ratio), current))
         (ok, previous)) = true ->
     ok = true /\
     forall offset, offset < count ->
       F.equal
-        (PrimArray.get array (ArrayLinear.index (start + offset)))
+        (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index (start + offset)))
         (F.mul (preceding array start previous offset) ratio) = true.
   Proof.
     revert start ok previous.
@@ -196,7 +196,7 @@ Module VkDomainPowerRefinement.
     - cbn in Hfold. split; [exact Hfold | intros offset Hoffset; lia].
     - cbn [Prim63Loop.foldi_from] in Hfold.
       set (current :=
-        PrimArray.get array (ArrayLinear.index start)) in *.
+        PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index start)) in *.
       destruct (IH (S start)
         (ok && F.equal current (F.mul previous ratio)) current Hfold)
         as [Hfirst Hrest].
@@ -220,16 +220,16 @@ Module VkDomainPowerRefinement.
           exact Hrest.
   Qed.
 
-  Lemma powers_check_parts (array : PrimArray.array F.t)
+  Lemma powers_check_parts (array : VkIFFT.field_array)
       (length : PrimInt63.int) (count : nat) (ratio : F.t) :
     ArrayLinear.fits_nat (1 + count) ->
     VkDomain.powers_check array length count ratio = true ->
-    PrimArray.length array = length /\
-    PrimArray.get array 0%uint63 = F.one /\
+    PrimArray.length@{VkIFFT.array_u} array = length /\
+    PrimArray.get@{VkIFFT.array_u} array 0%uint63 = F.one /\
     forall index : nat, 1 <= index <= count ->
-      PrimArray.get array (ArrayLinear.index index) =
+      PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index) =
         F.mul
-          (PrimArray.get array (ArrayLinear.index (index - 1))) ratio.
+          (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index (index - 1))) ratio.
   Proof.
     unfold VkDomain.powers_check, VkDomain.length_is.
     intros Hfits Hcheck.
@@ -242,7 +242,7 @@ Module VkDomainPowerRefinement.
     change 1%uint63 with (ArrayLinear.index 1) in Hfold.
     rewrite Prim63Loop.foldi_u63_index in Hfold by exact Hfits.
     destruct (powers_fold_true array ratio count 1 true
-      (PrimArray.get array 0%uint63) Hfold) as [_ Hall].
+      (PrimArray.get@{VkIFFT.array_u} array 0%uint63) Hfold) as [_ Hall].
     intros index Hindex.
     specialize (Hall (index - 1) ltac:(lia)).
     replace (1 + (index - 1)) with index in Hall by lia.
@@ -253,18 +253,18 @@ Module VkDomainPowerRefinement.
     all: exact Hall.
   Qed.
 
-  Lemma checked_powers_semantics (array : PrimArray.array F.t)
+  Lemma checked_powers_semantics (array : VkIFFT.field_array)
       (count : nat) (ratio : F.t)
-      (Hone : PrimArray.get array 0%uint63 = F.one)
+      (Hone : PrimArray.get@{VkIFFT.array_u} array 0%uint63 = F.one)
       (Hstep : forall index : nat, 1 <= index <= count ->
-        PrimArray.get array (ArrayLinear.index index) =
+        PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index) =
           F.mul
-            (PrimArray.get array (ArrayLinear.index (index - 1))) ratio)
+            (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index (index - 1))) ratio)
       (Hratio : F.canonical ratio) :
     forall index : nat, index <= count ->
       F.canonical
-        (PrimArray.get array (ArrayLinear.index index)) /\
-      F.denote (PrimArray.get array (ArrayLinear.index index)) =
+        (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) /\
+      F.denote (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index)) =
         ((F.denote ratio ^ Z.of_nat index)
           mod PallasPConfig.modulus_Z)%Z.
   Proof.
@@ -284,7 +284,7 @@ Module VkDomainPowerRefinement.
       + apply FR.mul_canonical. exact Hratio.
       + transitivity
           (((F.denote
-              (PrimArray.get array (ArrayLinear.index index))) *
+              (PrimArray.get@{VkIFFT.array_u} array (ArrayLinear.index index))) *
             F.denote ratio) mod PallasPConfig.modulus_Z)%Z.
         * apply FR.mul_denote. exact Hratio.
         * rewrite (proj2 IH).
@@ -326,18 +326,18 @@ Module VkDomainPowerRefinement.
   Proof. vm_compute. reflexivity. Qed.
 
   Lemma inverse_roots_checked_parts (certificate : VkDomain.certificate) :
-    PrimArray.get VkDomainData.inverse_roots_array 0%uint63 = F.one /\
+    PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array 0%uint63 = F.one /\
     forall index : nat, 1 <= index <= 1023 ->
-      PrimArray.get VkDomainData.inverse_roots_array
+      PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index index) =
       F.mul
-        (PrimArray.get VkDomainData.inverse_roots_array
+        (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
           (ArrayLinear.index (index - 1))) VkDomain.inverse_omega.
   Proof.
     pose proof certificate.(VkDomain.inverse_roots_checked) as Hcheck.
     unfold VkDomain.inverse_roots_check in Hcheck.
     apply andb_prop in Hcheck as [_ Hpowers].
-    destruct (powers_check_parts VkDomainData.inverse_roots_array
+    destruct (powers_check_parts VkDomain.inverse_roots_array
       1024%uint63 1023 VkDomain.inverse_omega
       ltac:(vm_compute; reflexivity) Hpowers) as [_ Hparts].
     exact Hparts.
@@ -346,17 +346,17 @@ Module VkDomainPowerRefinement.
   Lemma inverse_roots_semantics (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 1024) :
     F.canonical
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index index)) /\
     F.denote
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index index)) =
       ((VkMsm.omega_inv ^ Z.of_nat index) mod Primes.pallas_p)%Z.
   Proof.
     assert (Hbound : index <= 1023) by lia.
     destruct (inverse_roots_checked_parts certificate) as [Hone Hstep].
     pose proof (checked_powers_semantics
-      VkDomainData.inverse_roots_array 1023 VkDomain.inverse_omega
+      VkDomain.inverse_roots_array 1023 VkDomain.inverse_omega
       Hone Hstep inverse_omega_canonical index Hbound) as H.
     destruct H as [Hcanonical Hdenote].
     split; [exact Hcanonical |].
@@ -368,47 +368,49 @@ Module VkDomainPowerRefinement.
   Lemma inverse_roots_canonical (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 1024) :
     F.canonical
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index index)).
   Proof. exact (proj1 (inverse_roots_semantics certificate index Hindex)). Qed.
 
   Lemma inverse_roots_denote (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 1024) :
     F.denote
-      (PrimArray.get VkDomainData.inverse_roots_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.inverse_roots_array
         (ArrayLinear.index index)) =
       ((VkMsm.omega_inv ^ Z.of_nat index) mod Primes.pallas_p)%Z.
   Proof. exact (proj2 (inverse_roots_semantics certificate index Hindex)). Qed.
 
   Lemma omega_powers_checked_parts (certificate : VkDomain.certificate) :
-    PrimArray.get VkDomainData.omega_powers_array 0%uint63 = F.one /\
+    PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array 0%uint63 = F.one /\
     forall index : nat, 1 <= index <= 2047 ->
-      PrimArray.get VkDomainData.omega_powers_array
+      PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
         (ArrayLinear.index index) =
       F.mul
-        (PrimArray.get VkDomainData.omega_powers_array
+        (PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
           (ArrayLinear.index (index - 1))) VkDomain.omega.
   Proof.
-    destruct (powers_check_parts VkDomainData.omega_powers_array
+    pose proof certificate.(VkDomain.omega_powers_checked) as Hcheck.
+    unfold VkDomain.omega_powers_check in Hcheck.
+    destruct (powers_check_parts VkDomain.omega_powers_array
       2048%uint63 2047 VkDomain.omega
       ltac:(vm_compute; reflexivity)
-      certificate.(VkDomain.omega_powers_checked)) as [_ Hparts].
+      Hcheck) as [_ Hparts].
     exact Hparts.
   Qed.
 
   Lemma omega_powers_semantics (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 2048) :
     F.canonical
-      (PrimArray.get VkDomainData.omega_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
         (ArrayLinear.index index)) /\
     F.denote
-      (PrimArray.get VkDomainData.omega_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
         (ArrayLinear.index index)) =
       ((PolyDomain.omega ^ Z.of_nat index) mod Primes.pallas_p)%Z.
   Proof.
     assert (Hbound : index <= 2047) by lia.
     destruct (omega_powers_checked_parts certificate) as [Hone Hstep].
-    pose proof (checked_powers_semantics VkDomainData.omega_powers_array
+    pose proof (checked_powers_semantics VkDomain.omega_powers_array
       2047 VkDomain.omega Hone Hstep omega_canonical index Hbound) as H.
     destruct H as [Hcanonical Hdenote].
     split; [exact Hcanonical |].
@@ -426,48 +428,50 @@ Module VkDomainPowerRefinement.
   Lemma omega_powers_canonical (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 2048) :
     F.canonical
-      (PrimArray.get VkDomainData.omega_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
         (ArrayLinear.index index)).
   Proof. exact (proj1 (omega_powers_semantics certificate index Hindex)). Qed.
 
   Lemma omega_powers_denote (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 2048) :
     F.denote
-      (PrimArray.get VkDomainData.omega_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.omega_powers_array
         (ArrayLinear.index index)) =
       ((PolyDomain.omega ^ Z.of_nat index) mod Primes.pallas_p)%Z.
   Proof. exact (proj2 (omega_powers_semantics certificate index Hindex)). Qed.
 
   Lemma delta_powers_checked_parts (certificate : VkDomain.certificate) :
-    PrimArray.get VkDomainData.delta_powers_array 0%uint63 = F.one /\
+    PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array 0%uint63 = F.one /\
     forall index : nat, 1 <= index <= 14 ->
-      PrimArray.get VkDomainData.delta_powers_array
+      PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
         (ArrayLinear.index index) =
       F.mul
-        (PrimArray.get VkDomainData.delta_powers_array
+        (PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
           (ArrayLinear.index (index - 1))) VkDomain.delta.
   Proof.
-    destruct (powers_check_parts VkDomainData.delta_powers_array
+    pose proof certificate.(VkDomain.delta_powers_checked) as Hcheck.
+    unfold VkDomain.delta_powers_check in Hcheck.
+    destruct (powers_check_parts VkDomain.delta_powers_array
       15%uint63 14 VkDomain.delta
       ltac:(vm_compute; reflexivity)
-      certificate.(VkDomain.delta_powers_checked)) as [_ Hparts].
+      Hcheck) as [_ Hparts].
     exact Hparts.
   Qed.
 
   Lemma delta_powers_semantics (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 15) :
     F.canonical
-      (PrimArray.get VkDomainData.delta_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
         (ArrayLinear.index index)) /\
     F.denote
-      (PrimArray.get VkDomainData.delta_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
         (ArrayLinear.index index)) =
       ((OrchardCompiledAlgebraic.delta ^ Z.of_nat index)
         mod Primes.pallas_p)%Z.
   Proof.
     assert (Hbound : index <= 14) by lia.
     destruct (delta_powers_checked_parts certificate) as [Hone Hstep].
-    pose proof (checked_powers_semantics VkDomainData.delta_powers_array
+    pose proof (checked_powers_semantics VkDomain.delta_powers_array
       14 VkDomain.delta Hone Hstep delta_canonical index Hbound) as H.
     destruct H as [Hcanonical Hdenote].
     split; [exact Hcanonical |].
@@ -485,14 +489,14 @@ Module VkDomainPowerRefinement.
   Lemma delta_powers_canonical (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 15) :
     F.canonical
-      (PrimArray.get VkDomainData.delta_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
         (ArrayLinear.index index)).
   Proof. exact (proj1 (delta_powers_semantics certificate index Hindex)). Qed.
 
   Lemma delta_powers_denote (certificate : VkDomain.certificate)
       (index : nat) (Hindex : index < 15) :
     F.denote
-      (PrimArray.get VkDomainData.delta_powers_array
+      (PrimArray.get@{VkIFFT.array_u} VkDomain.delta_powers_array
         (ArrayLinear.index index)) =
       ((OrchardCompiledAlgebraic.delta ^ Z.of_nat index)
         mod Primes.pallas_p)%Z.

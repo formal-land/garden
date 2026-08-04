@@ -6,7 +6,7 @@
     exponentiation and keep every update on the latest primitive-array
     version. *)
 
-From Corelib Require Import PrimArray PrimInt63.
+From Corelib Require Import PrimArray PrimInt63 ArrayAxioms.
 From Stdlib Require Import Lists.List Bool.Bool ZArith.
 Require Import Garden.Prim63.Words.
 Require Import Garden.Prim63.Pasta.
@@ -23,99 +23,126 @@ Module VkIFFT.
   Module F := PallasP.
   Import Prim63Words.
 
+  (** Corelib's primitive-array laws quantify over [Type], so keep every
+      executable FFT array in one fixed universe strictly above [Set].
+      Universes are erased by extraction and primitive evaluation; this only
+      prevents proof elaboration from choosing incompatible array instances. *)
+  Monomorphic Universe array_u.
+  Monomorphic Constraint Set < array_u.
+  Monomorphic Constraint array_u = ArrayAxioms.length_make.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.length_set.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.get_set_same.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.get_set_other.u0.
+  Definition field_array := PrimArray.array@{array_u} F.t.
+  Definition index_array := PrimArray.array@{array_u} PrimInt63.int.
+
   Definition size_nat : nat := 2048.
 
   (** The common fresh-array fill used by all pointwise 2048-row passes.
       Keeping this operation named and opaque prevents proof conversion from
       expanding a concrete primitive array, while [vm_compute] still executes
       the exact same tail-recursive loop. *)
-  Definition fill {A : Type} (default : A) (value : nat -> A)
-      : PrimArray.array A :=
+  Definition fill (default : F.t) (value : nat -> F.t)
+      : field_array :=
     Prim63Loop.foldi_from size_nat O
       (fun index array =>
-        PrimArray.set array (ArrayLinear.index index) (value index))
-      (PrimArray.make ArrayLinear.vector_size default).
+        PrimArray.set@{array_u}
+          array (ArrayLinear.index index) (value index))
+      (PrimArray.make@{array_u} ArrayLinear.vector_size default).
+
+  (** An explicit equation for the one proof that reasons about [fill]'s
+      loop.  It is established while [fill] is transparent, so clients can
+      rewrite with it after the conversion barrier below without temporarily
+      changing that barrier (which would not persist through [Qed]). *)
+  Lemma fill_unfold (default : F.t) (value : nat -> F.t) :
+    fill default value =
+      Prim63Loop.foldi_from size_nat O
+        (fun index array =>
+          PrimArray.set@{array_u}
+            array (ArrayLinear.index index) (value index))
+        (PrimArray.make@{array_u} ArrayLinear.vector_size default).
+  Proof. reflexivity. Qed.
 
   Strategy opaque [fill].
 
   Definition load_evaluations (evaluation : nat -> Z)
-      : PrimArray.array F.t :=
+      : field_array :=
     fill F.zero (fun index => F.from_Z (evaluation index)).
 
   Definition load_field_evaluations (evaluation : nat -> F.t)
-      : PrimArray.array F.t :=
+      : field_array :=
     fill F.zero evaluation.
 
   (** Out-of-place bit-reversal gather.  Each output slot is written once
       from the immutable input array, which retains the primitive-array
       linear-write fast path and gives the refinement proof a direct
       pointwise reading. *)
-  Definition bit_reverse (table : PrimArray.array PrimInt63.int)
-      (array : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition bit_reverse (table : index_array)
+      (array : field_array) : field_array :=
     fill F.zero
       (fun index =>
-        PrimArray.get array
-          (PrimArray.get table (ArrayLinear.index index))).
+        PrimArray.get@{array_u} array
+          (PrimArray.get@{array_u} table (ArrayLinear.index index))).
 
-  Definition stage_value (inverse_roots : PrimArray.array F.t)
-      (length half stride index : nat) (array : PrimArray.array F.t) : F.t :=
+  Definition stage_value (inverse_roots : field_array)
+      (length half stride index : nat) (array : field_array) : F.t :=
     let in_block := index mod length in
     let offset := in_block mod half in
     let base := (index / length) * length in
     let left_index := base + offset in
     let right_index := left_index + half in
-    let left := PrimArray.get array (ArrayLinear.index left_index) in
+    let left := PrimArray.get@{array_u} array (ArrayLinear.index left_index) in
     let right :=
-      F.mul (PrimArray.get array (ArrayLinear.index right_index))
-        (PrimArray.get inverse_roots (ArrayLinear.index (offset * stride))) in
+      F.mul (PrimArray.get@{array_u} array (ArrayLinear.index right_index))
+        (PrimArray.get@{array_u} inverse_roots (ArrayLinear.index (offset * stride))) in
     if (in_block <? half)%nat then F.add left right else F.sub left right.
 
   (** One disjoint butterfly pair, reading from the immutable stage input
       and writing both results to the fresh output.  This retains one field
       multiplication per pair while avoiding read-after-write reasoning. *)
-  Definition stage_pair_at (inverse_roots : PrimArray.array F.t)
-      (array : PrimArray.array F.t) (length half stride block offset : nat)
-      (output : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition stage_pair_at (inverse_roots : field_array)
+      (array : field_array) (length half stride block offset : nat)
+      (output : field_array) : field_array :=
     let base := block * length in
     let left_index := base + offset in
     let right_index := left_index + half in
-    let left := PrimArray.get array (ArrayLinear.index left_index) in
+    let left := PrimArray.get@{array_u} array (ArrayLinear.index left_index) in
     let right :=
-      F.mul (PrimArray.get array (ArrayLinear.index right_index))
-        (PrimArray.get inverse_roots (ArrayLinear.index (offset * stride))) in
-    PrimArray.set
-      (PrimArray.set output (ArrayLinear.index left_index) (F.add left right))
+      F.mul (PrimArray.get@{array_u} array (ArrayLinear.index right_index))
+        (PrimArray.get@{array_u} inverse_roots (ArrayLinear.index (offset * stride))) in
+    PrimArray.set@{array_u}
+      (PrimArray.set@{array_u} output (ArrayLinear.index left_index) (F.add left right))
       (ArrayLinear.index right_index) (F.sub left right).
 
   (** Flat-index compatibility spelling.  The production stage below uses
       nested block/offset loops: it performs the same pair writes while
       avoiding division and remainder in every executable butterfly and
       exposing the block structure used by the refinement proof. *)
-  Definition stage_pair (inverse_roots : PrimArray.array F.t)
-      (array : PrimArray.array F.t) (length half stride index : nat)
-      (output : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition stage_pair (inverse_roots : field_array)
+      (array : field_array) (length half stride index : nat)
+      (output : field_array) : field_array :=
     stage_pair_at inverse_roots array length half stride
       (index / half) (index mod half) output.
 
-  Definition stage_block (inverse_roots : PrimArray.array F.t)
-      (array : PrimArray.array F.t) (length half stride block : nat)
-      (output : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition stage_block (inverse_roots : field_array)
+      (array : field_array) (length half stride block : nat)
+      (output : field_array) : field_array :=
     Prim63Loop.foldi_from half O
       (fun offset output =>
         stage_pair_at inverse_roots array length half stride block offset
           output)
       output.
 
-  Definition stage (inverse_roots : PrimArray.array F.t) (length : nat)
-      (array : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition stage (inverse_roots : field_array) (length : nat)
+      (array : field_array) : field_array :=
     let half := length / 2 in
     let stride := size_nat / length in
     Prim63Loop.foldi_from (size_nat / length) O
       (stage_block inverse_roots array length half stride)
-      (PrimArray.make ArrayLinear.vector_size F.zero).
+      (PrimArray.make@{array_u} ArrayLinear.vector_size F.zero).
 
-  Definition stages (inverse_roots : PrimArray.array F.t)
-      (array : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition stages (inverse_roots : field_array)
+      (array : field_array) : field_array :=
     let a := stage inverse_roots 2 array in
     let a := stage inverse_roots 4 a in
     let a := stage inverse_roots 8 a in
@@ -128,32 +155,32 @@ Module VkIFFT.
     let a := stage inverse_roots 1024 a in
     stage inverse_roots 2048 a.
 
-  Definition scale (n_inverse : F.t) (array : PrimArray.array F.t)
-      : PrimArray.array F.t :=
+  Definition scale (n_inverse : F.t) (array : field_array)
+      : field_array :=
     fill F.zero
       (fun index =>
-        F.mul (PrimArray.get array (ArrayLinear.index index)) n_inverse).
+        F.mul (PrimArray.get@{array_u} array (ArrayLinear.index index)) n_inverse).
 
-  Definition inverse_fft (bit_reverse_table : PrimArray.array PrimInt63.int)
-      (inverse_roots : PrimArray.array F.t) (n_inverse : F.t)
-      (evaluations : PrimArray.array F.t) : PrimArray.array F.t :=
+  Definition inverse_fft (bit_reverse_table : index_array)
+      (inverse_roots : field_array) (n_inverse : F.t)
+      (evaluations : field_array) : field_array :=
     scale n_inverse (stages inverse_roots (bit_reverse bit_reverse_table evaluations)).
 
   Definition standard_coefficients_array (coefficients : list words5)
       : PrimArray.array words5 :=
     VkJacobian.array_of_list zero5 coefficients.
 
-  Definition coefficients_match_array (computed : PrimArray.array F.t)
+  Definition coefficients_match_array (computed : field_array)
       (expected : PrimArray.array words5) : bool :=
     Prim63Loop.foldi_u63 size_nat 0
       (fun index ok =>
-        ok && F.equal (F.decode (PrimArray.get computed index))
-          (PrimArray.get expected index))
+        ok && F.equal (F.decode (PrimArray.get@{array_u} computed index))
+          (PrimArray.get@{array_u} expected index))
       true.
 
   Definition coefficients_match
-      (bit_reverse_table : PrimArray.array PrimInt63.int)
-      (inverse_roots : PrimArray.array F.t) (n_inverse : F.t)
+      (bit_reverse_table : index_array)
+      (inverse_roots : field_array) (n_inverse : F.t)
       (evaluation : nat -> Z) (coefficients : list words5) : bool :=
     (List.length coefficients =? size_nat)%nat
       && coefficients_match_array
@@ -162,8 +189,8 @@ Module VkIFFT.
         (standard_coefficients_array coefficients).
 
   Definition coefficients_match_field
-      (bit_reverse_table : PrimArray.array PrimInt63.int)
-      (inverse_roots : PrimArray.array F.t) (n_inverse : F.t)
+      (bit_reverse_table : index_array)
+      (inverse_roots : field_array) (n_inverse : F.t)
       (evaluation : nat -> F.t) (coefficients : list words5) : bool :=
     (List.length coefficients =? size_nat)%nat
       && coefficients_match_array
