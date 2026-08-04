@@ -47,6 +47,15 @@ Module ArrayLinear.
     lia.
   Qed.
 
+  Lemma fits_nat_le (n m : nat) :
+    n <= m -> fits_nat m -> fits_nat n.
+  Proof.
+    intros Hnm Hm.
+    apply Nat2Z.inj_le in Hnm.
+    unfold fits_nat in *.
+    lia.
+  Qed.
+
   Lemma to_Z_index (n : nat) :
     fits_nat n ->
     Uint63Axioms.to_Z (index n) = Z.of_nat n.
@@ -91,6 +100,44 @@ Module ArrayLinear.
     apply Nat2Z.inj.
     rewrite <- (to_Z_index n Hn), <- (to_Z_index m Hm), Heq.
     reflexivity.
+  Qed.
+
+  Lemma index_succ (n : nat) :
+    fits_nat (S n) ->
+    PrimInt63.add (index n) 1%uint63 = index (S n).
+  Proof.
+    intro Hfit.
+    apply Uint63.to_Z_inj.
+    rewrite Uint63.add_spec, Uint63.to_Z_1.
+    rewrite (to_Z_index n), (to_Z_index (S n)).
+    - rewrite Z.mod_small.
+      + f_equal; lia.
+      + unfold fits_nat, word_capacity in Hfit.
+        split; lia.
+    - exact Hfit.
+    - exact (fits_nat_lt n (S n) (Nat.lt_succ_diag_r n) Hfit).
+  Qed.
+
+  Lemma index_add (n m : nat) :
+    fits_nat (n + m) ->
+    PrimInt63.add (index n) (index m) = index (n + m).
+  Proof.
+    intro Hfit.
+    apply Uint63.to_Z_inj.
+    rewrite Uint63.add_spec.
+    rewrite (to_Z_index n), (to_Z_index m), (to_Z_index (n + m)).
+    - rewrite Z.mod_small.
+      + rewrite Nat2Z.inj_add; reflexivity.
+      + unfold fits_nat, word_capacity in Hfit.
+        rewrite Nat2Z.inj_add in Hfit.
+        split; lia.
+    - exact Hfit.
+    - unfold fits_nat, word_capacity in *.
+      rewrite Nat2Z.inj_add in Hfit.
+      lia.
+    - unfold fits_nat, word_capacity in *.
+      rewrite Nat2Z.inj_add in Hfit.
+      lia.
   Qed.
 
   Lemma index_ltb_iff (n m : nat) :

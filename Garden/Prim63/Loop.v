@@ -124,6 +124,42 @@ Module Prim63Loop.
       + exact Hstep.
   Qed.
 
+  Lemma advance_u63_index (count start : nat) :
+    ArrayLinear.fits_nat (start + count) ->
+    advance_u63 count (ArrayLinear.index start) =
+      ArrayLinear.index (start + count).
+  Proof.
+    revert start.
+    induction count as [|count IH]; intro start; simpl.
+    - replace (start + 0)%nat with start by lia.
+      reflexivity.
+    - intro Hfit.
+      rewrite ArrayLinear.index_succ.
+      + rewrite IH.
+        * f_equal; lia.
+        * replace (S start + count)%nat with (start + S count)%nat by lia.
+          exact Hfit.
+      + apply (ArrayLinear.fits_nat_le (S start) (start + S count));
+          [lia | exact Hfit].
+  Qed.
+
+  Lemma foldi_u63_index {State : Type} (count start : nat)
+      (step : PrimInt63.int -> State -> State) (state : State) :
+    ArrayLinear.fits_nat (start + count) ->
+    foldi_u63 count (ArrayLinear.index start) step state =
+      foldi_from count start (fun i => step (ArrayLinear.index i)) state.
+  Proof.
+    revert start state.
+    induction count as [|count IH]; intros start state Hfit; simpl.
+    - reflexivity.
+    - rewrite ArrayLinear.index_succ.
+      + apply IH.
+        replace (S start + count)%nat with (start + S count)%nat by lia.
+        exact Hfit.
+      + apply (ArrayLinear.fits_nat_le (S start) (start + S count));
+          [lia | exact Hfit].
+  Qed.
+
   (** ** Primitive-array specializations *)
 
   Definition array_loop_from {A : Type} (count start : nat)
@@ -136,6 +172,18 @@ Module Prim63Loop.
       (step : PrimInt63.int -> PrimArray.array A -> PrimArray.array A)
       (a : PrimArray.array A) : PrimArray.array A :=
     foldi_u63 count start step a.
+
+  Lemma array_loop_u63_index {A : Type} (count start : nat)
+      (step : PrimInt63.int -> PrimArray.array A -> PrimArray.array A)
+      (a : PrimArray.array A) :
+    ArrayLinear.fits_nat (start + count) ->
+    array_loop_u63 count (ArrayLinear.index start) step a =
+      array_loop_from count start
+        (fun i => step (ArrayLinear.index i)) a.
+  Proof.
+    unfold array_loop_u63, array_loop_from.
+    apply foldi_u63_index.
+  Qed.
 
   Lemma array_loop_from_length {A : Type} (count start : nat)
       (step : nat -> PrimArray.array A -> PrimArray.array A)
@@ -188,6 +236,19 @@ Module Prim63Loop.
     array_loop_u63 count start
       (fun i current => PrimArray.set current i (value i)) a.
 
+  Lemma set_loop_u63_index {A : Type} (count start : nat)
+      (value : PrimInt63.int -> A) (a : PrimArray.array A) :
+    ArrayLinear.fits_nat (start + count) ->
+    set_loop_u63 count (ArrayLinear.index start) value a =
+      set_loop_from count start (fun i => value (ArrayLinear.index i)) a.
+  Proof.
+    intro Hfit.
+    unfold set_loop_u63, set_loop_from.
+    rewrite (array_loop_u63_index count start
+      (fun i current => PrimArray.set current i (value i)) a Hfit).
+    reflexivity.
+  Qed.
+
   Lemma set_loop_from_length {A : Type} (count start : nat)
       (value : nat -> A) (a : PrimArray.array A) :
     PrimArray.length (set_loop_from count start value a) =
@@ -229,6 +290,23 @@ Module Prim63Loop.
         * lia.
       + rewrite ArrayLinear.length_list_set.
         lia.
+  Qed.
+
+  Lemma set_loop_u63_view {A : Type} (count start : nat)
+      (value : PrimInt63.int -> A) (a : PrimArray.array A) (xs : list A) :
+    ArrayLinear.view a xs ->
+    start + count <= List.length xs ->
+    ArrayLinear.view
+      (set_loop_u63 count (ArrayLinear.index start) value a)
+      (list_set_loop_from count start
+        (fun i => value (ArrayLinear.index i)) xs).
+  Proof.
+    intros Hview Hrange.
+    rewrite set_loop_u63_index.
+    - apply set_loop_from_view; assumption.
+    - exact (ArrayLinear.fits_nat_le
+        (start + count) (List.length xs) Hrange
+        (ArrayLinear.view_fits Hview)).
   Qed.
 
   (** ** Executed production-size smoke checks *)

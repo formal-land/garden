@@ -37,6 +37,40 @@ Module Vesta.
       (UnOp.from (p := vesta_p) x)
       (UnOp.from (p := vesta_p) y).
 
+  (** Executable curve-membership predicate.  This mirrors [on_curve]
+      exactly, rather than relying on a concrete coordinate fixture. *)
+  Definition on_curveb (P : point) : bool :=
+    match P with
+    | Weierstrass.Infinity => true
+    | Weierstrass.Affine x y =>
+        Z.eqb
+          (UnOp.from (p := vesta_p)
+            (BinOp.mul (p := vesta_p) y y))
+          (UnOp.from (p := vesta_p)
+            (BinOp.add (p := vesta_p)
+              (BinOp.add (p := vesta_p)
+                (BinOp.mul (p := vesta_p)
+                  (BinOp.mul (p := vesta_p) x x) x)
+                (BinOp.mul (p := vesta_p) a x))
+              b))
+    end.
+
+  Lemma on_curveb_sound (P : point) :
+    on_curveb P = true -> on_curve P.
+  Proof.
+    destruct P as [|x y]; cbn [on_curveb on_curve
+      Weierstrass.on_curve].
+    - trivial.
+    - now apply Z.eqb_eq.
+  Qed.
+
+  Lemma affine_reduced (x y : Z) : reduced (affine x y).
+  Proof.
+    cbn [reduced affine Weierstrass.reduced UnOp.from].
+    split; apply Z.mod_mod;
+      pose proof (prime_range (p := vesta_p)); lia.
+  Qed.
+
   Lemma nonsingular : Weierstrass.nonsingular (p := vesta_p) a b.
   Proof.
     unfold Weierstrass.nonsingular. intro Hc. vm_compute in Hc. discriminate.

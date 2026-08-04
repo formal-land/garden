@@ -11,9 +11,11 @@ commit_lagrange(Params::new(11), column_evaluations, Blind::default())
 
 for every one of the 44 columns. Generated literals are witnesses, not
 assumptions: small Rocq leaves recompute and check each stage before
-`generated/certificates/Main.v` bundles the results. The closed theorem is
-currently an equality in this executable model; the exact mathematical
-refinement boundary is described below.
+`generated/certificates/Main.v` bundles the results.  Its closed
+`orchard_vk_commit_lagrange_refined` theorem has type
+`OrchardVkAbstract.certificate`: all 44 deployed points are equal to the
+library-level group/polynomial `commit_lagrange` specification, and the
+`Params::new(11)` premise of that specification is discharged.
 
 ## What is checked
 
@@ -44,11 +46,19 @@ The certificate graph covers the following chain.
    an exact generated Jacobian representative.  `AssemblyCheck.v` shifts the
    high half by 128 bits, adds the default blinding generator `w`, and checks
    the deployed affine point.
+7. `DomainRefinement.v`, `JacobianRefinement.v`, and `MsmRefinement.v` prove
+   the semantic refinement of those optimized primitive operations.  The
+   inverse FFT is identified with `VkMsm.intt`; every window, bucket update,
+   doubling, addition, and split-MSM recombination is transported to the
+   abstract Vesta group; and `VkMsm.commit_lagrange_intt` connects that MSM
+   with the mathematical group inverse FFT used by Halo 2.
 
 `Checks.commitment_certificate_sound` rewrites the two exact half-MSM
-equalities into the assembly check.  Thus the aggregate establishes the
-actual executable committed point, rather than merely checking two unrelated
-affine witnesses.
+equalities into the assembly check. `CommitmentRefinement.v` then composes
+the calibration, SRS, primitive-arithmetic, and pinned-coordinate refinements.
+Thus the aggregate establishes the actual executable committed point and its
+equality to the abstract `commit_lagrange`, rather than merely checking two
+unrelated affine witnesses.
 
 ## Representation and parallelism
 
@@ -111,10 +121,15 @@ carry equations, the five-word CIOS sweep, and modular correctness of
 five-limb Montgomery multiplication for a canonical operand. The certificates
 ultimately rely on Rocq's standard `PrimInt63` and `PrimArray` primitives.
 
-The refinement chain is not yet complete up to a library-level mathematical
-`commit_lagrange`: canonicality of every optimized field result and semantic
-refinements of the inverse FFT, Jacobian formulas, and Pippenger MSM remain
-to be proved. Accordingly, the aggregate theorem should be read as a
-kernel-checked equality for the optimized executable implementation, plus a
-canonical proof of the generated SRS points—not yet as a complete abstract
-group/polynomial semantics theorem.
+The refinement chain is complete up to the library-level mathematical
+`commit_lagrange`: it proves field canonicality, inverse-FFT semantics,
+Jacobian group-law semantics, Pippenger semantics, the mandatory default
+blind `[1]w`, and equality with every pinned coordinate. Generated `.v`
+sources are ignored build artifacts and can be reproduced exactly by the
+emitter; their small closed facts are checked by Rocq's kernel when built.
+
+This theorem does not prove cryptographic verifier soundness, knowledge
+soundness, or extractability. It also intentionally treats Garden's compiled
+Orchard column configuration and pinned VK coordinate list as the objects
+whose compilation provenance is being established; those protocol-level
+choices are not independently re-specified here.

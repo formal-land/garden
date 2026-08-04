@@ -581,6 +581,51 @@ Module Prim63MontgomeryRefinement (C : Prim63MontgomeryConfig).
     reflexivity.
   Qed.
 
+  Lemma eval5_inj (a b : words5) :
+    eval5 a = eval5 b -> a = b.
+  Proof.
+    destruct a as [a0 a1 a2 a3 a4].
+    destruct b as [b0 b1 b2 b3 b4].
+    intro E.
+    pose proof (word_bounds a0) as Ha0.
+    pose proof (word_bounds a1) as Ha1.
+    pose proof (word_bounds a2) as Ha2.
+    pose proof (word_bounds a3) as Ha3.
+    pose proof (word_bounds a4) as Ha4.
+    pose proof (word_bounds b0) as Hb0.
+    pose proof (word_bounds b1) as Hb1.
+    pose proof (word_bounds b2) as Hb2.
+    pose proof (word_bounds b3) as Hb3.
+    pose proof (word_bounds b4) as Hb4.
+    unfold eval5 in E; cbn [w0 w1 w2 w3 w4] in E.
+    rewrite radix_value in E, Ha0, Ha1, Ha2, Ha3, Ha4,
+      Hb0, Hb1, Hb2, Hb3, Hb4.
+    assert (E4 : Uint63.to_Z a4 = Uint63.to_Z b4) by nia.
+    assert (E3 : Uint63.to_Z a3 = Uint63.to_Z b3) by nia.
+    assert (E2 : Uint63.to_Z a2 = Uint63.to_Z b2) by nia.
+    assert (E1 : Uint63.to_Z a1 = Uint63.to_Z b1) by nia.
+    assert (E0 : Uint63.to_Z a0 = Uint63.to_Z b0) by nia.
+    apply Uint63.to_Z_inj in E0.
+    apply Uint63.to_Z_inj in E1.
+    apply Uint63.to_Z_inj in E2.
+    apply Uint63.to_Z_inj in E3.
+    apply Uint63.to_Z_inj in E4.
+    subst; reflexivity.
+  Qed.
+
+  Lemma equal_spec (a b : words5) :
+    M.equal a b = true <-> a = b.
+  Proof.
+    split.
+    - intro H.
+      apply eval5_inj.
+      exact (equal_sound a b H).
+    - intros ->.
+      unfold M.equal.
+      repeat rewrite Uint63.eqb_refl.
+      reflexivity.
+  Qed.
+
   Lemma less_than_sound (a b : words5) :
     M.less_than a b = true -> eval5 a < eval5 b.
   Proof.
@@ -612,6 +657,80 @@ Module Prim63MontgomeryRefinement (C : Prim63MontgomeryConfig).
     - solve_lex a0 a1 a2 a3 a4 b0 b1 b2 b3 b4.
   Qed.
 
+  Lemma word_ltb_false_ge (a b : word) :
+    PrimInt63.ltb a b = false -> Uint63.to_Z b <= Uint63.to_Z a.
+  Proof.
+    intros Hfalse.
+    destruct (Z_lt_ge_dec (Uint63.to_Z a) (Uint63.to_Z b)) as [Hlt | Hge].
+    - apply Uint63.ltb_spec in Hlt.
+      rewrite Hlt in Hfalse.
+      discriminate.
+    - lia.
+  Qed.
+
+  Lemma word_eqb_false_neq (a b : word) :
+    PrimInt63.eqb a b = false -> Uint63.to_Z a <> Uint63.to_Z b.
+  Proof.
+    intros Hfalse Heq.
+    apply Uint63.to_Z_inj in Heq.
+    subst b.
+    rewrite Uint63.eqb_refl in Hfalse.
+    discriminate.
+  Qed.
+
+  Lemma less_than_complete (a b : words5) :
+    eval5 a < eval5 b -> M.less_than a b = true.
+  Proof.
+    destruct a as [a0 a1 a2 a3 a4].
+    destruct b as [b0 b1 b2 b3 b4].
+    unfold M.less_than; cbn [w0 w1 w2 w3 w4].
+    intro H.
+    pose proof (word_bounds a0) as Ha0.
+    pose proof (word_bounds a1) as Ha1.
+    pose proof (word_bounds a2) as Ha2.
+    pose proof (word_bounds a3) as Ha3.
+    pose proof (word_bounds a4) as Ha4.
+    pose proof (word_bounds b0) as Hb0.
+    pose proof (word_bounds b1) as Hb1.
+    pose proof (word_bounds b2) as Hb2.
+    pose proof (word_bounds b3) as Hb3.
+    pose proof (word_bounds b4) as Hb4.
+    unfold eval5 in H; cbn [w0 w1 w2 w3 w4] in H.
+    rewrite radix_value in H, Ha0, Ha1, Ha2, Ha3, Ha4,
+      Hb0, Hb1, Hb2, Hb3, Hb4.
+    destruct (PrimInt63.eqb a4 b4) eqn:E4.
+    - apply Uint63.eqb_spec in E4; subst b4.
+      destruct (PrimInt63.eqb a3 b3) eqn:E3.
+      + apply Uint63.eqb_spec in E3; subst b3.
+        destruct (PrimInt63.eqb a2 b2) eqn:E2.
+        * apply Uint63.eqb_spec in E2; subst b2.
+          destruct (PrimInt63.eqb a1 b1) eqn:E1.
+          -- apply Uint63.eqb_spec in E1; subst b1.
+             apply Uint63.ltb_spec. nia.
+          -- destruct (PrimInt63.ltb a1 b1) eqn:L1; [reflexivity |].
+             pose proof (word_ltb_false_ge a1 b1 L1).
+             pose proof (word_eqb_false_neq a1 b1 E1).
+             exfalso; nia.
+        * destruct (PrimInt63.ltb a2 b2) eqn:L2; [reflexivity |].
+          pose proof (word_ltb_false_ge a2 b2 L2).
+          pose proof (word_eqb_false_neq a2 b2 E2).
+          exfalso; nia.
+      + destruct (PrimInt63.ltb a3 b3) eqn:L3; [reflexivity |].
+        pose proof (word_ltb_false_ge a3 b3 L3).
+        pose proof (word_eqb_false_neq a3 b3 E3).
+        exfalso; nia.
+    - destruct (PrimInt63.ltb a4 b4) eqn:L4; [reflexivity |].
+      pose proof (word_ltb_false_ge a4 b4 L4).
+      pose proof (word_eqb_false_neq a4 b4 E4).
+      exfalso; nia.
+  Qed.
+
+  Lemma less_than_spec (a b : words5) :
+    M.less_than a b = true <-> eval5 a < eval5 b.
+  Proof.
+    split; [apply less_than_sound | apply less_than_complete].
+  Qed.
+
   Lemma less_equal_sound (a b : words5) :
     M.less_equal a b = true -> eval5 a <= eval5 b.
   Proof.
@@ -622,7 +741,112 @@ Module Prim63MontgomeryRefinement (C : Prim63MontgomeryConfig).
     - apply equal_sound in Heq; lia.
   Qed.
 
+  Lemma less_equal_spec (a b : words5) :
+    M.less_equal a b = true <-> eval5 a <= eval5 b.
+  Proof.
+    split; [apply less_equal_sound |].
+    intro Hle.
+    destruct (proj1 (Z.lt_eq_cases (eval5 a) (eval5 b)) Hle)
+      as [Hlt | Heq].
+    - unfold M.less_equal.
+      apply Bool.orb_true_iff; left.
+      exact (less_than_complete a b Hlt).
+    - unfold M.less_equal.
+      apply Bool.orb_true_iff; right.
+      apply (proj2 (equal_spec a b)).
+      apply eval5_inj.
+      exact Heq.
+  Qed.
+
   Definition borrow_Z (b : bool) : Z := if b then 1 else 0.
+
+  Definition carry_Z (b : bool) : Z := if b then 1 else 0.
+
+  Lemma add_step_spec (a b : word) (carry : bool) :
+    let '(r, carry') := M.add_step a b carry in
+    Uint63.to_Z r + radix * carry_Z carry' =
+      Uint63.to_Z a + Uint63.to_Z b + carry_Z carry.
+  Proof.
+    unfold M.add_step, carry_Z.
+    destruct carry.
+    - destruct (PrimInt63.addcarryc a b) as [r | r] eqn:E;
+        pose proof (Uint63.addcarryc_spec a b) as S;
+        rewrite E in S; cbn [interp_carry fst snd] in S |- *;
+        unfold radix in *; lia.
+    - destruct (PrimInt63.addc a b) as [r | r] eqn:E;
+        pose proof (Uint63.addc_spec a b) as S;
+        rewrite E in S; cbn [interp_carry fst snd] in S |- *;
+        unfold radix in *; lia.
+  Qed.
+
+  Lemma add_raw_spec (a b : words5) :
+    let '(r, carry) := M.add_raw a b in
+    eval5 r + radix5 * carry_Z carry = eval5 a + eval5 b.
+  Proof.
+    destruct a as [a0 a1 a2 a3 a4].
+    destruct b as [b0 b1 b2 b3 b4].
+    unfold M.add_raw; cbn [w0 w1 w2 w3 w4].
+    destruct (M.add_step a0 b0 false) as [r0 c0] eqn:E0.
+    destruct (M.add_step a1 b1 c0) as [r1 c1] eqn:E1.
+    destruct (M.add_step a2 b2 c1) as [r2 c2] eqn:E2.
+    destruct (M.add_step a3 b3 c2) as [r3 c3] eqn:E3.
+    destruct (M.add_step a4 b4 c3) as [r4 c4] eqn:E4.
+    pose proof (add_step_spec a0 b0 false) as S0.
+    pose proof (add_step_spec a1 b1 c0) as S1.
+    pose proof (add_step_spec a2 b2 c1) as S2.
+    pose proof (add_step_spec a3 b3 c2) as S3.
+    pose proof (add_step_spec a4 b4 c3) as S4.
+    rewrite E0 in S0; cbn [fst snd carry_Z] in S0.
+    rewrite E1 in S1; cbn [fst snd] in S1.
+    rewrite E2 in S2; cbn [fst snd] in S2.
+    rewrite E3 in S3; cbn [fst snd] in S3.
+    rewrite E4 in S4; cbn [fst snd] in S4 |- *.
+    unfold eval5, radix5; cbn [w0 w1 w2 w3 w4].
+    replace
+      (Uint63.to_Z r0 +
+       radix * (Uint63.to_Z r1 +
+       radix * (Uint63.to_Z r2 +
+       radix * (Uint63.to_Z r3 + radix * Uint63.to_Z r4))) +
+       radix ^ 5 * carry_Z c4)
+      with
+      ((Uint63.to_Z r0 + radix * carry_Z c0) +
+       radix * (Uint63.to_Z r1 + radix * carry_Z c1 - carry_Z c0) +
+       radix ^ 2 *
+         (Uint63.to_Z r2 + radix * carry_Z c2 - carry_Z c1) +
+       radix ^ 3 *
+         (Uint63.to_Z r3 + radix * carry_Z c3 - carry_Z c2) +
+       radix ^ 4 *
+         (Uint63.to_Z r4 + radix * carry_Z c4 - carry_Z c3))
+      by ring.
+    rewrite S0.
+    assert (T1 : Uint63.to_Z r1 + radix * carry_Z c1 - carry_Z c0 =
+      Uint63.to_Z a1 + Uint63.to_Z b1) by lia.
+    assert (T2 : Uint63.to_Z r2 + radix * carry_Z c2 - carry_Z c1 =
+      Uint63.to_Z a2 + Uint63.to_Z b2) by lia.
+    assert (T3 : Uint63.to_Z r3 + radix * carry_Z c3 - carry_Z c2 =
+      Uint63.to_Z a3 + Uint63.to_Z b3) by lia.
+    assert (T4 : Uint63.to_Z r4 + radix * carry_Z c4 - carry_Z c3 =
+      Uint63.to_Z a4 + Uint63.to_Z b4) by lia.
+    rewrite T1, T2, T3, T4.
+    ring.
+  Qed.
+
+  Lemma add_raw_no_carry (a b : words5)
+      (Hfit : eval5 a + eval5 b < radix5) :
+    exists r : words5,
+      M.add_raw a b = (r, false) /\ eval5 r = eval5 a + eval5 b.
+  Proof.
+    destruct (M.add_raw a b) as [r carry] eqn:Eraw.
+    pose proof (add_raw_spec a b) as E.
+    rewrite Eraw in E; cbn [fst snd] in E.
+    destruct carry.
+    - cbn [carry_Z] in E.
+      pose proof (eval5_bounds r) as Hr.
+      lia.
+    - exists r; split; [reflexivity |].
+      cbn [carry_Z] in E.
+      lia.
+  Qed.
 
   Lemma sub_step_spec (a b : word) (borrow : bool) :
     let '(r, borrow') := M.sub_step a b borrow in
@@ -849,6 +1073,571 @@ Module Prim63MontgomeryRefinement (C : Prim63MontgomeryConfig).
     rewrite Z.mul_mod by exact Hm0.
     reflexivity.
     all: exact Hm0.
+  Qed.
+
+  (** ** Stable field-operation interface *)
+
+  Lemma modulus_nonzero : C.modulus_Z <> 0.
+  Proof. pose proof C.modulus_positive; lia. Qed.
+
+  Lemma modulus_gt_one : 1 < C.modulus_Z.
+  Proof.
+    pose proof C.modulus_positive as Hm.
+    pose proof
+      (Z.mod_pos_bound (radix5 * C.r_inverse_Z) C.modulus_Z Hm) as Hbound.
+    rewrite C.r_inverse_correct in Hbound.
+    lia.
+  Qed.
+
+  Lemma eval5_zero : eval5 zero5 = 0.
+  Proof.
+    unfold eval5, zero5; cbn [w0 w1 w2 w3 w4].
+    rewrite Uint63.to_Z_0.
+    ring.
+  Qed.
+
+  Lemma eval5_one : eval5 one5 = 1.
+  Proof.
+    unfold eval5, one5; cbn [w0 w1 w2 w3 w4].
+    rewrite Uint63.to_Z_0, Uint63.to_Z_1.
+    ring.
+  Qed.
+
+  Lemma reduce_once_canonical (a : words5)
+      (Ha : eval5 a < 2 * C.modulus_Z) :
+    M.canonical (M.reduce_once a).
+  Proof.
+    unfold M.canonical, M.reduce_once.
+    destruct (M.less_equal C.modulus a) eqn:Hcmp.
+    - rewrite (subtract_modulus_spec a Hcmp).
+      pose proof (less_equal_sound C.modulus a Hcmp) as Hle.
+      rewrite C.modulus_words_correct in Hle.
+      lia.
+    - assert (Hnot : ~ eval5 C.modulus <= eval5 a).
+      { intro Hle.
+        pose proof (proj2 (less_equal_spec C.modulus a) Hle) as Htrue.
+        rewrite Hcmp in Htrue.
+        discriminate. }
+      rewrite C.modulus_words_correct in Hnot.
+      lia.
+  Qed.
+
+  Lemma reduce_once_eval (a : words5)
+      (Ha : eval5 a < 2 * C.modulus_Z) :
+    eval5 (M.reduce_once a) = eval5 a mod C.modulus_Z.
+  Proof.
+    pose proof (reduce_once_canonical a Ha) as Hcanonical.
+    pose proof (reduce_once_congruent a) as Hcongruent.
+    unfold M.canonical in Hcanonical.
+    rewrite Z.mod_small in Hcongruent.
+    - exact Hcongruent.
+    - pose proof (eval5_bounds (M.reduce_once a)).
+      lia.
+  Qed.
+
+  Lemma zero_canonical : M.canonical M.zero.
+  Proof.
+    unfold M.canonical, M.zero.
+    rewrite eval5_zero.
+    exact C.modulus_positive.
+  Qed.
+
+  Lemma denote_zero : M.denote M.zero = 0.
+  Proof.
+    unfold M.denote, M.zero.
+    rewrite eval5_zero, Z.mul_0_l, Z.mod_0_l by exact modulus_nonzero.
+    reflexivity.
+  Qed.
+
+  Lemma one_canonical : M.canonical M.one.
+  Proof.
+    unfold M.canonical, M.one.
+    rewrite C.montgomery_one_correct.
+    apply (proj2 (Z.mod_pos_bound radix5 C.modulus_Z C.modulus_positive)).
+  Qed.
+
+  Lemma denote_one : M.denote M.one = 1.
+  Proof.
+    unfold M.denote, M.one.
+    rewrite C.montgomery_one_correct.
+    rewrite Z.mul_mod_idemp_l by exact modulus_nonzero.
+    rewrite C.r_inverse_correct.
+    reflexivity.
+  Qed.
+
+  Lemma add_canonical (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.canonical (M.add a b).
+  Proof.
+    assert (Hsum : eval5 a + eval5 b < radix5).
+    { unfold M.canonical in Ha, Hb.
+      pose proof C.twice_modulus_fits.
+      lia. }
+    destruct (add_raw_no_carry a b Hsum) as [s [Eraw Es]].
+    unfold M.add.
+    rewrite Eraw; cbn [fst snd].
+    apply reduce_once_canonical.
+    rewrite Es.
+    unfold M.canonical in Ha, Hb.
+    lia.
+  Qed.
+
+  Lemma add_eval (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    eval5 (M.add a b) = (eval5 a + eval5 b) mod C.modulus_Z.
+  Proof.
+    assert (Hsum : eval5 a + eval5 b < radix5).
+    { unfold M.canonical in Ha, Hb.
+      pose proof C.twice_modulus_fits.
+      lia. }
+    destruct (add_raw_no_carry a b Hsum) as [s [Eraw Es]].
+    unfold M.add.
+    rewrite Eraw; cbn [fst snd].
+    rewrite reduce_once_eval.
+    - rewrite Es; reflexivity.
+    - rewrite Es.
+      unfold M.canonical in Ha, Hb.
+      lia.
+  Qed.
+
+  Lemma sub_canonical (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.canonical (M.sub a b).
+  Proof.
+    destruct (M.sub_raw a b) as [d borrow] eqn:Eraw.
+    pose proof (sub_raw_spec a b) as Esub.
+    rewrite Eraw in Esub; cbn [fst snd] in Esub.
+    unfold M.sub.
+    rewrite Eraw; cbn [fst snd].
+    pose proof (eval5_bounds a) as Ha0.
+    pose proof (eval5_bounds b) as Hb0.
+    pose proof (eval5_bounds d) as Hd0.
+    unfold M.canonical in Ha, Hb |- *.
+    destruct borrow.
+    - cbn [borrow_Z] in Esub.
+      destruct (M.add_raw d C.modulus) as [s carry] eqn:Eadd.
+      pose proof (add_raw_spec d C.modulus) as Sadd.
+      rewrite Eadd in Sadd; cbn [fst snd] in Sadd |- *.
+      rewrite C.modulus_words_correct in Sadd.
+      pose proof (eval5_bounds s) as Hs0.
+      destruct carry.
+      + cbn [carry_Z] in Sadd.
+        lia.
+      + cbn [carry_Z] in Sadd.
+        exfalso; lia.
+    - cbn [borrow_Z] in Esub.
+      lia.
+  Qed.
+
+  Lemma sub_eval_congruent (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    eval5 (M.sub a b) mod C.modulus_Z =
+      (eval5 a - eval5 b) mod C.modulus_Z.
+  Proof.
+    destruct (M.sub_raw a b) as [d borrow] eqn:Eraw.
+    pose proof (sub_raw_spec a b) as Esub.
+    rewrite Eraw in Esub; cbn [fst snd] in Esub.
+    unfold M.sub.
+    rewrite Eraw; cbn [fst snd].
+    pose proof (eval5_bounds a) as Ha0.
+    pose proof (eval5_bounds b) as Hb0.
+    pose proof (eval5_bounds d) as Hd0.
+    unfold M.canonical in Ha, Hb.
+    destruct borrow.
+    - cbn [borrow_Z] in Esub.
+      destruct (M.add_raw d C.modulus) as [s carry] eqn:Eadd.
+      pose proof (add_raw_spec d C.modulus) as Sadd.
+      rewrite Eadd in Sadd; cbn [fst snd] in Sadd |- *.
+      rewrite C.modulus_words_correct in Sadd.
+      pose proof (eval5_bounds s) as Hs0.
+      destruct carry.
+      + cbn [carry_Z] in Sadd.
+        replace (eval5 s) with
+          ((eval5 a - eval5 b) + C.modulus_Z) by lia.
+        rewrite Z.add_mod by exact modulus_nonzero.
+        rewrite Z.mod_same by exact modulus_nonzero.
+        rewrite Z.add_0_r, Z.mod_mod by exact modulus_nonzero.
+        reflexivity.
+      + cbn [carry_Z] in Sadd.
+        exfalso; lia.
+    - cbn [borrow_Z] in Esub.
+      assert (Ed : eval5 d = eval5 a - eval5 b) by lia.
+      rewrite Ed.
+      reflexivity.
+  Qed.
+
+  Lemma sub_eval (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    eval5 (M.sub a b) =
+      (eval5 a - eval5 b) mod C.modulus_Z.
+  Proof.
+    pose proof (sub_canonical a b Ha Hb) as Hcanonical.
+    pose proof (sub_eval_congruent a b Ha Hb) as Hcongruent.
+    unfold M.canonical in Hcanonical.
+    rewrite Z.mod_small in Hcongruent.
+    - exact Hcongruent.
+    - pose proof (eval5_bounds (M.sub a b)).
+      lia.
+  Qed.
+
+  Lemma neg_canonical (a : M.t) (Ha : M.canonical a) :
+    M.canonical (M.neg a).
+  Proof.
+    unfold M.neg.
+    destruct (M.equal a M.zero) eqn:Heq.
+    - exact zero_canonical.
+    - assert (Hneq : a <> M.zero).
+      { intro E; subst a.
+        rewrite (proj2 (equal_spec M.zero M.zero) eq_refl) in Heq.
+        discriminate. }
+      assert (Hpositive : 0 < eval5 a).
+      { pose proof (eval5_bounds a) as Ha0.
+        destruct (Z.eq_dec (eval5 a) 0) as [Hz | Hz]; [|lia].
+        exfalso.
+        apply Hneq.
+        apply eval5_inj.
+        unfold M.zero.
+        rewrite eval5_zero.
+        exact Hz. }
+      assert (Hle : eval5 a <= eval5 C.modulus).
+      { rewrite C.modulus_words_correct.
+        unfold M.canonical in Ha.
+        lia. }
+      destruct (sub_raw_no_borrow C.modulus a Hle) as [d [Eraw Ed]].
+      rewrite Eraw; cbn [fst snd].
+      unfold M.canonical.
+      rewrite Ed, C.modulus_words_correct.
+      lia.
+  Qed.
+
+  Lemma neg_eval_congruent (a : M.t) (Ha : M.canonical a) :
+    eval5 (M.neg a) mod C.modulus_Z = (- eval5 a) mod C.modulus_Z.
+  Proof.
+    unfold M.neg.
+    destruct (M.equal a M.zero) eqn:Heq.
+    - apply (proj1 (equal_spec a M.zero)) in Heq.
+      subst a.
+      unfold M.zero.
+      rewrite !eval5_zero, Z.opp_0, !Z.mod_0_l by exact modulus_nonzero.
+      reflexivity.
+    - assert (Hle : eval5 a <= eval5 C.modulus).
+      { rewrite C.modulus_words_correct.
+        unfold M.canonical in Ha.
+        lia. }
+      destruct (sub_raw_no_borrow C.modulus a Hle) as [d [Eraw Ed]].
+      rewrite Eraw; cbn [fst snd].
+      rewrite Ed, C.modulus_words_correct.
+      replace (C.modulus_Z - eval5 a) with
+        (- eval5 a + C.modulus_Z) by ring.
+      rewrite Z.add_mod by exact modulus_nonzero.
+      rewrite Z.mod_same by exact modulus_nonzero.
+      rewrite Z.add_0_r, Z.mod_mod by exact modulus_nonzero.
+      reflexivity.
+  Qed.
+
+  Lemma neg_eval (a : M.t) (Ha : M.canonical a) :
+    eval5 (M.neg a) = (- eval5 a) mod C.modulus_Z.
+  Proof.
+    pose proof (neg_canonical a Ha) as Hcanonical.
+    pose proof (neg_eval_congruent a Ha) as Hcongruent.
+    unfold M.canonical in Hcanonical.
+    rewrite Z.mod_small in Hcongruent.
+    - exact Hcongruent.
+    - pose proof (eval5_bounds (M.neg a)).
+      lia.
+  Qed.
+
+  Lemma mul_canonical (a b : M.t) (Hb : M.canonical b) :
+    M.canonical (M.mul a b).
+  Proof.
+    unfold M.mul.
+    rewrite montgomery_reduce_unfold.
+    apply reduce_once_canonical.
+    rewrite (montgomery_steps_low5 a b Hb).
+    exact (montgomery_steps_bound a b Hb).
+  Qed.
+
+  Lemma square_canonical (a : M.t) (Ha : M.canonical a) :
+    M.canonical (M.square a).
+  Proof. exact (mul_canonical a a Ha). Qed.
+
+  Lemma square_denote (a : M.t) (Ha : M.canonical a) :
+    M.denote (M.square a) =
+      (M.denote a * M.denote a) mod C.modulus_Z.
+  Proof. exact (mul_denote a a Ha). Qed.
+
+  Lemma add_denote (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.denote (M.add a b) =
+      (M.denote a + M.denote b) mod C.modulus_Z.
+  Proof.
+    unfold M.denote.
+    rewrite (add_eval a b Ha Hb).
+    rewrite Z.mul_mod_idemp_l by exact modulus_nonzero.
+    rewrite <- Z.add_mod by exact modulus_nonzero.
+    f_equal; ring.
+  Qed.
+
+  Lemma sub_denote (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.denote (M.sub a b) =
+      (M.denote a - M.denote b) mod C.modulus_Z.
+  Proof.
+    unfold M.denote.
+    rewrite (sub_eval a b Ha Hb).
+    rewrite Z.mul_mod_idemp_l by exact modulus_nonzero.
+    rewrite <- Zminus_mod.
+    f_equal; ring.
+  Qed.
+
+  Lemma neg_denote (a : M.t) (Ha : M.canonical a) :
+    M.denote (M.neg a) = (- M.denote a) mod C.modulus_Z.
+  Proof.
+    unfold M.denote.
+    rewrite (neg_eval a Ha).
+    rewrite Z.mul_mod_idemp_l by exact modulus_nonzero.
+    replace (- ((eval5 a * C.r_inverse_Z) mod C.modulus_Z))
+      with
+      (0 - ((eval5 a * C.r_inverse_Z) mod C.modulus_Z)) by ring.
+    rewrite <- (Z.mod_0_l C.modulus_Z modulus_nonzero).
+    rewrite <- Zminus_mod.
+    f_equal; ring.
+  Qed.
+
+  Lemma r_inverse_cancel (x : Z) :
+    ((x * C.r_inverse_Z) * radix5) mod C.modulus_Z =
+      x mod C.modulus_Z.
+  Proof.
+    replace ((x * C.r_inverse_Z) * radix5)
+      with (x * (radix5 * C.r_inverse_Z)) by ring.
+    assert (Hinv :
+      (radix5 * C.r_inverse_Z) mod C.modulus_Z =
+        1 mod C.modulus_Z).
+    { rewrite C.r_inverse_correct, Z.mod_small; [reflexivity |].
+      pose proof modulus_gt_one; lia. }
+    pose proof
+      (mod_mul_compat x x (radix5 * C.r_inverse_Z) 1
+        eq_refl Hinv) as E.
+    replace (x * 1) with x in E by ring.
+    exact E.
+  Qed.
+
+  Lemma denote_injective (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.denote a = M.denote b -> a = b.
+  Proof.
+    unfold M.denote, M.canonical in *.
+    intro H.
+    pose proof
+      (f_equal (fun z => (z * radix5) mod C.modulus_Z) H) as Hscaled.
+    cbn beta in Hscaled.
+    rewrite !Z.mul_mod_idemp_l in Hscaled by exact modulus_nonzero.
+    rewrite !r_inverse_cancel in Hscaled.
+    pose proof (eval5_bounds a) as Ha0.
+    pose proof (eval5_bounds b) as Hb0.
+    rewrite !Z.mod_small in Hscaled by lia.
+    apply eval5_inj.
+    exact Hscaled.
+  Qed.
+
+  Lemma equal_denote_iff (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.equal a b = true <-> M.denote a = M.denote b.
+  Proof.
+    split.
+    - intro Heq.
+      apply (proj1 (equal_spec a b)) in Heq.
+      subst b; reflexivity.
+    - intro Hdenote.
+      apply (proj2 (equal_spec a b)).
+      exact (denote_injective a b Ha Hb Hdenote).
+  Qed.
+
+  Lemma equal_denote_false_iff (a b : M.t)
+      (Ha : M.canonical a) (Hb : M.canonical b) :
+    M.equal a b = false <-> M.denote a <> M.denote b.
+  Proof.
+    split.
+    - intros Hfalse Hdenote.
+      pose proof (proj2 (equal_denote_iff a b Ha Hb) Hdenote) as Htrue.
+      rewrite Hfalse in Htrue; discriminate.
+    - intro Hneq.
+      destruct (M.equal a b) eqn:Heq; [|reflexivity].
+      exfalso.
+      apply Hneq.
+      exact (proj1 (equal_denote_iff a b Ha Hb) Heq).
+  Qed.
+
+  Lemma modulus_lt_radix5 : C.modulus_Z < radix5.
+  Proof.
+    pose proof C.modulus_positive.
+    pose proof C.twice_modulus_fits.
+    lia.
+  Qed.
+
+  Lemma words_of_nonnegative_eval (z : Z)
+      (Hz : 0 <= z < radix5) :
+    eval5 (M.words_of_nonnegative z) = z.
+  Proof.
+    unfold M.words_of_nonnegative, eval5.
+    cbn [w0 w1 w2 w3 w4].
+    rewrite !Uint63.of_Z_spec.
+    pose proof radix_pos as Hr.
+    assert (Hr0 : radix <> 0) by lia.
+    assert (Hr2 : radix ^ 2 <> 0) by
+      (apply Z.pow_nonzero; [exact Hr0 | lia]).
+    assert (Hr3 : radix ^ 3 <> 0) by
+      (apply Z.pow_nonzero; [exact Hr0 | lia]).
+    assert (E12 : z / radix / radix = z / radix ^ 2).
+    { rewrite Z.div_div by (exact Hr0 || lia).
+      f_equal; ring. }
+    assert (E23 : z / radix ^ 2 / radix = z / radix ^ 3).
+    { rewrite Z.div_div by (exact Hr2 || lia).
+      f_equal; ring. }
+    assert (E34 : z / radix ^ 3 / radix = z / radix ^ 4).
+    { rewrite Z.div_div by (exact Hr3 || lia).
+      f_equal; ring. }
+    assert (Hq4 : 0 <= z / radix ^ 4 < radix).
+    { split.
+      - apply Z.div_pos; [exact (proj1 Hz) |].
+        apply Z.pow_pos_nonneg; lia.
+      - apply Z.div_lt_upper_bound.
+        + apply Z.pow_pos_nonneg; lia.
+        + unfold radix5 in Hz.
+          replace (radix ^ 4 * radix) with (radix ^ 5) by ring.
+          exact (proj2 Hz). }
+    assert (E45 : z / radix ^ 4 / radix = 0).
+    { apply Z.div_small; exact Hq4. }
+    rewrite !Z.mod_eq by exact Hr0.
+    fold radix.
+    rewrite E12, E23, E34, E45.
+    ring.
+  Qed.
+
+  Lemma standard_of_Z_eval (z : Z) :
+    eval5 (M.standard_of_Z z) = z mod C.modulus_Z.
+  Proof.
+    unfold M.standard_of_Z.
+    apply words_of_nonnegative_eval.
+    pose proof (Z.mod_pos_bound z C.modulus_Z C.modulus_positive).
+    pose proof modulus_lt_radix5.
+    lia.
+  Qed.
+
+  Lemma standard_of_Z_canonical (z : Z) :
+    M.canonical (M.standard_of_Z z).
+  Proof.
+    unfold M.canonical.
+    rewrite standard_of_Z_eval.
+    apply (proj2 (Z.mod_pos_bound z C.modulus_Z C.modulus_positive)).
+  Qed.
+
+  Lemma r2_canonical : M.canonical C.r2.
+  Proof.
+    unfold M.canonical.
+    rewrite C.r2_correct.
+    apply (proj2
+      (Z.mod_pos_bound (radix5 * radix5) C.modulus_Z C.modulus_positive)).
+  Qed.
+
+  Lemma denote_r2 : M.denote C.r2 = radix5 mod C.modulus_Z.
+  Proof.
+    unfold M.denote.
+    rewrite C.r2_correct.
+    rewrite Z.mul_mod_idemp_l by exact modulus_nonzero.
+    replace ((radix5 * radix5) * C.r_inverse_Z)
+      with (radix5 * (radix5 * C.r_inverse_Z)) by ring.
+    assert (Hinv :
+      (radix5 * C.r_inverse_Z) mod C.modulus_Z =
+        1 mod C.modulus_Z).
+    { rewrite C.r_inverse_correct, Z.mod_small; [reflexivity |].
+      pose proof modulus_gt_one; lia. }
+    pose proof
+      (mod_mul_compat radix5 radix5
+        (radix5 * C.r_inverse_Z) 1 eq_refl Hinv) as E.
+    replace (radix5 * 1) with radix5 in E by ring.
+    exact E.
+  Qed.
+
+  Lemma encode_canonical (standard : words5) :
+    M.canonical (M.encode standard).
+  Proof.
+    unfold M.encode.
+    exact (mul_canonical standard C.r2 r2_canonical).
+  Qed.
+
+  Lemma encode_denote (standard : words5) :
+    M.denote (M.encode standard) = eval5 standard mod C.modulus_Z.
+  Proof.
+    unfold M.encode.
+    rewrite (mul_denote standard C.r2 r2_canonical), denote_r2.
+    unfold M.denote.
+    rewrite <- Z.mul_mod by exact modulus_nonzero.
+    exact (r_inverse_cancel (eval5 standard)).
+  Qed.
+
+  Lemma from_Z_canonical (z : Z) : M.canonical (M.from_Z z).
+  Proof.
+    unfold M.from_Z.
+    apply encode_canonical.
+  Qed.
+
+  Lemma from_Z_denote (z : Z) :
+    M.denote (M.from_Z z) = z mod C.modulus_Z.
+  Proof.
+    unfold M.from_Z.
+    rewrite encode_denote, standard_of_Z_eval.
+    rewrite Z.mod_mod by exact modulus_nonzero.
+    reflexivity.
+  Qed.
+
+  Lemma standard_one_canonical : M.canonical one5.
+  Proof.
+    unfold M.canonical.
+    rewrite eval5_one.
+    exact modulus_gt_one.
+  Qed.
+
+  Lemma mul_eval (a b : M.t) (Hb : M.canonical b) :
+    eval5 (M.mul a b) =
+      (eval5 a * eval5 b * C.r_inverse_Z) mod C.modulus_Z.
+  Proof.
+    pose proof (mul_congruent a b Hb) as Hmul.
+    pose proof
+      (mod_mul_compat
+        (radix5 * eval5 (M.mul a b)) (eval5 a * eval5 b)
+        C.r_inverse_Z C.r_inverse_Z Hmul eq_refl) as Hscaled.
+    replace
+      ((radix5 * eval5 (M.mul a b)) * C.r_inverse_Z)
+      with
+      ((eval5 (M.mul a b) * C.r_inverse_Z) * radix5)
+      in Hscaled by ring.
+    rewrite r_inverse_cancel in Hscaled.
+    pose proof (mul_canonical a b Hb) as Hcanonical.
+    unfold M.canonical in Hcanonical.
+    pose proof (eval5_bounds (M.mul a b)) as Hbounds.
+    rewrite Z.mod_small in Hscaled by lia.
+    exact Hscaled.
+  Qed.
+
+  Lemma decode_canonical (a : M.t) : M.canonical (M.decode a).
+  Proof.
+    unfold M.decode.
+    exact (mul_canonical a one5 standard_one_canonical).
+  Qed.
+
+  Lemma decode_eval5 (a : M.t) :
+    eval5 (M.decode a) = M.denote a.
+  Proof.
+    unfold M.decode, M.denote.
+    rewrite (mul_eval a one5 standard_one_canonical), eval5_one.
+    f_equal; ring.
+  Qed.
+
+  Lemma to_Z_denote (a : M.t) : M.to_Z a = M.denote a.
+  Proof.
+    unfold M.to_Z.
+    apply decode_eval5.
   Qed.
 
 End Prim63MontgomeryRefinement.

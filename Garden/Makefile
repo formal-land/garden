@@ -212,16 +212,19 @@ orchard-vk-pinned-check:
 # The provenance graph has plenty of parallelism, but its leaves have very
 # different memory profiles.  In particular, SRS, inverse-FFT, Pippenger and
 # assembly workers retain large generated terms.  Keep those phases at one
-# worker by default (two is the practical upper bound on ordinary developer
-# machines), independently of the data/cheap-leaf fan-out.
+# worker by default.  Generated literals and record-packaging leaves are
+# individually cheaper, but a production-size graph can still retain enough
+# elaborated terms for several simultaneous workers to exhaust memory.  The
+# safe default is therefore one worker for every phase; measured builders can
+# opt into fan-out one phase at a time below.
 VK_PROVENANCE_CORE_JOBS ?= 1
-VK_PROVENANCE_DATA_JOBS ?= 2
+VK_PROVENANCE_DATA_JOBS ?= 1
 VK_PROVENANCE_CHECK_JOBS ?= 1
 VK_PROVENANCE_SRS_JOBS ?= 1
 VK_PROVENANCE_CALIBRATION_JOBS ?= 1
 VK_PROVENANCE_MSM_JOBS ?= 1
 VK_PROVENANCE_ASSEMBLY_JOBS ?= 1
-VK_PROVENANCE_CHEAP_JOBS ?= 2
+VK_PROVENANCE_CHEAP_JOBS ?= 1
 VK_PROVENANCE_FINAL_JOBS ?= 1
 
 # Backwards compatibility: the former global knob now controls only the
@@ -248,20 +251,27 @@ VK_PROVENANCE_CORE_VOS := \
 	Prim63/Montgomery.vo \
 	Prim63/Pasta.vo \
 	Prim63/Refinement.vo \
+	Prim63/PastaRefinement.vo \
+	Prim63/WindowRefinement.vo \
+	EllipticCurve/GroupOrderTight.vo \
 	EllipticCurve/Vesta.vo \
+	EllipticCurve/VestaOrder.vo \
 	GroupHash/sswu_vesta.vo \
 	GroupHash/group_hash_vesta.vo \
 	GroupHash/sswu_vesta_witness.vo \
 	$(VK_PROVENANCE_DIR)/DataTypes.vo \
 	$(VK_PROVENANCE_DIR)/Kinds.vo \
 	$(VK_PROVENANCE_DIR)/Jacobian.vo \
+	$(VK_PROVENANCE_DIR)/ArrayOfListRefinement.vo \
+	$(VK_PROVENANCE_DIR)/JacobianRefinement.vo \
 	$(VK_PROVENANCE_DIR)/ModelColumns.vo \
 	$(VK_PROVENANCE_DIR)/CompressShape.vo \
 	$(VK_PROVENANCE_DIR)/OrchardCombinationCount.vo \
 	$(VK_PROVENANCE_DIR)/OrchardCompressShape.vo \
 	$(VK_PROVENANCE_DIR)/ModelColumnsCorrect.vo \
 	$(VK_PROVENANCE_DIR)/FFT.vo \
-	$(VK_PROVENANCE_DIR)/Srs.vo
+	$(VK_PROVENANCE_DIR)/Srs.vo \
+	Orchard/vk_msm.vo
 
 # Phase 1b: independent generated literals.  These are the only large fan-out
 # for which a memory-rich builder should normally request roughly 32 workers.
@@ -288,7 +298,18 @@ VK_PROVENANCE_CHECKER_VOS := \
 	$(VK_PROVENANCE_DIR)/Calibration.vo \
 	$(VK_PROVENANCE_DIR)/MsmChecks.vo \
 	$(VK_PROVENANCE_DIR)/AssemblyCheck.vo \
-	$(VK_PROVENANCE_DIR)/Checks.vo
+	$(VK_PROVENANCE_DIR)/Checks.vo \
+	$(VK_PROVENANCE_DIR)/ColumnValues.vo \
+	$(VK_PROVENANCE_DIR)/ColumnValuesCorrect.vo \
+	$(VK_PROVENANCE_DIR)/DomainPowerRefinement.vo \
+	$(VK_PROVENANCE_DIR)/DomainRefinement.vo \
+	$(VK_PROVENANCE_DIR)/SigmaRefinement.vo \
+	$(VK_PROVENANCE_DIR)/PermutationValuesCorrect.vo \
+	$(VK_PROVENANCE_DIR)/MsmRefinement.vo \
+	$(VK_PROVENANCE_DIR)/PinnedSpec.vo \
+	$(VK_PROVENANCE_DIR)/PinnedCorrect.vo \
+	$(VK_PROVENANCE_DIR)/Abstract.vo \
+	$(VK_PROVENANCE_DIR)/CommitmentRefinement.vo
 
 # Closed domain/sigma checks are smaller than the cryptographic arithmetic
 # leaves, but still default to a single worker because they replay sizeable

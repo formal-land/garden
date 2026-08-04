@@ -4,6 +4,7 @@ From Stdlib Require Import ZArith.
 Require Import Stdlib.Numbers.Cyclic.Int63.Uint63.
 Require Import Garden.Prim63.Words.
 Require Import Garden.Prim63.Montgomery.
+Require Import Garden.Prim63.Refinement.
 
 Local Open Scope Z_scope.
 
@@ -71,7 +72,8 @@ Module PallasPConfig <: Prim63MontgomeryConfig.
   Proof. vm_compute. reflexivity. Qed.
 End PallasPConfig.
 
-Module PallasP := Prim63Montgomery PallasPConfig.
+Module PallasPRefinement := Prim63MontgomeryRefinement PallasPConfig.
+Module PallasP := PallasPRefinement.M.
 
 Module PallasQConfig <: Prim63MontgomeryConfig.
   Import Prim63Words.
@@ -137,4 +139,5 @@ Module PallasQConfig <: Prim63MontgomeryConfig.
   Proof. vm_compute. reflexivity. Qed.
 End PallasQConfig.
 
-Module PallasQ := Prim63Montgomery PallasQConfig.
+Module PallasQRefinement := Prim63MontgomeryRefinement PallasQConfig.
+Module PallasQ := PallasQRefinement.M.

@@ -23,18 +23,46 @@ Module VkDomain.
       (length : PrimInt63.int) : bool :=
     PrimInt63.eqb (PrimArray.length array) length.
 
-  Fixpoint reverse_bits_aux (count : nat) (input output : PrimInt63.int)
+  (** The original executable spelling used primitive shifts and masks.  Keep
+      it as an independently executable parity oracle while exposing a
+      natural-number spelling whose range and splitting laws can be used by
+      the FFT refinement proof. *)
+  Fixpoint reverse_bits_aux_primitive
+      (count : nat) (input output : PrimInt63.int)
       : PrimInt63.int :=
     match count with
     | O => output
     | S count =>
-        reverse_bits_aux count (PrimInt63.lsr input 1)
+        reverse_bits_aux_primitive count (PrimInt63.lsr input 1)
           (PrimInt63.lor (PrimInt63.lsl output 1)
             (PrimInt63.land input 1))
     end.
 
+  Fixpoint reverse_nat (count input : nat) : nat :=
+    match count with
+    | O => O
+    | S count =>
+        2 * reverse_nat count (input mod (2 ^ count))
+          + input / (2 ^ count)
+    end.
+
   Definition reverse_11 (input : PrimInt63.int) : PrimInt63.int :=
-    reverse_bits_aux 11 input 0.
+    ArrayLinear.index (reverse_nat 11 (ArrayLinear.index_nat input)).
+
+  Definition reverse_11_primitive (input : PrimInt63.int) : PrimInt63.int :=
+    reverse_bits_aux_primitive 11 input 0.
+
+  (** Closed parity check for the only input range consumed by the 2048-row
+      inverse FFT.  This protects the refactor above independently of the
+      generated bit-reversal table. *)
+  Definition reverse_11_parity_check : bool :=
+    Prim63Loop.foldi_u63 2048 0
+      (fun index ok =>
+        ok && PrimInt63.eqb (reverse_11 index) (reverse_11_primitive index))
+      true.
+
+  Lemma reverse_11_parity_checked : reverse_11_parity_check = true.
+  Proof. vm_compute. reflexivity. Qed.
 
   Definition bit_reversal_check : bool :=
     length_is VkDomainData.bit_reversed_array 2048

@@ -50,9 +50,8 @@ Module VkJacobian.
   Definition thrice (a : F.t) : F.t := F.add a (twice a).
   Definition eight_times (a : F.t) : F.t := twice (twice (twice a)).
 
-  (** [dbl-2007-bl], specialized to [a=0]. *)
-  Definition double (p : point) : point :=
-    if is_identity p then identity else
+  (** Nonidentity body of [dbl-2007-bl], specialized to [a=0]. *)
+  Definition double_core (p : point) : point :=
     let xx := F.square p.(x) in
     let yy := F.square p.(y) in
     let yyyy := F.square yy in
@@ -63,10 +62,12 @@ Module VkJacobian.
     let z3 := twice (F.mul p.(y) p.(z)) in
     {| x := x3; y := y3; z := z3 |}.
 
-  (** Complete dispatch around [add-2007-bl]. *)
-  Definition add (p q : point) : point :=
-    if is_identity p then q else
-    if is_identity q then p else
+  (** [dbl-2007-bl], with an explicit identity dispatch. *)
+  Definition double (p : point) : point :=
+    if is_identity p then identity else double_core p.
+
+  (** Nonidentity dispatch and body of [add-2007-bl]. *)
+  Definition add_core (p q : point) : point :=
     let z1z1 := F.square p.(z) in
     let z2z2 := F.square q.(z) in
     let u1 := F.mul p.(x) z2z2 in
@@ -86,6 +87,11 @@ Module VkJacobian.
       let z3 :=
         F.mul (F.sub (F.sub (F.square (F.add p.(z) q.(z))) z1z1) z2z2) h in
       {| x := x3; y := y3; z := z3 |}.
+
+  (** Complete dispatch around [add-2007-bl]. *)
+  Definition add (p q : point) : point :=
+    if is_identity p then q else
+    if is_identity q then p else add_core p q.
 
   Fixpoint double_n (count : nat) (p : point) : point :=
     match count with

@@ -687,9 +687,15 @@ def emit_sigma_certificate() -> None:
             f"    sigma_{index:02d} : VkSigma.column_check {index} = true;"
         )
         values.append(f"    sigma_{index:02d} := {module}.checked;")
+    column_cases = "".join(
+        "  destruct column as [|column]; "
+        f"[exact certificate.(sigma_{index:02d}) |].\n"
+        for index in range(15)
+    )
     write(
         CERTS / "Sigma.v",
         "(** Generated aggregation tying all sigma columns to the model. *)\n"
+        "From Stdlib Require Import Lia.\n"
         "Require Import Garden.Orchard.vk.provenance.Sigma.\n"
         + "\n".join(imports)
         + "\n\nModule VkSigmaCertificate.\n"
@@ -697,7 +703,16 @@ def emit_sigma_certificate() -> None:
         + "\n".join(record_fields).rstrip(";")
         + "\n}.\n\nDefinition checked : certificate :=\n  {|\n"
         + "\n".join(values).rstrip(";")
-        + "\n  |}.\nEnd VkSigmaCertificate.\n",
+        + "\n  |}.\n\n"
+        + "Theorem column_checked (certificate : certificate) (column : nat) :\n"
+        + "  (column < VkSigma.width_nat)%nat ->\n"
+        + "  VkSigma.column_check column = true.\n"
+        + "Proof.\n"
+        + "  intro Hcolumn.\n"
+        + column_cases
+        + "  lia.\n"
+        + "Qed.\n"
+        + "End VkSigmaCertificate.\n",
     )
 
 
@@ -763,6 +778,22 @@ def emit_srs_certificates() -> None:
     )
     fields.append("    srs_extra := VkSrsExtraCertificate.checked;")
 
+    refinement_steps = "".join(
+        "  eapply VkSrs.checked_g_shard_cons; "
+        f"[ exact certificate.(srs_{shard:02d}) | ].\n"
+        for shard in range(31)
+    )
+    coordinate_length_steps = "".join(
+        "  rewrite (VkSrs.shard_coordinates_length "
+        f"{shard * 64} VkSrsData{shard:02d}.entries "
+        f"VkSrsCoordinates{shard:02d}Data.coordinates\n"
+        "    (VkSrs.check_g_shard_sound "
+        f"{shard * 64} VkSrsData{shard:02d}.entries "
+        f"VkSrsCoordinates{shard:02d}Data.coordinates "
+        f"certificate.(srs_{shard:02d}))).\n"
+        for shard in range(32)
+    )
+
     write(
         CERTS / "Srs.v",
         "(** Generated aggregation of the sharded Params::new(11) checks. *)\n"
@@ -770,12 +801,57 @@ def emit_srs_certificates() -> None:
         + "\n".join(data_imports)
         + "\n"
         + "\n".join(imports)
+        + "\nRequire Import Garden.Orchard.vk.provenance.generated.SrsAll.\n"
+        + "Require Import Garden.Orchard.vk.provenance.generated.SrsCoordinatesAll."
+        + "\nRequire Import Garden.Orchard.vk.provenance.SrsDataView."
+        + "\nRequire Import Garden.Orchard.vk_msm."
         + "\n\nModule VkSrsCertificate.\n"
         "Record certificate : Prop := {\n"
         + "\n".join(record_fields).rstrip(";")
         + "\n}.\n\nDefinition checked : certificate :=\n  {|\n"
         + "\n".join(fields).rstrip(";")
-        + "\n  |}.\nEnd VkSrsCertificate.\n",
+        + "\n  |}.\n\n"
+        + "Theorem g_refinement (certificate : certificate) :\n"
+        + "  VkSrs.g_entries_refine_from 0 VkSrsAll.g_entries\n"
+        + "    VkSrsCoordinatesAll.g.\n"
+        + "Proof.\n"
+        + "  unfold VkSrsAll.g_entries, VkSrsCoordinatesAll.g.\n"
+        + refinement_steps
+        + "  apply VkSrs.checked_g_shard_refines.\n"
+        + "  exact certificate.(srs_31).\n"
+        + "Qed.\n\n"
+        + "Theorem g_coordinates_length (certificate : certificate) :\n"
+        + "  List.length VkSrsCoordinatesAll.g = 2048%nat.\n"
+        + "Proof.\n"
+        + "  unfold VkSrsCoordinatesAll.g.\n"
+        + "  rewrite !List.length_app.\n"
+        + coordinate_length_steps
+        + "  reflexivity.\n"
+        + "Qed.\n\n"
+        + "Theorem extra_refinement (certificate : certificate) :\n"
+        + "  VkSrs.extra_entries_refinement\n"
+        + "    VkSrsExtraData.w_entry VkSrsExtraData.u_entry\n"
+        + "    VkSrsCoordinatesExtraData.w VkSrsCoordinatesExtraData.u.\n"
+        + "Proof.\n"
+        + "  apply VkSrs.check_extra_entries_sound.\n"
+        + "  exact certificate.(srs_extra).\n"
+        + "Qed.\n"
+        + "\nTheorem data_view_refinement (certificate : certificate) :\n"
+        + "  VkSrsDataView.refinement.\n"
+        + "Proof.\n"
+        + "  eapply VkSrsDataView.refinement_from_checks.\n"
+        + "  - exact (g_refinement certificate).\n"
+        + "  - exact (g_coordinates_length certificate).\n"
+        + "  - exact (extra_refinement certificate).\n"
+        + "Qed.\n\n"
+        + "Theorem params_well_formed (certificate : certificate) :\n"
+        + "  VkMsm.params_well_formed.\n"
+        + "Proof.\n"
+        + "  change VkSrsDataView.params_well_formed.\n"
+        + "  apply VkSrsDataView.refinement_params_well_formed.\n"
+        + "  exact (data_view_refinement certificate).\n"
+        + "Qed.\n"
+        + "End VkSrsCertificate.\n",
     )
 
 
@@ -848,10 +924,47 @@ def emit_commitment_certificates() -> None:
                 f"Require Import Garden.Orchard.vk.provenance.generated.certificates.{prefix}{suffix}."
                 for suffix in ("Calibration", "Low", "High", "Assembly")
             )
+            if kind == "fixed":
+                abstract_theorem = (
+                    "\n\nTheorem abstract_sound\n"
+                    "    (domain_certificate : VkDomain.certificate)\n"
+                    "    (srs_refinement : VkSrsDataView.refinement)\n"
+                    "    (params_well_formed : VkMsm.params_well_formed) :\n"
+                    f"  VkMsm.commit_lagrange (VkCommitmentColumns.fixed_values {index}) =\n"
+                    f"    VkPinnedSpec.fixed_point {index}.\n"
+                    "Proof.\n"
+                    "  apply (VkCommitmentRefinement.fixed_abstract_sound\n"
+                    "    domain_certificate srs_refinement params_well_formed\n"
+                    f"    {index} {data}.coefficients\n"
+                    f"    {data}.low_projective_expected {data}.high_projective_expected).\n"
+                    "  exact checked.\n"
+                    "Qed.\n"
+                )
+            else:
+                abstract_theorem = (
+                    "\n\nTheorem abstract_sound\n"
+                    "    (domain_certificate : VkDomain.certificate)\n"
+                    "    (srs_refinement : VkSrsDataView.refinement)\n"
+                    "    (params_well_formed : VkMsm.params_well_formed) :\n"
+                    f"  VkSigma.column_check {index} = true ->\n"
+                    f"  VkMsm.commit_lagrange (VkCommitmentColumns.permutation_values {index}) =\n"
+                    f"    VkPinnedSpec.permutation_point {index}.\n"
+                    "Proof.\n"
+                    "  intro Hsigma.\n"
+                    "  apply (VkCommitmentRefinement.permutation_abstract_sound\n"
+                    "    domain_certificate srs_refinement params_well_formed\n"
+                    f"    {index} {data}.coefficients\n"
+                    f"    {data}.low_projective_expected {data}.high_projective_expected).\n"
+                    "  - exact Hsigma.\n"
+                    "  - vm_compute. reflexivity.\n"
+                    "  - exact checked.\n"
+                    "Qed.\n"
+                )
             write(
                 CERTS / f"{prefix}.v",
                 f"(** Generated aggregate certificate for {kind} column {index}. *)\n"
                 "Require Import Garden.Orchard.vk.provenance.Checks.\n"
+                "Require Import Garden.Orchard.vk.provenance.CommitmentRefinement.\n"
                 "Require Import Garden.Orchard.vk.provenance.Kinds.\n"
                 f"Require Import {data_import}.\n"
                 + imports
@@ -868,7 +981,8 @@ def emit_commitment_certificates() -> None:
                 f"Vk{prefix}HighCertificate.checked;\n"
                 "     VkProvenanceChecks.assembly_checked := "
                 f"{assembly_module}.checked |}}.\n"
-                f"End {aggregate_module}.\n",
+                + abstract_theorem
+                + f"End {aggregate_module}.\n",
             )
             aggregates.append((prefix, data, column_kind, index))
 
@@ -888,18 +1002,62 @@ def emit_commitment_certificates() -> None:
         f"    {prefix.lower()} := Vk{prefix}Certificate.checked;"
         for prefix, _, _, _ in aggregates
     )
+    fixed_cases = "".join(
+        "  destruct index as [|index]; "
+        f"[exact (VkFixed{index:02d}Certificate.abstract_sound "
+        "domain_certificate srs_refinement params_well_formed) |].\n"
+        for index in range(29)
+    )
+    permutation_cases = "".join(
+        "  destruct index as [|index];\n"
+        f"  [ apply (VkPermutation{index:02d}Certificate.abstract_sound "
+        "domain_certificate srs_refinement params_well_formed);\n"
+        f"    apply (VkSigmaCertificate.column_checked sigma_certificate {index}); "
+        "lia |].\n"
+        for index in range(15)
+    )
     write(
         CERTS / "Commitments.v",
         "(** Generated aggregation of all 44 commitment certificates. *)\n"
+        "From Stdlib Require Import Lia.\n"
         "Require Import Garden.Orchard.vk.provenance.Checks.\n"
+        "Require Import Garden.Orchard.vk.provenance.Abstract.\n"
+        "Require Import Garden.Orchard.vk.provenance.CommitmentRefinement.\n"
         "Require Import Garden.Orchard.vk.provenance.Kinds.\n"
+        "Require Import Garden.Orchard.vk.provenance.generated.certificates.Sigma.\n"
         + imports
         + "\n\nModule VkCommitmentsCertificate.\n"
         "Record certificate : Prop := {\n"
         + record_fields.rstrip(";")
         + "\n}.\n\nDefinition checked : certificate :=\n  {|\n"
         + values.rstrip(";")
-        + "\n  |}.\nEnd VkCommitmentsCertificate.\n",
+        + "\n  |}.\n\n"
+        "Theorem fixed_abstract_sound\n"
+        "    (domain_certificate : VkDomain.certificate)\n"
+        "    (srs_refinement : VkSrsDataView.refinement)\n"
+        "    (params_well_formed : VkMsm.params_well_formed)\n"
+        "    (index : nat) :\n"
+        "  (index < 29)%nat ->\n"
+        "  OrchardVkAbstract.fixed_commitment index =\n"
+        "    VkPinnedSpec.fixed_point index.\n"
+        "Proof.\n"
+        "  intro Hindex. unfold OrchardVkAbstract.fixed_commitment.\n"
+        + fixed_cases
+        + "  lia.\nQed.\n\n"
+        "Theorem permutation_abstract_sound\n"
+        "    (domain_certificate : VkDomain.certificate)\n"
+        "    (srs_refinement : VkSrsDataView.refinement)\n"
+        "    (params_well_formed : VkMsm.params_well_formed)\n"
+        "    (sigma_certificate : VkSigmaCertificate.certificate)\n"
+        "    (index : nat) :\n"
+        "  (index < 15)%nat ->\n"
+        "  OrchardVkAbstract.permutation_commitment index =\n"
+        "    VkPinnedSpec.permutation_point index.\n"
+        "Proof.\n"
+        "  intro Hindex. unfold OrchardVkAbstract.permutation_commitment.\n"
+        + permutation_cases
+        + "  lia.\nQed.\n"
+        "End VkCommitmentsCertificate.\n",
     )
 
 
@@ -912,6 +1070,7 @@ def emit_main_certificate() -> None:
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Srs.\n"
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Commitments.\n\n"
         "Require Import Garden.Orchard.vk.provenance.Domain.\n"
+        "Require Import Garden.Orchard.vk.provenance.Abstract.\n"
         "Require Import Garden.Orchard.vk.provenance.Sigma.\n"
         "Require Import Garden.Orchard.vk.provenance.ModelColumnsCorrect.\n"
         "Module OrchardVkProvenance.\n"
@@ -929,6 +1088,23 @@ def emit_main_certificate() -> None:
         "           sigma_mapping := VkSigmaCertificate.checked;\n"
         "           params_new_11 := VkSrsCertificate.checked;\n"
         "           commitments := VkCommitmentsCertificate.checked |}.\n"
+        "Qed.\n"
+        "\nTheorem orchard_vk_commit_lagrange_refined :\n"
+        "  OrchardVkAbstract.certificate.\n"
+        "Proof.\n"
+        "  pose proof (VkSrsCertificate.data_view_refinement\n"
+        "    VkSrsCertificate.checked) as Hsrs.\n"
+        "  pose proof (VkSrsCertificate.params_well_formed\n"
+        "    VkSrsCertificate.checked) as Hparams.\n"
+        "  constructor.\n"
+        "  - exact Hparams.\n"
+        "  - intros index Hindex.\n"
+        "    exact (VkCommitmentsCertificate.fixed_abstract_sound\n"
+        "      VkDomainCertificate.checked Hsrs Hparams index Hindex).\n"
+        "  - intros index Hindex.\n"
+        "    exact (VkCommitmentsCertificate.permutation_abstract_sound\n"
+        "      VkDomainCertificate.checked Hsrs Hparams\n"
+        "      VkSigmaCertificate.checked index Hindex).\n"
         "Qed.\n"
         "End OrchardVkProvenance.\n",
     )
