@@ -195,10 +195,10 @@ Module OrchardBundleSum.
         (Pallas.mul (action_rcv Γ)
           PallasGenerators.value_commit_r_G).
   Proof.
-    destruct Hok as (Hcircuit & Hmerkle & Hnote & Hold).
+    destruct Hok as (Hcircuit & Hnew & Hold).
     unfold action_cv_net, action_net_value, action_rcv.
     rewrite (CvNetValue.cv_net_commits_net_value_Z
-      Γ Hcircuit Hmerkle Hnote Hold).
+      Γ Hcircuit Hnew Hold).
     apply unrepr_value_commit.
   Qed.
 

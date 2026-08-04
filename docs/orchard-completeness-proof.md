@@ -17,11 +17,26 @@ a generator that is a function of the honest input.
 
 It does not by itself discharge the four witness-honesty premises
 (`merkle_witness_ok`, `note_commit_witness_ok`, `old_note_witness_ok`,
-`commit_ivk_witness_ok`) that the Action-statement theorem carries. The
+`commit_ivk_witness_ok`) that the equality-shaped Action-statement theorem
+carries. The
 `nondegenerate` clauses below are *shaped* so that reading the generated
 assignment back turns them into those predicates, but the implications are
 not proved; establishing them is what would make this theorem a non-vacuity
-certificate for the Action statement itself rather than for `circuit_holds`.
+certificate for that Action statement itself rather than for
+`circuit_holds`.
+
+Two narrowings (2026-08-03) reduce what is left to establish, without
+changing anything in this document's statements. The short-lookup halves of
+three of those four packages are derived from operational acceptance rather
+than assumed, and the variable-base conjunct of `commit_ivk_witness_ok` is
+a theorem from the gates. And the *adversarial* Action statement
+(`Orchard/circuit_proof/adversarial.v`, carried to the acceptance levels in
+`Orchard/circuit_adversarial.v`) states the four affected §4.18.4 clauses
+disjunctively, as the protocol does, and carries no witness-honesty
+hypothesis at all — so for that statement the C1 instance below is already
+a non-vacuity certificate, and the residual gap concerns only the
+equality-shaped reading. See
+[`orchard-soundness-proof.md`](orchard-soundness-proof.md).
 
 The companion document for the other direction is
 [`orchard-soundness-proof.md`](orchard-soundness-proof.md). Both sit on the

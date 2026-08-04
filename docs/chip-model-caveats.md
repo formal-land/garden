@@ -459,9 +459,18 @@ instantiation layers are proved:
   enabled-point indicator, 0 off the enabled points), consumed by
   `Complete.circuit_holds_intro`. It is not yet propagated back into the
   soundness lemmas: the short-lookup form still carries its `q_running = 0`
-  hypothesis explicitly, and folding the default-0 model into the soundness
-  side (so the named short-lookup witness-honesty conditions discharge
-  automatically) remains open.
+  hypothesis explicitly, so within the relational model the named
+  short-lookup witness-honesty conditions do not discharge automatically.
+  One level down they do. The realized assignment reads its selector plane
+  from the replayed grid at absolute rows, so operational acceptance of the
+  pinned Orchard circuit supplies `q_running = 0` at the twenty-five
+  short-range rows as a certificate over the event stream, and
+  `short_word_sound` then applies. That is the derivation of
+  `Orchard/circuit_proof/lookup_closure.v` (with the two companion site
+  inventories `lookup_closure_old_note.v` and `lookup_closure_ivk.v`),
+  consumed by `Orchard/circuit_adversarial.v`. What stays open is the
+  relational-level closure: the idealization is real in `proof.v`, and the
+  discharge is available only for grid-accepted assignments.
 
 ## Bottom line
 
@@ -485,5 +494,12 @@ event-replay bridge (`operational_sound`/`operational_complete`,
 `Halo2/realize/sound.v`), instantiated on the whole Orchard action circuit
 with its concrete placement and constants tail
 (`Orchard/circuit_operational.v`), so the action surface's `Holds`
-hypothesis follows from mock-prover acceptance of the serialized circuit;
-the remaining open gaps above are the exact trust boundary.
+hypothesis follows from mock-prover acceptance of the serialized circuit —
+and, at that level, so do the short-lookup halves of the witness-honesty
+hypotheses (`Orchard/circuit_adversarial.v`), leaving the incomplete-add
+nondegeneracy residue and the Merkle package. That residue is a hypothesis
+only of the equality-shaped statement: the adversarial Action statement of
+the same file states the four affected §4.18.4 clauses disjunctively, as
+the protocol does, and carries no witness-honesty hypothesis at all — so
+the selector-freedom caveat does not reach the strongest statement of the
+surface. The remaining open gaps above are the exact trust boundary.

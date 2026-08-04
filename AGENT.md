@@ -109,6 +109,41 @@ Personal or not-yet-committed documentation is indexed in `CLAUDE.local.md`
   puts only the validated static bundle on the force-replaced `gh-pages`
   deployment branch.
 
+## Comment and doc style
+
+Write Rocq comments and `docs/` prose for a reader who never saw the change
+history — describe what the code *is*, not how it got that way. These rules
+apply to everything committed: `(* *)`/`(** *)` comments, `docs/`, and this
+file.
+
+- Declarative present tense. No temporal or comparative narration ("no
+  longer", "previously", "now does X", "used to"), no refactoring narration
+  ("factored out of", "moved here from", "this file was split"), and no
+  diff narration ("this is additive", "X is untouched", "X is weakened
+  to") — state the current fact directly.
+- This does not mean "don't explain why" — rationale is the most valuable
+  content a comment can carry. State it as a timeless constraint rather
+  than a story: not "we switched from `f_equal` because it was slow" but
+  "`f_equal` on a primitive projection forces normalization of the shared
+  fold; rewriting in the hypothesis avoids it". History that cannot be
+  rewritten this way belongs in the commit message or PR description, or —
+  when the event itself is the subject — in a dedicated record document in
+  `docs/` with explicit dates.
+- No editorializing that implies contrast with a past or lesser state:
+  "genuine", "real lemma", "honest, true assumptions". (Established
+  technical terms — the "honest branch" of a disjunction — are fine.)
+- No planning or process vocabulary from working notes: campaign, phase,
+  workflow, recon, deferred, future work, TODO, or internal shorthand such
+  as decision-gate labels (D1, D2b, …).
+- Reference only committed files. Never cite local documents — anything
+  uncommitted and not intended for the repository, such as private plan,
+  status, or design notes — a dangling pointer misleads every later
+  reader. Referencing the public documents under `docs/` is fine.
+- Cite the protocol specification as `§x.y.z` (never page numbers), and
+  cite it wherever a statement implements a specific protocol clause.
+- Bracketed references (`[Module.lemma]`, `[file.v]`, `[docs/foo.md]`) and
+  `file:line` citations must resolve — verify them at write time.
+
 ## Proof iteration workflow
 
 Pick the cheapest feedback loop for the scale of the change:
