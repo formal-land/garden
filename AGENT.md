@@ -163,11 +163,14 @@ Pick the cheapest feedback loop for the scale of the change:
     -stdlib-vector <path>/<file>.v` followed by the same command with `-vok`. The
     `-vok` pass runs and checks THIS file's proofs while loading dependencies as
     trusted `.vos` interfaces (so the slow certificates never run).
-- **Final check only:** run a full `make -C Garden` (building every `.vo`, which
-  executes the certificate `vm_compute`s) as the last step, and as the basis for
-  any `Print Assumptions` audit. `.vos`/`-vok`-against-`.vos` trusts the skipped
-  dependency proofs, so it is a development accelerator only — never report a
-  result as proved on `.vos` alone.
+- **Final check only:** run `make -C Garden` to build every checked-in `.vo` and
+  its generated data dependencies.  The ignored Orchard VK provenance
+  certificate modules are deliberately excluded from that ordinary build
+  because their serialized replay takes multiple hours; check them with
+  `make -C Garden orchard-vk-provenance`.  Use the relevant full `.vo` target
+  as the basis for any `Print Assumptions` audit. `.vos`/`-vok`-against-`.vos`
+  trusts the skipped dependency proofs, so it is a development accelerator
+  only — never report a result as proved on `.vos` alone.
 
 When a specific file, definition, or tactic compiles too slowly (a heavy
 `vm_compute`, a pathological `rewrite`/`f_equal`, etc.), record it in

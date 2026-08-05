@@ -83,6 +83,17 @@ more memory than their source size suggests:
 make -C Garden orchard-vk-provenance
 ```
 
+This explicit target is the full kernel replay of all 278 generated
+certificate modules (229 computational leaves and 49 aggregate or packaging
+modules).  Ordinary `make -C Garden` still compiles every
+checked-in refinement theorem and all 129 generated data modules, but omits
+those certificate modules: their conservative serialized runtime is longer
+than a hosted PR runner's build window.  PR CI instead checks deterministic
+source generation and runs the independent all-44-point oracle.  Those fast
+checks are useful diagnostics, but they do not replace the full target above
+when claiming that `OrchardVkProvenance.orchard_vk_commit_lagrange_refined`
+has been kernel-checked.
+
 A memory-rich 32-core builder can expose 32-way parallelism for generated
 data and cheap record-packaging leaves with:
 

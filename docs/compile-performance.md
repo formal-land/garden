@@ -53,8 +53,12 @@ dependents.
 **Honesty constraint.** `.vos`/`-vok`-against-`.vos` trusts the skipped
 dependency proofs. It is a development accelerator only. Any "closed /
 axiom-free" claim, and every `Print Assumptions` audit, must run on a full
-`.vo` build (`make all`) that actually executes the certificate
-`vm_compute`s. Treat `-vos` as "compiles and type-checks", not "verified".
+`.vo` build that actually executes the relevant certificate `vm_compute`s.
+`make all` checks the checked-in certificates. The 278 ignored generated
+Orchard VK provenance certificate modules are intentionally outside that target;
+replay them with `make orchard-vk-provenance` before auditing
+`orchard_vk_commit_lagrange_refined`. Treat `-vos` as "compiles and
+type-checks", not "verified".
 Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
