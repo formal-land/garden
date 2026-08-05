@@ -26,7 +26,7 @@ Module VkProvenanceChecks.
       (VkMsmChecks.low_msm coefficients)
       (VkMsmChecks.high_msm coefficients) VkSrsDataView.w.
 
-  (** This is the actual executable commitment equation.  The expensive
+  (** This is the executable commitment equation.  The expensive
       halves are proved equal to exact generated Jacobian representatives in
       separate leaves; rewriting them makes the final assembly proof cheap. *)
   Theorem commitment_certificate_sound

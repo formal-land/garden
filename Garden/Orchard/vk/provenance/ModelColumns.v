@@ -1,8 +1,8 @@
 (** * Executable fixed-column image used by VK provenance certificates
 
     The relational replay grid is a function built by nesting 19,679 event
-    updates.  Reading every cell through that function is faithful but a bad
-    evaluator: it rescans the update spine for each of 29 * 2048 cells.
+    updates. Reading every cell through that function rescans the update spine
+    for each of 29 * 2048 cells.
 
     This module gives the same keygen-facing construction an explicitly
     linear primitive-array implementation.  It starts with the zero fixed

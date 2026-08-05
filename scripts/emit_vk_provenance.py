@@ -1158,8 +1158,8 @@ def write_generation_metadata() -> None:
     if not state.exists() or state.read_text() != wanted_state:
         atomic_write(state, wanted_state)
     else:
-        # Make uses this file as the stamp for generator inputs.  Refresh its
-        # timestamp even when a touched input still has identical contents.
+        # Make uses this file as the stamp for generator inputs. Its timestamp
+        # tracks content-preserving touches of those inputs as well.
         state.touch()
 
 

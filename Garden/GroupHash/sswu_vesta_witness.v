@@ -20,7 +20,8 @@ Global Open Scope Z_scope.
 #[local] Existing Instance Primes.PallasQIsPrime.
 
 Module SswuVestaWitness.
-  (** The final SSWU sign-selection operation, factored out only for proofs. *)
+  (** Naming the final SSWU sign-selection operation lets the
+      sign-independence lemmas below reuse it. *)
   Definition normalize_sign (target : bool) (y : Z) : Z :=
     if xorb target (SswuVesta.sgn0 y) then -F y else UnOp.from y.
 
@@ -538,9 +539,9 @@ Module SswuVestaWitness.
       domain_prefix msg was_square0 root0 was_square1 root1 Hcheck)).
   Qed.
 
-  (** Two checked SSWU witnesses therefore give exactly the canonical Vesta
-      group hash.  Hashing, addition, and the isogeny remain the original
-      definitions; only the square-root computation has been replaced. *)
+  (** Two checked SSWU witnesses give the canonical Vesta group hash because
+      sign normalization makes each witnessed square root equivalent to the
+      canonical root consumed by the hash, addition, and isogeny definitions. *)
   Theorem group_hash_with_witness_eq
       (domain_prefix msg : list Z)
       (was_square0 : bool) (root0 : Z)

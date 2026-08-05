@@ -389,16 +389,24 @@ transcription to certified bytes (`Orchard/vk/*.v`,
   is sharded per the `compile-performance.md` discipline; a personalized
   BLAKE2b reference vector guards the parameter-block wiring.
 
-The vk-commitment MSM (computing the 44 pinned commitments from the
-compiled polynomials) stays deferred — T1 pins their coordinate literals
-and certifies them as bytes; the MSM certificate would additionally prove
-they are the commitments *of the compiled polynomials*.
+`Orchard/vk/provenance/` supplies the separate VK-commitment provenance graph.
+Its premise-free `orchard_vk_commit_lagrange_refined` theorem proves that all
+29 fixed and 15 permutation points equal Garden's mathematical
+`commit_lagrange` for the configured column vectors and modeled
+`Params::new(11)` SRS. `fixed_values_compiled_grid` separately identifies the
+fixed vectors with every successfully replayed grid after `with_combinations`;
+the permutation vectors are derived from `orchard_sigma` relative to the
+pinned `permutation_columns` order. `make -C Garden orchard-vk-provenance`
+performs the full generated-certificate replay.
 
 Assumption audit: the counting lemmas are at impredicative `Set` only (no
 `PrimString`); the boundary corollaries, T1, and T2 add exactly the
 `PrimString`/`PrimInt63` primitive family; no classical axioms anywhere,
 and `orchard_algebraic_action_statement` / `OrchardAction.action_statement`
 re-audit unchanged at their baselines.
+The commitment-provenance theorem has no premises and no Garden-specific
+axiom; its assumption profile is Rocq's standard `PrimString`, `PrimInt63`,
+`PrimArray`, `Uint63Axioms`, and `ArrayAxioms` interface.
 
 ## What this does not claim
 
@@ -420,19 +428,17 @@ distance to a deployed prover is recorded, not hidden:
 - The compiled and polynomial layers prove the *algebraic* content of the
   system — selector compression, the permutation construction, the
   cyclic-domain/blinding discipline, and the vanishing / permutation /
-  lookup identities in the all-challenge reading (L1) — pinned to the
-  deployed vk by the parity certificates, now byte-anchored (T1 retires
-  the offline-transcription trust of the pinned description; T2 delivers
-  the Fiat–Shamir binding scalar). The external residue has shrunk to
-  exactly the R4 named set: (i) *challenge instantiation* — the deployed
-  transcript's sampled tuple avoids the three bad sets, now an in-model
-  finite-cardinality statement (`counting.v`) consumed through
-  `FiatShamirChallengeGood`, not an opaque gap; (ii) `IPABinding`
-  (polynomial-commitment binding); and (iii) Fiat–Shamir / the multiopen
-  reduction (`MultiopenReduction`) — the L0 layer. Each is a named
-  `SignatureKnowledge`-style hypothesis, never an axiom. The vk-commitment
-  MSM (the compiled polynomials' commitments equal the pinned points) is
-  the one remaining byte-level stretch, still deferred.
+  lookup identities in the all-challenge reading (L1) — and T1 anchors the
+  pinned description byte-for-byte while T2 supplies the modeled
+  Fiat–Shamir binding scalar. The R4 cryptographic boundary consists of:
+  (i) *challenge instantiation*, expressed by the in-model finite-cardinality
+  statement in `counting.v` and consumed through
+  `FiatShamirChallengeGood`; (ii) `IPABinding` (polynomial-commitment
+  binding); and (iii) Fiat–Shamir / the multiopen reduction
+  (`MultiopenReduction`) at L0. Each is a named `SignatureKnowledge`-style
+  hypothesis, never an axiom. The VK-provenance theorem provides the
+  mathematical commitment equation for Garden's configured columns; it does
+  not discharge IPA binding, the multiopen reduction, or Fiat–Shamir.
 - The witness-honesty side conditions of the action surface, and the
   model caveats of `docs/chip-model-caveats.md`, apply unchanged, with
   two narrowings: at the operational and algebraic levels the short-lookup

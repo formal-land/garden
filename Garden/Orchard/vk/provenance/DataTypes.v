@@ -15,10 +15,9 @@ Module VkProvenanceDataTypes.
     y_words : words5;
   }.
 
-  (** Exact Jacobian coordinates.  Unlike [affine_words], this preserves the
-      concrete representative produced by the executable Pippenger fold, so
-      a shard can export an ordinary Rocq equality rather than merely a
-      projective-equivalence test. *)
+  (** Exact Jacobian coordinates preserve the concrete representative produced
+      by the executable Pippenger fold, so a shard can export an ordinary Rocq
+      equality for that representative. *)
   Record point_words : Set := {
     jacobian_x_words : words5;
     jacobian_y_words : words5;

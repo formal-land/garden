@@ -17,9 +17,9 @@ Require Import Garden.Orchard.vk.provenance.Jacobian.
 Import ListNotations.
 Local Open Scope Z_scope.
 
-(** Keep the conversion oracle from unfolding the full BLAKE2b/XMD pipeline
-    while checking symbolic soundness lemmas.  Closed [vm_compute]
-    certificates still evaluate this transparent definition explicitly. *)
+(** This opacity barrier prevents conversion from unfolding the full
+    BLAKE2b/XMD pipeline while checking symbolic soundness lemmas. Closed
+    [vm_compute] certificates evaluate the transparent definition explicitly. *)
 Strategy opaque
   [GroupHashVesta.hash_to_field_vesta].
 
@@ -244,9 +244,8 @@ Module VkSrs.
     Vesta.reduced (expected_point entry.(coordinates)).
   Proof. intros _. apply expected_point_reduced. Qed.
 
-  (** End-to-end SRS-entry provenance: an accepted entry is the canonical
-      [GroupHashVesta.group_hash] point, not merely the witnessed evaluator's
-      output. *)
+  (** End-to-end SRS-entry provenance: an accepted entry equals the canonical
+      [GroupHashVesta.group_hash] point. *)
   Lemma check_entry_sound (entry : srs_entry) :
     check_entry entry = true ->
     GroupHashVesta.group_hash domain_prefix entry.(message) =

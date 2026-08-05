@@ -140,8 +140,9 @@ Module VestaOrder.
     2 * qq + 1 < 3 * Vesta.vesta_q.
   Proof. vm_compute. reflexivity. Qed.
 
-  (** Keep conversion from re-running the [pallas_p]-fold ladder when the
-      [Vesta.mul] and [Weierstrass.mul] spellings are aligned. *)
+  (** The opacity barrier prevents conversion from re-running the
+      [pallas_p]-fold ladder when the [Vesta.mul] and [Weierstrass.mul]
+      spellings are aligned. *)
   Strategy opaque [Weierstrass.mul].
 
   (** ** Every reduced on-curve Vesta point is annihilated by [pallas_p]. *)

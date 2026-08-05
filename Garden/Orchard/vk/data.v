@@ -5,10 +5,10 @@
     the base/scalar modulus strings, the [extended_k] domain constant,
     [minimum_degree], and the 44 commitment coordinate pairs (29
     fixed-column + 15 permutation commitments, affine Vesta points).
-    These remain literal inputs to the byte printer, but
-    [vk/provenance/generated/certificates/Main.v] now separately derives
-    every coordinate from the model's column evaluations, [Params::new(11)],
-    the inverse FFT, and the MSM in an optimized executable Rocq model. They
+    These are literal inputs to the byte printer. The provenance certificate
+    described in [Garden/Orchard/vk/provenance/README.md] derives every
+    coordinate from the model's column evaluations, [Params::new(11)], the
+    inverse FFT, and the MSM in an optimized executable Rocq model. They
     are also certified byte-for-byte against the dump by the T1 parity
     certificate ([vk/parity.v]).
 

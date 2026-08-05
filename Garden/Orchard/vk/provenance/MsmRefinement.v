@@ -1046,7 +1046,7 @@ Module VkMsmRefinement.
     apply VkMsm.digits_go_bound.
   Qed.
 
-  (** Recombination is stated on the actual scalar list, before mapping to
+  (** Recombination is stated on the input scalar list, before mapping to
       its digit vectors. *)
   Lemma scalar_halves_recombine (scalars : list Z)
       (bases : list Vesta.point) :

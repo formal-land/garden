@@ -2,9 +2,8 @@
 
     The transform is specialized to Orchard's 2048-row domain.  Generated
     data supplies a bit-reversal table and the first 1024 inverse powers of
-    [omega], all as primitive words.  Eleven unrolled radix-2 stages avoid
-    exponentiation and keep every update on the latest primitive-array
-    version. *)
+    [omega], all as primitive words. Eleven unrolled radix-2 stages avoid
+    exponentiation and thread each returned primitive-array state. *)
 
 From Corelib Require Import PrimArray PrimInt63 ArrayAxioms.
 From Stdlib Require Import Lists.List Bool.Bool ZArith.
@@ -23,8 +22,8 @@ Module VkIFFT.
   Module F := PallasP.
   Import Prim63Words.
 
-  (** Corelib's primitive-array laws quantify over [Type], so keep every
-      executable FFT array in one fixed universe strictly above [Set].
+  (** Corelib's primitive-array laws quantify over [Type], so every executable
+      FFT array inhabits one fixed universe strictly above [Set].
       Universes are erased by extraction and primitive evaluation; this only
       prevents proof elaboration from choosing incompatible array instances. *)
   Monomorphic Universe array_u.
@@ -38,10 +37,9 @@ Module VkIFFT.
 
   Definition size_nat : nat := 2048.
 
-  (** The common fresh-array fill used by all pointwise 2048-row passes.
-      Keeping this operation named and opaque prevents proof conversion from
-      expanding a concrete primitive array, while [vm_compute] still executes
-      the exact same tail-recursive loop. *)
+  (** The common fresh-array fill used by all pointwise 2048-row passes. Its
+      opaque name prevents proof conversion from expanding a concrete
+      primitive array, while [vm_compute] executes the tail-recursive loop. *)
   Definition fill (default : F.t) (value : nat -> F.t)
       : field_array :=
     Prim63Loop.foldi_from size_nat O

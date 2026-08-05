@@ -17,9 +17,8 @@ Only the Python standard library is used.  The implementation mirrors:
 * ``Params::commit_lagrange(poly, Blind::default())``, where the default
   blind is one and therefore contributes the point ``w``.
 
-The command is intentionally side-effect free for now.  ``--verify`` emits
-a compact JSON summary to stdout; the Rocq shard emitter is layered on this
-checked core below.
+The ``--verify`` command is side-effect free and emits a compact JSON summary
+to stdout; the Rocq shard emitter is layered on this checked core.
 """
 
 from __future__ import annotations

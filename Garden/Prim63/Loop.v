@@ -1,4 +1,4 @@
-(** * Tail-recursive loops that thread the latest primitive-array version
+(** * Tail-recursive loops that thread primitive-array state linearly
 
     The computational convention in this file is deliberate: a step consumes
     the current state, and the recursive call receives only the state returned
@@ -332,7 +332,7 @@ Module Prim63Loop.
     Goal PrimArray.get fill_buckets 254 = 254.
     Proof. vm_compute. reflexivity. Qed.
 
-    (** A modest stress check: 32768 latest-version updates distributed over
+    (** A modest stress check: 32768 linearly threaded updates distributed over
         the 2048 vector slots.  Every slot is incremented exactly 16 times. *)
     Definition bump_step (i : PrimInt63.int)
         (a : PrimArray.array PrimInt63.int) :

@@ -1,6 +1,6 @@
 (** * Executable provenance checks for the primitive FFT/domain tables
 
-    [generated/DomainData.v] is an untrusted cache.  The checks below tie
+    [VkDomainData] is an untrusted cache.  The checks below tie
     every cached entry back to the domain constants already used by Garden's
     compiled-system model.  In particular, the inverse-FFT checker cannot be
     made to accept arbitrary coefficients by changing its twiddle table. *)
@@ -38,10 +38,9 @@ Module VkDomain.
     PrimInt63.eqb
       (PrimArray.length@{VkIFFT.array_u} array) length.
 
-  (** The original executable spelling used primitive shifts and masks.  Keep
-      it as an independently executable parity oracle while exposing a
-      natural-number spelling whose range and splitting laws can be used by
-      the FFT refinement proof. *)
+  (** The primitive shift/mask implementation is an independently executable
+      parity oracle for the natural-number spelling whose range and splitting
+      laws support the FFT refinement proof. *)
   Fixpoint reverse_bits_aux_primitive
       (count : nat) (input output : PrimInt63.int)
       : PrimInt63.int :=
@@ -67,9 +66,9 @@ Module VkDomain.
   Definition reverse_11_primitive (input : PrimInt63.int) : PrimInt63.int :=
     reverse_bits_aux_primitive 11 input 0.
 
-  (** Closed parity check for the only input range consumed by the 2048-row
-      inverse FFT.  This protects the refactor above independently of the
-      generated bit-reversal table. *)
+  (** This closed check establishes equality of the two bit-reversal spellings
+      on the 2048-row inverse-FFT input range, independently of the generated
+      table. *)
   Definition reverse_11_parity_check : bool :=
     Prim63Loop.foldi_u63 2048 0
       (fun index ok =>

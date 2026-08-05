@@ -9,9 +9,9 @@
 
     The executable addition uses the standard [add-2007-bl] formula.  Its
     non-degenerate output is a projective rescaling by two of fiat-crypto's
-    unequal-point formula; this is proved algebraically below.  Thus the
-    proof validates the actual primitive implementation and does not replace
-    it with a second executable group law. *)
+    unequal-point formula; this is proved algebraically below. The refinement
+    theorem connects the primitive implementation directly to Garden's
+    abstract [Vesta.add] without introducing a second executable group law. *)
 
 From Stdlib Require Import ZArith Lia Ring Bool PeanoNat.
 From Stdlib Require Import Classes.RelationClasses Classes.Morphisms.

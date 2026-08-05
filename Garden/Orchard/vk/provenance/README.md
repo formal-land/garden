@@ -10,12 +10,13 @@ commit_lagrange(Params::new(11), column_evaluations, Blind::default())
 ```
 
 for every one of the 44 columns. Generated literals are witnesses, not
-assumptions: small Rocq leaves recompute and check each stage before
-`generated/certificates/Main.v` bundles the results.  Its closed
+assumptions: small Rocq leaves recompute and check each stage before the
+generated aggregate bundles the results. Its closed
 `orchard_vk_commit_lagrange_refined` theorem has type
 `OrchardVkAbstract.certificate`: all 44 deployed points are equal to the
-library-level group/polynomial `commit_lagrange` specification, and the
-`Params::new(11)` premise of that specification is discharged.
+library-level group/polynomial `commit_lagrange` specification. The
+`params_well_formed` side condition used to refine that specification to the
+raw-base `Params::new(11)` MSM is discharged inside the certificate.
 
 ## What is checked
 
@@ -56,16 +57,16 @@ The certificate graph covers the following chain.
 `Checks.commitment_certificate_sound` rewrites the two exact half-MSM
 equalities into the assembly check. `CommitmentRefinement.v` then composes
 the calibration, SRS, primitive-arithmetic, and pinned-coordinate refinements.
-Thus the aggregate establishes the actual executable committed point and its
-equality to the abstract `commit_lagrange`, rather than merely checking two
-unrelated affine witnesses.
+Thus the aggregate establishes the executable committed point, its equality
+to the abstract `commit_lagrange`, and the connection between the two affine
+witnesses.
 
 ## Representation and parallelism
 
 Field elements use five little-endian radix-`2^63` words.  Montgomery
 addition and multiplication use Rocq's primitive `uint63` instructions;
 2048-element vectors and 255 Pippenger buckets use primitive arrays whose
-latest version is threaded linearly through every loop.
+updates are threaded linearly through every loop.
 
 The proof graph deliberately has separate leaves for:
 
@@ -85,7 +86,7 @@ make -C Garden orchard-vk-provenance
 
 This explicit target is the full kernel replay of all 278 generated
 certificate modules (229 computational leaves and 49 aggregate or packaging
-modules).  Ordinary `make -C Garden` still compiles every
+modules).  Ordinary `make -C Garden` compiles every
 checked-in refinement theorem and all 129 generated data modules, but omits
 those certificate modules: their conservative serialized runtime is longer
 than a hosted PR runner's build window.  PR CI instead checks deterministic
@@ -101,15 +102,14 @@ data and cheap record-packaging leaves with:
 make -C Garden orchard-vk-provenance VK_PROVENANCE_JOBS=32
 ```
 
-The memory-heavy phases remain independently capped. Builders that have
+The memory-heavy job groups are independently capped. Builders that have
 measured sufficient headroom can raise, for example,
 `VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`, or
-`VK_PROVENANCE_MSM_JOBS`; after observed OOMs their defaults are one worker.
+`VK_PROVENANCE_MSM_JOBS`. Their one-worker defaults bound aggregate memory.
 
-The sigma mapping is split into 15 primitive-word shards.  A previous
-monolithic representation as 30,720 pairs of `nat` exhausted memory during
-elaboration; packing `(column,row)` as `column * 2048 + row` avoids that
-Peano-term blow-up.
+The sigma mapping is split into 15 primitive-word shards. Packing
+`(column,row)` as `column * 2048 + row` avoids the elaboration-time Peano-term
+blow-up of a 30,720-pair `nat` representation.
 
 To run the independent Python diagnostic or regenerate every untrusted
 witness:
@@ -124,8 +124,8 @@ reproduces all 44 pinned points, but it is not in the trusted proof path.
 
 ## Proof and trust boundary
 
-The closed certificates use `vm_compute`; this Rocq installation was built
-without the native compiler, so `native_compute` falls back to the same VM.
+The closed certificates use `vm_compute`. On Rocq installations without
+native-compiler support, `native_compute` falls back to the same VM.
 The executable arithmetic contains no project-specific `Axiom` or
 `Admitted`. Its logical refinement layer proves the primitive multiply/add
 carry equations, the five-word CIOS sweep, and modular correctness of

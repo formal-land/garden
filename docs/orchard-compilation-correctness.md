@@ -410,25 +410,53 @@ test suite, not by us.
 
 ### What the anchor reaches, and what it does not
 
-**Reaches.** Anything that feeds `vk.pinned()` — but the certificate is only
-as strong as the provenance of what is printed, and that splits in two:
+**Reaches.** The compilation certificates cover every field that feeds
+`vk.pinned()`, subject to the provenance of each field's value. The fields
+fall into three classes:
 
-- **Computed by the model, hence genuine parity evidence**: every gate
-  polynomial, the selector compression (through the indicator factors), the
-  query tables, the lookup argument expressions, and the constants column. A
-  hand-translation error in a gate — a wrong rotation, a dropped term, a
+- **Model-derived or independently model-cross-checked fields:** every gate
+  polynomial, selector-compression assignment (through the indicator
+  factors), lookup argument expression, the constants column, and the domain
+  values `k` and `omega`. The constants column is supplied to
+  `Compile.compile` as pinned configuration, but
+  `constants_column_match` checks it against the event stream. A
+  hand-translation error in a gate — a wrong rotation, a dropped term, or a
   swapped constant — changes a gate polynomial and therefore changes the dump.
-- **Pinned literals passed through the printer**: the permutation column
-  list, the 44 commitment coordinate pairs, the moduli strings, `extended_k`
-  and `minimum_degree`. T1 itself certifies only that their transcription into
-  `vk/data.v` is faithful to the dump. The 44 points now have an additional,
-  independent provenance layer under `Orchard/vk/provenance/`: it derives the
-  fixed and permutation evaluations, performs the inverse FFT and
-  `Params::new(11)` MSM, adds the default blind, and checks the resulting
-  affine coordinates against those literals in an optimized executable Rocq
-  model. The permutation derivation is conditional on the existing pinned
-  permutation-column list and ordering. The other pass-through fields remain
-  exactly that.
+- **Pinned configuration and presentation literals:** the four column and
+  selector counts, the keygen-order query tables, the permutation-column list,
+  the modulus strings, `extended_k`, and `minimum_degree`. They live across
+  `compiled/pinned.v` and `vk/data.v`; T1 proves their printed bytes agree with
+  the implementation dump. The component certificates cross-check each query
+  table against the model as set equality plus length, the fixed-column total
+  through the combination count, selector-assignment coverage over the
+  hardcoded model range `0..55`, the constants column by equality, and copied
+  columns by inclusion in the permutation list. They do not derive the printed
+  selector count, exact query ordering, or complete permutation list.
+- **Commitment coordinates with mathematical provenance:** the 29 fixed and
+  15 permutation coordinate pairs are literals in `vk/data.v`, and
+  `OrchardVkProvenance.orchard_vk_commit_lagrange_refined` proves
+  `OrchardVkAbstract.certificate` with no theorem premises. Its fields
+  establish `VkMsm.params_well_formed` and, at every valid index, equality
+  between `VkMsm.commit_lagrange` applied to
+  `VkCommitmentColumns.fixed_values` or
+  `VkCommitmentColumns.permutation_values` and the corresponding
+  `VkPinnedSpec` point. `VkMsmRefinement.assemble_halves_commit_lagrange_sound`
+  and `VkCommitmentRefinement.certificate_abstract_sound` connect the
+  optimized inverse FFT, split Jacobian Pippenger MSM, and default blind
+  `[1]w` to those equalities.
+  `VkCommitmentColumnsCorrect.fixed_values_compiled_grid` identifies the fixed
+  inputs with the compiled grid after `with_combinations` for every successful
+  Orchard event replay. The permutation inputs use
+  `OrchardCompiled.orchard_sigma`, which `OrchardCompiled.orchard_sigma_eq`
+  derives from the copy obligations relative to
+  `OrchardCompiledPinned.permutation_columns`. The generated
+  `orchard_vk_commitments_derived` package bundles the fixed-column replay,
+  domain, sigma, SRS, and executable commitment certificates. The separate
+  `orchard_vk_commit_lagrange_refined` theorem consumes the latter four
+  certificate families to prove `OrchardVkAbstract.certificate`; the fixed
+  replay result is part of the provenance graph, not a field of that abstract
+  record. See
+  [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
 
 **Does not reach:**
 
@@ -440,44 +468,46 @@ as strong as the provenance of what is printed, and that splits in two:
   is *not* kernel-checked — together with the in-kernel event-replay bridge of
   [`operational-soundness.md`](operational-soundness.md) over the imported
   floor-planner placement.
-- **The commitment computation is a separate certificate graph.** T1 still
-  does not derive commitments merely by printing them. The new provenance
-  graph supplies that missing evidence: `ModelColumnsCorrect` connects the
-  fast fixed-plane evaluator to replay plus `with_combinations`; sharded sigma
-  checks connect the permutation evaluations to the model; domain-table and
-  inverse-FFT checks derive the scalar vectors; and exact low/high Jacobian
-  Pippenger equalities reassemble to each pinned point. See
-  [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
-  The arithmetic refinement currently reaches modular correctness of the
-  primitive five-limb Montgomery multiplier and canonical hash-to-curve SRS
-  points; abstract inverse-FFT, Jacobian-group, and MSM refinement theorems
-  remain future work, so this is presently an executable-model provenance
-  result rather than a full library-level `commit_lagrange` semantics theorem.
+- **An independent specification of the configured VK columns.** The
+  commitment theorem uses Garden's compiled fixed-column configuration and
+  `OrchardCompiledPinned.permutation_columns` as its commitment inputs. It
+  proves the Halo2 commitment equation for those inputs; it does not supply a
+  separate protocol-level specification from which the column selection and
+  ordering follow. The equation models Halo2's commitment operation rather
+  than interpreting Rust semantics.
 - **Anything the dump omits.** Two circuits agreeing on `vk.pinned()` agree on
   everything a verifier is configured by, but the dump is a description, not a
   denotation — it is evidence of agreement, not a proof of it.
 
 ## Assumption audit
 
-`Print Assumptions` on every theorem named here, against a full `.vo` build,
-reports exactly `PrimString.string : Set` plus the impredicative `Set` the
-development is compiled with — with two documented exceptions in
-`Orchard/vk/`, where the byte-level certificates additionally use kernel
-primitives: T1 adds `PrimString.make` and `PrimString.cat`, and T2 reports
-twelve axioms in total (`PrimString.string` plus eleven `PrimString` /
-`PrimInt63` operations, the BLAKE2b word arithmetic among them). Several
-plonkish lemmas are cleaner still, closed under the global context with no
-axioms at all. There is no `Admitted`, `Axiom` or `admit` under
-`Garden/Halo2/` or `Garden/Orchard/`.
+`Print Assumptions` must run against full `.vo` builds. The named results have
+the following profiles:
 
-The named L0 hypotheses (`IPABinding`, `MultiopenReduction`,
-`FiatShamirChallengeGood`) are `Definition`s taken as explicit premises where
-used, so they correctly do *not* appear in any audit.
+- Most circuit and compilation theorems report `PrimString.string : Set` and
+  impredicative `Set`. Several plonkish lemmas are closed under the global
+  context.
+- T1 additionally reports `PrimString.make` and `PrimString.cat`. T2 reports
+  twelve primitive-interface assumptions in total: `PrimString.string` plus
+  eleven `PrimString` / `PrimInt63` operations, including the BLAKE2b word
+  arithmetic.
+- `OrchardVkProvenance.orchard_vk_commit_lagrange_refined`, after
+  `make -C Garden orchard-vk-provenance`, reports 48 Rocq primitive-interface
+  declarations from Corelib and Stdlib:
+  `PrimString.string`; `PrimInt63.int`, 17 primitive operations and 19
+  `Uint63Axioms` laws; and `PrimArray.array`, four primitive operations and
+  five `ArrayAxioms` laws. The explicit provenance target is required because
+  ordinary `make -C Garden` omits the generated certificate modules.
 
-The commitment-provenance certificates add Rocq's standard `PrimInt63` and
-`PrimArray` primitive operations to their assumption cone. They use five-word
-Montgomery arithmetic and linearly threaded primitive arrays so that the 44
-inverse FFTs and MSMs are executable at all; there is no project-specific
-`Axiom` or `Admitted` in that layer. Generated coefficients, SRS roots,
-projective partial sums, and domain tables remain untrusted inputs until their
-corresponding sharded `vm_compute` certificates close.
+The last profile is Rocq's primitive integer and array interface used by the
+five-word Montgomery arithmetic and linearly threaded arrays. It contains no
+Garden-specific axiom. The theorem has no premises: `VkMsm.params_well_formed`
+and all 44 equalities in `OrchardVkAbstract.certificate` are discharged by the
+sharded `vm_compute` certificates. Generated coefficients, SRS witnesses,
+projective partial sums, and domain tables are data inside those closed
+propositions, not logical premises of the aggregate theorem.
+
+The L0 names `IPABinding`, `MultiopenReduction`, and
+`FiatShamirChallengeGood` are definitions taken as explicit premises where
+used, so they do not appear in `Print Assumptions`. There is no `Admitted`,
+`Axiom`, or `admit` declaration under `Garden/Halo2/` or `Garden/Orchard/`.

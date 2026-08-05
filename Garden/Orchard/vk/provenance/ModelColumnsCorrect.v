@@ -755,10 +755,9 @@ Module VkModelColumnsCorrect.
     exact (IH columns Hcolumns' Hfound).
   Qed.
 
-  (** Keep the compiled-system argument abstract while exposing the fixed
-      cell read.  Specializing this opaque lemma is deliberately preferable
-      to simplifying [with_combinations] at the concrete Orchard system:
-      the latter asks conversion to normalize the whole compiled circuit. *)
+  (** The opaque compiled-system argument exposes the fixed cell read without
+      asking conversion to normalize the whole concrete Orchard circuit
+      through [with_combinations]. *)
   Lemma with_combinations_fixed_read (compiled : CompiledSystem.t)
       (grid : RawGrid.t) (column row : Z) :
     (OrchardCompiled.with_combinations compiled grid).(RawGrid.cell)

@@ -8,9 +8,9 @@
 .PHONY: orchard-vk-provenance-generated-check
 .PHONY: orchard-vk-provenance-witnesses orchard-vk-provenance-oracle-check
 
-# These sources are deterministic build artifacts.  Keep an exact inventory
-# here rather than discovering them with wildcards: on a clean checkout they
-# do not exist until the generator has run.
+# These sources are deterministic build artifacts. An exact inventory avoids
+# wildcard discovery because they do not exist on a clean checkout until the
+# generator has run.
 VK_PROVENANCE_GENERATED_DIR := Orchard/vk/provenance/generated
 VK_PROVENANCE_CERT_DIR := $(VK_PROVENANCE_GENERATED_DIR)/certificates
 VK_PROVENANCE_MANIFEST := $(VK_PROVENANCE_GENERATED_DIR)/.manifest
@@ -70,10 +70,10 @@ VK_PROVENANCE_GENERATED_VFILES := \
 # depending on whether a developer happens to have generated it already.
 VFILES := $(shell find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort)
 
-# Keep the ordinary project build bounded: it checks every hand-written Rocq
-# source and all generated literal data, but leaves the 278 generated
-# provenance certificate modules to the explicitly phased target below.  A
-# complete kernel replay of those certificates is `make orchard-vk-provenance`.
+# The ordinary project build checks every hand-written Rocq source and all
+# generated literal-data modules.  The dedicated target below owns the 278
+# generated provenance certificate modules; a complete kernel replay of those
+# certificates is `make orchard-vk-provenance`.
 DEFAULT_VOFILES := $(VFILES:.v=.vo) $(VK_PROVENANCE_GENERATED_DATA_VFILES:.v=.vo)
 
 default: all
@@ -85,7 +85,7 @@ $(VK_PROVENANCE_MANIFEST): | $(VK_PROVENANCE_STATE)
 	python3 $(VK_PROVENANCE_EMITTER) --ensure
 
 # The order-only metadata prerequisites avoid rebuilding all sources merely
-# because the generation stamp is newer.  A missing source still invokes the
+# because the generation stamp is newer.  A missing source invokes the
 # locked, idempotent ensure path and recreates the entire coherent set.
 $(VK_PROVENANCE_GENERATED_VFILES): | $(VK_PROVENANCE_STATE) $(VK_PROVENANCE_MANIFEST)
 	@test -f $@ || python3 $(VK_PROVENANCE_EMITTER) --ensure
@@ -217,12 +217,12 @@ orchard-vk-pinned-check:
 
 # The provenance graph has plenty of parallelism, but its leaves have very
 # different memory profiles.  In particular, SRS, inverse-FFT, Pippenger and
-# assembly workers retain large generated terms.  Keep those phases at one
-# worker by default.  Generated literals and record-packaging leaves are
-# individually cheaper, but a production-size graph can still retain enough
+# assembly workers retain large generated terms. Those job groups default to
+# one worker. Generated literals and record-packaging leaves are
+# individually cheaper, but a production-size graph can retain enough
 # elaborated terms for several simultaneous workers to exhaust memory.  The
-# safe default is therefore one worker for every phase; measured builders can
-# opt into fan-out one phase at a time below.
+# safe default is therefore one worker for every job group; builders with
+# measured memory headroom can opt into fan-out one group at a time below.
 VK_PROVENANCE_CORE_JOBS ?= 1
 VK_PROVENANCE_DATA_JOBS ?= 1
 VK_PROVENANCE_CHECK_JOBS ?= 1
@@ -233,9 +233,9 @@ VK_PROVENANCE_ASSEMBLY_JOBS ?= 1
 VK_PROVENANCE_CHEAP_JOBS ?= 1
 VK_PROVENANCE_FINAL_JOBS ?= 1
 
-# Backwards compatibility: the former global knob now controls only the
-# generated-data and cheap record-construction phases.  It deliberately does
-# not affect any of the four memory-heavy job counts above.  A memory-rich
+# VK_PROVENANCE_JOBS is a compatibility alias for the generated-data and cheap
+# record-construction job counts.  It does not affect any of the four
+# memory-heavy job counts above.  A memory-rich
 # 32-core builder can equivalently set
 #
 #   VK_PROVENANCE_DATA_JOBS=32 VK_PROVENANCE_CHEAP_JOBS=32
@@ -249,7 +249,7 @@ endif
 VK_PROVENANCE_DIR := Orchard/vk/provenance
 VK_PROVENANCE_MAIN := $(VK_PROVENANCE_CERT_DIR)/Main.vo
 
-# Phase 1a: implementation modules that do not depend on generated tables.
+# Implementation modules that do not depend on generated tables.
 VK_PROVENANCE_CORE_VOS := \
 	Prim63/ArrayLinear.vo \
 	Prim63/Loop.vo \
@@ -279,7 +279,7 @@ VK_PROVENANCE_CORE_VOS := \
 	$(VK_PROVENANCE_DIR)/Srs.vo \
 	Orchard/vk_msm.vo
 
-# Phase 1b: independent generated literals.  These are the only large fan-out
+# Independent generated literals.  These are the only large fan-out
 # for which a memory-rich builder should normally request roughly 32 workers.
 VK_PROVENANCE_DATA_LEAF_VOS := \
 	$(VK_PROVENANCE_GENERATED_DIR)/DomainData.vo \
@@ -318,7 +318,7 @@ VK_PROVENANCE_CHECKER_VOS := \
 	$(VK_PROVENANCE_DIR)/CommitmentRefinement.vo
 
 # Closed domain/sigma checks are smaller than the cryptographic arithmetic
-# leaves, but still default to a single worker because they replay sizeable
+# leaves and default to a single worker because they replay sizeable
 # model terms.
 VK_PROVENANCE_DOMAIN_LEAF_VOS := \
 	$(VK_PROVENANCE_CERT_DIR)/DomainBitReversal.vo \
@@ -329,12 +329,12 @@ VK_PROVENANCE_DOMAIN_LEAF_VOS := \
 VK_PROVENANCE_SIGMA_LEAF_VOS := \
 	$(foreach index,$(VK_PROVENANCE_PERMUTATION_INDICES),$(VK_PROVENANCE_CERT_DIR)/Sigma$(index).vo)
 
-# Phase 2: hash-to-curve/SRS checks.  Each shard is independent but heavy.
+# Hash-to-curve/SRS checks.  Each shard is independent but heavy.
 VK_PROVENANCE_SRS_LEAF_VOS := \
 	$(foreach index,$(VK_PROVENANCE_SRS_INDICES),$(VK_PROVENANCE_CERT_DIR)/Srs$(index).vo) \
 	$(VK_PROVENANCE_CERT_DIR)/SrsExtra.vo
 
-# Phase 3: inverse FFTs, the two Pippenger halves, and final point assembly.
+# Inverse FFTs, the two Pippenger halves, and final point assembly.
 VK_PROVENANCE_CALIBRATION_VOS := \
 	$(foreach prefix,$(VK_PROVENANCE_COLUMN_PREFIXES),$(VK_PROVENANCE_CERT_DIR)/$(prefix)Calibration.vo)
 VK_PROVENANCE_MSM_VOS := \
@@ -344,7 +344,7 @@ VK_PROVENANCE_ASSEMBLY_VOS := \
 	$(foreach prefix,$(VK_PROVENANCE_COLUMN_PREFIXES),$(VK_PROVENANCE_CERT_DIR)/$(prefix)Assembly.vo)
 
 # These per-column files only package already-checked leaves.  They may use
-# the cheap fan-out, while the graph-wide aggregates remain serialized.
+# the cheap fan-out, while the graph-wide aggregates are serialized.
 VK_PROVENANCE_COLUMN_AGGREGATE_VOS := \
 	$(foreach prefix,$(VK_PROVENANCE_COLUMN_PREFIXES),$(VK_PROVENANCE_CERT_DIR)/$(prefix).vo)
 VK_PROVENANCE_FINAL_VOS := \
@@ -375,7 +375,7 @@ orchard-vk-provenance: orchard-vk-provenance-generate
 	+$(MAKE) orchard-vk-provenance-build
 
 # This private target is invoked only after the outer make has ensured that
-# all generated sources exist, so its fixed phase lists are valid on a clean
+# all generated sources exist, so its fixed target lists are valid on a clean
 # checkout as well as in a developer's populated tree.
 orchard-vk-provenance-build: CoqMakefile
 	@echo "[vk provenance 1/4] core modules and generated data"

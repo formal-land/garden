@@ -3,7 +3,8 @@
     The reusable machinery behind the 44 vk-commitment certificates.  The
     deployed keygen commits each fixed/permutation column [v] as
     [commit_lagrange v = sum_j v_j * g_lagrange_j + w]
-    ([halo2_proofs/src/poly/commitment.rs]; [Blind::default() = 1], so the
+    ([third-party/halo2/halo2_proofs/src/poly/commitment.rs];
+    [Blind::default() = 1], so the
     [+ w] term is mandatory), with [g_lagrange] the inverse EC-FFT of the
     deterministic [Params::new(11)] generators [g].  Computing
     [g_lagrange] in-model is infeasible, so the certificates run over the
@@ -16,7 +17,7 @@
     - [commit_lagrange_intt] (the linearity theorem) moves the commitment
       to the coefficient side, [commit_lagrange v = msm (intt v) g + w],
       by scalar-multiplication algebra over the Vesta group and reduction
-      modulo the certified group order ([EllipticCurve/VestaOrder.v]);
+      modulo the certified group order ([Garden/EllipticCurve/VestaOrder.v]);
     - [intt] computes the coefficients through a radix-2
       decimation-in-time FFT over the scalar field [F_{pallas_p}], proved
       pointwise equal to the Horner evaluations
@@ -104,9 +105,9 @@ Lemma omega_inv_half_fast_check :
   fast_pow_modulo_positive 1 omega_inv scalar_p 1024 = scalar_p - 1.
 Proof. vm_compute. reflexivity. Qed.
 
-(** Keep every conversion engine from evaluating the unreduced concrete
-    power while the [modpow] certificate is transferred to the [Z.pow]
-    spelling. *)
+(** The opacity barrier prevents conversion from evaluating the unreduced
+    concrete power while the [modpow] certificate is transferred to the
+    [Z.pow] spelling. *)
 Strategy opaque [Z.pow Z.pow_pos].
 
 Lemma omega_inv_half : (omega_inv ^ 1024) mod scalar_p = scalar_p - 1.
@@ -922,7 +923,7 @@ Proof.
     eqp_ring.
 Qed.
 
-(** The linearity theorem (route (b)): the commitment over [g_lagrange]
+(** The linearity theorem: the commitment over [g_lagrange]
     equals the [intt]-coefficient MSM over the raw certified [g], for any
     blinding scalar. *)
 Theorem commit_lagrange_intt_with_blind (v : list Z) (blind : Z) :

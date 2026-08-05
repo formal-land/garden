@@ -29,9 +29,9 @@ Module VkJacobian.
   Module F := PallasQ.
   Import Prim63Words.
 
-  (** Corelib states primitive-array laws at one universe above [Set].
-      Keep every executable MSM array at that universe so the semantic
-      refinement can use those laws without a universe cast. *)
+  (** Corelib states primitive-array laws at one universe above [Set]. Every
+      executable MSM array inhabits that universe so the semantic refinement
+      can use those laws without a universe cast. *)
   Monomorphic Universe array_u.
   Monomorphic Constraint Set < array_u.
   Monomorphic Constraint array_u = ArrayAxioms.length_make.u0.
@@ -135,9 +135,9 @@ Module VkJacobian.
 
   (** ** List-to-array loading
 
-      Generated files stay pleasant to inspect as lists; the heavy path
-      immediately loads them into primitive arrays and thereafter threads
-      only the latest array version. *)
+      Generated files are inspectable as lists; the heavy path immediately
+      loads them into primitive arrays and threads only the returned array
+      state. *)
 
   Fixpoint load_list_from {A : Type@{array_u}}
       (values : list A) (index : nat)
