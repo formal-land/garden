@@ -1235,6 +1235,19 @@ record-packaging concurrency. Builders with measured memory headroom can tune
 `VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`,
 `VK_PROVENANCE_MSM_JOBS`, and `VK_PROVENANCE_ASSEMBLY_JOBS` independently.
 
+The generated computational leaves were changed on 2026-08-05 from
+`vm_compute; reflexivity` to `vm_cast_no_check`. The old form evaluates the
+closed expression in the tactic and then makes the kernel evaluate it again
+when checking `eq_refl`; the cast asks the kernel to perform a single VM
+conversion. A serialized representative batch containing one domain leaf,
+one sigma leaf, one SRS shard, one inverse-FFT calibration, both MSM halves,
+and one assembly leaf took **374.01 s wall** after the change. A subsequent
+default-settings replay checked every domain and sigma leaf and SRS shards
+00–04 before being stopped once the repeated SRS template was established.
+The 2026-08-04 figures above therefore remain the most recent complete
+all-278-module measurement; do not extrapolate the representative batch as a
+new full-replay timing.
+
 ## History: the big cost cliffs
 
 **Table alias → pasted literal (2026-07-02).** `full_table_reduced` was

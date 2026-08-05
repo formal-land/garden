@@ -638,7 +638,7 @@ def emit_domain_certificates() -> None:
             "Require Import Garden.Orchard.vk.provenance.Domain.\n\n"
             f"Module VkDomain{cap}Certificate.\n"
             f"Lemma checked : VkDomain.{check} = true.\n"
-            "Proof. vm_compute. reflexivity. Qed.\n"
+            "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
             f"End VkDomain{cap}Certificate.\n",
         )
 
@@ -677,7 +677,7 @@ def emit_sigma_certificate() -> None:
             "Require Import Garden.Orchard.vk.provenance.Sigma.\n\n"
             f"Module {module}.\n"
             f"Lemma checked : VkSigma.column_check {index} = true.\n"
-            "Proof. vm_compute. reflexivity. Qed.\n"
+            "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
             f"End {module}.\n",
         )
         imports.append(
@@ -734,7 +734,7 @@ def emit_srs_certificates() -> None:
             f"Module {module}.\n"
             f"Lemma checked : VkSrs.check_g_shard {shard * 64} "
             f"{data}.entries VkSrsCoordinates{shard:02d}Data.coordinates = true.\n"
-            "Proof. vm_compute. reflexivity. Qed.\n"
+            "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
             f"End {module}.\n",
         )
         imports.append(
@@ -761,7 +761,7 @@ def emit_srs_certificates() -> None:
         "  VkSrs.check_extra_entries VkSrsExtraData.w_entry\n"
         "    VkSrsExtraData.u_entry VkSrsCoordinatesExtraData.w\n"
         "    VkSrsCoordinatesExtraData.u = true.\n"
-        "Proof. vm_compute. reflexivity. Qed.\n"
+        "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
         "End VkSrsExtraCertificate.\n",
     )
     imports.append(
@@ -882,7 +882,7 @@ def emit_commitment_certificates() -> None:
                 f"Module {calibration_module}.\n"
                 f"Lemma checked : VkCalibration.check {column_kind} {index} "
                 f"{data}.coefficients = true.\n"
-                "Proof. vm_compute. reflexivity. Qed.\n"
+                "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
                 f"End {calibration_module}.\n",
             )
 
@@ -899,7 +899,8 @@ def emit_commitment_certificates() -> None:
                     f"Module {module}.\n"
                     f"Lemma checked : VkMsmChecks.{check} {data}.coefficients "
                     f"{data}.{expected}.\n"
-                    "Proof. vm_compute. reflexivity. Qed.\n"
+                    "Proof. vm_cast_no_check "
+                    f"(@eq_refl _ (VkMsmChecks.point_of_words {data}.{expected})). Qed.\n"
                     f"End {module}.\n",
                 )
 
@@ -915,7 +916,7 @@ def emit_commitment_certificates() -> None:
                 f"Lemma checked : VkAssemblyCheck.check {column_kind} {index} "
                 f"{data}.low_projective_expected "
                 f"{data}.high_projective_expected = true.\n"
-                "Proof. vm_compute. reflexivity. Qed.\n"
+                "Proof. vm_cast_no_check (@eq_refl bool true). Qed.\n"
                 f"End {assembly_module}.\n",
             )
 

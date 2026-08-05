@@ -106,6 +106,9 @@ The memory-heavy job groups are independently capped. Builders that have
 measured sufficient headroom can raise, for example,
 `VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`, or
 `VK_PROVENANCE_MSM_JOBS`. Their one-worker defaults bound aggregate memory.
+The generated-source inventories, job controls, and recipes for these targets
+are kept in `Garden/vk-provenance.mk`; the main Makefile contains only the
+ordinary-build integration points.
 
 The sigma mapping is split into 15 primitive-word shards. Packing
 `(column,row)` as `column * 2048 + row` avoids the elaboration-time Peano-term
@@ -124,13 +127,17 @@ reproduces all 44 pinned points, but it is not in the trusted proof path.
 
 ## Proof and trust boundary
 
-The closed certificates use `vm_compute`. On Rocq installations without
-native-compiler support, `native_compute` falls back to the same VM.
-The executable arithmetic contains no project-specific `Axiom` or
-`Admitted`. Its logical refinement layer proves the primitive multiply/add
-carry equations, the five-word CIOS sweep, and modular correctness of
-five-limb Montgomery multiplication for a canonical operand. The certificates
-ultimately rely on Rocq's standard `PrimInt63` and `PrimArray` primitives.
+The 229 closed computational leaves use `vm_cast_no_check`: Boolean checks
+cast `eq_refl true`, while each MSM leaf casts reflexivity at its expected
+Jacobian point. Rocq's kernel compares the cast term's type with the goal by
+VM conversion. This performs the concrete computation once during kernel
+checking instead of once in the `vm_compute` tactic and again when checking
+the resulting `eq_refl`. The executable arithmetic contains no
+project-specific `Axiom` or `Admitted`. Its logical refinement layer proves
+the primitive multiply/add carry equations, the five-word CIOS sweep, and
+modular correctness of five-limb Montgomery multiplication for a canonical
+operand. The certificates ultimately rely on Rocq's standard `PrimInt63`,
+`PrimArray`, and VM-conversion primitives.
 
 The refinement chain is complete up to the library-level mathematical
 `commit_lagrange`: it proves field canonicality, inverse-FFT semantics,
