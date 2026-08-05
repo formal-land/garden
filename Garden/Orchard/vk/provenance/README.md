@@ -39,7 +39,10 @@ The certificate graph covers the following chain.
    that its decoded output is exactly the generated standard scalar vector.
 5. `Srs.v` enforces the exact `Params::new(11)` message schedule, canonical
    Montgomery coordinates, and the hash-to-field and SSWU witness equations
-   for every base, including `w` and `u`, in 64-point shards. A generic
+   for every base, including `w` and `u`, in 64-point shards. The witness
+   equations, point reconstruction, and curve membership evaluate over
+   five-limb Montgomery words (`GroupHash/sswu_vesta_words.v`), with the
+   BLAKE2b-XMD hash-to-field stage on `Z` bytes. A generic
    square-root-independence theorem connects every accepted witness to the
    canonical `GroupHashVesta.group_hash` definition.
 6. `Jacobian.v` performs a width-8 Pippenger MSM.  The low and high 128-bit

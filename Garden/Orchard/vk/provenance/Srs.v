@@ -11,6 +11,7 @@ Require Import Garden.GroupHash.xmd.
 Require Import Garden.GroupHash.sswu_vesta.
 Require Import Garden.GroupHash.group_hash_vesta.
 Require Import Garden.GroupHash.sswu_vesta_witness.
+Require Import Garden.GroupHash.sswu_vesta_words.
 Require Import Garden.Orchard.vk.provenance.DataTypes.
 Require Import Garden.Orchard.vk.provenance.Jacobian.
 
@@ -93,6 +94,20 @@ Module VkSrs.
       GroupHashVesta.hash_to_field_vesta domain_prefix entry.(message) in
     check_entry_for u0 u1 entry.
 
+  (** Montgomery-word evaluation of the same per-entry check.  The XMD
+      hash-to-field computation still runs over [Z] bytes; every field
+      operation afterwards runs on five-limb [PallasQ] words.
+      [check_entry_fast_sound] below transfers acceptance to
+      [check_entry], so the certificate lemma surface is unchanged. *)
+  Definition check_entry_fast (entry : srs_entry) : bool :=
+    let '(u0, u1) :=
+      GroupHashVesta.hash_to_field_vesta domain_prefix entry.(message) in
+    coordinates_canonical entry.(coordinates)
+      && SswuVestaWords.group_hash_checkb_exec u0 u1
+        entry.(was_square0) entry.(root0)
+        entry.(was_square1) entry.(root1)
+        entry.(coordinates).(x_words) entry.(coordinates).(y_words).
+
   Definition check_entries (entries : list srs_entry) : bool :=
     List.forallb check_entry entries.
 
@@ -125,7 +140,7 @@ Module VkSrs.
         bytes_eqb entry.(message) (g_message index)
           && (affine_words_eqb entry.(VkProvenanceDataTypes.coordinates)
               coordinate
-            && (check_entry entry
+            && (check_entry_fast entry
               && check_g_entries_from (S index) entries coordinates))
     | _, _ => false
     end.
@@ -144,7 +159,7 @@ Module VkSrs.
             w_coordinates
           && (affine_words_eqb u_entry.(VkProvenanceDataTypes.coordinates)
               u_coordinates
-            && (check_entry w_entry && check_entry u_entry)))).
+            && (check_entry_fast w_entry && check_entry_fast u_entry)))).
 
   Lemma check_entry_for_canonical_witnesses_ok
       (u0 u1 : Z) (entry : srs_entry) :
@@ -352,6 +367,49 @@ Module VkSrs.
       now rewrite Hcoordinate in Hcanonical.
   Qed.
 
+  Lemma coordinates_canonical_words (value : affine_words) :
+    coordinates_canonical value = true ->
+    PallasQ.canonical value.(x_words) /\ PallasQ.canonical value.(y_words).
+  Proof.
+    intros Hcheck. apply andb_prop in Hcheck as [Hx Hy].
+    apply pallas_q_equal_eq in Hx. apply pallas_q_equal_eq in Hy.
+    split; [rewrite Hx | rewrite Hy];
+      apply PallasQRefinement.from_Z_canonical.
+  Qed.
+
+  Lemma check_entry_fast_sound (entry : srs_entry) :
+    check_entry_fast entry = true -> check_entry entry = true.
+  Proof.
+    unfold check_entry_fast, check_entry.
+    destruct (GroupHashVesta.hash_to_field_vesta domain_prefix
+      entry.(message)) as [u0 u1].
+    intros Hfast. apply andb_prop in Hfast as [Hcanonical Hfast].
+    rewrite SswuVestaWords.group_hash_checkb_exec_eq in Hfast.
+    pose proof (coordinates_canonical_words _ Hcanonical) as [Hcx Hcy].
+    destruct (SswuVestaWords.group_hash_checkb_sound
+      u0 u1 entry.(root0) entry.(root1)
+      entry.(was_square0) entry.(was_square1)
+      entry.(coordinates).(x_words) entry.(coordinates).(y_words)
+      Hcx Hcy Hfast) as (Hwitnesses & Hpoint & Hcurve).
+    unfold check_entry_for, expected_point.
+    rewrite Hcanonical, Hcurve.
+    unfold SswuVestaWitness.canonical_point_eqb, canonical_witnesses_ok_for.
+    now rewrite Hwitnesses, Hpoint.
+  Qed.
+
+  Lemma checked_entry_refinement_fast
+      (expected_message : list Z) (entry : srs_entry)
+      (coordinate : affine_words) :
+    bytes_eqb entry.(message) expected_message = true ->
+    affine_words_eqb entry.(coordinates) coordinate = true ->
+    check_entry_fast entry = true ->
+    entry_refinement expected_message entry coordinate.
+  Proof.
+    intros Hmessage Hcoordinate Hentry.
+    apply checked_entry_refinement; try assumption.
+    now apply check_entry_fast_sound.
+  Qed.
+
   Inductive g_entries_refine_from :
       nat -> list srs_entry -> list affine_words -> Prop :=
   | g_entries_refine_nil (index : nat) :
@@ -378,7 +436,7 @@ Module VkSrs.
       apply andb_prop in Hcheck as [Hcoordinate Hcheck].
       apply andb_prop in Hcheck as [Hentry Htail].
       constructor.
-      + now apply checked_entry_refinement.
+      + now apply checked_entry_refinement_fast.
       + now apply IH.
   Qed.
 
@@ -556,7 +614,7 @@ Module VkSrs.
     apply andb_prop in Hcheck as [Hw_coordinate Hcheck].
     apply andb_prop in Hcheck as [Hu_coordinate Hcheck].
     apply andb_prop in Hcheck as [Hw_entry Hu_entry].
-    constructor; now apply checked_entry_refinement.
+    constructor; now apply checked_entry_refinement_fast.
   Qed.
 
 End VkSrs.

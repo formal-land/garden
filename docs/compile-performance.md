@@ -1248,6 +1248,41 @@ The 2026-08-04 figures above therefore remain the most recent complete
 all-278-module measurement; do not extrapolate the representative batch as a
 new full-replay timing.
 
+**Montgomery-word SRS entry check (2026-08-05).** `VkSrs.check_entry_fast`
+evaluates the per-entry SSWU witness check over five-limb `PallasQ`
+Montgomery words (`GroupHash/sswu_vesta_words.v`); the BLAKE2b-XMD
+hash-to-field stage stays on `Z` bytes. Measured on a 32-core builder, the
+33 SRS leaves cost 3 212 s CPU total (≈ 97 s per leaf under 16-way load,
+79 s single-job, ≈ 2.2 GB peak each; 3 m 32 s wall at
+`VK_PROVENANCE_SRS_JOBS=16`), against ≈ 4 h 04 min serialized for the
+`Z`-arithmetic checker. Per-entry cost is ≈ 0.6 s: the eight
+`mod_inverse` calls (≈ 43 ms each — extended-Euclid on 255-bit operands),
+the hash (≈ 40 ms), and residual `Z`-side reductions dominate; the
+Montgomery multiplications themselves are microsecond-scale. Three
+structural lessons from that file:
+
+- The soundness layer works over `represents w x` (canonical word `w`
+  denotes `x mod q`) with one congruence rule per operation and a
+  discriminated hint database; every accessor obligation closes by
+  structural descent, avoiding rewrite search and `mod`-idempotence
+  normal forms entirely. `Hint Constants Opaque` on the databases is
+  load-bearing: without it, hint unification δ-unfolds `from_Z` against
+  `mul`-headed goals into the CIOS expansions and diverges.
+- The exported checker is a conjunction of *named* per-conjunct
+  definitions marked `Strategy expand`, with a definitionally equal
+  `let`-sharing `_exec` form for evaluation. Decomposing a `let`-bound or
+  anonymous conjunction hypothesis makes kernel conversion at `Qed` pick
+  the `andb` side to reduce, which forces weak-head evaluation of a
+  symbolic Montgomery term and diverges; the named-conjunct + `Strategy
+  expand` layout keeps every hypothesis type a compact application.
+- Per-reference `Q.from_Z` of curve constants costs a `Z` modular
+  reduction each; the file precomputes all twenty as `Eval vm_compute`
+  literals with equality bridges, which halved the per-entry cost.
+
+The remaining SRS floor is the extended-Euclid inversions; a proven
+Montgomery Fermat ladder (≈ 380 word multiplications) would reduce them
+to ≈ 1 ms each.
+
 ## History: the big cost cliffs
 
 **Table alias → pasted literal (2026-07-02).** `full_table_reduced` was
