@@ -17,6 +17,8 @@
 
 From Stdlib Require Import ZArith Bool.Bool.
 Require Import Garden.Field.Field.
+Require Garden.Field.Fermat.
+Require Garden.Field.Div.
 Require Import Garden.EllipticCurve.Weierstrass.
 Require Import Garden.EllipticCurve.Vesta.
 Require Import Garden.GroupHash.sswu_vesta.
@@ -70,8 +72,20 @@ Module SswuVestaWords.
   Definition va_c : Q.t := Eval vm_compute in Q.from_Z Vesta.a.
   Definition vb_c : Q.t := Eval vm_compute in Q.from_Z Vesta.b.
 
-  Definition inverse_w (v : Q.t) : Q.t :=
-    Q.from_Z (mod_inverse (Q.to_Z v) Primes.pallas_q).
+  Fixpoint pow_w (b : Q.t) (e : positive) : Q.t :=
+    match e with
+    | xH => b
+    | xO p => Q.square (pow_w b p)
+    | xI p => Q.mul b (Q.square (pow_w b p))
+    end.
+
+  (** Fermat inversion exponent: the ladder computes [v^(q-2)] in
+      Montgomery words (roughly 380 word multiplications), replacing an
+      extended-Euclid [mod_inverse] over 255-bit [Z] operands. *)
+  Definition inverse_exponent : positive :=
+    Eval vm_compute in Z.to_pos (Primes.pallas_q - 2).
+
+  Definition inverse_w (v : Q.t) : Q.t := pow_w v inverse_exponent.
 
   Definition div_w (n d : Q.t) : Q.t := Q.mul n (inverse_w d).
 
@@ -440,11 +454,20 @@ Module SswuVestaWords.
 
   (** Word terms produced by this module are canonical by construction;
       the case splits below mirror the executable branch structure. *)
-  Lemma inverse_w_canonical (v : Q.t) : Q.canonical (inverse_w v).
+  #[local] Hint Resolve PallasQCanonicalFacts.square_canonical : swu_cano.
+
+  Lemma pow_w_canonical (b : Q.t) (e : positive) (Hb : Q.canonical b) :
+    Q.canonical (pow_w b e).
+  Proof. induction e; cbn [pow_w]; cano. Qed.
+  #[local] Hint Resolve pow_w_canonical : swu_cano.
+
+  Lemma inverse_w_canonical (v : Q.t) (Hv : Q.canonical v) :
+    Q.canonical (inverse_w v).
   Proof. unfold inverse_w. cano. Qed.
   #[local] Hint Resolve inverse_w_canonical : swu_cano.
 
-  Lemma div_w_canonical (n d : Q.t) : Q.canonical (div_w n d).
+  Lemma div_w_canonical (n d : Q.t) (Hd : Q.canonical d) :
+    Q.canonical (div_w n d).
   Proof. unfold div_w. cano. Qed.
   #[local] Hint Resolve div_w_canonical : swu_cano.
 
@@ -602,19 +625,106 @@ Module SswuVestaWords.
     now rewrite Z.mod_mod by lia.
   Qed.
 
+  Lemma pow_w_denote (b : Q.t) (e : positive) (Hb : Q.canonical b) :
+    Q.denote (pow_w b e) =
+      (Q.denote b) ^ (Z.pos e) mod Primes.pallas_q.
+  Proof.
+    induction e as [e IH | e IH |]; cbn [pow_w].
+    - rewrite PallasQDenoteFacts.mul_denote
+        by (apply PallasQCanonicalFacts.square_canonical;
+          now apply pow_w_canonical).
+      rewrite PallasQDenoteFacts.square_denote
+        by now apply pow_w_canonical.
+      rewrite IH.
+      rewrite <- Z.mul_mod by exact q_neq.
+      rewrite Z.mul_mod_idemp_r by exact q_neq.
+      rewrite <- Z.pow_add_r by lia.
+      rewrite <- Z.pow_succ_r by lia.
+      rewrite Pos2Z.inj_xI.
+      f_equal. f_equal. lia.
+    - rewrite PallasQDenoteFacts.square_denote by now apply pow_w_canonical.
+      rewrite IH.
+      rewrite <- Z.mul_mod by exact q_neq.
+      rewrite <- Z.pow_add_r by lia.
+      rewrite Pos2Z.inj_xO.
+      f_equal. f_equal. lia.
+    - rewrite Z.pow_1_r.
+      now rewrite Z.mod_small by apply denote_range.
+  Qed.
+
+  Lemma mod_inverse_zero : mod_inverse 0 Primes.pallas_q = 0.
+  Proof.
+    pose proof q_pos as Hq.
+    unfold mod_inverse.
+    destruct Primes.pallas_q as [| p | p]; [lia | | lia].
+    now rewrite Z.mod_0_l by lia.
+  Qed.
+
+  Lemma mod_inverse_range (a : Z) :
+    0 <= mod_inverse a Primes.pallas_q < Primes.pallas_q.
+  Proof.
+    pose proof q_pos as Hq.
+    unfold mod_inverse.
+    destruct Primes.pallas_q as [| p | p]; [lia | | lia].
+    destruct (a mod Z.pos p =? 0); [lia |].
+    apply Z.mod_pos_bound. lia.
+  Qed.
+
+  (** The Fermat ladder agrees with the extended-Euclid inverse: both are
+      two-sided inverses of a nonzero residue, and a field inverse is
+      unique; both send zero to zero. *)
+  Lemma inverse_w_denote (v : Q.t) (Hv : Q.canonical v) :
+    Q.denote (inverse_w v) =
+      mod_inverse (Q.denote v) Primes.pallas_q.
+  Proof.
+    unfold inverse_w.
+    rewrite (pow_w_denote v inverse_exponent Hv).
+    assert (He : Z.pos inverse_exponent = Primes.pallas_q - 2)
+      by (vm_compute; reflexivity).
+    rewrite He.
+    pose proof (denote_range v) as Hrange.
+    pose proof q_gt_1 as Hq1.
+    assert (Hq2 : 2 < Primes.pallas_q) by (vm_compute; reflexivity).
+    destruct (Z.eq_dec (Q.denote v) 0) as [Hzero | Hnz].
+    - rewrite Hzero, mod_inverse_zero.
+      rewrite Z.pow_0_l by lia.
+      now rewrite Z.mod_0_l by exact q_neq.
+    - set (dv := Q.denote v) in *.
+      assert (Hdvmod : dv mod Primes.pallas_q = dv)
+        by (apply Z.mod_small; lia).
+      assert (Hdvnz : dv mod Primes.pallas_q <> 0) by (rewrite Hdvmod; lia).
+      pose proof (@is_prime Primes.pallas_q Primes.PallasQIsPrime) as Hprime.
+      pose proof (Fermat.inv_correct_gen dv Primes.pallas_q Hprime Hdvnz)
+        as Hfermat.
+      pose proof (Div.mod_inverse_mul_prime (p := Primes.pallas_q) dv Hdvnz)
+        as Hegcd.
+      unfold BinOp.mul in Hegcd.
+      set (x := dv ^ (Primes.pallas_q - 2) mod Primes.pallas_q) in *.
+      set (m := mod_inverse dv Primes.pallas_q) in *.
+      assert (Hxr : 0 <= x < Primes.pallas_q)
+        by (apply Z.mod_pos_bound; exact q_pos).
+      pose proof (mod_inverse_range dv) as Hmr. fold m in Hmr.
+      transitivity ((x * ((m * dv) mod Primes.pallas_q)) mod Primes.pallas_q).
+      + rewrite Hegcd. rewrite Z.mul_1_r.
+        symmetry. apply Z.mod_small. exact Hxr.
+      + rewrite Z.mul_mod_idemp_r by exact q_neq.
+        replace (x * (m * dv)) with (m * (dv * x)) by ring.
+        rewrite <- (Z.mul_mod_idemp_r m (dv * x)) by exact q_neq.
+        rewrite Hfermat. rewrite Z.mul_1_r.
+        apply Z.mod_small. exact Hmr.
+  Qed.
+
   Lemma div_repr (wn wd : Q.t) (n d : Z) :
     represents wn n -> represents wd d ->
     represents (div_w wn wd) (BinOp.div n d).
   Proof.
-    intros [Hcn Hdn] [Hcd Hdd]. unfold div_w, inverse_w.
+    intros [Hcn Hdn] [Hcd Hdd]. unfold div_w.
     split; [cano |].
     rewrite PallasQDenoteFacts.mul_denote
-      by apply PallasQCanonicalFacts.from_Z_canonical.
-    rewrite PallasQDenoteFacts.from_Z_denote.
-    rewrite PallasQDenoteFacts.to_Z_denote.
+      by now apply inverse_w_canonical.
+    rewrite (inverse_w_denote wd Hcd).
     rewrite Hdn, Hdd, mod_inverse_mod.
     unfold BinOp.div, BinOp.mul.
-    rewrite Z.mul_mod_idemp_r by exact q_neq.
     rewrite Z.mul_mod_idemp_l by exact q_neq.
     now rewrite Z.mod_mod by exact q_neq.
   Qed.

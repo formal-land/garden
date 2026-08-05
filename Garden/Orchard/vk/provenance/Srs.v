@@ -118,15 +118,19 @@ Module VkSrs.
     | _, _ => false
     end.
 
-  Definition index_byte (index divisor : nat) : Z :=
-    Z.of_nat ((index / divisor) mod 256).
+  (** Byte extraction runs on [Z]: [nat] literals as large as [2^24] cost
+      millions of successor constructors per evaluation under the virtual
+      machine. *)
+  Definition index_byte (index divisor : Z) : Z :=
+    (index / divisor) mod 256.
 
   (** The exact message schedule in
       [halo2_proofs::poly::commitment::Params::new]:
       [0x00 || LE32(i)] for [g_i], followed by [0x01] and [0x02]. *)
   Definition g_message (index : nat) : list Z :=
-    [0; index_byte index 1; index_byte index 256;
-        index_byte index 65536; index_byte index 16777216].
+    [0; index_byte (Z.of_nat index) 1; index_byte (Z.of_nat index) 256;
+        index_byte (Z.of_nat index) 65536;
+        index_byte (Z.of_nat index) 16777216].
 
   Definition affine_words_eqb (left right : affine_words) : bool :=
     PallasQ.equal left.(x_words) right.(x_words)

@@ -1251,15 +1251,22 @@ new full-replay timing.
 **Montgomery-word SRS entry check (2026-08-05).** `VkSrs.check_entry_fast`
 evaluates the per-entry SSWU witness check over five-limb `PallasQ`
 Montgomery words (`GroupHash/sswu_vesta_words.v`); the BLAKE2b-XMD
-hash-to-field stage stays on `Z` bytes. Measured on a 32-core builder, the
-33 SRS leaves cost 3 212 s CPU total (≈ 97 s per leaf under 16-way load,
-79 s single-job, ≈ 2.2 GB peak each; 3 m 32 s wall at
-`VK_PROVENANCE_SRS_JOBS=16`), against ≈ 4 h 04 min serialized for the
-`Z`-arithmetic checker. Per-entry cost is ≈ 0.6 s: the eight
-`mod_inverse` calls (≈ 43 ms each — extended-Euclid on 255-bit operands),
-the hash (≈ 40 ms), and residual `Z`-side reductions dominate; the
-Montgomery multiplications themselves are microsecond-scale. Three
-structural lessons from that file:
+hash-to-field stage stays on `Z` bytes. Inversions run a proven Fermat
+ladder (`pow_w` at exponent `q - 2`, ≈ 380 word multiplications;
+`inverse_w_denote` identifies it with `mod_inverse` through
+`Fermat.inv_correct_gen`, `Div.mod_inverse_mul_prime`, and inverse
+uniqueness). Measured on a 32-core builder, the 33 SRS leaves cost
+≈ 289 s CPU total (≈ 8.8 s per leaf under 16-way load, 7.2 s single-job),
+against ≈ 4 h 04 min serialized for the `Z`-arithmetic checker — a 50×
+reduction. Three intermediate cost cliffs, in the order they were found:
+`Z` field multiplications at ≈ 7 ms amplified by the unshared
+specification accessors (the port itself, 330 s → 79 s per leaf);
+extended-Euclid `mod_inverse` at ≈ 43 ms per 255-bit operand and
+per-reference `Q.from_Z` constant conversions (constant literals and the
+Fermat ladder, 79 s → 47 s); and `g_message`'s `nat` byte extraction,
+whose `2^24` literal expands to millions of successor constructors per
+evaluation under the virtual machine (`Z` byte extraction, 47 s → 7.2 s).
+Structural lessons from the soundness layer:
 
 - The soundness layer works over `represents w x` (canonical word `w`
   denotes `x mod q`) with one congruence rule per operation and a
@@ -1277,11 +1284,12 @@ structural lessons from that file:
   expand` layout keeps every hypothesis type a compact application.
 - Per-reference `Q.from_Z` of curve constants costs a `Z` modular
   reduction each; the file precomputes all twenty as `Eval vm_compute`
-  literals with equality bridges, which halved the per-entry cost.
+  literals with equality bridges.
 
-The remaining SRS floor is the extended-Euclid inversions; a proven
-Montgomery Fermat ladder (≈ 380 word multiplications) would reduce them
-to ≈ 1 ms each.
+The remaining per-entry floor is the BLAKE2b-XMD hash-to-field stage
+(≈ 40 ms over `Z` bytes) plus the `Z`-side digest reductions; a
+primitive-integer BLAKE2b would be the next lever if the SRS group ever
+needs another order of magnitude.
 
 ## History: the big cost cliffs
 
