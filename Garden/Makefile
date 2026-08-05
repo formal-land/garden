@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := default
+
 .PHONY: all clean clean-util distclean default
 .PHONY: orchard-json-from-model orchard-configure-json-from-model orchard-configure-json-compare
 .PHONY: orchard-synthesis-json-from-model orchard-synthesis-json-compare orchard-synthesis-json-compare-normalized
@@ -5,15 +7,28 @@
 .PHONY: orchard-circuit-grid-json orchard-circuit-grid-check orchard-circuit-grid-test
 .PHONY: orchard-vk-pinned orchard-vk-pinned-check
 
-VFILES := $(shell find -L . -name "*.v" | grep -v -f blacklist.txt | sort)
+# The VK provenance graph is large and branch-specific, so its inventories,
+# generator rules, job controls, and explicit build targets live separately.
+include vk-provenance.mk
+
+# Excluding the generated subtree here prevents parse-time discovery from
+# depending on whether a developer happens to have generated it already.
+VFILES := $(shell find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort)
+
+# The ordinary project build checks every hand-written Rocq source and all
+# generated literal-data modules.  The dedicated target below owns the 278
+# generated provenance certificate modules; a complete kernel replay of those
+# certificates is `make orchard-vk-provenance`.
+DEFAULT_VOFILES := $(VFILES:.v=.vo) $(VK_PROVENANCE_GENERATED_DATA_VFILES:.v=.vo)
 
 default: all
 
-CoqMakefile: $(VFILES) blacklist.txt
+CoqMakefile: $(VFILES) blacklist.txt $(VK_PROVENANCE_STATE) $(VK_PROVENANCE_MANIFEST) $(VK_PROVENANCE_GENERATED_VFILES)
 	echo "-R . Garden" > _CoqProject
 	echo "-arg -impredicative-set -arg -w -arg -stdlib-vector" >> _CoqProject
-	# We copy & paste the command to find files as this variable is too long on command line
-	find -L . -name "*.v" | grep -v -f blacklist.txt | sort >> _CoqProject
+	# The checked-in sources and generated manifest are deliberately separate.
+	find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort >> _CoqProject
+	cat $(VK_PROVENANCE_MANIFEST) >> _CoqProject
 	rocq makefile -f _CoqProject -o $@
 
 MAKECOQ := +$(MAKE) -f CoqMakefile
@@ -22,7 +37,7 @@ MAKECOQ := +$(MAKE) -f CoqMakefile
 	$(MAKECOQ) $@
 
 all: CoqMakefile
-	$(MAKECOQ) all
+	$(MAKECOQ) $(DEFAULT_VOFILES)
 
 ORCHARD_SYNTHESIS_JSON_BUILD := _build/orchard_synthesis_json
 ORCHARD_SNAPSHOTS := Orchard/Snapshots

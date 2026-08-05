@@ -53,8 +53,12 @@ dependents.
 **Honesty constraint.** `.vos`/`-vok`-against-`.vos` trusts the skipped
 dependency proofs. It is a development accelerator only. Any "closed /
 axiom-free" claim, and every `Print Assumptions` audit, must run on a full
-`.vo` build (`make all`) that actually executes the certificate
-`vm_compute`s. Treat `-vos` as "compiles and type-checks", not "verified".
+`.vo` build that actually executes the relevant certificate `vm_compute`s.
+`make all` checks the checked-in certificates. The 278 ignored generated
+Orchard VK provenance certificate modules are intentionally outside that target;
+replay them with `make orchard-vk-provenance` before auditing
+`orchard_vk_commit_lagrange_refined`. Treat `-vos` as "compiles and
+type-checks", not "verified".
 Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
@@ -63,10 +67,9 @@ tracked, and every claim still requires the full-`.vo` audit.
 
 ## Rules and pitfalls
 
-The rules below are branch-independent. A few cite worked examples from the
-vk-commitment MSM and Vesta/SRS layers, which are not in this worktree — they
-live on `valerii-huhnin@msm-stretch`. The lesson still applies; only the
-example is elsewhere.
+The rules below are branch-independent. The VK-commitment MSM and Vesta/SRS
+examples refer to the files under `Garden/Orchard/vk/provenance/` and their
+git-ignored generated certificate leaves.
 
 ### State checker lemmas as the raw `forallb` term
 
@@ -966,13 +969,12 @@ worker in its own transient systemd scope; sum the per-file `TIMED=1` times
 instead.
 
 That figure was measured over the 399 files of
-`valerii-huhnin@orchard-completeness`, so it excludes the 24 compiled-plonkish,
-pinned-vk and transcript-repr files this branch adds; those are listed
-individually among the heavy leaves below, and the whole-branch total has not
-been re-measured since they landed. The vk-commitment MSM and Vesta SRS layers
-are not on this branch at all — they live on `valerii-huhnin@msm-stretch`, and
-their entries are kept in a separate section at the end only because the
-pitfalls above cite them as worked examples.
+`valerii-huhnin@orchard-completeness`, so it predates the compiled-plonkish,
+pinned-vk, transcript-representation, and VK-provenance layers. Ordinary
+`make` includes the checked-in provenance refinements and 129 generated data
+modules. The explicit `make orchard-vk-provenance` replay adds 278 generated
+certificate modules and is outside that historical total. A whole-tree total
+covering both targets has not been measured.
 The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 ≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
@@ -1209,59 +1211,42 @@ help, but do NOT retry swapping the `cbn` for `lazy` — `lazy` inlines the
 later rewrite pattern; `cbn`'s refolding is load-bearing there.
 
 
-### Leaves of the vk-commitment MSM and Vesta SRS layers (not on this branch)
+### VK-commitment MSM and Vesta SRS provenance
 
-The entries below measure files that live on `valerii-huhnin@msm-stretch`
-and are **not** present in this worktree, so they contribute nothing to the
-build figure above. They are kept here because the pitfalls elsewhere in this
-file cite them as worked examples; re-measure them against that branch before
-relying on the numbers.
+The explicit `make orchard-vk-provenance` target checks 278 generated
+certificate modules: 229 computational leaves and 49 aggregate or packaging
+modules. Ordinary `make` checks the committed refinement code and all 129
+generated literal-data modules, but not those certificates. The detailed
+proof graph and trust boundary are documented in
+[`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
 
-- The vk-commitment MSM layer, on `valerii-huhnin@msm-stretch` (2026-07-24;
-  machinery + the fixed-column-0 calibration certificate):
-  `EllipticCurve/GroupOrderTight.v` ≈ 8 s (the three-coset order theorem
-  and the ladder-distribution point algebra, all symbolic);
-  `EllipticCurve/VestaOrder.v` ≈ 115 s — dominated by the
-  [pallas_p]-fold `placeholder_order` ladder (`vm_cast_no_check`, ~100 s)
-  plus the Euler-criterion cube certificate (~1.3 s);
-  `Orchard/vk_msm.v` ≈ 14 s (95 `Qed`, no concrete-instance heavy
-  `vm_compute`; the largest sentence is `fft_spec`'s `Qed` at ~19 s under
-  a cold elaborator, ~7 s warm);
-  `Orchard/vk_msm_data_fixed0.v` ≈ 19 s (2 × 2048 pasted literals + two
-  checkpoint points);
-  `Orchard/vk_msm_calibrate.v` ≈ 110 s — the replayed-column certificate
-  (≈ 17 s before the post-NU6.3 update: the 19,679-event replay + 2048
-  installed-plane reads), the
-  inverse-NTT coefficient certificate (≈ 82 s: 11-level radix-2 FFT,
-  ~22.5 k modular multiplications), the sub-second range/length/
-  blind-and-compare certificates, and the term-style assembly theorem;
-  `Orchard/vk_msm_calibrate_{a,b}.v`: MEASURED_SHARD — one half-range
-  1024-base Pippenger `vm_compute` each (32 windows of 8 bits,
-  255 filter-buckets, suffix-sum aggregation; ≈ 49 k affine point
-  operations at ≈ 57 ms each), mutually independent, ≈ 0.7 GB peak.
-  The 44-commitment fan-out runs two such leaves per commitment fully
-  parallel; under route (b) every column is a dense 2048-scalar MSM, so
-  the per-commitment cost is uniform.
+The generated graph contains 32 independent 64-base SRS shards plus the
+`w`/`u` shard. Each of the 44 commitments has an inverse-FFT calibration,
+two 1024-base Pippenger halves, a final assembly, and a packaging module.
+Domain-table and 15 sigma-column certificates supply the remaining
+computational leaves.
 
-- The Vesta SRS provenance shards, on `valerii-huhnin@msm-stretch`
-  (2026-07-23):
-  `Orchard/vk_srs_cert_{0..15}.v` — ≈ 295 s CPU each
-  (`vk_srs_shard_N_check`, a 128-point raw-`forallb` `vm_compute` over the
-  witnessed `GroupHashVesta` recomputation — BLAKE2b XMD, witnessed SSWU
-  onto iso-Vesta, iso-curve addition, `iso_map` — ≈ 2.3 s per point under
-  16-way parallel load; witnesses pasted from
-  `scripts/generate_vk_srs_witnesses.py`, never an in-kernel `field_sqrt`).
-  The sixteen leaves are mutually independent and only
-  `Orchard/vk_srs_cert.v` (≈ 70 s: the 2049-point on-curve/reducedness scan,
-  the single-point `w` certificate, the index scan, and list-plumbing
-  assembly — all `Qed`) consumes them: ≈ 5.2 min wall for all 16 on 32
-  cores, never re-paid while iterating elsewhere.  Supporting leaves:
-  `GroupHash/sswu_vesta.v` ≈ 14 s (two Euler-criterion nonsquare checks, the
-  λ-provenance `modpow`, and the pinned SSWU test vectors),
-  `GroupHash/group_hash_vesta.v` ≈ 8 s (the pinned Vesta `hash_to_curve`
-  reference vector), the sixteen `Orchard/vk_srs_data_*.v` literal files
-  ≈ 2.5 s each (see the literal-table sharding pitfall above),
-  `EllipticCurve/Vesta.v` and `Orchard/vk_srs_entry.v` < 1 s.
+A serialized full replay measured on 2026-08-04 spent approximately 4 h 04
+min in the SRS job group and 2 h 15 min in the commitment certificate groups.
+Every job-group default is one worker because concurrent SRS, inverse-FFT,
+Pippenger, and assembly workers retain enough generated terms to exhaust the
+available memory. `VK_PROVENANCE_JOBS` raises only generated-data and cheap
+record-packaging concurrency. Builders with measured memory headroom can tune
+`VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`,
+`VK_PROVENANCE_MSM_JOBS`, and `VK_PROVENANCE_ASSEMBLY_JOBS` independently.
+
+The generated computational leaves were changed on 2026-08-05 from
+`vm_compute; reflexivity` to `vm_cast_no_check`. The old form evaluates the
+closed expression in the tactic and then makes the kernel evaluate it again
+when checking `eq_refl`; the cast asks the kernel to perform a single VM
+conversion. A serialized representative batch containing one domain leaf,
+one sigma leaf, one SRS shard, one inverse-FFT calibration, both MSM halves,
+and one assembly leaf took **374.01 s wall** after the change. A subsequent
+default-settings replay checked every domain and sigma leaf and SRS shards
+00–04 before being stopped once the repeated SRS template was established.
+The 2026-08-04 figures above therefore remain the most recent complete
+all-278-module measurement; do not extrapolate the representative batch as a
+new full-replay timing.
 
 ## History: the big cost cliffs
 

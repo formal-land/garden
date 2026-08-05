@@ -56,6 +56,11 @@ jobs:
           startGroup "Compile the Rocq project"
             cd Garden
             make
+            # The complete generated certificate replay is intentionally an
+            # explicit, multi-hour target.  PR CI checks deterministic source
+            # generation and an independent computation of all 44 points.
+            make orchard-vk-provenance-generated-check
+            make orchard-vk-provenance-oracle-check
             make snapshot
             make orchard-structure-json-from-model
             cd ..
