@@ -55,7 +55,9 @@ Module VkCommitmentRefinement.
     intros scalar Hscalar.
     assert (Hp : VkMsm.scalar_p < 2 ^ 256) by
       (vm_compute; reflexivity).
-    lia.
+    destruct Hscalar as [Hnonnegative Hscalar].
+    split; [exact Hnonnegative |].
+    exact (Z.lt_trans _ _ _ Hscalar Hp).
   Qed.
 
   Theorem certificate_abstract_sound
@@ -120,7 +122,8 @@ Module VkCommitmentRefinement.
     eapply certificate_abstract_sound; try exact Hcertificate;
       try exact srs_refinement; try exact params_well_formed.
     - apply VkCommitmentColumns.fixed_values_length.
-    - apply VkCommitmentColumns.values_nonnegative.
+    - exact (VkCommitmentColumns.values_nonnegative
+        VkColumnKinds.Fixed index).
     - exact Hcoefficients.
   Qed.
 
@@ -144,26 +147,29 @@ Module VkCommitmentRefinement.
         index coefficients low high).
     { constructor; assumption. }
     unfold VkCalibration.check in Hcalibration.
+    assert (Hevaluation_canonical :
+      forall row : nat, (row < VkIFFT.size_nat)%nat ->
+        VkPermutationValuesCorrect.F.canonical
+          (VkSigma.evaluation index row)).
+    { intros row Hrow.
+      exact (VkPermutationValuesCorrect.evaluation_canonical
+        domain_certificate index row Hsigma Hindex Hrow). }
     pose proof (VkDomainRefinement.coefficients_match_field_sound
       domain_certificate (VkSigma.evaluation index) coefficients
-      ltac:(intros row Hrow;
-        apply VkPermutationValuesCorrect.evaluation_canonical
-          with (domain_certificate := domain_certificate);
-        try assumption;
-        unfold VkIFFT.size_nat, VkSigma.rows_nat in Hrow |- *;
-        exact Hrow)
+      Hevaluation_canonical
       Hcalibration) as Hcoefficients.
-    change
+    change (
       VkMsmRefinement.scalar_values coefficients =
         VkMsm.intt
           (VkDomainRefinement.field_evaluation_values
-            (VkSigma.evaluation index)) in Hcoefficients.
+            (VkSigma.evaluation index))) in Hcoefficients.
     rewrite (VkPermutationValuesCorrect.field_evaluation_values_exact
       domain_certificate index Hsigma Hindex) in Hcoefficients.
     eapply certificate_abstract_sound; try exact Hcertificate;
       try exact srs_refinement; try exact params_well_formed.
     - apply VkCommitmentColumns.permutation_values_length.
-    - apply VkCommitmentColumns.values_nonnegative.
+    - exact (VkCommitmentColumns.values_nonnegative
+        VkColumnKinds.Permutation index).
     - exact Hcoefficients.
   Qed.
 End VkCommitmentRefinement.

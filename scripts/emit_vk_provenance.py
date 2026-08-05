@@ -710,7 +710,7 @@ def emit_sigma_certificate() -> None:
         + "Proof.\n"
         + "  intro Hcolumn.\n"
         + column_cases
-        + "  lia.\n"
+        + "  unfold VkSigma.width_nat in Hcolumn. lia.\n"
         + "Qed.\n"
         + "End VkSigmaCertificate.\n",
     )
@@ -956,16 +956,22 @@ def emit_commitment_certificates() -> None:
                     f"    {index} {data}.coefficients\n"
                     f"    {data}.low_projective_expected {data}.high_projective_expected).\n"
                     "  - exact Hsigma.\n"
-                    "  - vm_compute. reflexivity.\n"
+                    "  - repeat constructor.\n"
                     "  - exact checked.\n"
                     "Qed.\n"
                 )
             write(
                 CERTS / f"{prefix}.v",
                 f"(** Generated aggregate certificate for {kind} column {index}. *)\n"
+                "Require Import Garden.Orchard.vk_msm.\n"
                 "Require Import Garden.Orchard.vk.provenance.Checks.\n"
+                "Require Import Garden.Orchard.vk.provenance.ColumnValues.\n"
                 "Require Import Garden.Orchard.vk.provenance.CommitmentRefinement.\n"
+                "Require Import Garden.Orchard.vk.provenance.Domain.\n"
                 "Require Import Garden.Orchard.vk.provenance.Kinds.\n"
+                "Require Import Garden.Orchard.vk.provenance.PinnedSpec.\n"
+                "Require Import Garden.Orchard.vk.provenance.Sigma.\n"
+                "Require Import Garden.Orchard.vk.provenance.SrsDataView.\n"
                 f"Require Import {data_import}.\n"
                 + imports
                 + f"\n\nModule {aggregate_module}.\n"
@@ -1013,17 +1019,23 @@ def emit_commitment_certificates() -> None:
         f"  [ apply (VkPermutation{index:02d}Certificate.abstract_sound "
         "domain_certificate srs_refinement params_well_formed);\n"
         f"    apply (VkSigmaCertificate.column_checked sigma_certificate {index}); "
-        "lia |].\n"
+        "repeat constructor |].\n"
         for index in range(15)
     )
     write(
         CERTS / "Commitments.v",
         "(** Generated aggregation of all 44 commitment certificates. *)\n"
         "From Stdlib Require Import Lia.\n"
+        "Require Import Garden.Orchard.vk_msm.\n"
         "Require Import Garden.Orchard.vk.provenance.Checks.\n"
         "Require Import Garden.Orchard.vk.provenance.Abstract.\n"
+        "Require Import Garden.Orchard.vk.provenance.ColumnValues.\n"
         "Require Import Garden.Orchard.vk.provenance.CommitmentRefinement.\n"
+        "Require Import Garden.Orchard.vk.provenance.Domain.\n"
         "Require Import Garden.Orchard.vk.provenance.Kinds.\n"
+        "Require Import Garden.Orchard.vk.provenance.PinnedSpec.\n"
+        "Require Import Garden.Orchard.vk.provenance.Sigma.\n"
+        "Require Import Garden.Orchard.vk.provenance.SrsDataView.\n"
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Sigma.\n"
         + imports
         + "\n\nModule VkCommitmentsCertificate.\n"

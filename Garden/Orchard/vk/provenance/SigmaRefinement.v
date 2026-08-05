@@ -22,6 +22,10 @@ Local Open Scope Z_scope.
 Local Open Scope uint63_scope.
 
 Module VkSigmaRefinement.
+  Local Lemma andb_right_true (left right : bool) :
+    left && right = true -> right = true.
+  Proof. destruct left, right; cbn; auto. Qed.
+
   Lemma foldi_from_and_true
       (count start : nat) (test : nat -> bool) (ok : bool) :
     Prim63Loop.foldi_from count start
@@ -53,30 +57,17 @@ Module VkSigmaRefinement.
   Proof.
     unfold VkSigma.column_check.
     intros Hcheck.
-    apply andb_prop in Hcheck as [_ Hcheck].
-    apply andb_prop in Hcheck as [_ Hfold].
-    assert (Hfold' :
-      Prim63Loop.foldi_from VkSigma.rows_nat O
-        (fun row ok =>
-          ok && PrimInt63.eqb
-            (PrimArray.get (VkSigma.generated_column column)
-              (ArrayLinear.index row))
-            (PrimArray.get (VkSigma.model_column column)
-              (ArrayLinear.index row))) true = true).
-    { rewrite <- (Prim63Loop.foldi_u63_index VkSigma.rows_nat O
-        (fun row ok =>
-          ok && PrimInt63.eqb
-            (PrimArray.get (VkSigma.generated_column column) row)
-            (PrimArray.get (VkSigma.model_column column) row)) true
-        ArrayLinear.vector_size_fits_word).
-      exact Hfold. }
+    pose proof (andb_right_true _ _ Hcheck) as Hfold.
+    change 0%uint63 with (ArrayLinear.index O) in Hfold.
+    rewrite Prim63Loop.foldi_u63_index in Hfold by
+      exact ArrayLinear.vector_size_fits_word.
     destruct (foldi_from_and_true VkSigma.rows_nat O
       (fun row =>
         PrimInt63.eqb
           (PrimArray.get (VkSigma.generated_column column)
             (ArrayLinear.index row))
           (PrimArray.get (VkSigma.model_column column)
-            (ArrayLinear.index row))) true Hfold') as [_ Hall].
+            (ArrayLinear.index row))) true Hfold) as [_ Hall].
     intros row Hrow.
     apply Uint63.eqb_spec.
     apply Hall. lia.
@@ -113,7 +104,7 @@ Module VkSigmaRefinement.
     intros Hcolumn.
     pose proof (matrix_wf_nth
       OrchardCompiledPinned.permutation_columns
-      Sigma.cell OrchardCompiled.orchard_n_rows
+      OrchardCompiled.orchard_n_rows
       OrchardCompiled.orchard_sigma.(Sigma.mapping)
       column orchard_mapping_wf) as Hlength.
     rewrite permutation_columns_length in Hlength.
@@ -172,26 +163,21 @@ Module VkSigmaRefinement.
   Proof. vm_compute. reflexivity. Qed.
 
   Lemma index_mul (left right : nat) :
+    ArrayLinear.fits_nat left ->
+    ArrayLinear.fits_nat right ->
     ArrayLinear.fits_nat (left * right) ->
     PrimInt63.mul (ArrayLinear.index left) (ArrayLinear.index right) =
       ArrayLinear.index (left * right).
   Proof.
-    intro Hfits.
+    intros Hleft Hright Hfits.
     apply Uint63.to_Z_inj.
     rewrite Uint63.mul_spec.
-    rewrite (ArrayLinear.to_Z_index left),
-      (ArrayLinear.to_Z_index right),
-      (ArrayLinear.to_Z_index (left * right)).
-    - rewrite Nat2Z.inj_mul, Z.mod_small; [reflexivity |].
-      unfold ArrayLinear.fits_nat, ArrayLinear.word_capacity in Hfits.
-      split; lia.
-    - exact Hfits.
-    - unfold ArrayLinear.fits_nat, ArrayLinear.word_capacity in *.
-      rewrite Nat2Z.inj_mul in Hfits.
-      nia.
-    - unfold ArrayLinear.fits_nat, ArrayLinear.word_capacity in *.
-      rewrite Nat2Z.inj_mul in Hfits.
-      nia.
+    rewrite (ArrayLinear.to_Z_index left Hleft),
+      (ArrayLinear.to_Z_index right Hright),
+      (ArrayLinear.to_Z_index (left * right) Hfits).
+    rewrite Nat2Z.inj_mul, Z.mod_small; [reflexivity |].
+    unfold ArrayLinear.fits_nat, ArrayLinear.word_capacity in Hfits.
+    split; lia.
   Qed.
 
   Lemma rows_as_index :
@@ -218,8 +204,15 @@ Module VkSigmaRefinement.
         (fst cell * VkSigma.rows_nat + snd cell)
         (VkSigma.width_nat * VkSigma.rows_nat)); [nia |].
       exact matrix_size_fits. }
+    assert (Hcolumn_fits : ArrayLinear.fits_nat (fst cell)).
+    { apply (ArrayLinear.fits_nat_lt
+        (fst cell) VkSigma.width_nat Hcolumn).
+      vm_compute. reflexivity. }
+    assert (Hrows_fits : ArrayLinear.fits_nat VkSigma.rows_nat).
+    { vm_compute. reflexivity. }
     unfold VkSigma.pack_cell.
-    rewrite rows_as_index, index_mul by exact Hproduct.
+    rewrite rows_as_index,
+      (index_mul _ _ Hcolumn_fits Hrows_fits Hproduct).
     rewrite ArrayLinear.index_add by exact Hsum.
     reflexivity.
   Qed.
@@ -248,37 +241,42 @@ Module VkSigmaRefinement.
     assert (Hrow_fits : ArrayLinear.fits_nat (snd cell)).
     { apply (ArrayLinear.fits_nat_lt (snd cell) VkSigma.rows_nat);
         [exact Hrow | exact ArrayLinear.vector_size_fits_word]. }
+    assert (Hrows_fits : ArrayLinear.fits_nat VkSigma.rows_nat).
+    { vm_compute. reflexivity. }
     split; apply Uint63.to_Z_inj.
     - rewrite Uint63.div_spec.
-      rewrite (ArrayLinear.to_Z_index _ Hsum),
-        (ArrayLinear.to_Z_index _ ArrayLinear.vector_size_fits_word),
-        (ArrayLinear.to_Z_index _ Hcolumn_fits).
+      rewrite (ArrayLinear.to_Z_index
+          (fst cell * VkSigma.rows_nat + snd cell) Hsum),
+        (ArrayLinear.to_Z_index VkSigma.rows_nat Hrows_fits),
+        (ArrayLinear.to_Z_index (fst cell) Hcolumn_fits).
       rewrite Nat2Z.inj_add, Nat2Z.inj_mul.
       replace
-        (Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat +
-          Z.of_nat (snd cell))
+        ((Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat +
+          Z.of_nat (snd cell))%Z)
         with
-        (Z.of_nat (snd cell) +
-          Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat) by ring.
+        ((Z.of_nat (snd cell) +
+          Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat)%Z) by ring.
       rewrite Z.div_add by (unfold VkSigma.rows_nat; lia).
       rewrite Z.div_small; [lia |].
       unfold VkSigma.rows_nat in Hrow |- *.
       lia.
     - rewrite Uint63.mod_spec.
-      rewrite (ArrayLinear.to_Z_index _ Hsum),
-        (ArrayLinear.to_Z_index _ ArrayLinear.vector_size_fits_word),
-        (ArrayLinear.to_Z_index _ Hrow_fits).
+      rewrite (ArrayLinear.to_Z_index
+          (fst cell * VkSigma.rows_nat + snd cell) Hsum),
+        (ArrayLinear.to_Z_index VkSigma.rows_nat Hrows_fits),
+        (ArrayLinear.to_Z_index (snd cell) Hrow_fits).
       rewrite Nat2Z.inj_add, Nat2Z.inj_mul.
       replace
-        (Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat +
-          Z.of_nat (snd cell))
+        ((Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat +
+          Z.of_nat (snd cell))%Z)
         with
-        (Z.of_nat (snd cell) +
-          Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat) by ring.
+        ((Z.of_nat (snd cell) +
+          Z.of_nat (fst cell) * Z.of_nat VkSigma.rows_nat)%Z) by ring.
       rewrite Z.mod_add.
       apply Z.mod_small.
       unfold VkSigma.rows_nat in Hrow |- *.
       lia.
+    all: unfold VkSigma.rows_nat in *; lia.
   Qed.
 
   Lemma model_column_get (column row : nat) :
@@ -295,10 +293,13 @@ Module VkSigmaRefinement.
       exact ArrayLinear.vector_size_fits_word.
     - rewrite List.length_map, model_mapping_row_length by exact Hcolumn.
       exact ArrayLinear.vector_size_fits_array.
-    - rewrite List.nth_error_map.
-      rewrite List.nth_error_nth'.
-      + reflexivity.
-      + rewrite model_mapping_row_length by exact Hcolumn.
+    - rewrite (List.nth_error_nth'
+        (List.map VkSigma.pack_cell
+          (List.nth column OrchardCompiled.orchard_sigma.(Sigma.mapping) []))
+        (n := row) (VkSigma.pack_cell (O, O))).
+      + rewrite List.map_nth. reflexivity.
+      + rewrite List.length_map,
+          model_mapping_row_length by exact Hcolumn.
         exact Hrow.
   Qed.
 

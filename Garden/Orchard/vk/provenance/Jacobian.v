@@ -12,7 +12,7 @@
     Projective-to-affine comparison uses cross products and performs no field
     inversion. *)
 
-From Corelib Require Import PrimArray PrimInt63.
+From Corelib Require Import PrimArray PrimInt63 ArrayAxioms.
 From Stdlib Require Import Lists.List Bool.Bool.
 Require Import Garden.Prim63.Words.
 Require Import Garden.Prim63.Montgomery.
@@ -23,9 +23,22 @@ Require Import Garden.Prim63.Loop.
 Import ListNotations.
 Local Open Scope uint63_scope.
 
+Set Universe Polymorphism.
+
 Module VkJacobian.
   Module F := PallasQ.
   Import Prim63Words.
+
+  (** Corelib states primitive-array laws at one universe above [Set].
+      Keep every executable MSM array at that universe so the semantic
+      refinement can use those laws without a universe cast. *)
+  Monomorphic Universe array_u.
+  Monomorphic Constraint Set < array_u.
+  Monomorphic Constraint array_u = ArrayAxioms.length_make.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.get_make.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.length_set.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.get_set_same.u0.
+  Monomorphic Constraint array_u = ArrayAxioms.get_set_other.u0.
 
   Record affine : Set := {
     affine_x : F.t;
@@ -37,6 +50,10 @@ Module VkJacobian.
     y : F.t;
     z : F.t;
   }.
+
+  Definition scalar_array := PrimArray.array@{array_u} words5.
+  Definition affine_array := PrimArray.array@{array_u} affine.
+  Definition point_array := PrimArray.array@{array_u} point.
 
   Definition identity : point :=
     {| x := F.zero; y := F.one; z := F.zero |}.
@@ -122,8 +139,10 @@ Module VkJacobian.
       immediately loads them into primitive arrays and thereafter threads
       only the latest array version. *)
 
-  Fixpoint load_list_from {A : Type} (values : list A) (index : nat)
-      (array : PrimArray.array A) : PrimArray.array A :=
+  Fixpoint load_list_from {A : Type@{array_u}}
+      (values : list A) (index : nat)
+      (array : PrimArray.array@{array_u} A)
+      : PrimArray.array@{array_u} A :=
     match values with
     | [] => array
     | value :: values =>
@@ -131,16 +150,17 @@ Module VkJacobian.
           (PrimArray.set array (ArrayLinear.index index) value)
     end.
 
-  Definition array_of_list {A : Type} (default : A) (values : list A)
-      : PrimArray.array A :=
+  Definition array_of_list {A : Type@{array_u}}
+      (default : A) (values : list A)
+      : PrimArray.array@{array_u} A :=
     load_list_from values O
       (PrimArray.make (ArrayLinear.index (List.length values)) default).
 
   (** ** Window-sharded Pippenger *)
 
-  Definition bucket_step (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) (window index : PrimInt63.int)
-      (buckets : PrimArray.array point) : PrimArray.array point :=
+  Definition bucket_step (scalars : scalar_array)
+      (bases : affine_array) (window index : PrimInt63.int)
+      (buckets : point_array) : point_array :=
     let digit :=
       PallasP.window8_standard (PrimArray.get scalars index) window in
     if PrimInt63.eqb digit 0 then buckets else
@@ -149,48 +169,48 @@ Module VkJacobian.
       (add (PrimArray.get buckets bucket)
         (of_affine (PrimArray.get bases index))).
 
-  Definition fill_buckets (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) (window : PrimInt63.int)
-      : PrimArray.array point :=
+  Definition fill_buckets (scalars : scalar_array)
+      (bases : affine_array) (window : PrimInt63.int)
+      : point_array :=
     Prim63Loop.foldi_u63 ArrayLinear.vector_size_nat 0
       (bucket_step scalars bases window)
       (PrimArray.make ArrayLinear.pippenger_bucket_count identity).
 
   Definition bucket_sum_state : Set := (point * point)%type.
 
-  Definition bucket_sum_step (buckets : PrimArray.array point)
+  Definition bucket_sum_step (buckets : point_array)
       (ascending_index : PrimInt63.int) (state : bucket_sum_state)
       : bucket_sum_state :=
     let index := PrimInt63.sub 254 ascending_index in
     let running := add (fst state) (PrimArray.get buckets index) in
     (running, add (snd state) running).
 
-  Definition window_sum (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) (window : PrimInt63.int) : point :=
+  Definition window_sum (scalars : scalar_array)
+      (bases : affine_array) (window : PrimInt63.int) : point :=
     snd
       (Prim63Loop.foldi_u63 ArrayLinear.pippenger_bucket_count_nat 0
         (bucket_sum_step (fill_buckets scalars bases window))
         (identity, identity)).
 
-  Definition window_range_step (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) (range_start range_count index : nat)
+  Definition window_range_step (scalars : scalar_array)
+      (bases : affine_array) (range_start range_count index : nat)
       (acc : point) : point :=
     let descending := range_start + range_count - 1 - index in
     add (double_n ArrayLinear.pippenger_window_bits_nat acc)
       (window_sum scalars bases (ArrayLinear.index descending)).
 
-  Definition window_range (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) (range_start range_count : nat)
+  Definition window_range (scalars : scalar_array)
+      (bases : affine_array) (range_start range_count : nat)
       : point :=
     Prim63Loop.foldi_from range_count O
       (window_range_step scalars bases range_start range_count) identity.
 
-  Definition low_half (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) : point :=
+  Definition low_half (scalars : scalar_array)
+      (bases : affine_array) : point :=
     window_range scalars bases 0 16.
 
-  Definition high_half (scalars : PrimArray.array words5)
-      (bases : PrimArray.array affine) : point :=
+  Definition high_half (scalars : scalar_array)
+      (bases : affine_array) : point :=
     window_range scalars bases 16 16.
 
   Definition assemble_halves (low high : point) (w : affine) : point :=

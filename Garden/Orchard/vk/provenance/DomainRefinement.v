@@ -7,6 +7,7 @@ Require Import Garden.Prim63.ArrayLinear.
 Require Import Garden.Prim63.Loop.
 Require Import Garden.Prim63.Pasta.
 Require Import Garden.Prim63.PastaRefinement.
+Require Import Garden.Prim63.Words.
 Require Import Garden.Field.Field.
 Require Import Garden.Halo2.plonkish.poly_domain.
 Require Import Garden.Orchard.compiled.algebraic.
@@ -1500,6 +1501,13 @@ Module VkDomainRefinement.
     run_stages 1 (stage_roots count root) 1
       (bit_reverse_list count values).
 
+  Lemma iterative_fft_run (count : nat) (root : Z)
+      (values : list Z) :
+    iterative_fft count root values =
+      run_stages 1 (stage_roots count root) 1
+        (bit_reverse_list count values).
+  Proof. reflexivity. Qed.
+
   Lemma normalized_values_deinter (values : list Z) :
     normalized_values values ->
     normalized_values (VkMsm.evens values) /\
@@ -1578,6 +1586,11 @@ Module VkDomainRefinement.
     List.map (fun value => (VkMsm.n_inv * value) mod Primes.pallas_p)%Z
       values.
 
+  Lemma scale_values_fft_intt (values : list Z) :
+    scale_values (VkMsm.fft 11 VkMsm.omega_inv values) =
+      VkMsm.intt values.
+  Proof. reflexivity. Qed.
+
   Lemma scale_values_length (values : list Z) :
     List.length (scale_values values) = List.length values.
   Proof. apply List.length_map. Qed.
@@ -1595,13 +1608,15 @@ Module VkDomainRefinement.
       exact (array_denotes_values_length Hdenotes).
     - exact Hlength.
     - intros index value Hvalue.
+      unfold scale_values in Hvalue.
       rewrite List.nth_error_map in Hvalue.
       destruct (List.nth_error values index) as [input |] eqn:Hinput;
         cbn in Hvalue; [inversion Hvalue; subst value | discriminate].
       pose proof (array_denotes_entry Hdenotes index input Hinput)
         as [Hcanonical Hdenote].
       assert (Hindex : index < VkIFFT.size_nat).
-      { apply (proj1 (List.nth_error_Some values index)).
+      { rewrite <- (array_denotes_values_length Hdenotes).
+        apply (proj1 (List.nth_error_Some values index)).
         rewrite Hinput. discriminate. }
       pose proof (Hentry index Hindex) as Hloaded.
       assert (Hproduct_canonical :
@@ -1613,7 +1628,9 @@ Module VkDomainRefinement.
       + exact (eq_ind_r F.canonical Hproduct_canonical Hloaded).
       + refine (eq_trans (f_equal F.denote Hloaded) _).
         rewrite FR.mul_denote by exact n_inverse_canonical.
+        change PallasPConfig.modulus_Z with Primes.pallas_p.
         rewrite Hdenote, n_inverse_denote.
+        rewrite (Z.mul_comm input VkMsm.n_inv).
         reflexivity.
   Qed.
 
@@ -1624,11 +1641,21 @@ Module VkDomainRefinement.
       VkMsm.intt values.
   Proof.
     intros Hlength Hnormalized.
-    rewrite bit_reverse_values_spec, stages_values_run.
-    fold (iterative_fft 11 VkMsm.omega_inv values).
-    rewrite (iterative_fft_correct 11 VkMsm.omega_inv values
-      Hlength Hnormalized).
-    reflexivity.
+    pose proof (iterative_fft_correct 11 VkMsm.omega_inv values
+      Hlength Hnormalized) as Hfft.
+    assert (Hstaged :
+      stages_values (bit_reverse_values values) =
+      VkMsm.fft 11 VkMsm.omega_inv values).
+    { refine (eq_trans (stages_values_run _) _).
+      refine (eq_trans
+        (f_equal
+          (run_stages 1 (stage_roots 11 VkMsm.omega_inv) 1)
+          (bit_reverse_values_spec values)) _).
+      exact (eq_trans
+        (eq_sym (iterative_fft_run 11 VkMsm.omega_inv values))
+        Hfft). }
+    exact (eq_trans (f_equal scale_values Hstaged)
+      (scale_values_fft_intt values)).
   Qed.
 
   Theorem inverse_fft_sound (certificate : VkDomain.certificate)
@@ -1694,7 +1721,7 @@ Module VkDomainRefinement.
     apply List.nth_ext with
       (d := Prim63Words.eval5 Prim63Words.zero5) (d' := 0%Z).
     - rewrite List.length_map, Hcoefficients_length.
-      exact (array_denotes_values_length Hdenotes).
+      exact (eq_sym (array_denotes_values_length Hdenotes)).
     - intros index Hindex.
       rewrite List.length_map, Hcoefficients_length in Hindex.
       rewrite (List.map_nth Prim63Words.eval5 coefficients

@@ -13,7 +13,7 @@
     proof validates the actual primitive implementation and does not replace
     it with a second executable group law. *)
 
-From Stdlib Require Import ZArith Lia Ring Bool.
+From Stdlib Require Import ZArith Lia Ring Bool PeanoNat.
 From Stdlib Require Import Classes.RelationClasses Classes.Morphisms.
 From Stdlib Require Import Setoids.Setoid.
 Require Import Garden.Field.Field.
@@ -827,6 +827,39 @@ Module VkJacobianRefinement.
     rewrite double_yy_denote by exact Hp. reflexivity.
   Qed.
 
+  Strategy opaque [F.add F.sub F.mul F.square F.denote].
+
+  (** Prove the nested field formula once over variables.  Instantiating this
+      opaque lemma is substantially cheaper than replaying its rewrite chain
+      over the concrete Montgomery expression in [double_s]. *)
+  Local Lemma double_s_formula_denote (x yy xx yyyy : F.t) :
+    F.canonical x -> F.canonical yy ->
+    F.canonical xx -> F.canonical yyyy ->
+    F.denote
+      (J.twice
+        (F.sub (F.sub (F.square (F.add x yy)) xx) yyyy)) =
+      ztwice
+        (BinOp.sub
+          (BinOp.sub
+            (BinOp.mul
+              (BinOp.add (F.denote x) (F.denote yy))
+              (BinOp.add (F.denote x) (F.denote yy)))
+            (F.denote xx))
+          (F.denote yyyy)).
+  Proof.
+    intros Hx Hyy Hxx Hyyyy.
+    pose proof (R.add_canonical x yy Hx Hyy) as Hsum.
+    pose proof (R.square_canonical _ Hsum) as Hsqsum.
+    pose proof (R.sub_canonical _ _ Hsqsum Hxx) as Hsubxx.
+    pose proof (R.sub_canonical _ _ Hsubxx Hyyyy) as Hsubyyyy.
+    rewrite (twice_denote _ Hsubyyyy).
+    rewrite (R.sub_denote _ _ Hsubxx Hyyyy).
+    rewrite (R.sub_denote _ _ Hsqsum Hxx).
+    rewrite (R.square_denote _ Hsum).
+    rewrite (R.add_denote _ _ Hx Hyy).
+    reflexivity.
+  Qed.
+
   Lemma double_s_denote (p : J.point) :
     point_canonical p ->
     F.denote (double_s p) = zdouble_s (coordinates p).
@@ -836,28 +869,12 @@ Module VkJacobianRefinement.
     pose proof (double_xx_canonical p Hp) as Hxx.
     pose proof (double_yy_canonical p Hp) as Hyy.
     pose proof (double_yyyy_canonical p Hp) as Hyyyy.
-    assert (Hsum : F.canonical (F.add p.(J.x) (double_yy p)))
-      by exact (R.add_canonical _ _ Hx Hyy).
-    assert (Hsqsum : F.canonical
-      (F.square (F.add p.(J.x) (double_yy p))))
-      by exact (R.square_canonical _ Hsum).
-    assert (Hsubxx : F.canonical
-      (F.sub (F.square (F.add p.(J.x) (double_yy p))) (double_xx p)))
-      by exact (R.sub_canonical _ _ Hsqsum Hxx).
-    assert (Hsubyyyy : F.canonical
-      (F.sub
-        (F.sub (F.square (F.add p.(J.x) (double_yy p))) (double_xx p))
-        (double_yyyy p)))
-      by exact (R.sub_canonical _ _ Hsubxx Hyyyy).
-    unfold double_s, zdouble_s.
-    rewrite (twice_denote _ Hsubyyyy).
-    rewrite (R.sub_denote _ _ Hsubxx Hyyyy).
-    rewrite (R.sub_denote _ _ Hsqsum Hxx).
-    rewrite (R.square_denote _ Hsum).
-    rewrite (R.add_denote _ _ Hx Hyy).
+    unfold double_s.
+    rewrite (double_s_formula_denote p.(J.x) (double_yy p)
+      (double_xx p) (double_yyyy p) Hx Hyy Hxx Hyyyy).
     rewrite (double_xx_denote p Hp), (double_yy_denote p Hp),
       (double_yyyy_denote p Hp).
-    destruct p; reflexivity.
+    unfold zdouble_s. destruct p; reflexivity.
   Qed.
 
   Lemma double_m_denote (p : J.point) :
@@ -885,26 +902,41 @@ Module VkJacobianRefinement.
     now rewrite (double_m_denote p Hp), (double_s_denote p Hp).
   Qed.
 
+  Local Lemma double_y3_formula_denote
+      (m s x3 yyyy : F.t) (zm zs zx3 zyyyy : Z) :
+    F.canonical s -> F.canonical x3 -> F.canonical yyyy ->
+    F.denote m = zm -> F.denote s = zs ->
+    F.denote x3 = zx3 -> F.denote yyyy = zyyyy ->
+    F.denote
+      (F.sub (F.mul m (F.sub s x3)) (J.eight_times yyyy)) =
+      BinOp.sub (BinOp.mul zm (BinOp.sub zs zx3))
+        (zeight_times zyyyy).
+  Proof.
+    intros Hsc Hx3c Hyyyyc Hm Hs Hx3 Hyyyy.
+    pose proof (R.sub_canonical s x3 Hsc Hx3c) as Hsx.
+    pose proof (R.mul_canonical m (F.sub s x3) Hsx) as Hmul.
+    pose proof (eight_times_canonical yyyy Hyyyyc) as Height.
+    rewrite (R.sub_denote _ _ Hmul Height).
+    rewrite (R.mul_denote _ _ Hsx).
+    rewrite (R.sub_denote _ _ Hsc Hx3c).
+    rewrite (eight_times_denote _ Hyyyyc).
+    now rewrite Hm, Hs, Hx3, Hyyyy.
+  Qed.
+
   Lemma double_y3_denote (p : J.point) :
     point_canonical p ->
     F.denote (double_y3 p) = zdouble_y3 (coordinates p).
   Proof.
     intro Hp.
-    pose proof (double_s_canonical p Hp) as Hs.
-    pose proof (double_x3_canonical p Hp) as Hx3.
-    pose proof (double_yyyy_canonical p Hp) as Hyyyy.
-    pose proof (R.sub_canonical _ _ Hs Hx3) as Hsx.
-    pose proof
-      (R.mul_canonical (double_m p)
-        (F.sub (double_s p) (double_x3 p)) Hsx) as Hmul.
-    pose proof (eight_times_canonical _ Hyyyy) as Height.
     unfold double_y3, zdouble_y3.
-    rewrite (R.sub_denote _ _ Hmul Height).
-    rewrite (R.mul_denote _ _ Hsx).
-    rewrite (R.sub_denote _ _ Hs Hx3).
-    rewrite (eight_times_denote _ Hyyyy).
-    now rewrite (double_m_denote p Hp), (double_s_denote p Hp),
-      (double_x3_denote p Hp), (double_yyyy_denote p Hp).
+    exact (double_y3_formula_denote
+      (double_m p) (double_s p) (double_x3 p) (double_yyyy p)
+      (zdouble_m (coordinates p)) (zdouble_s (coordinates p))
+      (zdouble_x3 (coordinates p)) (zdouble_yyyy (coordinates p))
+      (double_s_canonical p Hp) (double_x3_canonical p Hp)
+      (double_yyyy_canonical p Hp) (double_m_denote p Hp)
+      (double_s_denote p Hp) (double_x3_denote p Hp)
+      (double_yyyy_denote p Hp)).
   Qed.
 
   Lemma double_z3_denote (p : J.point) :
@@ -926,13 +958,18 @@ Module VkJacobianRefinement.
     intro Hp. unfold coordinates, double_core, J.double_core.
     change
       ((F.denote (double_x3 p), F.denote (double_y3 p),
-        F.denote (double_z3 p)) = _).
+        F.denote (double_z3 p)) =
+       (zdouble_x3 (coordinates p), zdouble_y3 (coordinates p),
+        zdouble_z3 (coordinates p))).
     now rewrite double_x3_denote, double_y3_denote, double_z3_denote.
   Qed.
 
+  Strategy transparent [F.add F.sub F.mul F.square F.denote].
+
   Local Ltac fdenote :=
     repeat first
-      [ rewrite R.square_denote by fcanonical
+      [ rewrite twice_denote by fcanonical
+      | rewrite R.square_denote by fcanonical
       | rewrite R.add_denote by fcanonical
       | rewrite R.sub_denote by fcanonical
       | rewrite R.mul_denote by fcanonical ].
@@ -959,6 +996,7 @@ Module VkJacobianRefinement.
       [jdouble_exec jdouble_impl Jacobian.double_impl ztwice zthrice
        zeight_times zdouble_xx zdouble_yy zdouble_yyyy zdouble_s zdouble_m
        zdouble_x3 zdouble_y3 zdouble_z3 Vesta.a].
+    cbn [fst snd].
     rewrite Hnz. repeat split; eqm_ring.
   Qed.
 
@@ -977,7 +1015,7 @@ Module VkJacobianRefinement.
       subst P. cbn [Vesta.add Vesta.identity Weierstrass.add].
       cbn [jdouble_exec]. rewrite Hz. exact jrepr_zero.
     - eapply jrepr_trip_eqm.
-      + apply jdouble_exec_agrees. exact Hz.
+      + exact (jdouble_exec_agrees (X, Y, Zc) Hz).
       + apply jrepr_double_impl; assumption.
   Qed.
 
@@ -1007,10 +1045,10 @@ Module VkJacobianRefinement.
     represents (J.double_n count p)
       (Nat.iter count (fun Q => Vesta.add Q Q) P).
   Proof.
-    revert p P. induction count as [|count IH]; intros p P Hp;
-      cbn [J.double_n Nat.iter].
-    - exact Hp.
-    - apply IH, double_represents, Hp.
+    revert p P. induction count as [|count IH]; intros p P Hp.
+    - cbn [J.double_n Nat.iter]. exact Hp.
+    - cbn [J.double_n]. rewrite Nat.iter_succ_r.
+      apply IH, double_represents, Hp.
   Qed.
 
   (** ** Executable complete addition *)
@@ -1128,6 +1166,94 @@ Module VkJacobianRefinement.
         rewrite (equal_denote_eqb a b) by fcanonical
     end.
 
+  Strategy opaque [F.add F.sub F.mul F.square F.denote].
+
+  Local Definition add_unequal_field_output
+      (x1 y1 z1 x2 y2 z2 : F.t) : J.point :=
+    let z1z1 := F.square z1 in
+    let z2z2 := F.square z2 in
+    let u1 := F.mul x1 z2z2 in
+    let u2 := F.mul x2 z1z1 in
+    let s1 := F.mul y1 (F.mul z2 z2z2) in
+    let s2 := F.mul y2 (F.mul z1 z1z1) in
+    let h := F.sub u2 u1 in
+    let i := F.square (J.twice h) in
+    let jc := F.mul h i in
+    let rr := J.twice (F.sub s2 s1) in
+    let v := F.mul u1 i in
+    let x3 := F.sub (F.sub (F.square rr) jc) (J.twice v) in
+    let y3 := F.sub (F.mul rr (F.sub v x3))
+      (J.twice (F.mul s1 jc)) in
+    let z3 := F.mul
+      (F.sub (F.sub (F.square (F.add z1 z2)) z1z1) z2z2) h in
+    {| J.x := x3; J.y := y3; J.z := z3 |}.
+
+  Local Definition add_unequal_z_output
+      (x1 y1 z1 x2 y2 z2 : Z) : jpoint :=
+    let z1z1 := BinOp.mul z1 z1 in
+    let z2z2 := BinOp.mul z2 z2 in
+    let u1 := BinOp.mul x1 z2z2 in
+    let u2 := BinOp.mul x2 z1z1 in
+    let s1 := BinOp.mul y1 (BinOp.mul z2 z2z2) in
+    let s2 := BinOp.mul y2 (BinOp.mul z1 z1z1) in
+    let h := BinOp.sub u2 u1 in
+    let i := BinOp.mul (ztwice h) (ztwice h) in
+    let jc := BinOp.mul h i in
+    let rr := ztwice (BinOp.sub s2 s1) in
+    let v := BinOp.mul u1 i in
+    let x3 := BinOp.sub (BinOp.sub (BinOp.mul rr rr) jc) (ztwice v) in
+    let y3 := BinOp.sub (BinOp.mul rr (BinOp.sub v x3))
+      (ztwice (BinOp.mul s1 jc)) in
+    let z3 := BinOp.mul
+      (BinOp.sub (BinOp.sub
+        (BinOp.mul (BinOp.add z1 z2) (BinOp.add z1 z2)) z1z1) z2z2) h in
+    (x3, y3, z3).
+
+  Local Lemma add_denote_as_binop (a b : F.t) :
+    F.canonical a -> F.canonical b ->
+    F.denote (F.add a b) = BinOp.add (F.denote a) (F.denote b).
+  Proof. exact (R.add_denote a b). Qed.
+
+  Local Lemma sub_denote_as_binop (a b : F.t) :
+    F.canonical a -> F.canonical b ->
+    F.denote (F.sub a b) = BinOp.sub (F.denote a) (F.denote b).
+  Proof. exact (R.sub_denote a b). Qed.
+
+  Local Lemma mul_denote_as_binop (a b : F.t) :
+    F.canonical b ->
+    F.denote (F.mul a b) = BinOp.mul (F.denote a) (F.denote b).
+  Proof. exact (R.mul_denote a b). Qed.
+
+  Local Lemma square_denote_as_binop (a : F.t) :
+    F.canonical a ->
+    F.denote (F.square a) = BinOp.mul (F.denote a) (F.denote a).
+  Proof. exact (R.square_denote a). Qed.
+
+  Local Ltac fdenote_as_binop :=
+    repeat first
+      [ rewrite twice_denote by fcanonical
+      | rewrite square_denote_as_binop by fcanonical
+      | rewrite add_denote_as_binop by fcanonical
+      | rewrite sub_denote_as_binop by fcanonical
+      | rewrite mul_denote_as_binop by fcanonical ].
+
+  Local Lemma add_unequal_output_denote
+      (x1 y1 z1 x2 y2 z2 : F.t) (X1 Y1 Z1 X2 Y2 Z2 : Z) :
+    F.canonical x1 -> F.canonical y1 -> F.canonical z1 ->
+    F.canonical x2 -> F.canonical y2 -> F.canonical z2 ->
+    F.denote x1 = X1 -> F.denote y1 = Y1 -> F.denote z1 = Z1 ->
+    F.denote x2 = X2 -> F.denote y2 = Y2 -> F.denote z2 = Z2 ->
+    coordinates (add_unequal_field_output x1 y1 z1 x2 y2 z2) =
+      add_unequal_z_output X1 Y1 Z1 X2 Y2 Z2.
+  Proof.
+    intros Hx1 Hy1 Hz1 Hx2 Hy2 Hz2
+      Hx1d Hy1d Hz1d Hx2d Hy2d Hz2d.
+    unfold add_unequal_field_output, add_unequal_z_output, coordinates.
+    cbn [J.x J.y J.z].
+    fdenote_as_binop.
+    now rewrite Hx1d, Hy1d, Hz1d, Hx2d, Hy2d, Hz2d.
+  Qed.
+
   Lemma add_coordinates (p r : J.point) :
     point_canonical p -> point_canonical r ->
     coordinates (J.add p r) = jadd_exec (coordinates p) (coordinates r).
@@ -1145,9 +1271,37 @@ Module VkJacobianRefinement.
     destruct (Z.eqb (F.denote rz) 0); [reflexivity |].
     cbv beta iota zeta.
     rewrite_equal_denote. fdenote.
-    cbn [ztwice zthrice zeight_times BinOp.add BinOp.sub BinOp.mul].
-    reflexivity.
+    fold (@BinOp.add q Primes.PallasQIsPrime).
+    fold (@BinOp.sub q Primes.PallasQIsPrime).
+    fold (@BinOp.mul q Primes.PallasQIsPrime).
+    destruct (Z.eqb
+      (BinOp.mul (F.denote px)
+        (BinOp.mul (F.denote rz) (F.denote rz)))
+      (BinOp.mul (F.denote rx)
+        (BinOp.mul (F.denote pz) (F.denote pz)))) eqn:HU.
+    - unfold BinOp.mul in HU. rewrite HU.
+      destruct (Z.eqb
+        (BinOp.mul (F.denote py)
+          (BinOp.mul (F.denote rz)
+            (BinOp.mul (F.denote rz) (F.denote rz))))
+        (BinOp.mul (F.denote ry)
+          (BinOp.mul (F.denote pz)
+            (BinOp.mul (F.denote pz) (F.denote pz))))) eqn:HS.
+      + unfold BinOp.mul in HS. rewrite HS.
+        apply double_coordinates. repeat split; assumption.
+      + unfold BinOp.mul in HS. rewrite HS.
+        cbn [fst snd ztwice zthrice zeight_times]. reflexivity.
+    - unfold BinOp.mul in HU. rewrite HU.
+      change
+        (coordinates (add_unequal_field_output px py pz rx ry rz) =
+          add_unequal_z_output
+            (F.denote px) (F.denote py) (F.denote pz)
+            (F.denote rx) (F.denote ry) (F.denote rz)).
+      apply add_unequal_output_denote;
+        first [assumption | reflexivity].
   Qed.
+
+  Strategy transparent [F.add F.sub F.mul F.square F.denote].
 
   (** The unequal-point formula used by fiat-crypto.  Keeping this small
       projection explicit makes the factor-of-two rescaling in [jadd_exec]
@@ -1166,8 +1320,9 @@ Module VkJacobianRefinement.
     let HSqr := BinOp.mul H H in
     let HCub := BinOp.mul HSqr H in
     let U1HSqr := BinOp.mul U1 HSqr in
-    let X3 := BinOp.sub (BinOp.sub (BinOp.mul Rr Rr) HCub)
-      (BinOp.add U1HSqr U1HSqr) in
+    let X3 := BinOp.sub
+      (BinOp.sub (BinOp.sub (BinOp.mul Rr Rr) HCub) U1HSqr)
+      U1HSqr in
     let Y3 := BinOp.sub (BinOp.mul (BinOp.sub U1HSqr X3) Rr)
       (BinOp.mul HCub S1) in
     let Z3 := BinOp.mul (BinOp.mul H Z1) Z2 in
@@ -1176,7 +1331,10 @@ Module VkJacobianRefinement.
   Lemma jadd_neq_fiat_proj (P Q : fpt) (Hneq : ~ Jacobian.eq P Q) :
     proj1_sig (jadd_neq_fiat P Q Hneq) =
       jadd_inequal_impl (proj1_sig P) (proj1_sig Q).
-  Proof. reflexivity. Qed.
+  Proof.
+    destruct P as [[[X1 Y1] Z1] HP], Q as [[[X2 Y2] Z2] HQ].
+    reflexivity.
+  Qed.
 
   Lemma jrepr_inequal_impl (K L : jpoint) (P Q : Vesta.point) :
     Vesta.on_curve P -> Vesta.on_curve Q ->
@@ -1197,11 +1355,13 @@ Module VkJacobianRefinement.
     pose (JQ := fpt_of X2 Y2 Z2 Q HonQ HreprQ).
     assert (Hneq : ~ Jacobian.eq JP JQ).
     { intro Heq. unfold JP, JQ in Heq.
-      cbn [Jacobian.eq fpt_of] in Heq.
+      unfold Jacobian.eq in Heq.
+      rewrite !fpt_of_proj in Heq. cbn [fst snd] in Heq.
       destruct (dec (eqm q Z1 0)) as [Hbad | _]; [contradiction |].
-      destruct Heq as (_ & HU & HS). apply Hneqcross. split.
+      destruct Heq as [_ [HU HS]]. apply Hneqcross. split.
       - exact HU.
-      - exact HS. }
+      - transitivity (Y1 *F (Z2 *F Z2 *F Z2)); [eqm_ring |].
+        transitivity (Y2 *F (Z1 *F Z1 *F Z1)); [exact HS | eqm_ring]. }
     assert (HisoP : ~ Jacobian.iszero JP).
     { unfold JP, Jacobian.iszero. cbn [fpt_of]. exact HZ1. }
     assert (HisoQ : ~ Jacobian.iszero JQ).
@@ -1267,14 +1427,59 @@ Module VkJacobianRefinement.
     pose (JP := fpt_of X1 Y1 Z1 P HonP HreprP).
     pose (JQ := fpt_of X2 Y2 Z2 Q HonQ HreprQ).
     assert (Heq : Jacobian.eq JP JQ).
-    { unfold JP, JQ. cbn [Jacobian.eq fpt_of].
+    { unfold JP, JQ, Jacobian.eq. rewrite !fpt_of_proj.
+      cbn [fst snd].
       destruct (dec (eqm q Z1 0)) as [Hbad | _]; [contradiction |].
-      repeat split; assumption. }
+      repeat split; try assumption.
+      transitivity (Y1 *F (Z2 *F (Z2 *F Z2))); [eqm_ring |].
+      transitivity (Y2 *F (Z1 *F (Z1 *F Z1))); [exact HS | eqm_ring]. }
     pose proof (proj1 (Jacobian.eq_iff JP JQ) Heq) as HW.
     exact (Weierstrass.corresponds_inj Vesta.a Vesta.b P Q
       (jto_affine JP) (jto_affine JQ) HredP HredQ
       (jcorr X1 Y1 Z1 P HonP HreprP)
       (jcorr X2 Y2 Z2 Q HonQ HreprQ) HW).
+  Qed.
+
+  (** Scaling every projective coordinate by [(2^2, 2^3, 2)] preserves
+      the represented affine point.  This is the exact relationship between
+      Garden's add-2007-bl output and fiat-crypto's unequal-point formula. *)
+  Definition trip_eqm_scale2 (K L : jpoint) : Prop :=
+    let '(X, Y, Zc) := K in
+    let '(X', Y', Zc') := L in
+    eqm q X (ztwice (ztwice X')) /\
+    eqm q Y (zeight_times Y') /\
+    eqm q Zc (ztwice Zc').
+
+  Lemma ztwice_nz (u : Z) :
+    ~ eqm q u 0 -> ~ eqm q (ztwice u) 0.
+  Proof.
+    intros Hu Htwice.
+    assert (Htwo : ~ eqm q 2 0).
+    { unfold eqm. rewrite Z.mod_small by (pose proof three_lt_q; lia).
+      rewrite Z.mod_0_l by exact q_pos. discriminate. }
+    apply (nz_mul 2 u Htwo Hu).
+    transitivity (ztwice u); [unfold ztwice; eqm_ring | exact Htwice].
+  Qed.
+
+  Lemma jrepr_trip_eqm_scale2 (K L : jpoint) (P : Vesta.point) :
+    trip_eqm_scale2 K L -> jrepr L P -> jrepr K P.
+  Proof.
+    destruct K as [[X Y] Zc], L as [[X' Y'] Zc'].
+    cbn [trip_eqm_scale2 jrepr].
+    intros (HX & HY & HZ) HL.
+    destruct P as [|px py].
+    - transitivity (ztwice Zc'); [exact HZ |].
+      unfold ztwice. setoid_rewrite HL. eqm_ring.
+    - destruct HL as (Hnz & HXL & HYL). split.
+      + intro Hzero. apply (ztwice_nz Zc' Hnz).
+        transitivity Zc; [symmetry; exact HZ | exact Hzero].
+      + split.
+        * transitivity (ztwice (ztwice X')); [exact HX |].
+          unfold ztwice. setoid_rewrite HXL. setoid_rewrite HZ.
+          eqm_ring.
+        * transitivity (zeight_times Y'); [exact HY |].
+          unfold zeight_times, ztwice.
+          setoid_rewrite HYL. setoid_rewrite HZ. eqm_ring.
   Qed.
 
   Lemma jadd_exec_inequal_agrees (K L : jpoint) :
@@ -1283,13 +1488,14 @@ Module VkJacobianRefinement.
     Z.eqb Z1 0 = false -> Z.eqb Z2 0 = false ->
     Z.eqb (BinOp.mul X1 (BinOp.mul Z2 Z2))
       (BinOp.mul X2 (BinOp.mul Z1 Z1)) = false ->
-    trip_eqm (jadd_exec K L) (jadd_inequal_impl K L).
+    trip_eqm_scale2 (jadd_exec K L) (jadd_inequal_impl K L).
   Proof.
     destruct K as [[X1 Y1] Z1], L as [[X2 Y2] Z2].
     intros HZ1 HZ2 HU.
     cbv beta iota zeta delta
-      [jadd_exec jadd_inequal_impl ztwice].
+      [jadd_exec jadd_inequal_impl ztwice zeight_times].
     rewrite HZ1, HZ2, HU.
+    unfold trip_eqm_scale2. cbn [fst snd].
     repeat split; eqm_ring.
   Qed.
 
@@ -1323,8 +1529,11 @@ Module VkJacobianRefinement.
     - destruct (Z.eqb Z2 0) eqn:HZ2.
       + apply Z.eqb_eq in HZ2.
         pose proof (jrepr_exact_zero (X2, Y2, Z2) Q HreprQ HZ2) as HQ.
-        subst Q. cbn [Vesta.add Weierstrass.add jadd_exec].
-        rewrite HZ1, HZ2. exact HreprP.
+        subst Q.
+        assert (Hadd : Vesta.add P Vesta.identity = P).
+        { destruct P; reflexivity. }
+        rewrite Hadd. cbn [jadd_exec].
+        rewrite HZ1, HZ2. cbn. exact HreprP.
       + assert (HZ1neq : Z1 <> 0) by now apply Z.eqb_neq in HZ1.
         assert (HZ2neq : Z2 <> 0) by now apply Z.eqb_neq in HZ2.
         assert (HZ1eqm : ~ eqm q Z1 0).
@@ -1362,11 +1571,13 @@ Module VkJacobianRefinement.
              assert (Hzero :
                eqm q (snd (jadd_inequal_impl
                  (X1, Y1, Z1) (X2, Y2, Z2))) 0).
-             { apply jadd_inequal_z_zero. unfold U1, U2 in HU. exact HU. }
+             { apply (jadd_inequal_z_zero
+                 (X1, Y1, Z1) (X2, Y2, Z2)).
+               unfold U1, U2 in HU. exact HU. }
              assert (Hsum : Vesta.add P Q = Vesta.identity).
              { destruct (Vesta.add P Q) as [|sx sy] eqn:Hadd;
                  [reflexivity |].
-               rewrite Hadd in Hgen. cbn [jrepr] in Hgen.
+               cbn [jrepr] in Hgen.
                destruct Hgen as (Hnz & _ & _). contradiction. }
              rewrite Hsum.
              cbn [jadd_exec]. rewrite HZ1, HZ2.
@@ -1379,8 +1590,13 @@ Module VkJacobianRefinement.
               (from_bin_mul _ _))). exact HUe. }
           pose proof (jrepr_inequal_impl (X1, Y1, Z1) (X2, Y2, Z2)
             P Q HonP HonQ HreprP HreprQ HZ1eqm HZ2eqm Hneqcross) as Hgen.
-          eapply jrepr_trip_eqm.
-          -- apply jadd_exec_inequal_agrees. exact HZ1. exact HZ2.
+          apply (jrepr_trip_eqm_scale2
+            (jadd_exec (X1, Y1, Z1) (X2, Y2, Z2))
+            (jadd_inequal_impl (X1, Y1, Z1) (X2, Y2, Z2))
+            (Vesta.add P Q)).
+          -- apply (jadd_exec_inequal_agrees
+               (X1, Y1, Z1) (X2, Y2, Z2)).
+             exact HZ1. exact HZ2.
              unfold U1, U2 in HU. exact HU.
           -- exact Hgen.
   Qed.
@@ -1403,6 +1619,8 @@ Module VkJacobianRefinement.
 
   (** ** Inversion-free equality checks *)
 
+  Strategy opaque [F.add F.sub F.mul F.square F.denote].
+
   Lemma equal_affine_true (p : J.point) (r : J.affine) (P : Vesta.point) :
     represents p P -> affine_canonical r ->
     J.equal_affine p r = true -> P = affine_denote r.
@@ -1416,14 +1634,18 @@ Module VkJacobianRefinement.
     cbn [J.x J.y J.z] in Hcheck.
     destruct (Z.eqb (F.denote pz) 0) eqn:HZ; [discriminate |].
     apply andb_prop in Hcheck as [HX HY].
-    apply (proj1 (R.equal_denote_iff _ _ Hpx ltac:(fcanonical))) in HX.
-    apply (proj1 (R.equal_denote_iff _ _ Hpy ltac:(fcanonical))) in HY.
+    apply (proj1 (R.equal_denote_iff
+      px (F.mul rx (F.square pz)) Hpx ltac:(fcanonical))) in HX.
+    apply (proj1 (R.equal_denote_iff
+      py (F.mul ry (F.mul pz (F.square pz)))
+      Hpy ltac:(fcanonical))) in HY.
     assert (HZeqm : ~ eqm q (F.denote pz) 0).
     { apply not_eqm_of_reduced_neq; [apply denote_reduced | exact zero_reduced |].
       now apply Z.eqb_neq in HZ. }
     assert (Hpin : jrepr (coordinates {| J.x := px; J.y := py; J.z := pz |})
       (affine_denote {| J.affine_x := rx; J.affine_y := ry |})).
-    { cbn [coordinates affine_denote Vesta.affine jrepr].
+    { cbn [coordinates affine_denote Vesta.affine jrepr
+        J.x J.y J.z J.affine_x J.affine_y].
       split; [exact HZeqm | split].
       - rewrite HX.
         rewrite R.mul_denote by fcanonical.
@@ -1461,10 +1683,17 @@ Module VkJacobianRefinement.
       congruence.
     - destruct (Z.eqb (F.denote rz) 0) eqn:HZQ; [discriminate |].
       apply andb_prop in Hcheck as [HX HY].
-      apply (proj1 (R.equal_denote_iff _ _ ltac:(fcanonical)
-        ltac:(fcanonical))) in HX.
-      apply (proj1 (R.equal_denote_iff _ _ ltac:(fcanonical)
-        ltac:(fcanonical))) in HY.
+      apply (proj1 (R.equal_denote_iff
+        (F.mul px (F.square rz)) (F.mul rx (F.square pz))
+        ltac:(fcanonical) ltac:(fcanonical))) in HX.
+      apply (proj1 (R.equal_denote_iff
+        (F.mul py (F.mul rz (F.square rz)))
+        (F.mul ry (F.mul pz (F.square pz)))
+        ltac:(fcanonical) ltac:(fcanonical))) in HY.
+      rewrite !R.mul_denote in HX by fcanonical.
+      rewrite !R.square_denote in HX by fcanonical.
+      rewrite !R.mul_denote in HY by fcanonical.
+      rewrite !R.square_denote in HY by fcanonical.
       assert (HZPeqm : ~ eqm q (F.denote pz) 0).
       { apply not_eqm_of_reduced_neq;
           [apply denote_reduced | exact zero_reduced | now apply Z.eqb_neq in HZP]. }
@@ -1474,9 +1703,12 @@ Module VkJacobianRefinement.
       eapply jrepr_cross_equal;
         [exact HredP | exact HredQ | exact HonP | exact HonQ
         | exact HreprP | exact HreprQ | exact HZPeqm | exact HZQeqm |].
+      cbn [coordinates J.x J.y J.z].
       split.
-      + rewrite HX. fdenote. eqm_ring.
-      + rewrite HY. fdenote. eqm_ring.
+      + apply eqm_of_eq. exact HX.
+      + apply eqm_of_eq. exact HY.
   Qed.
+
+  Strategy transparent [F.add F.sub F.mul F.square F.denote].
 
 End VkJacobianRefinement.

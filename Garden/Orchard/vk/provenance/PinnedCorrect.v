@@ -6,6 +6,7 @@ Require Import Garden.Field.Field.
 Require Import Garden.Prim63.Pasta.
 Require Import Garden.Prim63.PastaRefinement.
 Require Import Garden.Orchard.vk.provenance.AssemblyCheck.
+Require Import Garden.Orchard.vk.provenance.Jacobian.
 Require Import Garden.Orchard.vk.provenance.JacobianRefinement.
 Require Import Garden.Orchard.vk.provenance.Kinds.
 Require Import Garden.Orchard.vk.provenance.PinnedSpec.
@@ -38,7 +39,7 @@ Module VkPinnedCorrect.
       destruct (List.nth index _ (0, 0)) as [x y];
       cbn [VkJacobian.affine_x VkJacobian.affine_y];
       rewrite !PallasQFacts.from_Z_denote;
-      unfold Vesta.affine, UnOp.from;
+      unfold Vesta.affine, UnOp.from, Vesta.vesta_p;
       rewrite !Z.mod_mod by
         (pose proof (@prime_range Primes.pallas_q Primes.PallasQIsPrime);
          lia);

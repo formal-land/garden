@@ -45,9 +45,11 @@ Module VkPermutationValuesCorrect.
     unfold VkSigma.evaluation.
     rewrite (VkSigmaRefinement.packed_target_refines_model
       column row Hcheck Hcolumn Hrow).
-    rewrite Htarget in Hpacked_column, Hpacked_row |- *.
-    cbn [fst snd] in Hpacked_column, Hpacked_row |- *.
+    rewrite Htarget.
+    cbn [fst snd].
+    cbn [fst snd] in Hpacked_column, Hpacked_row.
     rewrite Hpacked_column, Hpacked_row.
+    fold VkDomain.delta_powers_array VkDomain.omega_powers_array.
     split.
     - apply FR.mul_canonical.
       apply VkDomainRefinement.omega_powers_canonical;
@@ -58,6 +60,7 @@ Module VkPermutationValuesCorrect.
         domain_certificate target_column Htarget_column).
       rewrite (VkDomainRefinement.omega_powers_denote
         domain_certificate target_row Htarget_row).
+      change PallasPConfig.modulus_Z with Primes.pallas_p.
       unfold VkCommitmentColumns.permutation_evaluation,
         VkCommitmentColumns.permutation_target.
       rewrite <- (VkSigmaRefinement.model_target_is_perm
@@ -113,7 +116,5 @@ Module VkPermutationValuesCorrect.
     apply List.in_seq in Hrow.
     destruct Hrow as [_ Hrow].
     apply evaluation_denote; try assumption.
-    unfold VkIFFT.size_nat, VkSigma.rows_nat in Hrow |- *.
-    exact Hrow.
   Qed.
 End VkPermutationValuesCorrect.

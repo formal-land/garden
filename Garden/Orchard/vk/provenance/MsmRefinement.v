@@ -14,16 +14,18 @@ Require Import Garden.Prim63.PastaRefinement.
 Require Import Garden.Prim63.ArrayLinear.
 Require Import Garden.Prim63.Loop.
 Require Import Garden.Prim63.WindowRefinement.
+Require Import Garden.EllipticCurve.Vesta.
 Require Import Garden.Orchard.vk_msm.
 Require Import Garden.Orchard.vk.provenance.Jacobian.
 Require Import Garden.Orchard.vk.provenance.MsmChecks.
+Require Import Garden.Orchard.vk.provenance.Srs.
 Require Import Garden.Orchard.vk.provenance.ArrayOfListRefinement.
 Require Import Garden.Orchard.vk.provenance.JacobianRefinement.
 Require Import Garden.Orchard.vk.provenance.SrsDataView.
 
 Import ListNotations.
-Local Open Scope Z_scope.
 Local Open Scope uint63_scope.
+Local Open Scope Z_scope.
 
 Module VkMsmRefinement.
   Module J := VkJacobian.
@@ -61,7 +63,7 @@ Module VkMsmRefinement.
     induction values as [|head values IH]; intros [|index] value Hnth;
       cbn in *; try discriminate.
     - now inversion Hnth.
-    - rewrite IH by exact Hnth. reflexivity.
+    - rewrite (IH index value Hnth). reflexivity.
   Qed.
 
   Lemma forall_map_snd_firstn {A : Type}
@@ -84,6 +86,11 @@ Module VkMsmRefinement.
     JR.represents p P -> P = Q -> JR.represents p Q.
   Proof. intros H ->. exact H. Qed.
 
+  Lemma represents_coordinates_transport
+      (p q : J.point) (P : Vesta.point) :
+    p = q -> JR.represents q P -> JR.represents p P.
+  Proof. intros -> H. exact H. Qed.
+
   Lemma psum_snoc (points : list Vesta.point) (point : Vesta.point) :
     List.Forall VkMsm.good points -> VkMsm.good point ->
     VkMsm.psum (points ++ [point]) =
@@ -91,10 +98,15 @@ Module VkMsmRefinement.
   Proof.
     intros Hpoints Hpoint.
     induction Hpoints as [|head points Hhead Hpoints IH].
-    - cbn [VkMsm.psum].
+    - change (VkMsm.padd point VkMsm.identity =
+        VkMsm.padd VkMsm.identity point).
       now rewrite VkMsm.vadd_0_l, VkMsm.vadd_0_r.
-    - cbn [VkMsm.psum List.app].
-      rewrite IH.
+    - change
+        (VkMsm.padd head (VkMsm.psum (points ++ [point])) =
+          VkMsm.padd (VkMsm.padd head (VkMsm.psum points)) point).
+      transitivity
+        (VkMsm.padd head (VkMsm.padd (VkMsm.psum points) point)).
+      { apply f_equal. exact IH. }
       symmetry.
       apply VkMsm.vadd_assoc.
       + exact Hhead.
@@ -143,24 +155,23 @@ Module VkMsmRefinement.
   Lemma pow_256 (index : nat) :
     256 ^ Z.of_nat index = 2 ^ (8 * Z.of_nat index).
   Proof.
-    replace 256 with (2 ^ 8) by reflexivity.
+    replace (256 : Z) with ((2 ^ 8) : Z) by reflexivity.
     symmetry. apply Z.pow_mul_r; lia.
   Qed.
 
   Lemma nth_digits_go (fuel index : nat) (scalar : Z) :
     (index < fuel)%nat ->
-    List.nth index (VkMsm.digits_go fuel scalar) 0 =
+    List.nth index (VkMsm.digits_go fuel scalar) (0 : Z) =
       (scalar / 256 ^ Z.of_nat index) mod 256.
   Proof.
     revert index scalar.
     induction fuel as [|fuel IH]; intros [|index] scalar Hindex;
       cbn [VkMsm.digits_go List.nth]; try lia.
-    - now rewrite Z.pow_0_r, Z.div_1_r.
-    - rewrite IH by lia.
-      rewrite Z.div_div by
-        (try lia; apply Z.pow_pos_nonneg; lia).
-      rewrite Nat2Z.inj_succ, Z.pow_succ_r by lia.
-      f_equal. ring.
+    rewrite IH by lia.
+    rewrite Z.div_div by
+      (try lia; apply Z.pow_pos_nonneg; lia).
+    rewrite Nat2Z.inj_succ, Z.pow_succ_r by lia.
+    f_equal.
   Qed.
 
   Lemma nth_digits32 (scalar : Z) (window : nat) :
@@ -264,7 +275,7 @@ Module VkMsmRefinement.
 
   (** ** Bucket filling *)
 
-  Record buckets_represent (buckets : PrimArray.array J.point)
+  Record buckets_represent (buckets : J.point_array)
       (pairs : list (Z * Vesta.point)) : Prop := {
     buckets_length :
       PrimArray.length buckets = ArrayLinear.pippenger_bucket_count;
@@ -279,7 +290,7 @@ Module VkMsmRefinement.
       (PrimArray.make ArrayLinear.pippenger_bucket_count J.identity) [].
   Proof.
     constructor.
-    - apply ArrayLinear.make_bucket_length.
+    - exact (ArrayLinear.make_bucket_length J.identity).
     - intros index Hindex.
       change (JR.represents
         (ArrayLinear.get_at
@@ -292,9 +303,14 @@ Module VkMsmRefinement.
       { apply ArrayLinear.view_make.
         - exact ArrayLinear.bucket_count_fits_word.
         - exact ArrayLinear.bucket_count_fits_array. }
-      rewrite (ArrayLinear.view_nth Hview index J.identity).
-      + exact JR.identity_represents.
-      + apply ArrayLinear.nth_error_repeat_value. exact Hindex.
+      assert (Hnth : List.nth_error
+          (List.repeat J.identity ArrayLinear.pippenger_bucket_count_nat)
+          index = Some J.identity).
+      { apply ArrayLinear.nth_error_repeat_value. exact Hindex. }
+      pose proof (ArrayLinear.view_nth Hview index J.identity Hnth) as Hget.
+      exact (eq_rect_r
+        (fun point => JR.represents point Vesta.identity)
+        JR.identity_represents Hget).
   Qed.
 
   Lemma digit_bucket_index (digit : PrimInt63.int) :
@@ -321,9 +337,9 @@ Module VkMsmRefinement.
   Qed.
 
   Lemma bucket_step_sound
-      (scalars : PrimArray.array Prim63Words.words5)
-      (bases : PrimArray.array J.affine) (window index : nat)
-      (buckets : PrimArray.array J.point)
+      (scalars : J.scalar_array)
+      (bases : J.affine_array) (window index : nat)
+      (buckets : J.point_array)
       (pairs : list (Z * Vesta.point))
       (coefficient : Prim63Words.words5) (base : J.affine) :
     (window < 32)%nat ->
@@ -366,7 +382,8 @@ Module VkMsmRefinement.
     fold primitive_digit.
     destruct (PrimInt63.eqb primitive_digit 0%uint63) eqn:Hzero.
     - apply Uint63.eqb_spec in Hzero. subst primitive_digit.
-      assert (Hdigit_zero : digit = 0) by reflexivity.
+      assert (Hdigit_zero : digit = 0).
+      { unfold digit. rewrite Hzero. reflexivity. }
       rewrite Hdigit_zero in Hdigit_spec.
       constructor.
       + exact (buckets_length _ _ Hstate).
@@ -374,16 +391,19 @@ Module VkMsmRefinement.
         eapply represents_transport.
         * exact (bucket_at _ _ Hstate bucket_index Hbucket_index).
         * rewrite bucket_snoc by assumption.
-          rewrite <- Hdigit_spec, Hdigit_zero.
+          rewrite <- Hdigit_spec.
           destruct (Z.eqb_spec 0 (Z.of_nat (S bucket_index)));
             [lia | reflexivity].
     - assert (Hprimitive_nonzero : primitive_digit <> 0%uint63).
-      { intro Heq. subst primitive_digit.
-        rewrite Uint63.eqb_refl in Hzero. discriminate. }
+      { intro Heq.
+        assert (Htrue :
+          PrimInt63.eqb primitive_digit 0%uint63 = true).
+        { apply Uint63.eqb_spec. exact Heq. }
+        rewrite Htrue in Hzero. discriminate. }
       assert (Hdigit_nonzero : digit <> 0).
       { intro Hdigit_zero. apply Hprimitive_nonzero.
         apply Uint63.to_Z_inj.
-        change digit = Uint63.to_Z 0%uint63.
+        change (digit = Uint63.to_Z (0%uint63)).
         rewrite Hdigit_zero. reflexivity. }
       assert (Hdigit_positive : 0 < digit) by
         (pose proof (Uint63.to_Z_bounded primitive_digit); lia).
@@ -400,33 +420,44 @@ Module VkMsmRefinement.
       { unfold updated_index. apply digit_bucket_index. lia. }
       rewrite Hprimitive_index.
       constructor.
-      + rewrite ArrayLinear.length_set.
-        exact (buckets_length _ _ Hstate).
+      + transitivity (PrimArray.length buckets).
+        * exact (ArrayLinear.length_set buckets
+            (ArrayLinear.index updated_index)
+            (J.add
+              (PrimArray.get buckets (ArrayLinear.index updated_index))
+              (J.of_affine base))).
+        * exact (buckets_length _ _ Hstate).
       + intros bucket_index Hbucket_index.
         destruct (Nat.eq_dec bucket_index updated_index) as [Heq | Hneq].
         * subst bucket_index.
-          unfold ArrayLinear.get_at.
-          rewrite ArrayLinear.get_set_same.
-          2: { unfold ArrayLinear.in_bounds.
-               rewrite (buckets_length _ _ Hstate).
-               apply ArrayLinear.bucket_index_bound. exact Hupdated_index. }
+          eapply represents_coordinates_transport.
+          { unfold ArrayLinear.get_at.
+            apply ArrayLinear.get_set_same.
+            unfold ArrayLinear.in_bounds.
+            rewrite (buckets_length _ _ Hstate).
+            apply ArrayLinear.bucket_index_bound. exact Hupdated_index. }
           assert (Hvalue : Z.of_nat (S updated_index) = digit).
           { rewrite Nat2Z.inj_succ, Hupdated_index_Z. lia. }
           rewrite Hvalue.
           rewrite bucket_snoc by assumption.
           rewrite <- Hdigit_spec, Z.eqb_refl.
           apply JR.add_represents.
-          -- exact (bucket_at _ _ Hstate updated_index Hupdated_index).
+          -- eapply represents_transport.
+             ++ exact (bucket_at _ _ Hstate updated_index Hupdated_index).
+             ++ now rewrite Hvalue.
           -- exact Hbase_represents.
-        * unfold ArrayLinear.get_at.
-          rewrite ArrayLinear.get_set_other.
-          2: { intro Heq. apply Hneq.
-               apply ArrayLinear.index_inj.
-               - apply (ArrayLinear.fits_nat_lt bucket_index 255);
-                   assumption.
-               - apply (ArrayLinear.fits_nat_lt updated_index 255);
-                   assumption.
-               - symmetry. exact Heq. }
+        * eapply represents_coordinates_transport.
+          { unfold ArrayLinear.get_at.
+            apply ArrayLinear.get_set_other.
+            intro Heq. apply Hneq.
+            apply ArrayLinear.index_inj.
+            - apply (ArrayLinear.fits_nat_lt bucket_index 255).
+              + exact Hbucket_index.
+              + exact ArrayLinear.bucket_count_fits_word.
+            - apply (ArrayLinear.fits_nat_lt updated_index 255).
+              + exact Hupdated_index.
+              + exact ArrayLinear.bucket_count_fits_word.
+            - symmetry. exact Heq. }
           eapply represents_transport.
           -- exact (bucket_at _ _ Hstate bucket_index Hbucket_index).
           -- rewrite bucket_snoc by assumption.
@@ -435,7 +466,7 @@ Module VkMsmRefinement.
                as [Hequal | Hnot_equal]; [|reflexivity].
              exfalso. apply Hneq.
              apply Nat2Z.inj.
-             rewrite Hupdated_index_Z, Nat2Z.inj_succ, Hequal. lia.
+             rewrite Hupdated_index_Z, Hequal, Nat2Z.inj_succ. lia.
   Qed.
 
   Definition window_pairs (coefficients : list Prim63Words.words5)
@@ -464,8 +495,11 @@ Module VkMsmRefinement.
     intros Hcoefficients Hrefinement.
     unfold window_pairs, VkMsm.win_pairs, scalar_digits, scalar_values.
     rewrite List.length_combine, !List.length_map, Hcoefficients.
-    rewrite (proj2 (srs_lengths Hrefinement)).
-    reflexivity.
+    pose proof (proj2 (srs_lengths Hrefinement)) as Hdenoted_length.
+    transitivity (Nat.min 2048 2048).
+    - exact (f_equal (fun length => Nat.min 2048 length)
+        Hdenoted_length).
+    - reflexivity.
   Qed.
 
   Lemma window_pairs_good (coefficients : list Prim63Words.words5)
@@ -523,13 +557,13 @@ Module VkMsmRefinement.
     rewrite Prim63Loop.foldi_u63_index.
     2: { exact ArrayLinear.vector_size_fits_word. }
     set (pairs := window_pairs coefficients window).
-    set (Inv := fun (index : nat) (buckets : PrimArray.array J.point) =>
+    set (Inv := fun (index : nat) (buckets : J.point_array) =>
       buckets_represent buckets (List.firstn index pairs)).
-    assert (Hinitial : Inv 0
+    assert (Hinitial : Inv O
       (PrimArray.make ArrayLinear.pippenger_bucket_count J.identity)).
     { unfold Inv. cbn [List.firstn]. exact empty_buckets_represent. }
     assert (Hstep : forall index buckets,
-      0 <= index < 0 + ArrayLinear.vector_size_nat ->
+      (0 <= index < 0 + ArrayLinear.vector_size_nat)%nat ->
       Inv index buckets ->
       Inv (S index)
         (J.bucket_step (VkMsmChecks.scalar_array coefficients)
@@ -558,7 +592,10 @@ Module VkMsmRefinement.
       pose proof (window_pair_at coefficients window index coefficient base
         Hcoefficient Hbase) as Hpair.
       unfold Inv in Hstate |- *.
-      rewrite (firstn_succ_from_nth_error pairs index _).
+      rewrite (firstn_succ_from_nth_error pairs index
+        (List.nth window
+          (VkMsm.digits32 (Prim63Words.eval5 coefficient)) (0 : Z),
+         VkSrsDataView.denote_affine base)).
       2: { exact Hpair. }
       eapply bucket_step_sound.
       - exact Hwindow.
@@ -588,8 +625,10 @@ Module VkMsmRefinement.
       by reflexivity.
     rewrite List.firstn_all2 in Hfinal.
     - exact Hfinal.
-    - rewrite (window_pairs_length coefficients window
-      Hcoefficients Hrefinement). lia.
+    - unfold pairs.
+      pose proof (window_pairs_length coefficients window
+        Hcoefficients Hrefinement) as Hlength.
+      lia.
   Qed.
 
   (** ** Descending bucket aggregation *)
@@ -601,13 +640,15 @@ Module VkMsmRefinement.
   Proof.
     intro Hascending.
     assert (Hresult : (254 - ascending < 255)%nat) by lia.
+    assert (Hascending_254 : (ascending <= 254)%nat).
+    { unfold ArrayLinear.pippenger_bucket_count_nat in Hascending. lia. }
     apply Uint63.to_Z_inj.
     rewrite Uint63.sub_spec.
     change (Uint63.to_Z 254%uint63) with 254.
     rewrite ArrayLinear.to_Z_index.
     - rewrite ArrayLinear.to_Z_index.
       + rewrite Z.mod_small.
-        * f_equal. rewrite Nat2Z.inj_sub by lia. lia.
+        * f_equal. rewrite Nat2Z.inj_sub by exact Hascending_254. lia.
         * split; [lia |].
           assert (Hcapacity : 256 < Uint63Axioms.wB) by
             (vm_compute; reflexivity).
@@ -626,8 +667,8 @@ Module VkMsmRefinement.
     revert index.
     induction count as [|count IH]; intros [|index] Hindex;
       cbn [VkMsm.desc_from List.nth_error]; try lia.
-    - f_equal. f_equal. lia.
-    - rewrite IH by lia. f_equal. f_equal. lia.
+    - reflexivity.
+    - apply IH. lia.
   Qed.
 
   Definition bucket_values (pairs : list (Z * Vesta.point))
@@ -661,7 +702,7 @@ Module VkMsmRefinement.
       now apply JR.add_represents.
   Qed.
 
-  Lemma bucket_sum_step_sound (buckets : PrimArray.array J.point)
+  Lemma bucket_sum_step_sound (buckets : J.point_array)
       (pairs : list (Z * Vesta.point)) (ascending : nat)
       (state : J.point * J.point) (abstract : Vesta.point * Vesta.point) :
     (ascending < 255)%nat ->
@@ -686,8 +727,8 @@ Module VkMsmRefinement.
           (nth_error_desc_from 255 ascending Hascending).
         reflexivity. }
       apply List.nth_error_nth with (d := Vesta.identity) in Hnth.
-      rewrite Hnth.
-      f_equal. f_equal. lia. }
+      etransitivity; [exact Hnth |].
+      f_equal. rewrite Nat2Z.inj_iff. lia. }
     unfold J.bucket_sum_step.
     rewrite descending_bucket_index by exact Hascending.
     fold (ArrayLinear.get_at buckets (254 - ascending)).
@@ -711,7 +752,7 @@ Module VkMsmRefinement.
     rewrite List.fold_left_app. reflexivity.
   Qed.
 
-  Lemma bucket_sum_loop_sound (buckets : PrimArray.array J.point)
+  Lemma bucket_sum_loop_sound (buckets : J.point_array)
       (pairs : list (Z * Vesta.point)) :
     buckets_represent buckets pairs ->
     state_represents
@@ -729,11 +770,11 @@ Module VkMsmRefinement.
       state_represents state
         (List.fold_left aggregate_step (List.firstn index values)
           (Vesta.identity, Vesta.identity))).
-    assert (Hinitial : Inv 0 (J.identity, J.identity)).
+    assert (Hinitial : Inv O (J.identity, J.identity)).
     { unfold Inv, state_represents. cbn [List.firstn List.fold_left fst snd].
       split; exact JR.identity_represents. }
     assert (Hstep : forall index state,
-      0 <= index < 0 + ArrayLinear.pippenger_bucket_count_nat ->
+      (0 <= index < 0 + ArrayLinear.pippenger_bucket_count_nat)%nat ->
       Inv index state ->
       Inv (S index)
         (J.bucket_sum_step buckets (ArrayLinear.index index) state)).
@@ -865,7 +906,7 @@ Module VkMsmRefinement.
       VkMsm.pmul 256 point.
   Proof.
     intro Hpoint. rewrite iter_double_mul by exact Hpoint.
-    f_equal. vm_compute. reflexivity.
+    f_equal.
   Qed.
 
   Lemma range_step_sound (coefficients : list Prim63Words.words5)
@@ -912,18 +953,18 @@ Module VkMsmRefinement.
           (abstract_window_step (scalar_digits coefficients)
             VkSrsDataView.denoted_g)
           (List.firstn index windows) Vesta.identity)).
-    assert (Hinitial : Inv 0 J.identity).
+    assert (Hinitial : Inv O J.identity).
     { unfold Inv. cbn [List.firstn List.fold_left].
       exact JR.identity_represents. }
     assert (Hstep : forall index point,
-      0 <= index < 0 + range_count ->
+      (0 <= index < 0 + range_count)%nat ->
       Inv index point ->
       Inv (S index)
         (J.window_range_step (VkMsmChecks.scalar_array coefficients)
           VkSrsDataView.g_array range_start range_count index point)).
     { intros index point Hindex Hpoint.
       assert (Hindex_bound : (index < range_count)%nat) by lia.
-      set (window := range_start + range_count - 1 - index)%nat.
+      set (window := (range_start + range_count - 1 - index)%nat).
       assert (Hwindow : (window < 32)%nat) by
         (unfold window; lia).
       assert (Hnth : List.nth_error windows index = Some window).
@@ -1036,6 +1077,8 @@ Module VkMsmRefinement.
     unfold VkMsm.msm_pippenger.
     rewrite <- half_windows_partition, pip_go_app.
     fold digits high low.
+    change (VkMsm.padd low (VkMsm.pmul (2 ^ 128) high) =
+      VkMsm.pip_go digits bases (descending_windows 0 16) high).
     rewrite (VkMsm.pip_go_spec digits bases
       (descending_windows 0 16) high
       Hdigits_length Hbases Hhigh Hdigits_bound).
@@ -1090,21 +1133,25 @@ Module VkMsmRefinement.
     assert (Hmsm :
       VkMsm.padd low (VkMsm.pmul (2 ^ 128) high) =
         VkMsm.msm (scalar_values coefficients) VkSrsDataView.denoted_g).
-    { apply scalar_halves_recombine; try assumption.
-      exact (denoted_g_good Hrefinement). }
+    { exact (scalar_halves_recombine
+        (scalar_values coefficients) VkSrsDataView.denoted_g
+        Hlength (denoted_g_good Hrefinement) Hrange
+        Hlow_good Hhigh_good). }
     assert (Hcombined :
       JR.represents
         (J.add (VkMsmChecks.low_msm coefficients)
           (J.double_n 128 (VkMsmChecks.high_msm coefficients)))
         (VkMsm.msm (scalar_values coefficients)
           VkSrsDataView.denoted_g)).
-    { eapply represents_transport.
-      - apply JR.add_represents.
-        + exact Hlow.
-        + eapply represents_transport.
-          * apply JR.double_n_represents. exact Hhigh.
-          * apply iter_double_mul. exact Hhigh_good.
-      - exact Hmsm. }
+    { refine (represents_transport _
+        (VkMsm.padd low (VkMsm.pmul (2 ^ 128) high))
+        (VkMsm.msm (scalar_values coefficients)
+          VkSrsDataView.denoted_g) _ Hmsm).
+      apply JR.add_represents.
+      - exact Hlow.
+      - eapply represents_transport.
+        + apply JR.double_n_represents. exact Hhigh.
+        + apply iter_double_mul. exact Hhigh_good. }
     unfold J.assemble_halves.
     apply JR.add_represents.
     - exact Hcombined.
@@ -1134,10 +1181,10 @@ Module VkMsmRefinement.
     eapply represents_transport.
     - exact (assemble_halves_sound coefficients
         Hlength Hrefinement Hrange).
-    - unfold VkMsm.g_points, VkMsm.w_point.
-      rewrite <- (VkSrsDataView.g_exact Hrefinement),
-        <- (VkSrsDataView.w_exact Hrefinement).
-      reflexivity.
+    - apply f_equal2.
+      + apply f_equal.
+        exact (VkSrsDataView.g_exact Hrefinement).
+      + exact (VkSrsDataView.w_exact Hrefinement).
   Qed.
 
   (** Exact hand-off to the public Halo2 commitment specification.  The FFT
