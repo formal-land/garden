@@ -57,8 +57,9 @@ jobs:
             cd Garden
             # The default build includes the complete generated certificate
             # replay; the generation check and the independent all-44-point
-            # oracle stay as diagnostics.
-            make
+            # oracle stay as diagnostics.  One worker per runner vCPU;
+            # measured per-worker peaks fit inside the runner's memory.
+            make -j"$(nproc)"
             make orchard-vk-provenance-generated-check
             make orchard-vk-provenance-oracle-check
             make snapshot
