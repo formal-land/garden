@@ -54,11 +54,10 @@ dependents.
 dependency proofs. It is a development accelerator only. Any "closed /
 axiom-free" claim, and every `Print Assumptions` audit, must run on a full
 `.vo` build that actually executes the relevant certificate `vm_compute`s.
-`make all` checks the checked-in certificates. The 278 ignored generated
-Orchard VK provenance certificate modules are intentionally outside that target;
-replay them with `make orchard-vk-provenance` before auditing
-`orchard_vk_commit_lagrange_refined`. Treat `-vos` as "compiles and
-type-checks", not "verified".
+`make all` builds every certificate in the development, including the 278
+generated Orchard VK provenance certificate modules; a default build
+suffices for auditing `orchard_vk_commit_lagrange_refined`. Treat `-vos`
+as "compiles and type-checks", not "verified".
 Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
@@ -971,10 +970,11 @@ instead.
 That figure was measured over the 399 files of
 `valerii-huhnin@orchard-completeness`, so it predates the compiled-plonkish,
 pinned-vk, transcript-representation, and VK-provenance layers. Ordinary
-`make` includes the checked-in provenance refinements and 129 generated data
-modules. The explicit `make orchard-vk-provenance` replay adds 278 generated
-certificate modules and is outside that historical total. A whole-tree total
-covering both targets has not been measured.
+`make` includes the checked-in provenance refinements, the 129 generated
+data modules, and the 278 generated certificate modules, all outside that
+historical total. A clean default build on a 32-core builder measures
+16 m wall for the sources predating the certificate replay plus roughly
+22 min CPU for the replay itself.
 The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 ≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
@@ -1213,10 +1213,10 @@ later rewrite pattern; `cbn`'s refolding is load-bearing there.
 
 ### VK-commitment MSM and Vesta SRS provenance
 
-The explicit `make orchard-vk-provenance` target checks 278 generated
-certificate modules: 229 computational leaves and 49 aggregate or packaging
-modules. Ordinary `make` checks the committed refinement code and all 129
-generated literal-data modules, but not those certificates. The detailed
+The default build checks the 278 generated certificate modules: 229
+computational leaves and 49 aggregate or packaging modules. The explicit
+`make orchard-vk-provenance` target performs the same replay in phases
+with per-group worker caps. The detailed
 proof graph and trust boundary are documented in
 [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
 
@@ -1290,6 +1290,28 @@ The remaining per-entry floor is the BLAKE2b-XMD hash-to-field stage
 (≈ 40 ms over `Z` bytes) plus the `Z`-side digest reductions; a
 primitive-integer BLAKE2b would be the next lever if the SRS group ever
 needs another order of magnitude.
+
+**Evaluated fixed plane (2026-08-06).** The virtual machine evaluates a
+zero-argument global constant when it links any code that references the
+constant, even from an unselected match branch. Every calibration
+certificate dispatches through `VkCalibration.check`, whose fixed branch
+references `VkModelColumns.fixed_evaluation`, so all 44 leaves —
+permutation ones included — paid the ≈ 74 s evaluation of
+`VkModelColumns.all_columns` (the 19,679-event synthesis replay plus the
+compiled selector-combination planes) just to link. `all_columns` is
+stored as an `Eval vm_compute` literal with the `all_columns_spec` bridge
+back to `all_columns_computed`, paying that evaluation once inside
+`ModelColumns.v` (≈ 6 min for the `Eval` plus the `vm_cast` bridge; the
+`.vo` carries the ≈ 11.6 MB plane). The calibration group drops from
+3 827 s to 656 s CPU (≈ 26 s wall at 32 jobs), and the full certificate
+replay from ≈ 75 to ≈ 22 min CPU. Two cautions: the consumer-side
+`all_columns_unfold` proof must `rewrite all_columns_spec` and close by
+`reflexivity` on the named `all_columns_computed` — an `exact
+all_columns_spec` makes the elaborator convert the literal against the
+`install_combinations` application, which falls into the lazy engine and
+runs for tens of minutes; and any new named checker referenced from a
+generated certificate should keep its zero-argument dependencies literal
+for the same link-time reason.
 
 ## History: the big cost cliffs
 

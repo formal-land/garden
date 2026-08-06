@@ -15,11 +15,11 @@ include vk-provenance.mk
 # depending on whether a developer happens to have generated it already.
 VFILES := $(shell find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort)
 
-# The ordinary project build checks every hand-written Rocq source and all
-# generated literal-data modules.  The dedicated target below owns the 278
-# generated provenance certificate modules; a complete kernel replay of those
-# certificates is `make orchard-vk-provenance`.
-DEFAULT_VOFILES := $(VFILES:.v=.vo) $(VK_PROVENANCE_GENERATED_DATA_VFILES:.v=.vo)
+# The ordinary project build covers every source the generated makefile
+# knows: hand-written Rocq sources, generated literal-data modules, and the
+# 278 generated provenance certificate modules.  `make orchard-vk-provenance`
+# remains available as a phased replay with per-group worker caps for
+# memory-constrained builders.
 
 default: all
 
@@ -37,7 +37,7 @@ MAKECOQ := +$(MAKE) -f CoqMakefile
 	$(MAKECOQ) $@
 
 all: CoqMakefile
-	$(MAKECOQ) $(DEFAULT_VOFILES)
+	$(MAKECOQ) all
 
 ORCHARD_SYNTHESIS_JSON_BUILD := _build/orchard_synthesis_json
 ORCHARD_SNAPSHOTS := Orchard/Snapshots
