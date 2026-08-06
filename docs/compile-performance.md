@@ -54,11 +54,10 @@ dependents.
 dependency proofs. It is a development accelerator only. Any "closed /
 axiom-free" claim, and every `Print Assumptions` audit, must run on a full
 `.vo` build that actually executes the relevant certificate `vm_compute`s.
-`make all` checks the checked-in certificates. The 278 ignored generated
-Orchard VK provenance certificate modules are intentionally outside that target;
-replay them with `make orchard-vk-provenance` before auditing
-`orchard_vk_commit_lagrange_refined`. Treat `-vos` as "compiles and
-type-checks", not "verified".
+`make all` builds every certificate in the development, including the 278
+generated Orchard VK provenance certificate modules; a default build
+suffices for auditing `orchard_vk_commit_lagrange_refined`. Treat `-vos`
+as "compiles and type-checks", not "verified".
 Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
@@ -971,10 +970,11 @@ instead.
 That figure was measured over the 399 files of
 `valerii-huhnin@orchard-completeness`, so it predates the compiled-plonkish,
 pinned-vk, transcript-representation, and VK-provenance layers. Ordinary
-`make` includes the checked-in provenance refinements and 129 generated data
-modules. The explicit `make orchard-vk-provenance` replay adds 278 generated
-certificate modules and is outside that historical total. A whole-tree total
-covering both targets has not been measured.
+`make` includes the checked-in provenance refinements, the 129 generated
+data modules, and the 278 generated certificate modules, all outside that
+historical total. A clean default build on a 32-core builder measures
+16 m wall for the sources predating the certificate replay plus roughly
+22 min CPU for the replay itself.
 The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 ≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
@@ -1213,10 +1213,10 @@ later rewrite pattern; `cbn`'s refolding is load-bearing there.
 
 ### VK-commitment MSM and Vesta SRS provenance
 
-The explicit `make orchard-vk-provenance` target checks 278 generated
-certificate modules: 229 computational leaves and 49 aggregate or packaging
-modules. Ordinary `make` checks the committed refinement code and all 129
-generated literal-data modules, but not those certificates. The detailed
+The default build checks the 278 generated certificate modules: 229
+computational leaves and 49 aggregate or packaging modules. The explicit
+`make orchard-vk-provenance` target performs the same replay in phases
+with per-group worker caps. The detailed
 proof graph and trust boundary are documented in
 [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
 
