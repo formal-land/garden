@@ -270,8 +270,10 @@ Section WithPrime.
       destruct (Z_lt_le_dec row (Domain.usable_rows domain)) as [Hlt | Hge].
       - apply (proj1 (PlonkishLookup.lookup_compile_correct_installed
           domain system infos num_fixed_columns permutation_columns
-          constants grid compiled table_rows Hcompiled Hact Hexact
-          Hlookup_avoid row Hrow)).
+          constants grid compiled table_rows
+          (f_equal CompiledSystem.lookups Hcompiled)
+          (f_equal CompiledSystem.selector_assignments Hcompiled)
+          Hact Hexact Hlookup_avoid row Hrow)).
         rewrite List.Forall_forall in Hmem.
         apply List.Forall_forall.
         intros arg Hin.
