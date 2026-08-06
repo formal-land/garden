@@ -84,7 +84,8 @@ Lemma compile_gates_substituted
           constants).(CompiledSystem.selector_assignments)))
     (gate_polys system).
 Proof.
-  unfold Compile.compile, Compile.assignment_replacement.
+  unfold Compile.compile, Compile.compile_with_minimum,
+    Compile.assignment_replacement.
   cbv zeta.
   destruct (Compress.process _ _ _) as [combinations assignments].
   reflexivity.
@@ -1130,7 +1131,7 @@ Section WithPrime.
       destruct named_constraint as [name constraint].
       destruct constraint as
         [ selector inner | lhs rhs | inner | inner range | lhs rhs
-        | inner ];
+        | lhs rhs | inner ];
         cbn in Hflat; try discriminate.
       cbn in Hpoly, Hgates.
       subst poly.
@@ -1145,7 +1146,7 @@ Section WithPrime.
       destruct named_constraint as [name constraint].
       destruct constraint as
         [ selector inner | lhs rhs | inner | inner range | lhs rhs
-        | inner ];
+        | lhs rhs | inner ];
         cbn in Hflat; try discriminate.
       cbn.
       apply Hpolys.
@@ -1194,14 +1195,17 @@ Section WithPrime.
     unfold PlonkishMock.constraint_selector_vacuous_b in Hvacuous.
     cbn [snd] in Hvacuous, Hpoly.
     destruct constraint as
-      [ selector inner | lhs rhs | inner | inner range | lhs rhs | inner ];
+      [ selector inner | lhs rhs | inner | inner range | lhs rhs
+      | lhs rhs | inner ];
       try discriminate.
     - (* Select *)
-      cbn [Configure.constraint_to_expression] in Hpoly.
-      subst poly.
-      cbn [eval_expression].
-      rewrite (Hselectors selector).
-      apply FieldRewrite.mul_zero_left.
+      destruct inner;
+        cbn [Configure.constraint_to_expression] in Hpoly;
+        subst poly;
+        cbn [eval_expression];
+        rewrite (Hselectors selector);
+        autorewrite with field_rewrite;
+        reflexivity.
     - (* EqualZeroToPrecise *)
       destruct (Complete.zero_selector_value (p := p) inner)
         as [value |] eqn:Hvalue; [| discriminate].
@@ -1260,10 +1264,14 @@ Section WithPrime.
       (constants : list Z)
       (grid : RawGrid.t)
       (compiled : CompiledSystem.t)
-      (Hcompiled :
-        compiled =
-        Compile.compile system infos num_fixed_columns permutation_columns
-          constants)
+      (Hcompiled_gates :
+        compiled.(CompiledSystem.gates) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.gates))
+      (Hcompiled_selectors :
+        compiled.(CompiledSystem.selector_assignments) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.selector_assignments))
       (Hact : forall s row : Z,
         0 <= row < Domain.n domain ->
         grid.(RawGrid.sel) s row =
@@ -1294,7 +1302,8 @@ Section WithPrime.
     pose proof
       (compile_gates_substituted system infos num_fixed_columns
         permutation_columns constants) as Hgates.
-    rewrite <- Hcompiled in Hgates.
+    rewrite <- Hcompiled_gates in Hgates.
+    rewrite <- Hcompiled_selectors in Hgates.
     rewrite Hgates in Hpoly.
     apply List.in_map_iff in Hpoly.
     destruct Hpoly as (source & Hpoly & Hsource).
@@ -1350,10 +1359,14 @@ Section WithPrime.
       (constants : list Z)
       (grid : RawGrid.t)
       (compiled : CompiledSystem.t)
-      (Hcompiled :
-        compiled =
-        Compile.compile system infos num_fixed_columns permutation_columns
-          constants)
+      (Hcompiled_gates :
+        compiled.(CompiledSystem.gates) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.gates))
+      (Hcompiled_selectors :
+        compiled.(CompiledSystem.selector_assignments) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.selector_assignments))
       (Hblinding : 0 <= domain.(Domain.blinding_factors))
       (Hact : forall s row : Z,
         0 <= row < Domain.n domain ->
@@ -1384,7 +1397,7 @@ Section WithPrime.
     pose proof
       (compile_gates_substituted system infos num_fixed_columns
         permutation_columns constants) as Hgates.
-    rewrite <- Hcompiled in Hgates.
+    rewrite <- Hcompiled_gates, <- Hcompiled_selectors in Hgates.
     assert (Hval_row : forall row : Z,
       0 <= row < Domain.n domain ->
       forall (s : Z) (e : Expression.t Configure.indexed_columns),
@@ -1450,8 +1463,8 @@ Section WithPrime.
         exact
           (compiled_gates_blinding_vacuous domain system infos
             num_fixed_columns permutation_columns constants grid compiled
-            Hcompiled Hact Hwithin Hview Hvacuous Hmult Hcheck row Hrow
-            Hcase poly Hpoly).
+            Hcompiled_gates Hcompiled_selectors Hact Hwithin Hview Hvacuous
+            Hmult Hcheck row Hrow Hcase poly Hpoly).
   Qed.
 
   (** The full-domain reading of the original side — the gate conjunct of
@@ -1468,10 +1481,14 @@ Section WithPrime.
       (constants : list Z)
       (grid : RawGrid.t)
       (compiled : CompiledSystem.t)
-      (Hcompiled :
-        compiled =
-        Compile.compile system infos num_fixed_columns permutation_columns
-          constants)
+      (Hcompiled_gates :
+        compiled.(CompiledSystem.gates) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.gates))
+      (Hcompiled_selectors :
+        compiled.(CompiledSystem.selector_assignments) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.selector_assignments))
       (Hblinding : 0 <= domain.(Domain.blinding_factors))
       (Hact : forall s row : Z,
         0 <= row < Domain.n domain ->
@@ -1501,8 +1518,9 @@ Section WithPrime.
   Proof.
     pose proof
       (compile_correct domain system infos num_fixed_columns
-        permutation_columns constants grid compiled Hcompiled Hblinding
-        Hact Hwithin Hview Hflat Hvacuous Hmult Hcheck) as Hmain.
+        permutation_columns constants grid compiled Hcompiled_gates
+        Hcompiled_selectors Hblinding Hact Hwithin Hview Hflat Hvacuous
+        Hmult Hcheck) as Hmain.
     split.
     - intros Hcompiled_holds row Hrow.
       destruct (Z.ltb row (Domain.usable_rows domain)) eqn:Hcase.

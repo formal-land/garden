@@ -169,9 +169,8 @@ Definition gate_polys {columns : Columns.t}
     the permutation argument's required degree (the constant 3, per
     [plonk/permutation.rs]), each lookup argument's required degree
     ([plonk/lookup.rs] — the model's table side is a bare column, whose
-    query has degree 1), the gate polynomial degrees, and the default
-    minimum degree 1 ([minimum_degree] is unset for the modeled
-    circuits). *)
+    query has degree 1), the gate polynomial degrees, and the configured
+    minimum degree (default 1). *)
 
 Definition lookup_required_degree {columns : Columns.t}
     (lookup : LookupArgument.t columns) : nat :=
@@ -183,8 +182,9 @@ Definition lookup_required_degree {columns : Columns.t}
   let table_degree := 1%nat in
   Nat.max 4 (2 + input_degree + table_degree).
 
-Definition system_degree {columns : Columns.t}
-    (system : ConstraintSystem.t columns) : nat :=
+Definition system_degree_with_minimum {columns : Columns.t}
+    (system : ConstraintSystem.t columns)
+    (minimum_degree : option nat) : nat :=
   let degree := 3%nat in
   let degree :=
     Nat.max degree
@@ -198,7 +198,17 @@ Definition system_degree {columns : Columns.t}
         (fun acc poly => Nat.max acc (expression_degree poly))
         (gate_polys system)
         O) in
-  Nat.max degree 1.
+  Nat.max degree
+    (match minimum_degree with
+     | Some degree => degree
+     | None => 1
+     end).
+
+(** Compatibility entry point for configure programs that do not carry the
+    metadata trace. *)
+Definition system_degree {columns : Columns.t}
+    (system : ConstraintSystem.t columns) : nat :=
+  system_degree_with_minimum system None.
 
 (** ** Selector compression
 
@@ -714,15 +724,16 @@ Module Compile.
       [num_fixed_columns]; the permutation column list and the constants
       columns are configure-time data the modeled [ConstraintSystem.t]
       does not carry, so they are passed through. *)
-  Definition compile
+  Definition compile_with_minimum
       (system : ConstraintSystem.t Configure.indexed_columns)
       (infos : list SelectorInfo.t)
       (num_fixed_columns : Z)
       (permutation_columns : list Raw.ColumnRef.t)
       (constants : list Z)
+      (minimum_degree : option nat)
       : CompiledSystem.t :=
     let descriptions := selector_descriptions system infos in
-    let max_degree := system_degree system in
+    let max_degree := system_degree_with_minimum system minimum_degree in
     let '(combinations, assignments) :=
       Compress.process descriptions max_degree num_fixed_columns in
     let replacement := assignment_replacement assignments in
@@ -768,6 +779,72 @@ Module Compile.
           (List.seq 0 (List.length combinations));
       CompiledSystem.combination_assignments := combinations;
       CompiledSystem.selector_assignments := assignments;
+    |}.
+
+  Definition compile
+      (system : ConstraintSystem.t Configure.indexed_columns)
+      (infos : list SelectorInfo.t)
+      (num_fixed_columns : Z)
+      (permutation_columns : list Raw.ColumnRef.t)
+      (constants : list Z)
+      : CompiledSystem.t :=
+    compile_with_minimum system infos num_fixed_columns permutation_columns
+      constants None.
+
+  Module KeygenMetadata.
+    (** Indexed configure metadata consumed by selector compression and by
+        [PinnedConstraintSystem].  Query tables are in first-registration
+        order, before compression allocates its combination columns. *)
+    Record t : Set := {
+      base_fixed_columns : Z;
+      advice_queries : list (Z * Z);
+      fixed_queries : list (Z * Z);
+      instance_queries : list (Z * Z);
+      permutation_columns : list Raw.ColumnRef.t;
+      constants : list Z;
+      minimum_degree : option nat;
+    }.
+  End KeygenMetadata.
+
+  Definition add_combination_queries
+      (queries : list (Z * Z)) (columns : list Z) : list (Z * Z) :=
+    List.fold_left
+      (fun queries column => Queries.add queries (column, 0))
+      columns queries.
+
+  (** Compile from the configure interpreter rather than reconstructing
+      query sets from expression traversal.  This preserves Halo 2's
+      keygen-order query indices; selector compression appends one current-
+      rotation fixed query for each newly allocated combination column. *)
+  Definition compile_from_metadata
+      (system : ConstraintSystem.t Configure.indexed_columns)
+      (infos : list SelectorInfo.t)
+      (metadata : KeygenMetadata.t)
+      : CompiledSystem.t :=
+    let compiled :=
+      compile_with_minimum system infos
+        metadata.(KeygenMetadata.base_fixed_columns)
+        metadata.(KeygenMetadata.permutation_columns)
+        metadata.(KeygenMetadata.constants)
+        metadata.(KeygenMetadata.minimum_degree) in
+    {|
+      CompiledSystem.gates := compiled.(CompiledSystem.gates);
+      CompiledSystem.lookups := compiled.(CompiledSystem.lookups);
+      CompiledSystem.advice_queries := metadata.(KeygenMetadata.advice_queries);
+      CompiledSystem.fixed_queries :=
+        add_combination_queries metadata.(KeygenMetadata.fixed_queries)
+          compiled.(CompiledSystem.combination_columns);
+      CompiledSystem.instance_queries :=
+        metadata.(KeygenMetadata.instance_queries);
+      CompiledSystem.permutation_columns :=
+        metadata.(KeygenMetadata.permutation_columns);
+      CompiledSystem.constants := metadata.(KeygenMetadata.constants);
+      CompiledSystem.combination_columns :=
+        compiled.(CompiledSystem.combination_columns);
+      CompiledSystem.combination_assignments :=
+        compiled.(CompiledSystem.combination_assignments);
+      CompiledSystem.selector_assignments :=
+        compiled.(CompiledSystem.selector_assignments);
     |}.
 End Compile.
 

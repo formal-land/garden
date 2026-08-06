@@ -43,6 +43,8 @@ ORCHARD_SYNTHESIS_JSON_BUILD := _build/orchard_synthesis_json
 ORCHARD_SNAPSHOTS := Orchard/Snapshots
 ORCHARD_CONFIGURE_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_configure_generated_from_model.json
 ORCHARD_CONFIGURE_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_configure_generated_from_implementation.json
+ORCHARD_CONFIGURE_HIGHLEVEL_IMPL_JSON := ../third-party/orchard/src/circuit_data/action_circuit.highlevel.json
+ORCHARD_SELECTOR_COMPRESSION_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_selector_compression_generated_from_implementation.json
 ORCHARD_SYNTHESIS_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_synthesis_generated_from_model.json
 ORCHARD_SYNTHESIS_IMPL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_synthesis_generated_from_implementation.json
 ORCHARD_STRUCTURE_MODEL_JSON := $(ORCHARD_SNAPSHOTS)/circuit_structure_generated_from_model.json
@@ -107,7 +109,9 @@ orchard-circuit-visualization-check: orchard-structure-json-from-model
 orchard-configure-json-compare: orchard-configure-json-from-model
 	python3 ../scripts/compare_orchard_configure_json.py \
 	  $(ORCHARD_CONFIGURE_MODEL_JSON) \
-	  $(ORCHARD_CONFIGURE_IMPL_JSON)
+	  $(ORCHARD_CONFIGURE_IMPL_JSON) \
+	  --implementation-highlevel $(ORCHARD_CONFIGURE_HIGHLEVEL_IMPL_JSON) \
+	  --selector-compression $(ORCHARD_SELECTOR_COMPRESSION_IMPL_JSON)
 
 orchard-synthesis-json-compare: orchard-synthesis-json-from-model
 	python3 ../scripts/compare_orchard_synthesis_json.py \

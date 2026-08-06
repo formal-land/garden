@@ -8,7 +8,8 @@
     linear primitive-array implementation.  It starts with the zero fixed
     plane, applies every [AssignFixed]/[FillFromRow] event in order, and then
     installs the selector-combination columns produced by the model's own
-    [Compile.compile].  Advice, instance, selector and copy events do not
+    configure-derived [Compile.compile_from_metadata].  Advice, instance,
+    selector and copy events do not
     write fixed cells.  The returned array is flat, column-major, and its
     observable API is [fixed_evaluation].
 
@@ -21,6 +22,7 @@ Require Import Garden.Prim63.ArrayLinear.
 Require Import Garden.Halo2.serialize.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Orchard.circuit_operational.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.check.
 
 Import ListNotations.
@@ -30,8 +32,27 @@ Local Open Scope Z_scope.
 Module VkModelColumns.
 
   Definition rows_nat : nat := 2048.
+  Definition base_fixed_count_nat : nat :=
+    Z.to_nat OrchardConfigure.base_fixed_columns.
+
+  Definition combination_columns : list Z :=
+    OrchardCompiledCheck.compiled.(CompiledSystem.combination_columns).
+
+  Definition combination_assignments : list (list Z) :=
+    OrchardCompiledCheck.compiled.(CompiledSystem.combination_assignments).
+
+  Definition derived_fixed_count_nat : nat :=
+    (base_fixed_count_nat + List.length combination_columns)%nat.
+
+  (** Keep the hot array-bound constant small.  Its provenance is the closed
+      refinement below, so [29] is a checked cache rather than an input to
+      selector compression. *)
   Definition fixed_count_nat : nat := 29.
-  Definition base_fixed_count_nat : nat := 14.
+
+  Lemma fixed_count_nat_refined :
+    fixed_count_nat = derived_fixed_count_nat.
+  Proof. vm_compute. reflexivity. Qed.
+
   Definition flat_size_nat : nat := fixed_count_nat * rows_nat.
 
   Definition flat_size : PrimInt63.int := ArrayLinear.index flat_size_nat.
@@ -100,12 +121,6 @@ Module VkModelColumns.
 
   Definition base_columns : PrimArray.array Z :=
     apply_events orchard_events zero.
-
-  Definition combination_columns : list Z :=
-    OrchardCompiledCheck.compiled.(CompiledSystem.combination_columns).
-
-  Definition combination_assignments : list (list Z) :=
-    OrchardCompiledCheck.compiled.(CompiledSystem.combination_assignments).
 
   Lemma combination_columns_unfold :
     combination_columns =

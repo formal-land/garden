@@ -157,6 +157,8 @@ Fixpoint constraint_offsets {columns : Columns.t}
   | Constraint.Range expression _ => expression_offsets expression
   | Constraint.Either lhs rhs =>
       constraint_offsets lhs ++ constraint_offsets rhs
+  | Constraint.EitherZeroToPrecise lhs rhs =>
+      expression_offsets lhs ++ expression_offsets rhs
   | Constraint.EqualZeroToPrecise expression => expression_offsets expression
   end.
 
@@ -190,6 +192,8 @@ Fixpoint constraint_selectors
   | Constraint.Range expression _ => expression_selectors expression
   | Constraint.Either lhs rhs =>
       constraint_selectors lhs ++ constraint_selectors rhs
+  | Constraint.EitherZeroToPrecise lhs rhs =>
+      expression_selectors lhs ++ expression_selectors rhs
   | Constraint.EqualZeroToPrecise expression =>
       expression_selectors expression
   end.
@@ -637,7 +641,7 @@ Section WithPrime.
   Proof.
     destruct constraint as
       [ selector inner | lhs rhs | expression | expression range
-      | lhs rhs | expression ];
+      | lhs rhs | lhs rhs | expression ];
       intros Hcheck; cbn in Hcheck; try discriminate.
     - (* Select *)
       cbn.

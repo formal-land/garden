@@ -377,7 +377,7 @@ Module OrchardPlacementCerts.
       rewrite (proj2 (OrchardDecidableEq.selector_eqb_eq sel sel) eq_refl).
       left. reflexivity.
     - destruct constraint as [name' constraint'].
-      destruct constraint' as [sel' body' | | | | |];
+      destruct constraint' as [sel' body' | | | | | |];
         cbn [guarded_of]; try exact (IH Hin).
       destruct (OrchardDecidableEq.selector_eqb sel sel');
         [right |]; exact (IH Hin).

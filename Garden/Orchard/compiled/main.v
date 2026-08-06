@@ -4,15 +4,16 @@
     Orchard action circuit: acceptance of the compiled system — the
     selector-compressed gates on the cyclic [2^11]-row domain, the lookup
     arguments on the domain rows, and grid invariance under the permutation
-    σ built from the copy obligations over the pinned permutation columns —
+    σ built from the copy obligations over the configure-derived permutation
+    columns —
     implies [mock_prover_accepts] of the serialized circuit, hence
     [circuit_holds] of the realized assignment, hence the §4.18.4 Action
     statement.
 
     The compiled system is [OrchardCompiledCheck.compiled] =
-    [Compile.compile] on [orchard_indexed_system] with the activations of
-    the serialized events and the pinned permutation-column and constants
-    data of [compiled/pinned.v].  The parity certificates of
+    [Compile.compile_from_metadata] on [orchard_indexed_system] with the
+    activations and configure metadata interpreted from the formal circuit.
+    The parity certificates of
     [compiled/check.v] identify this object with the Post-NU6.3
     description [circuit_description_post_nu6_3] component by component — the
     193 gate polynomials (indicator factors included), the query tables,
@@ -38,7 +39,7 @@
       each 14-assignment shard ≈ 20 s), the finite-domain layout bundle of
       [plonkish_of_mock_prover], the combination-column disjointness of the
       original gates, the σ construction success, and the resolvability of
-      every copy cell in the pinned permutation columns;
+      every copy cell in the configure-derived permutation columns;
     - [orchard_compiled_sound]: compiled acceptance of a replayed grid
       implies [mock_prover_accepts] — the gate conjunct through
       [compile_correct_domain] plus the combination-plane transfer, the
@@ -70,7 +71,7 @@ Require Import Garden.Halo2.plonkish.sigma.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
-Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.check.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.protocol_spec.
@@ -481,6 +482,16 @@ Proof.
   reflexivity.
 Qed.
 
+(** The synthesis row bound and the compiled evaluation-domain usable prefix
+    are the same derived boundary. *)
+Lemma orchard_usable_rows_refined :
+  Garden.Orchard.circuit.orchard_usable_rows =
+    Domain.usable_rows orchard_domain.
+Proof.
+  vm_cast_no_check
+    (@eq_refl Z Garden.Orchard.circuit.orchard_usable_rows).
+Qed.
+
 Lemma orchard_blinding_nonneg : 0 <= orchard_domain.(Domain.blinding_factors).
 Proof.
   unfold orchard_domain.
@@ -663,35 +674,35 @@ Definition orchard_copies : list (Raw.Cell.t * Raw.Cell.t) :=
 
 Definition orchard_n_rows : nat := Z.to_nat (Domain.n orchard_domain).
 
-(** The closed assembly of the 3 004 copy obligations over the pinned
+(** The closed assembly of the 3 004 copy obligations over the derived
     permutation columns. *)
 Definition orchard_sigma : Sigma.t :=
   option_default
-    (Sigma.init OrchardCompiledPinned.permutation_columns orchard_n_rows)
-    (Sigma.sigma_of_copies OrchardCompiledPinned.permutation_columns
+    (Sigma.init OrchardConfigure.permutation_columns orchard_n_rows)
+    (Sigma.sigma_of_copies OrchardConfigure.permutation_columns
       orchard_n_rows orchard_copies).
 
-(** The σ construction succeeds: every copy names a pinned permutation
+(** The σ construction succeeds: every copy names a derived permutation
     column and an in-range row. *)
 Lemma orchard_sigma_some :
   opt_is_some
-    (Sigma.sigma_of_copies OrchardCompiledPinned.permutation_columns
+    (Sigma.sigma_of_copies OrchardConfigure.permutation_columns
       orchard_n_rows orchard_copies) = true.
 Proof.
   vm_cast_no_check (@eq_refl bool true).
 Qed.
 
 Lemma orchard_sigma_eq :
-  Sigma.sigma_of_copies OrchardCompiledPinned.permutation_columns
+  Sigma.sigma_of_copies OrchardConfigure.permutation_columns
     orchard_n_rows orchard_copies = Some orchard_sigma.
 Proof.
   exact
     (opt_is_some_default
-      (Sigma.init OrchardCompiledPinned.permutation_columns orchard_n_rows)
+      (Sigma.init OrchardConfigure.permutation_columns orchard_n_rows)
       _ orchard_sigma_some).
 Qed.
 
-(** Every copy cell resolves in the pinned permutation columns at a
+(** Every copy cell resolves in the derived permutation columns at a
     nonnegative row — the reading conditions of
     [permutation_cell_value_read]. *)
 Lemma orchard_copies_resolvable :
@@ -701,12 +712,12 @@ Lemma orchard_copies_resolvable :
         (andb
           (0 <=? (fst pair).(Raw.Cell.row))
           (opt_is_some
-            (Sigma.column_position OrchardCompiledPinned.permutation_columns
+            (Sigma.column_position OrchardConfigure.permutation_columns
               (fst pair).(Raw.Cell.column))))
         (andb
           (0 <=? (snd pair).(Raw.Cell.row))
           (opt_is_some
-            (Sigma.column_position OrchardCompiledPinned.permutation_columns
+            (Sigma.column_position OrchardConfigure.permutation_columns
               (snd pair).(Raw.Cell.column)))))
     orchard_copies = true.
 Proof.
@@ -739,6 +750,12 @@ Lemma orchard_info_activations_in (s : Z) (Hs : 0 <= s < 56) :
   OrchardCompiledCheck.activation_of s.
 Proof.
   assert (Hlt : (Z.to_nat s < 56)%nat) by lia.
+  assert (Htypes :
+    List.length OrchardConfigure.selector_types = 56%nat).
+  { vm_compute. reflexivity. }
+  assert (Hindex :
+    (Z.to_nat s < List.length OrchardConfigure.selector_types)%nat)
+    by lia.
   unfold PlonkishCompile.info_activations.
   destruct (s <? 0) eqn:Hneg.
   { apply Z.ltb_lt in Hneg.
@@ -746,9 +763,35 @@ Proof.
     lia. }
   unfold OrchardCompiledCheck.orchard_infos.
   rewrite List.map_map.
-  rewrite nth_map_seq by exact Hlt.
+  rewrite (nth_indep _ []
+    (OrchardCompiledCheck.activation_of (Z.of_nat 0))).
+  2: {
+    rewrite List.length_map.
+    unfold enumerate.
+    rewrite length_combine, List.length_seq, Htypes.
+    lia.
+  }
+  change (
+    List.nth (Z.to_nat s)
+      (List.map
+        (fun indexed : nat * bool =>
+          OrchardCompiledCheck.activation_of (Z.of_nat (fst indexed)))
+        (enumerate OrchardConfigure.selector_types))
+      (OrchardCompiledCheck.activation_of (Z.of_nat 0)) =
+    OrchardCompiledCheck.activation_of s).
+  pose proof (List.map_nth
+    (fun indexed : nat * bool =>
+      OrchardCompiledCheck.activation_of (Z.of_nat (fst indexed)))
+    (enumerate OrchardConfigure.selector_types) (0%nat, false)
+    (Z.to_nat s)) as Hmap.
+  cbn [fst] in Hmap.
+  rewrite Hmap.
+  unfold enumerate.
+  rewrite combine_nth by now rewrite List.length_seq.
+  rewrite seq_nth by exact Hindex.
   cbv beta.
   cbn [Compile.SelectorInfo.activations].
+  cbn [fst Nat.add].
   rewrite Z2Nat.id by lia.
   reflexivity.
 Qed.
@@ -761,8 +804,12 @@ Proof.
   apply Z.ltb_ge in Hneg.
   apply List.nth_overflow.
   rewrite List.length_map.
-  unfold OrchardCompiledCheck.orchard_infos.
-  rewrite List.length_map, List.length_seq.
+  unfold OrchardCompiledCheck.orchard_infos, enumerate.
+  rewrite List.length_map, length_combine, List.length_seq, Nat.min_id.
+  assert (Htypes :
+    List.length OrchardConfigure.selector_types = 56%nat).
+  { vm_compute. reflexivity. }
+  rewrite Htypes.
   lia.
 Qed.
 
@@ -824,20 +871,111 @@ Proof.
     destruct (Z.to_nat row); reflexivity.
 Qed.
 
-(** ** Compiled acceptance of the pinned Orchard system *)
+(** ** Compiled acceptance of the derived Orchard system *)
 
-(** [OrchardCompiledCheck.compiled] unfolds to the compilation of the
-    indexed Orchard system.  Stated once, closed on the VM: letting the
-    unifier prove this by conversion mid-application evaluates the whole
-    packing on the lazy machine. *)
+(** The public compiled object is built from the metadata interpretation of
+    the configure program.  In particular, its query tables retain Halo 2's
+    first-registration order instead of being reconstructed by traversing
+    the resulting expressions. *)
 Lemma orchard_compiled_eq :
   OrchardCompiledCheck.compiled =
-  Compile.compile orchard_indexed_system OrchardCompiledCheck.orchard_infos
-    14 OrchardCompiledPinned.permutation_columns
-    OrchardCompiledPinned.constants.
+  Compile.compile_from_metadata orchard_indexed_system
+    OrchardCompiledCheck.orchard_infos OrchardCompiledCheck.keygen_metadata.
 Proof.
-  vm_cast_no_check
-    (@eq_refl CompiledSystem.t OrchardCompiledCheck.compiled).
+  reflexivity.
+Qed.
+
+(** Selector-compression correctness only depends on the compiled gate list,
+    not on the configure-order query tables.  At [minimum_degree = None],
+    metadata compilation and traversal compilation have exactly the same
+    gate projection.  Keeping this lemma generic avoids reducing the
+    concrete Orchard compiler merely to transport a gate-holding proof. *)
+Lemma compile_from_metadata_gates
+    (system : ConstraintSystem.t Configure.indexed_columns)
+    (infos : list Compile.SelectorInfo.t)
+    (metadata : Compile.KeygenMetadata.t)
+    (Hminimum : metadata.(Compile.KeygenMetadata.minimum_degree) = None) :
+  (Compile.compile_from_metadata system infos metadata)
+      .(CompiledSystem.gates) =
+  (Compile.compile system infos
+    metadata.(Compile.KeygenMetadata.base_fixed_columns)
+    metadata.(Compile.KeygenMetadata.permutation_columns)
+    metadata.(Compile.KeygenMetadata.constants)).(CompiledSystem.gates).
+Proof.
+  unfold Compile.compile_from_metadata, Compile.compile.
+  rewrite Hminimum.
+  reflexivity.
+Qed.
+
+Lemma compile_from_metadata_selector_assignments
+    (system : ConstraintSystem.t Configure.indexed_columns)
+    (infos : list Compile.SelectorInfo.t)
+    (metadata : Compile.KeygenMetadata.t)
+    (Hminimum : metadata.(Compile.KeygenMetadata.minimum_degree) = None) :
+  (Compile.compile_from_metadata system infos metadata)
+      .(CompiledSystem.selector_assignments) =
+  (Compile.compile system infos
+    metadata.(Compile.KeygenMetadata.base_fixed_columns)
+    metadata.(Compile.KeygenMetadata.permutation_columns)
+    metadata.(Compile.KeygenMetadata.constants))
+      .(CompiledSystem.selector_assignments).
+Proof.
+  unfold Compile.compile_from_metadata, Compile.compile.
+  rewrite Hminimum.
+  reflexivity.
+Qed.
+
+Lemma compile_from_metadata_lookups
+    (system : ConstraintSystem.t Configure.indexed_columns)
+    (infos : list Compile.SelectorInfo.t)
+    (metadata : Compile.KeygenMetadata.t)
+    (Hminimum : metadata.(Compile.KeygenMetadata.minimum_degree) = None) :
+  (Compile.compile_from_metadata system infos metadata)
+      .(CompiledSystem.lookups) =
+  (Compile.compile system infos
+    metadata.(Compile.KeygenMetadata.base_fixed_columns)
+    metadata.(Compile.KeygenMetadata.permutation_columns)
+    metadata.(Compile.KeygenMetadata.constants)).(CompiledSystem.lookups).
+Proof.
+  unfold Compile.compile_from_metadata, Compile.compile.
+  rewrite Hminimum.
+  reflexivity.
+Qed.
+
+Lemma orchard_compiled_gates_eq :
+  OrchardCompiledCheck.compiled.(CompiledSystem.gates) =
+  (Compile.compile orchard_indexed_system OrchardCompiledCheck.orchard_infos
+    OrchardConfigure.base_fixed_columns OrchardConfigure.permutation_columns
+    OrchardConfigure.constants).(CompiledSystem.gates).
+Proof.
+  rewrite orchard_compiled_eq.
+  apply compile_from_metadata_gates.
+  cbn [OrchardCompiledCheck.keygen_metadata].
+  exact OrchardConfigure.minimum_degree_eq.
+Qed.
+
+Lemma orchard_compiled_selector_assignments_eq :
+  OrchardCompiledCheck.compiled.(CompiledSystem.selector_assignments) =
+  (Compile.compile orchard_indexed_system OrchardCompiledCheck.orchard_infos
+    OrchardConfigure.base_fixed_columns OrchardConfigure.permutation_columns
+    OrchardConfigure.constants).(CompiledSystem.selector_assignments).
+Proof.
+  rewrite orchard_compiled_eq.
+  apply compile_from_metadata_selector_assignments.
+  cbn [OrchardCompiledCheck.keygen_metadata].
+  exact OrchardConfigure.minimum_degree_eq.
+Qed.
+
+Lemma orchard_compiled_lookups_eq :
+  OrchardCompiledCheck.compiled.(CompiledSystem.lookups) =
+  (Compile.compile orchard_indexed_system OrchardCompiledCheck.orchard_infos
+    OrchardConfigure.base_fixed_columns OrchardConfigure.permutation_columns
+    OrchardConfigure.constants).(CompiledSystem.lookups).
+Proof.
+  rewrite orchard_compiled_eq.
+  apply compile_from_metadata_lookups.
+  cbn [OrchardCompiledCheck.keygen_metadata].
+  exact OrchardConfigure.minimum_degree_eq.
 Qed.
 
 (** The replayed grid with the compiled combination planes installed. *)
@@ -871,8 +1009,8 @@ Qed.
     - every lookup argument of the indexed system holds on every domain
       row;
     - the grid is invariant under the permutation σ closed from the copy
-      obligations over the pinned permutation columns — the compiled form
-      of the permutation argument's content. *)
+      obligations over the configure-derived permutation columns — the
+      compiled form of the permutation argument's content. *)
 Definition orchard_compiled_accepts (grid : RawGrid.t) : Prop :=
   PlonkishCompile.compiled_gates_hold orchard_domain
     OrchardCompiledCheck.compiled (orchard_compiled_grid grid) /\
@@ -883,7 +1021,7 @@ Definition orchard_compiled_accepts (grid : RawGrid.t) : Prop :=
         orchard_table_rows)
       orchard_indexed_system.(ConstraintSystem.lookups)) /\
   grid_invariant
-    (permutation_cell_value OrchardCompiledPinned.permutation_columns grid)
+    (permutation_cell_value OrchardConfigure.permutation_columns grid)
     orchard_sigma.
 
 (** ** The compiled-to-operational soundness theorem
@@ -909,10 +1047,12 @@ Proof.
   pose proof
     (proj1
       (PlonkishCompile.compile_correct_domain orchard_domain
-        orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
-        OrchardCompiledPinned.permutation_columns
-        OrchardCompiledPinned.constants (orchard_compiled_grid grid)
-        OrchardCompiledCheck.compiled orchard_compiled_eq
+        orchard_indexed_system OrchardCompiledCheck.orchard_infos
+        OrchardConfigure.base_fixed_columns
+        OrchardConfigure.permutation_columns OrchardConfigure.constants
+        (orchard_compiled_grid grid) OrchardCompiledCheck.compiled
+        orchard_compiled_gates_eq
+        orchard_compiled_selector_assignments_eq
         orchard_blinding_nonneg
         (orchard_compiled_grid_act advice instance_ grid Hreplay)
         orchard_activations_within
@@ -958,20 +1098,20 @@ Proof.
     destruct Hok_right as [Hrow_right Hpos_right].
     apply Z.leb_le in Hrow_left, Hrow_right.
     destruct
-      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+      (Sigma.column_position OrchardConfigure.permutation_columns
         left.(Raw.Cell.column))
       as [position_left |] eqn:Hleft; [| discriminate Hpos_left].
     destruct
-      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+      (Sigma.column_position OrchardConfigure.permutation_columns
         right.(Raw.Cell.column))
       as [position_right |] eqn:Hright; [| discriminate Hpos_right].
     pose proof
       (proj1 (List.Forall_forall _ _)
         (proj1
           (sigma_correct
-            (permutation_cell_value OrchardCompiledPinned.permutation_columns
+            (permutation_cell_value OrchardConfigure.permutation_columns
               grid)
-            OrchardCompiledPinned.permutation_columns orchard_n_rows
+            OrchardConfigure.permutation_columns orchard_n_rows
             orchard_copies orchard_sigma orchard_sigma_eq)
           Hsigma)
         (left, right)
@@ -981,10 +1121,10 @@ Proof.
     cbn [fst snd] in Hcopy.
     rewrite Hleft, Hright in Hcopy.
     rewrite <- (permutation_cell_value_read
-      OrchardCompiledPinned.permutation_columns grid left position_left
+      OrchardConfigure.permutation_columns grid left position_left
       Hrow_left Hleft).
     rewrite <- (permutation_cell_value_read
-      OrchardCompiledPinned.permutation_columns grid right position_right
+      OrchardConfigure.permutation_columns grid right position_right
       Hrow_right Hright).
     exact Hcopy. }
   exact
@@ -1027,10 +1167,12 @@ Proof.
     apply
       (proj2
         (PlonkishCompile.compile_correct_domain orchard_domain
-          orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
-          OrchardCompiledPinned.permutation_columns
-          OrchardCompiledPinned.constants (orchard_compiled_grid grid)
-          OrchardCompiledCheck.compiled orchard_compiled_eq
+          orchard_indexed_system OrchardCompiledCheck.orchard_infos
+          OrchardConfigure.base_fixed_columns
+          OrchardConfigure.permutation_columns OrchardConfigure.constants
+          (orchard_compiled_grid grid) OrchardCompiledCheck.compiled
+          orchard_compiled_gates_eq
+          orchard_compiled_selector_assignments_eq
           orchard_blinding_nonneg
           (orchard_compiled_grid_act advice instance_ grid Hreplay)
           orchard_activations_within
@@ -1058,9 +1200,9 @@ Proof.
     apply
       (proj2
         (sigma_correct
-          (permutation_cell_value OrchardCompiledPinned.permutation_columns
+          (permutation_cell_value OrchardConfigure.permutation_columns
             grid)
-          OrchardCompiledPinned.permutation_columns orchard_n_rows
+          OrchardConfigure.permutation_columns orchard_n_rows
           orchard_copies orchard_sigma orchard_sigma_eq)).
     apply List.Forall_forall.
     intros pair Hpair.
@@ -1076,18 +1218,18 @@ Proof.
     apply Z.leb_le in Hrow_left, Hrow_right.
     unfold copy_holds, resolve_cell.
     destruct
-      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+      (Sigma.column_position OrchardConfigure.permutation_columns
         (fst pair).(Raw.Cell.column))
       as [position_left |] eqn:Hleft; [| exact I].
     destruct
-      (Sigma.column_position OrchardCompiledPinned.permutation_columns
+      (Sigma.column_position OrchardConfigure.permutation_columns
         (snd pair).(Raw.Cell.column))
       as [position_right |] eqn:Hright; [| exact I].
     rewrite (permutation_cell_value_read
-      OrchardCompiledPinned.permutation_columns grid (fst pair) position_left
+      OrchardConfigure.permutation_columns grid (fst pair) position_left
       Hrow_left Hleft).
     rewrite (permutation_cell_value_read
-      OrchardCompiledPinned.permutation_columns grid (snd pair)
+      OrchardConfigure.permutation_columns grid (snd pair)
       position_right Hrow_right Hright).
     apply Hcopies.
     apply copies_of_events_inv.

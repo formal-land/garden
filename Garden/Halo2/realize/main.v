@@ -355,6 +355,8 @@ Fixpoint constraint_instance_free {columns : Columns.t}
   | Constraint.Range expression _ => expression_instance_free expression
   | Constraint.Either lhs rhs =>
       andb (constraint_instance_free lhs) (constraint_instance_free rhs)
+  | Constraint.EitherZeroToPrecise lhs rhs =>
+      andb (expression_instance_free lhs) (expression_instance_free rhs)
   | Constraint.EqualZeroToPrecise expression =>
       expression_instance_free expression
   end.
@@ -397,6 +399,7 @@ Fixpoint constraint_flattening_ok {columns : Columns.t}
   | Constraint.Range _ range => negb (range =? 0)%nat
   | Constraint.Either lhs rhs =>
       andb (constraint_flattening_ok lhs) (constraint_flattening_ok rhs)
+  | Constraint.EitherZeroToPrecise _ _ => true
   | Constraint.EqualZeroToPrecise _ => true
   end.
 

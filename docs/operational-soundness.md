@@ -225,9 +225,13 @@ this bridge:
 
 - `Halo2/plonkish/main.v` — `Domain` (n = 2^k rows, `usable_rows`,
   `l_0`/`l_last`/`l_blind`), `CompiledSystem` (numeric columns, selectors
-  gone), `Compile.compile` (the `compress_selectors` packing with the
-  indicator polynomial), and `Sigma.sigma_of_copies` (union-find cycle
-  closure).
+  gone), `Compile.compile_from_metadata` (the `compress_selectors` packing
+  plus configure-order queries, equality columns, constants, and minimum
+  degree), and `Sigma.sigma_of_copies` (union-find cycle closure).
+- `Orchard/configure_metadata.v` / `compiled/configuration.v` — the typed
+  configure trace and its ordered interpreter. They derive 14 base fixed / 10
+  advice / 1 instance columns, 56 selector kinds, exact query order, all 15
+  equality-enabled columns, constants `[3]`, and `minimum_degree = None`.
 - `Halo2/plonkish/compile.v` — `compile_correct` / `compile_correct_domain`:
   compiled-gate satisfaction on the cyclic domain ↔ selector-gated gate
   satisfaction on usable rows, allocation-independent, under the
@@ -256,12 +260,14 @@ fixed-plane hypotheses) are discharged by structural replay lemmas over
 `orchard_events`, not by symbolic-grid `vm_compute`.
 
 The compiled system is anchored to the deployed verifying key by parity:
-`Orchard/compiled/check.v` proves twelve `vm_cast_no_check`
-certificates that `Compile.compile` applied to the model's `ConstraintSystem.t`
-makes byte-identical choices to the deployed keygen — gate polynomials and
-counts, the 56-selector → combination-column assignment, query tables,
-permutation columns, constants column — against
-`circuit_description_post_nu6_3`, the in-tree Debug dump of `vk.pinned()`.
+`Orchard/compiled/certificate.v` packages the closed checks that
+`Compile.compile_from_metadata` applied to the model's constraint system and
+formal configure trace produces the deployed counts, 56-selector compression,
+193 gate polynomials, exact ordered query tables, complete permutation-column
+order, three lookups, constants `[3]`, and unset minimum degree. The deployed
+values are equality targets, not compiler arguments. `vk/print.v` prints the
+derived gate AST directly; the precise either-zero constructor preserves the
+two left-associated curve-check trees, so no printer-only rotation remains.
 Assumption audit on every new theorem:
 exactly `PrimString.string` + impredicative `Set` (the two `sigma.v`/`orbit.v`
 orbit theorems are cleaner still — impredicative `Set` only).
@@ -283,9 +289,10 @@ isolated as the counting lemmas of the R4 package:
   univariate polynomial library over the `Field/Field.v` mod-p arithmetic:
   monic division (`pdivmod_spec` / `pdivmod_unique`), the root bound
   (`roots_le_pdeg`), Lagrange interpolation (`lagrange_eval` /
-  `interpolant_unique`), and the pinned Orchard domain — the vk's ω with
-  `vm_compute` order-`2^11` certificates, the repetition-free `H = ⟨ω⟩`,
-  and `X^2048 − 1 = ∏_{j<2048}(X − ω^j)`.
+  `interpolant_unique`), and the Orchard domain — the cached vk value of ω,
+  now derived by `vk/setup.v` from the Pasta root-of-unity schedule, with
+  order-`2^11` certificates, the repetition-free `H = ⟨ω⟩`, and
+  `X^2048 − 1 = ∏_{j<2048}(X − ω^j)`.
 - `Halo2/plonkish/vanishing.v` — `vanishing_sound`: `(∀ y, ∃ h,
   Σ_i y^i·E_i = h·(X^n − 1)) ↔ ∀ i, ∀ j < n, E_i(ω^j) = 0`.
 - `Halo2/plonkish/permutation_poly.v` — `permutation_sound` /
@@ -312,11 +319,11 @@ isolated as the counting lemmas of the R4 package:
   carried. `algebraic_sound_regular` concludes from that same predicate,
   so the two directions meet there; `algebraic_sound` / `algebraic_accepts`
   are the all-challenge weakenings.
-- `Orchard/compiled/algebraic.v` — the pinned composition:
+- `Orchard/compiled/algebraic.v` — the configure-derived composition:
   `orchard_algebraic_sound` → `orchard_algebraic_mock_accepts` →
   `orchard_algebraic_operational_sound` →
   `orchard_algebraic_action_statement` — algebraic acceptance of the
-  pinned compiled system ends at the § 4.18.4 Action surface, with the new
+  derived compiled system ends at the § 4.18.4 Action surface, with the new
   computable side conditions (the σ-mapping scans, the δ-coset labels,
   lookup replacement exactness, tables-as-prefix coherence) discharged as
   `vm_compute` certificates on the concrete instance.
@@ -371,15 +378,15 @@ transcription to certified bytes (`Orchard/vk/*.v`,
 `Orchard/vk/transcript_repr.v`):
 
 - **T1 (dump parity)** — `vk_pinned_dump_parity`: a verified Debug printer
-  over the model's compiled Orchard system (real `Expression` trees,
-  queries, lookups, constants, permutation columns) plus fresh pinned
-  literals (moduli strings, `extended_k`, the 44 commitment coordinate
-  pairs, `minimum_degree`) emits the pretty rendering, proved
+  over the model's metadata-derived compiled Orchard system (real
+  `Expression` trees, ordered queries, lookups, constants, and permutation
+  columns), setup-derived moduli/domain values, and the 44 deployed
+  commitment targets emits the pretty rendering, proved
   primitive-string-equal to all 1,285,701 bytes of the in-tree
   `circuit_description_post_nu6_3` (the Debug dump of `vk.pinned()`). This
-  retires the offline-transcription trust of `compiled/pinned.v` —
-  the fingerprint literals stay as the checkers' interface, now backed by
-  certified bytes.
+  retires the offline-transcription trust of `compiled/pinned.v` as a source
+  of compiler inputs: those literals stay only as checker targets, now backed
+  by certified bytes.
 - **T2 (Fiat–Shamir scalar)** — `transcript_repr_spec`: the same printer's
   alternate (compact `{:?}`) flag yields `s`; `transcript_repr` is
   `le64(len s) ∥ s` hashed with BLAKE2b-512 personalized
@@ -389,24 +396,39 @@ transcription to certified bytes (`Orchard/vk/*.v`,
   is sharded per the `compile-performance.md` discipline; a personalized
   BLAKE2b reference vector guards the parameter-block wiring.
 
-`Orchard/vk/provenance/` supplies the separate VK-commitment provenance graph.
-Its premise-free `orchard_vk_commit_lagrange_refined` theorem proves that all
-29 fixed and 15 permutation points equal Garden's mathematical
-`commit_lagrange` for the configured column vectors and modeled
-`Params::new(11)` SRS. `fixed_values_compiled_grid` separately identifies the
-fixed vectors with every successfully replayed grid after `with_combinations`;
-the permutation vectors are derived from `orchard_sigma` relative to the
-pinned `permutation_columns` order. `make -C Garden orchard-vk-provenance`
-performs the full generated-certificate replay.
+The generated full aggregate transports both statements to
+`derived_commitment_coordinates`. Its coordinate certificate proves that
+view equal to the deployed targets and pointwise equal to mathematical
+`commit_lagrange`. T2's public statement uses `transcript_input s`, so its
+prefix is the computed `length s`.
+
+`Orchard/vk/provenance/` completes the VK provenance graph. Its premise-free
+`orchard_vk_commit_lagrange_refined` theorem proves that all 29 fixed and 15
+permutation points equal Garden's mathematical `commit_lagrange` for the
+configured column vectors and modeled `Params::new(11)` SRS.
+`fixed_values_compiled_grid` identifies the fixed vectors with every
+successfully replayed grid after `with_combinations`; the permutation vectors
+are derived from `orchard_sigma` in the complete order recorded by the formal
+configure trace. `OrchardVkSetupCompiled.certified` connects degree 9 to the
+actual compiled system and derives `extended_k`, `omega`, and both modulus
+strings. The generated premise-free `orchard_vk_fully_derived` packages those
+facts with the configure/compilation certificate and T1/T2. The 2026-08-05
+four-worker run of `make -C Garden orchard-vk-provenance` completed the full
+generated-certificate `.vo` replay, with the final aggregate serialized. A
+`.vos` build remains only a development type-check and is not evidence of
+that kernel replay.
 
 Assumption audit: the counting lemmas are at impredicative `Set` only (no
 `PrimString`); the boundary corollaries, T1, and T2 add exactly the
-`PrimString`/`PrimInt63` primitive family; no classical axioms anywhere,
-and `orchard_algebraic_action_statement` / `OrchardAction.action_statement`
-re-audit unchanged at their baselines.
-The commitment-provenance theorem has no premises and no Garden-specific
-axiom; its assumption profile is Rocq's standard `PrimString`, `PrimInt63`,
-`PrimArray`, `Uint63Axioms`, and `ArrayAxioms` interface.
+`PrimString`/`PrimInt63` primitive family; no classical axioms appear, and
+`orchard_algebraic_action_statement` / `OrchardAction.action_statement`
+re-audit unchanged at their baselines. Both
+`orchard_vk_commit_lagrange_refined` and `orchard_vk_fully_derived` are
+premise-free. After the completed full `.vo` replay, `Print Assumptions` on
+the combined theorem reported 52 standard `PrimString`, `PrimInt63`,
+`PrimArray`, `Uint63Axioms`, and `ArrayAxioms` interface declarations,
+together with impredicative `Set`; there is no Garden-specific or classical
+axiom.
 
 ## What this does not claim
 
@@ -460,14 +482,15 @@ distance to a deployed prover is recorded, not hidden:
 | `Halo2/realize/disjoint.v` | `replay_is_ok_conflict_free`, `layouter_replay_succeeds` |
 | `Orchard/circuit_operational.v` | `orchard_replay_ok`, `orchard_operational_sound`, `orchard_action_statement_operational` |
 | `Orchard/circuit_completeness/operational/` | the completeness mirror: `orchard_grid_identification`, `orchard_operational_complete` (see `orchard-completeness-proof.md`) |
-| `Halo2/plonkish/main.v` | `Domain`, `CompiledSystem`, `Compile.compile`, `Sigma.sigma_of_copies` |
+| `Halo2/plonkish/main.v` | `Domain`, `CompiledSystem`, `Compile.compile_from_metadata`, `Sigma.sigma_of_copies` |
 | `Halo2/plonkish/compile.v` | `compile_correct`, `compile_correct_domain` |
 | `Halo2/plonkish/orbit.v` | `FiniteOrbit` (generic finite-orbit / two-orbit merge theory) |
 | `Halo2/plonkish/sigma.v` | `sigma_correct`, `sigma_copies_connected`, `sigma_of_copies_dom` / `sigma_of_copies_inj` |
 | `Halo2/plonkish/mock.v` | `plonkish_of_mock_prover` |
-| `Orchard/compiled/pinned.v` / `compiled/check.v` | pinned-vk data + 12 parity certificates |
+| `Orchard/configure_metadata.v` / `compiled/configuration.v` | typed configure operations; derived counts, selector kinds, ordered queries, equality columns, constants, and minimum degree |
+| `Orchard/compiled/pinned.v` / `compiled/check.v` / `compiled/certificate.v` | deployed comparison targets + closed metadata-driven compilation certificate |
 | `Orchard/compiled/main.v` | `orchard_compiled_sound`, `orchard_compiled_complete`, `orchard_compiled_operational_sound`, `orchard_compiled_action_statement` |
-| `Halo2/plonkish/poly.v` / `poly_domain.v` | univariate polynomial library; the pinned ω, `H`, `X^n − 1` factorization |
+| `Halo2/plonkish/poly.v` / `poly_domain.v` | univariate polynomial library; cached ω, `H`, `X^n − 1` factorization |
 | `Halo2/plonkish/lookup_compile.v` | `lookup_compile_correct`, `plonkish_accepts_compiled_iff` |
 | `Halo2/plonkish/vanishing.v` | `vanishing_sound` |
 | `Halo2/plonkish/permutation_poly.v` | `permutation_sound` / `permutation_sound_regular`, `permutation_complete`, `challenge_regular` |
@@ -484,6 +507,8 @@ distance to a deployed prover is recorded, not hidden:
 | `Orchard/circuit_completeness/algebraic.v` | `orchard_honest_algebraic_accepts`, `orchard_honest_algebraic_accepts_ex` (L1 non-vacuity) |
 | `Halo2/plonkish/counting.v` | `vanishing_counting`, `permutation_counting`, `lookup_counting`, per-family bad-set `card_at_most` bounds, `*_accept_cases` |
 | `Halo2/plonkish/boundary.v` | `algebraic_sound_at_challenge`, `algebraic_accepts_at_cases`; named `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood` |
-| `Orchard/vk/print.v` / `vk/data.v` / `vk/bytes.v` | verified `vk.pinned()` Debug printer + pinned literals + dump bytes |
+| `Orchard/vk/setup.v` / `setup_compiled.v` | compiled degree, extended-domain, root-of-unity, and modulus provenance |
+| `Orchard/vk/print.v` / `vk/data.v` / `vk/bytes.v` | derived `vk.pinned()` Debug printer + deployed equality targets and dump bytes |
 | `Orchard/vk/parity.v` | `vk_pinned_dump_parity` (T1: printed pretty form = `circuit_description_post_nu6_3`, all 1,285,701 bytes) |
 | `Orchard/vk/transcript_repr.v` | `transcript_repr_spec` (T2: the BLAKE2b Fiat–Shamir binding scalar) |
+| `Orchard/vk/full_abstract.v` / `vk/provenance/generated/certificates/Main.v` | `OrchardVkFullAbstract.certificate`, generated `orchard_vk_fully_derived` aggregate |

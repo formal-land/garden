@@ -208,6 +208,31 @@ Section Correct.
     - intros [Hv | Hv]; subst v; reflexivity.
   Qed.
 
+  Lemma selected_zero_correct (selector value : Z) :
+    0 <= selector < p ->
+    0 <= value < p ->
+    (selector <> 0 -> value = 0) <-> BinOp.mul selector value = 0.
+  Proof.
+    intros Hselector Hvalue.
+    rewrite mul_zero_implies_zero,
+      (from_id selector Hselector), (from_id value Hvalue).
+    destruct (Z.eq_dec selector 0); tauto.
+  Qed.
+
+  Lemma selected_either_zero_correct (selector lhs rhs : Z) :
+    0 <= selector < p ->
+    0 <= lhs < p ->
+    0 <= rhs < p ->
+    (selector <> 0 -> lhs = 0 \/ rhs = 0) <->
+      BinOp.mul (BinOp.mul selector lhs) rhs = 0.
+  Proof.
+    intros Hselector Hlhs Hrhs.
+    rewrite mul_zero_implies_zero_3,
+      (from_id selector Hselector),
+      (from_id lhs Hlhs), (from_id rhs Hrhs).
+    destruct (Z.eq_dec selector 0); tauto.
+  Qed.
+
   (** ** The flattening theorem *)
 
   (** For every constraint outside the [Constraint.Range _ 0] class, relational
@@ -223,26 +248,43 @@ Section Correct.
   Proof.
     destruct index as [region row].
     induction c as
-      [ s c' IHc' | l r | e | e range | cl IHl cr IHr | e ];
+      [ s c' IHc' | l r | e | e range | cl IHl cr IHr
+      | l r | e ];
       intros Hfo.
     - (* Select *)
       cbn [constraint_flattening_ok] in Hfo.
       specialize (IHc' Hfo).
-      cbn [Configure.constraint_to_expression eval_expression eval_constraint].
-      set (sv := eval_selector assignment (region, row) s) in *.
-      set (ev := eval_expression assignment (region, row)
-        (Configure.constraint_to_expression c')) in *.
-      assert (Hsv : 0 <= sv < p).
-      { pose proof (eval_expression_range assignment (region, row)
-          (Expression.Selector s)) as Hr.
-        cbn [eval_expression] in Hr. exact Hr. }
-      assert (Hev : 0 <= ev < p) by (unfold ev; apply eval_expression_range).
-      rewrite mul_zero_implies_zero, (from_id sv Hsv), (from_id ev Hev), IHc'.
-      destruct (Z.eq_dec sv 0) as [Hz | Hnz]; split.
-      + intros _. left. exact Hz.
-      + intros _ Hcontra. exfalso. apply Hcontra. exact Hz.
-      + intros Himp. right. apply Himp. exact Hnz.
-      + intros [Hz | Hc] Hne; [ exfalso; apply Hnz; exact Hz | exact Hc ].
+      destruct c' as
+        [s' c'' | l r | e | e range | cl cr | l r | e];
+        cbn [Configure.constraint_to_expression eval_constraint]
+          in IHc' |- *.
+      all: pose proof (eval_expression_range assignment (region, row)
+        (Expression.Selector s)) as Hsv.
+      all: cbn [eval_expression] in Hsv.
+      all: try match type of IHc' with
+        | ?body <-> eval_expression ?a ?ix ?flat = 0 =>
+            let Hev := fresh "Hev" in
+            pose proof (eval_expression_range a ix flat) as Hev;
+            rewrite IHc';
+            cbn [eval_expression];
+            exact (selected_zero_correct
+              (eval_selector assignment (region, row) s)
+              (eval_expression a ix flat) Hsv Hev)
+        end.
+      (* [EitherZeroToPrecise] uses the exact deployed association. *)
+      pose proof (eval_expression_range assignment (region, row) l) as Hlv.
+      pose proof (eval_expression_range assignment (region, row) r) as Hrv.
+      cbn [eval_expression].
+      exact (selected_either_zero_correct
+        (eval_selector assignment (region, row) s)
+        (eval_expression assignment (region, row) l)
+        (eval_expression assignment (region, row) r) Hsv Hlv Hrv).
+      (* [EqualZeroToPrecise] reduces before the generic IH matcher. *)
+      pose proof (eval_expression_range assignment (region, row) e) as He.
+      cbn [eval_expression].
+      exact (selected_zero_correct
+        (eval_selector assignment (region, row) s)
+        (eval_expression assignment (region, row) e) Hsv He).
     - (* Equal *)
       cbn [Configure.constraint_to_expression eval_expression eval_constraint].
       pose proof (eval_expression_range assignment (region, row) l) as Hl.
@@ -277,6 +319,12 @@ Section Correct.
       assert (Her : 0 <= er < p) by (unfold er; apply eval_expression_range).
       rewrite mul_zero_implies_zero, (from_id el Hel), (from_id er Her),
         IHl, IHr.
+      reflexivity.
+    - (* EitherZeroToPrecise *)
+      cbn [Configure.constraint_to_expression eval_expression eval_constraint].
+      pose proof (eval_expression_range assignment (region, row) l) as Hl.
+      pose proof (eval_expression_range assignment (region, row) r) as Hr.
+      rewrite mul_zero_implies_zero, (from_id _ Hl), (from_id _ Hr).
       reflexivity.
     - (* EqualZeroToPrecise *)
       cbn [Configure.constraint_to_expression eval_constraint].

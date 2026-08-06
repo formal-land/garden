@@ -76,6 +76,15 @@ Module Indices.
   Arguments lookup {_} _ _.
   Arguments advice {_} _ _.
   Arguments instance_ {_} _ _.
+
+  Definition to_metadata {columns : Columns.t}
+      (self : t columns) : Metadata.IndexMap.t columns := {|
+    Metadata.IndexMap.selector := self.(selector);
+    Metadata.IndexMap.fixed := self.(fixed);
+    Metadata.IndexMap.lookup := self.(lookup);
+    Metadata.IndexMap.advice := self.(advice);
+    Metadata.IndexMap.instance_ := self.(instance_);
+  |}.
 End Indices.
 
 Module ColumnRef.
@@ -217,9 +226,16 @@ Module Configure.
       (constraint : Constraint.t columns) : Expression.t columns :=
     match constraint with
     | Constraint.Select selector constraint =>
-        Expression.Product
-          (Expression.Selector selector)
-          (constraint_to_expression constraint)
+        match constraint with
+        | Constraint.EitherZeroToPrecise lhs rhs =>
+            Expression.Product
+              (Expression.Product (Expression.Selector selector) lhs)
+              rhs
+        | _ =>
+            Expression.Product
+              (Expression.Selector selector)
+              (constraint_to_expression constraint)
+        end
     | Constraint.Equal lhs rhs =>
         Expression.Sum lhs (Expression.Negated rhs)
     | Constraint.Boolean expression =>
@@ -230,6 +246,8 @@ Module Configure.
         Expression.Product
           (constraint_to_expression lhs)
           (constraint_to_expression rhs)
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        Expression.Product lhs rhs
     | Constraint.EqualZeroToPrecise expression =>
         expression
     end.

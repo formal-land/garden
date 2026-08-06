@@ -3,8 +3,8 @@
 From Stdlib Require Import ZArith Lists.List Lia.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Orchard.circuit_operational.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.check.
-Require Import Garden.Orchard.compiled.pinned.
 Require Import Garden.Orchard.vk.provenance.CompressShape.
 Require Import Garden.Orchard.vk.provenance.OrchardCombinationCount.
 
@@ -23,7 +23,7 @@ Module OrchardCompressShape.
     unfold OrchardCompiledCheck.orchard_infos.
     apply (proj2 (List.Forall_map _ _ _)).
     apply List.Forall_forall.
-    intros selector Hin.
+    intros [selector simple] Hin.
     unfold OrchardCompiledCheck.activation_of.
     cbn [Compile.SelectorInfo.activations].
     now rewrite !List.map_length, List.length_seq.
@@ -38,12 +38,10 @@ Module OrchardCompressShape.
         .(CompiledSystem.combination_assignments).
   Proof.
     exact
-      (compile_combination_lengths
+      (compile_from_metadata_combination_lengths
         orchard_indexed_system
         OrchardCompiledCheck.orchard_infos
-        14
-        OrchardCompiledPinned.permutation_columns
-        OrchardCompiledPinned.constants).
+        OrchardCompiledCheck.keygen_metadata).
   Qed.
 
   Lemma orchard_combination_values_rows :
@@ -53,12 +51,10 @@ Module OrchardCompressShape.
         .(CompiledSystem.combination_assignments).
   Proof.
     apply
-      (compile_combination_assignments_rows
+      (compile_from_metadata_combination_assignments_rows
         orchard_indexed_system
         OrchardCompiledCheck.orchard_infos
-        14
-        OrchardCompiledPinned.permutation_columns
-        OrchardCompiledPinned.constants
+        OrchardCompiledCheck.keygen_metadata
         2048).
     exact orchard_infos_rows.
   Qed.

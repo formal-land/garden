@@ -354,6 +354,8 @@ Section Agreement.
     | Constraint.Range e _ => selector_queries e
     | Constraint.Either lhs rhs =>
         constraint_selector_queries lhs ++ constraint_selector_queries rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        selector_queries lhs ++ selector_queries rhs
     | Constraint.EqualZeroToPrecise e => selector_queries e
     end.
 
@@ -366,6 +368,8 @@ Section Agreement.
     | Constraint.Range e _ => fixed_queries e
     | Constraint.Either lhs rhs =>
         constraint_fixed_queries lhs ++ constraint_fixed_queries rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        fixed_queries lhs ++ fixed_queries rhs
     | Constraint.EqualZeroToPrecise e => fixed_queries e
     end.
 
@@ -378,6 +382,8 @@ Section Agreement.
     | Constraint.Range e _ => advice_queries e
     | Constraint.Either lhs rhs =>
         constraint_advice_queries lhs ++ constraint_advice_queries rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        advice_queries lhs ++ advice_queries rhs
     | Constraint.EqualZeroToPrecise e => advice_queries e
     end.
 
@@ -390,6 +396,8 @@ Section Agreement.
     | Constraint.Range e _ => instance_queries e
     | Constraint.Either lhs rhs =>
         constraint_instance_queries lhs ++ constraint_instance_queries rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        instance_queries lhs ++ instance_queries rhs
     | Constraint.EqualZeroToPrecise e => instance_queries e
     end.
 
@@ -411,7 +419,8 @@ Section Agreement.
      eval_constraint Γ2 (region, row) c).
   Proof.
     induction c as
-      [ selector c IH | lhs rhs | e | e range | lhs IHlhs rhs IHrhs | e ];
+      [ selector c IH | lhs rhs | e | e range | lhs IHlhs rhs IHrhs
+      | lhs rhs | e ];
       intros [Hsel [Hfix [Hadv Hinst] ] ];
       unfold selector_agree, fixed_agree, advice_agree, instance_agree
         in Hsel, Hfix, Hadv, Hinst;
@@ -461,6 +470,18 @@ Section Agreement.
       specialize (IHrhs (conj Hsel2 (conj Hfix2 (conj Hadv2 Hinst2)))).
       cbn [eval_constraint].
       rewrite IHlhs, IHrhs.
+      reflexivity.
+    - (* EitherZeroToPrecise *)
+      apply List.Forall_app in Hsel, Hfix, Hadv, Hinst.
+      destruct Hsel as [Hsel1 Hsel2].
+      destruct Hfix as [Hfix1 Hfix2].
+      destruct Hadv as [Hadv1 Hadv2].
+      destruct Hinst as [Hinst1 Hinst2].
+      cbn [eval_constraint].
+      rewrite (eval_expression_agree Γ1 Γ2 region row lhs
+        (conj Hsel1 (conj Hfix1 (conj Hadv1 Hinst1)))).
+      rewrite (eval_expression_agree Γ1 Γ2 region row rhs
+        (conj Hsel2 (conj Hfix2 (conj Hadv2 Hinst2)))).
       reflexivity.
     - (* EqualZeroToPrecise *)
       cbn [eval_constraint].
@@ -928,7 +949,8 @@ Section Agreement.
      eval_constraint (realize idx rs grid) (region2, row2) c).
   Proof.
     induction c as
-      [ selector c IH | lhs rhs | e | e range | lhs IHlhs rhs IHrhs | e ];
+      [ selector c IH | lhs rhs | e | e range | lhs IHlhs rhs IHrhs
+      | lhs rhs | e ];
       intros Hfree; cbn [constraint_instance_free] in Hfree.
     - (* Select *)
       specialize (IH Hfree).
@@ -966,6 +988,15 @@ Section Agreement.
       specialize (IHrhs Hrhs).
       cbn [eval_constraint].
       rewrite IHlhs, IHrhs.
+      reflexivity.
+    - (* EitherZeroToPrecise *)
+      apply Bool.andb_true_iff in Hfree.
+      destruct Hfree as [Hlhs Hrhs].
+      cbn [eval_constraint].
+      rewrite (realize_eval_expression_shift idx rs grid
+        region1 row1 region2 row2 lhs Hlhs Hrow).
+      rewrite (realize_eval_expression_shift idx rs grid
+        region1 row1 region2 row2 rhs Hrhs Hrow).
       reflexivity.
     - (* EqualZeroToPrecise *)
       cbn [eval_constraint].

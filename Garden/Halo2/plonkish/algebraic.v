@@ -629,10 +629,14 @@ Section WithPrime.
     Lemma algebraic_lookups_sound
         (Hreplay :
           apply_events events (initial_grid advice instance_) = Some grid)
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
         (Hur : 0 <= Domain.usable_rows domain)
         (Htr_pos : 0 < table_rows)
@@ -692,7 +696,8 @@ Section WithPrime.
            indexed system on the witness grid. *)
         apply (proj1 (PlonkishLookup.lookup_compile_correct_installed domain
           system infos num_fixed_columns permutation_columns constants grid
-          compiled table_rows Hcompiled Hact Hexact Hlookup_avoid row Hrow)).
+          compiled table_rows Hcompiled_lookups Hcompiled_selectors Hact
+          Hexact Hlookup_avoid row Hrow)).
         assert (Hargs :
           List.Forall
             (fun arg : LookupArgument.t Configure.indexed_columns =>
@@ -749,10 +754,14 @@ Section WithPrime.
     Theorem algebraic_sound_regular
         (Hreplay :
           apply_events events (initial_grid advice instance_) = Some grid)
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
         (Hk : 0 <= domain.(Domain.k))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
@@ -829,9 +838,10 @@ Section WithPrime.
       destruct Haccept as (Hagree & Hgates & Hperm & Hlookups).
       split; [| split].
       - exact (algebraic_gates_sound Hcount Hagree Hgates).
-      - exact (algebraic_lookups_sound Hreplay Hcompiled Hbf Hur Htr_pos
-          Htr_le Hp_pts Hp_theta Hcanon_events Hfill Htables_avoid Hact
-          Hexact Hlookup_avoid Hwithin Hdefaults Hlookups).
+      - exact (algebraic_lookups_sound Hreplay Hcompiled_lookups
+          Hcompiled_selectors Hbf Hur Htr_pos Htr_le Hp_pts Hp_theta
+          Hcanon_events Hfill Htables_avoid Hact Hexact Hlookup_avoid
+          Hwithin Hdefaults Hlookups).
       - exact (algebraic_permutation_sound_regular Hk Hbf Hur Hchunk Hbig
           Hinj Hrange Hfix Hred Hperm).
     Qed.
@@ -840,10 +850,14 @@ Section WithPrime.
     Theorem algebraic_sound
         (Hreplay :
           apply_events events (initial_grid advice instance_) = Some grid)
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
         (Hk : 0 <= domain.(Domain.k))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
@@ -917,10 +931,11 @@ Section WithPrime.
           system.(ConstraintSystem.lookups)) /\
       grid_invariant gperm assembly.
     Proof.
-      exact (algebraic_sound_regular Hreplay Hcompiled Hcount Hk Hbf Hur
-        Hchunk Hbig Hinj Hrange Hfix Hred Htr_pos Htr_le Hp_pts Hp_theta
-        Hcanon_events Hfill Htables_avoid Hact Hexact Hlookup_avoid Hwithin
-        Hdefaults (algebraic_accepts_regular_of_accepts Haccept)).
+      exact (algebraic_sound_regular Hreplay Hcompiled_lookups
+        Hcompiled_selectors Hcount Hk Hbf Hur Hchunk Hbig Hinj Hrange Hfix
+        Hred Htr_pos Htr_le Hp_pts Hp_theta Hcanon_events Hfill Htables_avoid
+        Hact Hexact Hlookup_avoid Hwithin Hdefaults
+        (algebraic_accepts_regular_of_accepts Haccept)).
     Qed.
 
     (** ** Completeness: compiled satisfaction to algebraic acceptance
@@ -982,10 +997,14 @@ Section WithPrime.
     (** *** The lookup conjunct: membership to the identity package *)
 
     Lemma algebraic_lookups_complete
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
         (Hur : 0 <= Domain.usable_rows domain)
         (Htr_le : table_rows <= Domain.usable_rows domain)
@@ -1021,7 +1040,8 @@ Section WithPrime.
       assert (Hrow' : 0 <= row < Domain.n domain) by lia.
       apply (proj2 (PlonkishLookup.lookup_compile_correct_installed domain
         system infos num_fixed_columns permutation_columns constants grid
-        compiled table_rows Hcompiled Hact Hexact Hlookup_avoid row Hrow')).
+        compiled table_rows Hcompiled_lookups Hcompiled_selectors Hact Hexact
+        Hlookup_avoid row Hrow')).
       exact (Hhold row Hrow').
     Qed.
 
@@ -1036,10 +1056,14 @@ Section WithPrime.
         compose in both directions at [algebraic_accepts_regular]. *)
 
     Theorem algebraic_complete
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hcount : Z.of_nat (List.length compiled.(CompiledSystem.gates)) <= p)
         (Hk : 0 <= domain.(Domain.k))
         (Hbf : 0 <= domain.(Domain.blinding_factors))
@@ -1081,8 +1105,9 @@ Section WithPrime.
       - exact (algebraic_gates_complete Hcount Hagree Hgates).
       - exact (algebraic_permutation_complete Hk Hbf Hur Hchunk Hfix Hginj
           Hsigma).
-      - exact (algebraic_lookups_complete Hcompiled Hbf Hur Htr_le Hact
-          Hexact Hlookup_avoid Hlookups).
+      - exact (algebraic_lookups_complete Hcompiled_lookups
+          Hcompiled_selectors Hbf Hur Htr_le Hact Hexact Hlookup_avoid
+          Hlookups).
     Qed.
 
   End Acceptance.

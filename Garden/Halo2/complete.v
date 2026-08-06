@@ -941,7 +941,7 @@ Section Completeness.
     cbn [eval_named_constraint].
     destruct constraint as
       [ selector body | lhs rhs | expression | expression range
-      | lhs rhs | expression ];
+      | lhs rhs | lhs rhs | expression ];
       try discriminate Hguarded.
     cbn [eval_constraint].
     intros Hnonzero.
@@ -1081,6 +1081,9 @@ Section Completeness.
         (0 <=? value) && (value <? Z.of_nat range)
     | Constraint.Either lhs rhs =>
         check_constraint Γ index lhs || check_constraint Γ index rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        Z.eqb (eval_expression Γ index lhs) 0 ||
+          Z.eqb (eval_expression Γ index rhs) 0
     | Constraint.EqualZeroToPrecise expression =>
         Z.eqb (eval_expression Γ index expression) 0
     end.
@@ -1094,7 +1097,7 @@ Section Completeness.
   Proof.
     induction constraint as
       [ selector body IHbody | lhs rhs | expression | expression range
-      | lhs IHl rhs IHr | expression ];
+      | lhs IHl rhs IHr | lhs rhs | expression ];
       cbn [check_constraint eval_constraint]; intros Hcheck.
     - (* Select *)
       intros Hnonzero.
@@ -1125,6 +1128,11 @@ Section Completeness.
       destruct Hcheck as [Hside | Hside].
       + left. exact (IHl Hside).
       + right. exact (IHr Hside).
+    - (* EitherZeroToPrecise *)
+      apply Bool.orb_true_iff in Hcheck.
+      destruct Hcheck as [Hside | Hside].
+      + left. now apply Z.eqb_eq in Hside.
+      + right. now apply Z.eqb_eq in Hside.
     - (* EqualZeroToPrecise *)
       apply Z.eqb_eq in Hcheck.
       exact Hcheck.

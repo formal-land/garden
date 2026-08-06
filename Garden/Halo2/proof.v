@@ -159,6 +159,9 @@ Section Semantics.
     | Constraint.Either lhs rhs =>
         eval_constraint assignment index lhs \/
           eval_constraint assignment index rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        eval_expression assignment index lhs = 0 \/
+          eval_expression assignment index rhs = 0
     | Constraint.EqualZeroToPrecise expression =>
         eval_expression assignment index expression = 0
     end.

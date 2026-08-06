@@ -11,7 +11,7 @@ Require Import Garden.Prim63.ArrayLinear.
 Require Import Garden.Prim63.Loop.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Halo2.plonkish.sigma.
-Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.main.
 Require Import Garden.Orchard.vk.provenance.ArrayOfListRefinement.
 Require Import Garden.Orchard.vk.provenance.Sigma.
@@ -78,16 +78,16 @@ Module VkSigmaRefinement.
   Proof. vm_compute. reflexivity. Qed.
 
   Lemma permutation_columns_length :
-    List.length OrchardCompiledPinned.permutation_columns = VkSigma.width_nat.
+    List.length OrchardConfigure.permutation_columns = VkSigma.width_nat.
   Proof. vm_compute. reflexivity. Qed.
 
   Lemma orchard_mapping_wf :
-    matrix_wf OrchardCompiledPinned.permutation_columns
+    matrix_wf OrchardConfigure.permutation_columns
       OrchardCompiled.orchard_n_rows
       OrchardCompiled.orchard_sigma.(Sigma.mapping).
   Proof.
     pose proof (sigma_of_copies_inv
-      OrchardCompiledPinned.permutation_columns
+      OrchardConfigure.permutation_columns
       OrchardCompiled.orchard_n_rows
       OrchardCompiled.orchard_copies
       OrchardCompiled.orchard_sigma
@@ -103,7 +103,7 @@ Module VkSigmaRefinement.
   Proof.
     intros Hcolumn.
     pose proof (matrix_wf_nth
-      OrchardCompiledPinned.permutation_columns
+      OrchardConfigure.permutation_columns
       OrchardCompiled.orchard_n_rows
       OrchardCompiled.orchard_sigma.(Sigma.mapping)
       column orchard_mapping_wf) as Hlength.
@@ -138,14 +138,14 @@ Module VkSigmaRefinement.
   Proof.
     intros Hcolumn Hrow.
     pose proof (sigma_of_copies_dom
-      OrchardCompiledPinned.permutation_columns
+      OrchardConfigure.permutation_columns
       OrchardCompiled.orchard_n_rows
       OrchardCompiled.orchard_copies
       OrchardCompiled.orchard_sigma
       OrchardCompiled.orchard_sigma_eq
       (column, row)) as Hdom.
     assert (Hsource :
-      cell_dom OrchardCompiledPinned.permutation_columns
+      cell_dom OrchardConfigure.permutation_columns
         OrchardCompiled.orchard_n_rows (column, row)).
     { split; cbn [fst snd].
       - now rewrite permutation_columns_length.

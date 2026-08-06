@@ -131,7 +131,9 @@ Definition transcript_input (s : PrimString.string) : list Z :=
 (** The concrete input: the compact rendering of the pinned description,
     behind its 8-byte little-endian length prefix. *)
 Definition t2_input : list Z :=
-  transcript_input VkPinnedPrint.vk_pinned_compact.
+  transcript_input
+    (VkPinnedPrint.vk_compact_with
+      VkPinnedPrint.pinned_commitment_coordinates).
 
 (** The input in the byte-parity track's terms: the pinned compact
     length ([vk/parity.v]) and the track's byte view. *)
@@ -345,10 +347,14 @@ Proof. vm_cast_no_check (@eq_refl Z transcript_repr). Qed.
     is the pinned scalar. *)
 Theorem transcript_repr_spec :
   Blake2b.word_of_le_bytes
-    (Blake2b.blake2b 64 Blake2b.zero16 personal t2_input)
+    (Blake2b.blake2b 64 Blake2b.zero16 personal
+      (transcript_input
+        (VkPinnedPrint.vk_compact_with
+          VkPinnedPrint.pinned_commitment_coordinates)))
     mod Primes.pallas_p
   = transcript_repr.
 Proof.
+  fold t2_input.
   unfold Blake2b.blake2b. cbv zeta.
   rewrite t2_input_length, t2_h0_eq, t2_blocks_def.
   rewrite (compress_blocks_chunk 557 t2_blocks t2_h0 0 71296 285142
@@ -377,6 +383,10 @@ Theorem transcript_repr_of_compact :
           ++ VkPinnedPrint.vk_pinned_compact_bytes))
     mod Primes.pallas_p
   = transcript_repr.
-Proof. rewrite <- t2_input_eq. exact transcript_repr_spec. Qed.
+Proof.
+  rewrite <- t2_input_eq.
+  unfold t2_input.
+  exact transcript_repr_spec.
+Qed.
 
 End VkTranscriptRepr.

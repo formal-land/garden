@@ -239,7 +239,7 @@ Module CompressShape.
       (Compile.compile system infos num_fixed_columns permutation_columns
         constants).(CompiledSystem.combination_assignments).
   Proof.
-    unfold Compile.compile.
+    unfold Compile.compile, Compile.compile_with_minimum.
     destruct (Compress.process _ _ _) as [combinations assignments].
     cbn.
     now rewrite List.map_length, List.length_seq.
@@ -260,7 +260,7 @@ Module CompressShape.
         (system_degree system)
         num_fixed_columns).
   Proof.
-    unfold Compile.compile.
+    unfold Compile.compile, Compile.compile_with_minimum.
     destruct (Compress.process _ _ _); reflexivity.
   Qed.
 
@@ -283,7 +283,7 @@ Module CompressShape.
               (system_degree system)
               num_fixed_columns)))).
   Proof.
-    unfold Compile.compile.
+    unfold Compile.compile, Compile.compile_with_minimum.
     destruct (Compress.process _ _ _); reflexivity.
   Qed.
 
@@ -328,14 +328,74 @@ Module CompressShape.
         constants).(CompiledSystem.combination_assignments).
   Proof.
     intros Hinfos.
-    unfold Compile.compile.
+    unfold Compile.compile, Compile.compile_with_minimum.
     remember (Compile.selector_descriptions system infos) as descriptions.
     destruct (Compress.process descriptions _ _) as [combinations assignments]
       eqn:Hprocess.
     cbn.
     pose proof
-      (process_preserves_rows descriptions (system_degree system)
+      (process_preserves_rows descriptions
+        (system_degree_with_minimum system None)
         num_fixed_columns n_rows) as Hrows.
+    rewrite Hprocess in Hrows; cbn in Hrows.
+    apply Hrows.
+    subst descriptions.
+    now apply selector_descriptions_preserve_rows.
+  Qed.
+
+  (** Ordered configure metadata changes only the query-table projections;
+      these two shape facts follow directly from the same compression
+      result, without reducing the concrete Orchard metadata state. *)
+  Lemma compile_from_metadata_combination_lengths
+      (system : Garden.Halo2.main.ConstraintSystem.t
+        Garden.Halo2.serialize.Configure.indexed_columns)
+      (infos : list Compile.SelectorInfo.t)
+      (metadata : Compile.KeygenMetadata.t) :
+    List.length
+      (Compile.compile_from_metadata system infos metadata)
+        .(CompiledSystem.combination_columns) =
+    List.length
+      (Compile.compile_from_metadata system infos metadata)
+        .(CompiledSystem.combination_assignments).
+  Proof.
+    unfold Compile.compile_from_metadata, Compile.compile_with_minimum.
+    cbv zeta.
+    destruct (Compress.process _ _ _) as [combinations assignments].
+    cbn.
+    now rewrite List.map_length, List.length_seq.
+  Qed.
+
+  Lemma compile_from_metadata_combination_assignments_rows
+      (system : Garden.Halo2.main.ConstraintSystem.t
+        Garden.Halo2.serialize.Configure.indexed_columns)
+      (infos : list Compile.SelectorInfo.t)
+      (metadata : Compile.KeygenMetadata.t)
+      (n_rows : nat) :
+    List.Forall
+      (fun info =>
+        List.length info.(Compile.SelectorInfo.activations) = n_rows)
+      infos ->
+    List.Forall
+      (values_rows n_rows)
+      (Compile.compile_from_metadata system infos metadata)
+        .(CompiledSystem.combination_assignments).
+  Proof.
+    intros Hinfos.
+    unfold Compile.compile_from_metadata, Compile.compile_with_minimum.
+    cbv zeta.
+    remember (Compile.selector_descriptions system infos) as descriptions.
+    destruct
+      (Compress.process descriptions
+        (system_degree_with_minimum system
+          metadata.(Compile.KeygenMetadata.minimum_degree))
+        metadata.(Compile.KeygenMetadata.base_fixed_columns))
+      as [combinations assignments] eqn:Hprocess.
+    cbn.
+    pose proof
+      (process_preserves_rows descriptions
+        (system_degree_with_minimum system
+          metadata.(Compile.KeygenMetadata.minimum_degree))
+        metadata.(Compile.KeygenMetadata.base_fixed_columns) n_rows) as Hrows.
     rewrite Hprocess in Hrows; cbn in Hrows.
     apply Hrows.
     subst descriptions.
@@ -361,7 +421,7 @@ Module CompressShape.
       (Compile.compile system infos num_fixed_columns permutation_columns
         constants).(CompiledSystem.combination_columns).
   Proof.
-    unfold Compile.compile.
+    unfold Compile.compile, Compile.compile_with_minimum.
     destruct (Compress.process _ _ _) as [combinations assignments].
     cbn.
     apply List.Forall_forall.

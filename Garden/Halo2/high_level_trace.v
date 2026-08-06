@@ -75,7 +75,11 @@ Module HighLevelTrace.
   Module ConfigureOp.
     Inductive t : Set :=
     | CreateGate (gate : Gate.t Configure.indexed_columns)
-    | CreateLookup (lookup : LookupArgument.t Configure.indexed_columns).
+    | CreateLookup (lookup : LookupArgument.t Configure.indexed_columns)
+    | Metadata
+        (operations :
+          list (Garden.Halo2.main.Metadata.Operation.t
+            Configure.indexed_columns)).
   End ConfigureOp.
 
   Module RegionOp.
@@ -138,6 +142,10 @@ Module HighLevelTrace.
         Constraint.Either
           (map_constraint column_map lhs)
           (map_constraint column_map rhs)
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        Constraint.EitherZeroToPrecise
+          (Configure.map_expression column_map lhs)
+          (Configure.map_expression column_map rhs)
     | Constraint.EqualZeroToPrecise expression =>
         Constraint.EqualZeroToPrecise
           (Configure.map_expression column_map expression)
@@ -158,6 +166,57 @@ Module HighLevelTrace.
     Gate.constraints := map_constraints column_map gate.(Gate.constraints);
   |}.
 
+  Definition map_metadata_operation {source target : Columns.t}
+      (column_map : Configure.ColumnMap.t source target)
+      (operation : Garden.Halo2.main.Metadata.Operation.t source)
+      : Garden.Halo2.main.Metadata.Operation.t target :=
+    match operation with
+    | Garden.Halo2.main.Metadata.Operation.AllocateAdvice column =>
+        Garden.Halo2.main.Metadata.Operation.AllocateAdvice
+          (column_map.(Configure.ColumnMap.advice) column)
+    | Garden.Halo2.main.Metadata.Operation.AllocateFixed column =>
+        Garden.Halo2.main.Metadata.Operation.AllocateFixed
+          (column_map.(Configure.ColumnMap.fixed) column)
+    | Garden.Halo2.main.Metadata.Operation.AllocateLookupTable column =>
+        Garden.Halo2.main.Metadata.Operation.AllocateLookupTable
+          (column_map.(Configure.ColumnMap.lookup) column)
+    | Garden.Halo2.main.Metadata.Operation.AllocateInstance column =>
+        Garden.Halo2.main.Metadata.Operation.AllocateInstance
+          (column_map.(Configure.ColumnMap.instance_) column)
+    | Garden.Halo2.main.Metadata.Operation.AllocateSelector selector kind =>
+        Garden.Halo2.main.Metadata.Operation.AllocateSelector
+          (column_map.(Configure.ColumnMap.selector) selector)
+          kind
+    | Garden.Halo2.main.Metadata.Operation.QueryAdvice column rotation =>
+        Garden.Halo2.main.Metadata.Operation.QueryAdvice
+          (column_map.(Configure.ColumnMap.advice) column)
+          rotation
+    | Garden.Halo2.main.Metadata.Operation.QueryFixed column =>
+        Garden.Halo2.main.Metadata.Operation.QueryFixed
+          (column_map.(Configure.ColumnMap.fixed) column)
+    | Garden.Halo2.main.Metadata.Operation.QueryLookup column =>
+        Garden.Halo2.main.Metadata.Operation.QueryLookup
+          (column_map.(Configure.ColumnMap.lookup) column)
+    | Garden.Halo2.main.Metadata.Operation.QueryInstance column rotation =>
+        Garden.Halo2.main.Metadata.Operation.QueryInstance
+          (column_map.(Configure.ColumnMap.instance_) column)
+          rotation
+    | Garden.Halo2.main.Metadata.Operation.EnableEqualityAdvice column =>
+        Garden.Halo2.main.Metadata.Operation.EnableEqualityAdvice
+          (column_map.(Configure.ColumnMap.advice) column)
+    | Garden.Halo2.main.Metadata.Operation.EnableEqualityFixed column =>
+        Garden.Halo2.main.Metadata.Operation.EnableEqualityFixed
+          (column_map.(Configure.ColumnMap.fixed) column)
+    | Garden.Halo2.main.Metadata.Operation.EnableEqualityInstance column =>
+        Garden.Halo2.main.Metadata.Operation.EnableEqualityInstance
+          (column_map.(Configure.ColumnMap.instance_) column)
+    | Garden.Halo2.main.Metadata.Operation.EnableConstant column =>
+        Garden.Halo2.main.Metadata.Operation.EnableConstant
+          (column_map.(Configure.ColumnMap.fixed) column)
+    | Garden.Halo2.main.Metadata.Operation.SetMinimumDegree degree =>
+        Garden.Halo2.main.Metadata.Operation.SetMinimumDegree degree
+    end.
+
   Fixpoint eval_configure {columns : Columns.t} {A : Set}
       (indices : Indices.t columns)
       (program : Garden.Halo2.main.𝓒 columns A) {struct program}
@@ -176,6 +235,9 @@ Module HighLevelTrace.
     | Garden.Halo2.main.𝓒.CreateLookup lookup =>
         (tt, [ConfigureOp.CreateLookup
           (Configure.map_lookup_argument column_map lookup)])
+    | Garden.Halo2.main.𝓒.Metadata operations =>
+        (tt, [ConfigureOp.Metadata
+          (List.map (map_metadata_operation column_map) operations)])
     end.
 
   Fixpoint eval_region {columns : Columns.t} {RegionId : Set} {A : Set}

@@ -127,6 +127,8 @@ Section Generic.
     | Constraint.Range e _ => expr_adv e region row
     | Constraint.Either lhs rhs =>
         constr_adv lhs region row ++ constr_adv rhs region row
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        expr_adv lhs region row ++ expr_adv rhs region row
     | Constraint.EqualZeroToPrecise e => expr_adv e region row
     end.
 
@@ -140,6 +142,8 @@ Section Generic.
     | Constraint.Range e _ => expr_fix e region row
     | Constraint.Either lhs rhs =>
         constr_fix lhs region row ++ constr_fix rhs region row
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        expr_fix lhs region row ++ expr_fix rhs region row
     | Constraint.EqualZeroToPrecise e => expr_fix e region row
     end.
 
@@ -151,6 +155,8 @@ Section Generic.
     | Constraint.Boolean e => expr_sels e
     | Constraint.Range e _ => expr_sels e
     | Constraint.Either lhs rhs => constr_sels lhs ++ constr_sels rhs
+    | Constraint.EitherZeroToPrecise lhs rhs =>
+        expr_sels lhs ++ expr_sels rhs
     | Constraint.EqualZeroToPrecise e => expr_sels e
     end.
 
@@ -283,7 +289,8 @@ Section Generic.
     eval_constraint Γ1 (region, row) c -> eval_constraint Γ2 (region, row) c.
   Proof.
     induction c as
-      [ selector c IH | lhs rhs | e | e range | lhs IHl rhs IHr | e ];
+      [ selector c IH | lhs rhs | e | e range | lhs IHl rhs IHr
+      | lhs rhs | e ];
       intros Hadv Hfix Hsel Heval.
     - (* Select *)
       cbn [eval_constraint] in Heval |- *.
@@ -332,6 +339,24 @@ Section Generic.
         exact Heval.
       + right.
         apply (IHr
+          (adv_agree_incl _ _ _ _ (List.incl_appr _ (List.incl_refl _)) Hadv)
+          (fix_agree_incl _ _ _ _ (List.incl_appr _ (List.incl_refl _)) Hfix)
+          (sel_agree_incl _ _ _ _ _ _
+            (List.incl_appr _ (List.incl_refl _)) Hsel)).
+        exact Heval.
+    - (* EitherZeroToPrecise *)
+      cbn [constr_adv constr_fix constr_sels] in Hadv, Hfix, Hsel.
+      cbn [eval_constraint] in Heval |- *.
+      destruct Heval as [Heval | Heval].
+      + left.
+        rewrite <- (eval_expression_agree Γ1 Γ2 Hinstance region row lhs
+          (adv_agree_incl _ _ _ _ (List.incl_appl _ (List.incl_refl _)) Hadv)
+          (fix_agree_incl _ _ _ _ (List.incl_appl _ (List.incl_refl _)) Hfix)
+          (sel_agree_incl _ _ _ _ _ _
+            (List.incl_appl _ (List.incl_refl _)) Hsel)).
+        exact Heval.
+      + right.
+        rewrite <- (eval_expression_agree Γ1 Γ2 Hinstance region row rhs
           (adv_agree_incl _ _ _ _ (List.incl_appr _ (List.incl_refl _)) Hadv)
           (fix_agree_incl _ _ _ _ (List.incl_appr _ (List.incl_refl _)) Hfix)
           (sel_agree_incl _ _ _ _ _ _
@@ -544,7 +569,8 @@ Section Generic.
   Proof.
     revert row1 row2.
     induction c as
-      [ selector c IH | lhs rhs | e | e range | lhs IHl rhs IHr | e ];
+      [ selector c IH | lhs rhs | e | e range | lhs IHl rhs IHr
+      | lhs rhs | e ];
       intros row1 row2 Hfree Hrow Heval;
       cbn [constraint_instance_free] in Hfree;
       cbn [eval_constraint] in Heval |- *.
@@ -574,6 +600,17 @@ Section Generic.
         exact (IHl row1 row2 Hl Hrow Heval).
       + right.
         exact (IHr row1 row2 Hr Hrow Heval).
+    - apply andb_prop in Hfree.
+      destruct Hfree as [Hl Hr].
+      destruct Heval as [Heval | Heval].
+      + left.
+        rewrite (realize_shift_expression idx rs grid region1 row1 region2 row2
+          lhs Hl Hrow).
+        exact Heval.
+      + right.
+        rewrite (realize_shift_expression idx rs grid region1 row1 region2 row2
+          rhs Hr Hrow).
+        exact Heval.
     - rewrite (realize_shift_expression idx rs grid region1 row1 region2 row2
         e Hfree Hrow).
       exact Heval.
@@ -2148,7 +2185,7 @@ Section Grid.
       Hconstraint) as Hguard.
     cbv beta iota in Hguard.
     destruct constraint as
-      [ selector body | lhs rhs | e | e range | lhs rhs | e ];
+      [ selector body | lhs rhs | e | e range | lhs rhs | left right | e ];
       cbn [Complete.constraint_guarded] in Hguard; try discriminate Hguard.
     cbn [eval_named_constraint eval_constraint].
     intros Hnonzero.

@@ -1,10 +1,11 @@
-(** * Pinned-vk parity certificate for the compiled Orchard action circuit.
+(** * Deployed-vk parity certificate for the compiled Orchard action circuit.
 
-    Machine-checked comparison of [Plonkish.Compile.compile] applied to the
-    model's own [orchard_indexed_system] against the pinned compiled
-    description of [compiled/pinned.v] (transcribed from the deployed
-    verifying key).  Each certificate is a single [vm_compute] conversion,
-    closed with [vm_cast_no_check].
+    Machine-checked comparison of
+    [Plonkish.Compile.compile_from_metadata] applied to the model's own
+    [orchard_indexed_system] and formal configure metadata against the
+    deployed comparison targets in [compiled/pinned.v].  Each closed
+    computational certificate uses VM conversion through
+    [vm_cast_no_check].
 
     Certified components:
 
@@ -17,21 +18,19 @@
     - the gate count (193), the combination-column count (15, so 29 fixed
       columns post-compression), coverage of all 56 selectors by the
       assignment, and gate selector-freeness;
-    - the query tables (25 advice / 29 fixed / 1 instance), as set equality
-      plus length — the model collects queries in gate order, the deployed
-      keygen in configure order;
+    - the query tables (25 advice / 29 fixed / 1 instance), in exact keygen
+      order derived from the formal configure metadata;
     - the three lookup arguments, input and table expressions pairwise;
     - the constants column ([Fixed 3]), derived from the floor planner's
       constants tail;
-    - the equality-enabled columns actually copied are all among the pinned
-      permutation column list.
+    - the complete ordered equality-enabled column list, plus the independent
+      check that every column actually copied by synthesis belongs to it.
 
-    Comparison is by expression fingerprint (below): the top-level product
-    chain flattened into factors, each factor serialized preorder.  The
-    flattening absorbs the product re-association between the model's
-    [constraint_to_expression] and the deployed gate builder (two gates
-    differ this way); every other node is compared exactly, including
-    rotations and canonical field constants. *)
+    The compact polynomial comparison uses an association-insensitive
+    top-level product fingerprint.  The exact expression tree is checked
+    separately: [vk/print.v] prints the derived compiled AST directly and T1
+    compares its complete Debug representation byte-for-byte with the
+    deployed dump. *)
 
 Require Import Stdlib.ZArith.ZArith.
 Require Import Garden.Field.Field.
@@ -39,6 +38,7 @@ Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.serialize.
 Require Import Garden.Halo2.plonkish.main.
 Require Import Garden.Orchard.circuit_operational.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.pinned.
 
 Import ListNotations.
@@ -50,14 +50,10 @@ Module OrchardCompiledCheck.
 (** ** The model's compiled Orchard system
 
     Per-selector activation vectors are read off the [EnableSelector] events
-    of the serialized stream, over the [2048] domain rows.  The complex
-    selectors — [Selector::is_simple] is configure-time data the modeled
-    [ConstraintSystem.t] does not carry — are [QLookup] (2) and [QRunning]
-    (3) ([halo2_gadgets/src/utilities/lookup_range_check.rs], the
-    [complex_selector] allocations) and the two Sinsemilla instances'
-    [q_sinsemilla1] (25, 29) ([halo2_gadgets/src/sinsemilla/chip.rs]); all
-    other selectors are simple.  The combination columns extend the [14]
-    pre-compression fixed columns. *)
+    of the serialized stream over the [2048] domain rows.  Allocation counts,
+    selector kinds, query order, equality columns, constants, and minimum
+    degree are interpreted from the metadata events in the same formal
+    configure program. *)
 
 Definition enable_pairs : list (Z * Z) :=
   List.flat_map
@@ -77,28 +73,31 @@ Definition activation_of (s : Z) : list bool :=
     (fun row => List.existsb (Z.eqb row) rs)
     (List.map Z.of_nat (List.seq 0 2048)).
 
-Definition complex_selectors : list Z := [2; 3; 25; 29].
-
 Definition orchard_infos : list Compile.SelectorInfo.t :=
   List.map
-    (fun s =>
+    (fun indexed =>
+      let '(s, simple) := indexed in
       {|
         Compile.SelectorInfo.activations := activation_of (Z.of_nat s);
-        Compile.SelectorInfo.simple :=
-          negb (List.existsb (Z.eqb (Z.of_nat s)) complex_selectors);
+        Compile.SelectorInfo.simple := simple;
       |})
-    (List.seq 0 56).
+    (enumerate OrchardConfigure.selector_types).
 
-(** The permutation column list and the constants column are configure-time
-    data the modeled [ConstraintSystem.t] does not carry; they are passed
-    through from the pinned description (which makes the pass-through fields
-    of [compiled] unusable as parity evidence — the stream-derived
-    cross-checks below cover them) and consulted only for the query
-    tables. *)
+Definition keygen_metadata : Compile.KeygenMetadata.t := {|
+  Compile.KeygenMetadata.base_fixed_columns :=
+    OrchardConfigure.base_fixed_columns;
+  Compile.KeygenMetadata.advice_queries := OrchardConfigure.advice_queries;
+  Compile.KeygenMetadata.fixed_queries := OrchardConfigure.fixed_queries;
+  Compile.KeygenMetadata.instance_queries := OrchardConfigure.instance_queries;
+  Compile.KeygenMetadata.permutation_columns :=
+    OrchardConfigure.permutation_columns;
+  Compile.KeygenMetadata.constants := OrchardConfigure.constants;
+  Compile.KeygenMetadata.minimum_degree := OrchardConfigure.minimum_degree;
+|}.
+
 Definition compiled : CompiledSystem.t :=
-  Compile.compile orchard_indexed_system orchard_infos 14
-    OrchardCompiledPinned.permutation_columns
-    OrchardCompiledPinned.constants.
+  Compile.compile_from_metadata orchard_indexed_system orchard_infos
+    keygen_metadata.
 
 (** ** Expression fingerprints
 
@@ -158,30 +157,12 @@ Fixpoint zlll_eqb (a b : list (list (list Z))) : bool :=
   | _, _ => false
   end.
 
-(** ** Query-table comparison
-
-    Both sides are duplicate-free ([Queries.add] deduplicates; the deployed
-    query tables index distinct queries), so mutual inclusion plus equal
-    length is equality up to order. *)
-
-Definition query_subset (a b : list (Z * Z)) : bool :=
-  List.forallb (fun q => List.existsb (Queries.query_eqb q) b) a.
-
-Definition query_set_eqb (a b : list (Z * Z)) : bool :=
-  andb
-    (andb (query_subset a b) (query_subset b a))
-    (Nat.eqb (List.length a) (List.length b)).
-
 (** ** The lookup table columns
 
-    The model's lookup-table namespace ([TableIdx], [TableX], [TableY] as
-    indexed columns 0, 1, 2) corresponds to the fixed columns the deployed
-    keygen allocates for the table columns; the correspondence is the
-    identity on indices, verified below against the pinned table
-    expressions.  Each table column is queried at the current rotation
-    inside its lookup argument. *)
+    The fixed column backing each typed lookup table is read from the shared
+    lookup/fixed allocator in the configure metadata. *)
 
-Definition table_fixed_column (c : Z) : Z := c.
+Definition table_fixed_column : Z -> Z := OrchardConfigure.lookup_fixed_column.
 
 Definition model_lookup_table_fps : list (list (list Z)) :=
   List.map
@@ -195,21 +176,6 @@ Definition model_lookup_table_fps : list (list (list Z)) :=
               Rotation.cur))
         lk.(LookupArgument.pairs))
     compiled.(CompiledSystem.lookups).
-
-(** The model's fixed queries extended with the lookup table columns, which
-    the deployed keygen also queries (the table expressions above) while the
-    model keeps them out of [Queries.collect_expression]'s reach on the
-    table side of each pair. *)
-Definition model_fixed_queries : list (Z * Z) :=
-  List.fold_left
-    (fun acc (lk : LookupArgument.t Configure.indexed_columns) =>
-      List.fold_left
-        (fun acc pair =>
-          Queries.add acc (table_fixed_column (snd pair), 0))
-        lk.(LookupArgument.pairs)
-        acc)
-    compiled.(CompiledSystem.lookups)
-    compiled.(CompiledSystem.fixed_queries).
 
 (** ** Derived permutation / constants data of the serialized stream *)
 
@@ -257,16 +223,23 @@ Definition constants_columns : list Z :=
       end)
     orchard_constants_events [].
 
-Definition pinned_permutation_codes : list (Z * Z) :=
-  List.map colref_code OrchardCompiledPinned.permutation_columns.
+Definition derived_permutation_codes : list (Z * Z) :=
+  List.map colref_code OrchardConfigure.permutation_columns.
+
+(** Small certified cache of selector-combination column indices.  Keeping
+    these indices materialized lets the VK printer resolve every fixed query
+    without replaying the 2,048-row compression computation per expression
+    leaf. *)
+Definition combination_columns_cache : list Z :=
+  [14; 15; 16; 17; 18; 19; 20; 21; 22; 23; 24; 25; 26; 27; 28].
 
 (** ** The certificates *)
 
-(** The 193 compiled gate polynomials match the pinned dump exactly, up to
-    top-level product re-association: indicator factors, rotations and
-    constants included.  This pins the selector compression — grouping,
-    combination-column numbering and assigned indicator values — to the
-    deployed keygen for every selector that guards a gate. *)
+(** The 193 compiled gate polynomials match the deployed flattened-factor
+    fingerprints: indicator factors, rotations and constants included.  This
+    pins the selector compression — grouping, combination-column numbering
+    and assigned indicator values — to the deployed keygen for every selector
+    that guards a gate.  Exact tree association is checked by T1. *)
 Lemma gate_polynomials_match :
   zll_eqb
     (List.map gate_fp compiled.(CompiledSystem.gates))
@@ -282,27 +255,50 @@ Lemma gate_count_match :
   = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-(** 15 combination columns, i.e. [14 + 15 = 29] fixed columns
-    post-compression. *)
+(** The configure interpreter derives the four pre-compression counts. *)
+Lemma configure_counts_match :
+  OrchardConfigure.base_fixed_columns =
+      OrchardCompiledPinned.base_fixed_columns /\
+  OrchardConfigure.num_advice_columns =
+      OrchardCompiledPinned.num_advice_columns /\
+  OrchardConfigure.num_instance_columns =
+      OrchardCompiledPinned.num_instance_columns /\
+  OrchardConfigure.num_selectors = OrchardCompiledPinned.num_selectors.
+Proof. vm_compute. repeat split; reflexivity. Qed.
+
+(** 15 combination columns, so the derived pre-compression fixed count plus
+    the compression output is the deployed post-compression count 29. *)
 Lemma combination_count_match :
   andb
     (Nat.eqb
       (List.length compiled.(CompiledSystem.combination_columns))
       OrchardCompiledPinned.num_combinations)
-    (OrchardCompiledPinned.base_fixed_columns
+    (OrchardConfigure.base_fixed_columns
       + Z.of_nat (List.length compiled.(CompiledSystem.combination_columns))
       =? OrchardCompiledPinned.num_fixed_columns)
   = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-(** Every one of the 56 selectors receives a compression assignment. *)
+(** Exact compression-column indices and the corresponding assignment count.
+    These strengthen the count check and justify the printer cache above. *)
+Lemma combination_columns_match :
+  compiled.(CompiledSystem.combination_columns) = combination_columns_cache.
+Proof.
+  vm_cast_no_check (@eq_refl (list Z) combination_columns_cache).
+Qed.
+
+Lemma combination_assignments_count_match :
+  List.length compiled.(CompiledSystem.combination_assignments) = 15%nat.
+Proof. vm_cast_no_check (@eq_refl nat 15%nat). Qed.
+
+(** Every allocated selector receives a compression assignment. *)
 Lemma selector_assignments_cover :
   List.forallb
     (fun s =>
       List.existsb
         (fun a => a.(SelectorAssignment.selector) =? Z.of_nat s)
         compiled.(CompiledSystem.selector_assignments))
-    (List.seq 0 56)
+    (List.seq 0 (Z.to_nat OrchardConfigure.num_selectors))
   = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
@@ -311,26 +307,54 @@ Lemma compiled_selector_free :
   CompiledSystem.selector_free_b compiled = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-(** The query tables match: 25 advice, 29 fixed (with the three lookup table
-    columns), 1 instance. *)
+(** The query tables match in exact keygen order: 25 advice, 29 fixed, and
+    one instance query.  This is stronger than set equality and determines
+    every [query_index] rendered in the pinned constraint system. *)
 Lemma advice_queries_match :
-  query_set_eqb
-    compiled.(CompiledSystem.advice_queries)
-    OrchardCompiledPinned.advice_queries
-  = true.
-Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+  compiled.(CompiledSystem.advice_queries) =
+    OrchardCompiledPinned.advice_queries.
+Proof.
+  vm_cast_no_check
+    (@eq_refl (list (Z * Z)) compiled.(CompiledSystem.advice_queries)).
+Qed.
 
 Lemma fixed_queries_match :
-  query_set_eqb model_fixed_queries OrchardCompiledPinned.fixed_queries
-  = true.
-Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+  compiled.(CompiledSystem.fixed_queries) =
+    OrchardCompiledPinned.fixed_queries.
+Proof.
+  vm_cast_no_check
+    (@eq_refl (list (Z * Z)) compiled.(CompiledSystem.fixed_queries)).
+Qed.
 
 Lemma instance_queries_match :
-  query_set_eqb
-    compiled.(CompiledSystem.instance_queries)
-    OrchardCompiledPinned.instance_queries
-  = true.
-Proof. vm_cast_no_check (@eq_refl bool true). Qed.
+  compiled.(CompiledSystem.instance_queries) =
+    OrchardCompiledPinned.instance_queries.
+Proof.
+  vm_cast_no_check
+    (@eq_refl (list (Z * Z)) compiled.(CompiledSystem.instance_queries)).
+Qed.
+
+(** Equality-enabled columns and constants are complete configure outputs,
+    not values passed through from the deployed description. *)
+Lemma permutation_columns_match :
+  compiled.(CompiledSystem.permutation_columns) =
+    OrchardCompiledPinned.permutation_columns.
+Proof.
+  vm_cast_no_check
+    (@eq_refl (list Raw.ColumnRef.t)
+      compiled.(CompiledSystem.permutation_columns)).
+Qed.
+
+Lemma configure_constants_match :
+  compiled.(CompiledSystem.constants) = OrchardCompiledPinned.constants.
+Proof.
+  vm_cast_no_check
+    (@eq_refl (list Z) compiled.(CompiledSystem.constants)).
+Qed.
+
+Lemma minimum_degree_match :
+  OrchardConfigure.minimum_degree = None.
+Proof. exact OrchardConfigure.minimum_degree_eq. Qed.
 
 (** The three lookup arguments match pairwise: the compiled input
     expressions (with the retained [QLookup]/[QRunning] fixed columns 14 and
@@ -357,13 +381,12 @@ Lemma constants_column_match :
   zlist_eqb constants_columns OrchardCompiledPinned.constants = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.
 
-(** Every column carrying an equality copy is in the pinned permutation
-    list.  Inclusion, not equality: fixed columns 8, 9, 10 are
-    equality-enabled but never copied by the synthesis stream, so the full
-    15-column list is configure-time pinned data. *)
+(** Every synthesis copy lies in the complete permutation list derived by the
+    configure interpreter, independently of the synthesis copy subset and
+    deployed comparison list. *)
 Lemma copy_columns_in_permutation :
   List.forallb
-    (fun c => List.existsb (pair_eqb c) pinned_permutation_codes)
+    (fun c => List.existsb (pair_eqb c) derived_permutation_codes)
     copy_columns
   = true.
 Proof. vm_cast_no_check (@eq_refl bool true). Qed.

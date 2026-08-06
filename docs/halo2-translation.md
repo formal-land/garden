@@ -265,6 +265,36 @@ Nested configure calls should sequence the child `configure` with `do🞵`.
 Call `𝓒.run_unit` only at extraction or comparison boundaries that need an
 actual `ConstraintSystem.t`.
 
+Configure-time effects that influence key generation but do not add gates or
+lookups are represented by a batched `𝓒.Metadata` node.  Its operations cover
+column and selector allocation, advice/fixed/lookup/instance queries,
+equality-enabled columns, constant columns, and the optional minimum degree.
+The ordinary `𝓒.run` interpreter erases the batch, so adding metadata does not
+change the circuit relation or the established gate/lookup proofs.
+`𝓒.run_metadata` interprets the same program into `Metadata.State.t`.
+
+The metadata interpreter uses a `Metadata.IndexMap.t` to project typed columns
+to Halo2 indices.  It records allocation counts, selector kinds, lookup-backed
+fixed columns, ordered query tables, the ordered permutation column list,
+constants, and minimum degree.  Query, equality, and constant registration is
+ordered and duplicate-suppressing.  Lookup-table and ordinary fixed
+allocations share the fixed-column counter.  `Metadata.State.valid` is true
+exactly while every allocation follows the index map and every later operation
+refers to an allocated column.  `Indices.to_metadata` reuses a serializer index
+map for this interpretation.
+
+Use one ordered batch when the typed circuit declares its physical configure
+metadata:
+
+```coq
+do🞵 𝓒.Metadata [
+  Metadata.Operation.AllocateAdvice advice;
+  Metadata.Operation.allocate_simple_selector selector;
+  Metadata.Operation.EnableEqualityAdvice advice
+] in
+...
+```
+
 For Orchard-only gadgets, use the absolute Orchard columns directly:
 
 ```coq
@@ -280,8 +310,10 @@ This is the current style for the ECC, Poseidon, Sinsemilla, and Merkle
 translations, because the active proof target is Orchard rather than reusable
 generic gadgets.
 
-`meta.enable_equality(...)` is omitted from the Rocq semantics. Do not add a
-placeholder event for it unless the shared DSL starts tracking equality state.
+Translate `meta.enable_equality(...)` with the matching typed
+`EnableEqualityAdvice`, `EnableEqualityFixed`, or `EnableEqualityInstance`
+operation.  This also inserts the current-rotation query and the permutation
+column, matching Halo2's configure state transition.
 
 ## Generated Configure Snapshots
 
@@ -690,10 +722,18 @@ Constraint.Equal lhs rhs
 Constraint.Boolean expression
 Constraint.Range expression range
 Constraint.Either left right
+Constraint.EitherZeroToPrecise left right
 ```
 
 Use `Constraint.EqualZeroToPrecise expression` only as a fallback for constraints
 that have not yet been refined.
+
+`Constraint.EitherZeroToPrecise left right` has the relational semantics
+`left = 0 \/ right = 0`. Under `Constraint.Select selector`, its polynomial
+lowering is the exact left-associated tree `(selector * left) * right`. Use
+this form when the Rust source's multiplication association is part of the
+pinned verifying-key representation; ordinary `Constraint.Either` lowers
+compositionally as `selector * (left * right)`.
 
 ## Expressions
 
