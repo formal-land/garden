@@ -37,11 +37,11 @@ witnesses to the setup-derived domain.
 
 ## Configure and compilation provenance
 
-`Orchard/configure_metadata.v` gives an explicit typed formal trace of the
+`Garden/Orchard/configure_metadata.v` gives an explicit typed formal trace of the
 keygen-relevant builder operations and installs it in the same free configure
 program that creates Garden's gates and lookups. The ordinary gate/lookup
 interpreter ignores this metadata node;
-`Orchard/compiled/configuration.v` interprets it with ordered deduplication
+`Garden/Orchard/compiled/configuration.v` interprets it with ordered deduplication
 and derives:
 
 - 14 fixed columns before compression, 10 advice columns, one instance

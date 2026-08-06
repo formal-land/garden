@@ -533,7 +533,7 @@ the following provenance split:
   the full public certificate (together with synthesis/compiled-domain
   usable-row equality), although it is not a field of the narrower abstract
   commitment record. See
-  [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
+  [`orchard-vk-provenance.md`](orchard-vk-provenance.md).
   The generated `orchard_vk_fully_derived` theorem combines this record with
   setup, compiled-system, T1, and T2 certificates in
   `OrchardVkFullAbstract.certificate`. Its T1 and T2 statements use the

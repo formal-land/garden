@@ -1229,7 +1229,7 @@ computational leaves and 49 aggregate or packaging modules. The explicit
 `make orchard-vk-provenance` target performs the same replay in phases
 with per-group worker caps. The detailed
 proof graph and trust boundary are documented in
-[`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
+[`orchard-vk-provenance.md`](orchard-vk-provenance.md).
 The final generated packaging module now exposes both the commitment-only
 `orchard_vk_commit_lagrange_refined` and the premise-free full aggregate
 `orchard_vk_fully_derived`. The latter adds the configure-derived counts,
