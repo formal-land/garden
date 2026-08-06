@@ -825,10 +825,17 @@ Module VkModelColumnsCorrect.
           congruence.
   Qed.
 
+  (** Rewriting with [all_columns_spec] first keeps the evaluated-plane
+      literal away from the conversion check: the remaining goal compares
+      [all_columns_computed] with this module's aliases, which unfold to
+      the same application without evaluating anything. *)
   Lemma all_columns_unfold :
     all_columns = install_combinations combination_columns
       combination_assignments base_columns.
-  Proof. reflexivity. Qed.
+  Proof.
+    rewrite VkModelColumns.all_columns_spec.
+    reflexivity.
+  Qed.
 
   (** These structural facts are symbolic consequences of
       [Compress.process], apart from the small closed certificate that its

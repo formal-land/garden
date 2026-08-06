@@ -1291,6 +1291,28 @@ The remaining per-entry floor is the BLAKE2b-XMD hash-to-field stage
 primitive-integer BLAKE2b would be the next lever if the SRS group ever
 needs another order of magnitude.
 
+**Evaluated fixed plane (2026-08-06).** The virtual machine evaluates a
+zero-argument global constant when it links any code that references the
+constant, even from an unselected match branch. Every calibration
+certificate dispatches through `VkCalibration.check`, whose fixed branch
+references `VkModelColumns.fixed_evaluation`, so all 44 leaves —
+permutation ones included — paid the ≈ 74 s evaluation of
+`VkModelColumns.all_columns` (the 19,679-event synthesis replay plus the
+compiled selector-combination planes) just to link. `all_columns` is
+stored as an `Eval vm_compute` literal with the `all_columns_spec` bridge
+back to `all_columns_computed`, paying that evaluation once inside
+`ModelColumns.v` (≈ 6 min for the `Eval` plus the `vm_cast` bridge; the
+`.vo` carries the ≈ 11.6 MB plane). The calibration group drops from
+3 827 s to 656 s CPU (≈ 26 s wall at 32 jobs), and the full certificate
+replay from ≈ 75 to ≈ 22 min CPU. Two cautions: the consumer-side
+`all_columns_unfold` proof must `rewrite all_columns_spec` and close by
+`reflexivity` on the named `all_columns_computed` — an `exact
+all_columns_spec` makes the elaborator convert the literal against the
+`install_combinations` application, which falls into the lazy engine and
+runs for tens of minutes; and any new named checker referenced from a
+generated certificate should keep its zero-argument dependencies literal
+for the same link-time reason.
+
 ## History: the big cost cliffs
 
 **Table alias → pasted literal (2026-07-02).** `full_table_reduced` was

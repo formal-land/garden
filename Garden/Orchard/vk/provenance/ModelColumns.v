@@ -117,8 +117,20 @@ Module VkModelColumns.
       OrchardCompiledCheck.compiled.(CompiledSystem.combination_assignments).
   Proof. reflexivity. Qed.
 
-  Definition all_columns : PrimArray.array Z :=
+  Definition all_columns_computed : PrimArray.array Z :=
     install_combinations combination_columns combination_assignments base_columns.
+
+  (** The virtual machine evaluates a zero-argument constant when it links
+      any code referencing it, including an unselected match branch, so
+      every calibration certificate would otherwise replay the synthesis
+      events and selector compression behind this plane.  Storing the
+      evaluated plane as a literal makes that link cost negligible;
+      [all_columns_spec] pays the full computation once, in this file. *)
+  Definition all_columns : PrimArray.array Z :=
+    Eval vm_compute in all_columns_computed.
+
+  Lemma all_columns_spec : all_columns = all_columns_computed.
+  Proof. vm_cast_no_check (@eq_refl (PrimArray.array Z) all_columns). Qed.
 
   Definition fixed_evaluation (column row : nat) : Z :=
     PrimArray.get all_columns (flat_index column row).
