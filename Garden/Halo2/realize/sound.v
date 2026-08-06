@@ -313,13 +313,17 @@ Section OperationalBridge.
     constraint_instance_free c = true ->
     expression_instance_free (Configure.constraint_to_expression c) = true.
   Proof.
-    induction c as [selector c' IH | lhs rhs | e | e range | cl IHl cr IHr | e];
+    induction c as
+      [selector c' IH | lhs rhs | e | e range | cl IHl cr IHr
+      | lhs rhs | e];
       intros Hc;
       cbn [constraint_instance_free] in Hc;
       cbn [Configure.constraint_to_expression].
     - (* Select *)
-      cbn [expression_instance_free].
-      exact (IH Hc).
+      destruct c';
+        cbn [Configure.constraint_to_expression expression_instance_free]
+          in IH |- *;
+        exact (IH Hc).
     - (* Equal *)
       exact Hc.
     - (* Boolean *)
@@ -334,6 +338,8 @@ Section OperationalBridge.
       cbn [expression_instance_free].
       rewrite (IHl Hcl), (IHr Hcr).
       reflexivity.
+    - (* EitherZeroToPrecise *)
+      exact Hc.
     - (* EqualZeroToPrecise *)
       exact Hc.
   Qed.

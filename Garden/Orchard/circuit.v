@@ -8,6 +8,7 @@ Require Garden.Halo2.halo2_gadgets.poseidon.pow5.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.chip.
 Require Garden.Halo2.halo2_gadgets.sinsemilla.merkle.chip.
 Require Import Garden.Orchard.columns.
+Require Import Garden.Orchard.configure_metadata.
 Require Garden.Orchard.constants.fixed_bases.nullifier_k.
 Require Garden.Orchard.constants.fixed_bases.spend_auth_g.
 Require Garden.Orchard.constants.fixed_bases.value_commit_r.
@@ -230,6 +231,7 @@ Definition orchard_circuit_checks_gate : Gate.t columns := {|
 |}.
 
 Definition configure : 𝓒 columns unit :=
+  do🞵 𝓒.Metadata OrchardConfigureMetadata.operations in
   do🞵 𝓒.CreateGate orchard_circuit_checks_gate in
   do🞵 Garden.Orchard.circuit.gadget.add_chip.configure in
   do🞵

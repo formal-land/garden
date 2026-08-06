@@ -1,22 +1,26 @@
-(** * Pinned compiled Orchard circuit description (parity witness input).
+(** * Deployed compiled Orchard circuit description (parity targets).
 
     Rocq literals transcribed offline from the pinned verifying-key dump
     [orchard/src/circuit_data/circuit_description_post_nu6_3.json] (the
     Debug serialization of [vk.pinned()] for the Post-NU6.3 Orchard action
     circuit), the compiled/post-[compress_selectors] constraint system the
-    implementation verifier keys against.  These literals are untrusted witness
-    input: [compiled/check.v] runs in-model checkers that compare
-    them against [Plonkish.Compile.compile] applied to the model's own
-    [orchard_indexed_system], component by component.
+    implementation verifier keys against. These literals are untrusted
+    equality targets: [compiled/check.v] compares them component by component
+    with [Plonkish.Compile.compile_from_metadata] applied to the model's own
+    [orchard_indexed_system] and configure-derived metadata. In particular,
+    counts, ordered query tables, equality-enabled columns, constants, and
+    minimum degree are not passed through from this file.
 
-    Expressions are pinned as fingerprints: the top-level product chain of
-    each polynomial is flattened into its factor list, and each factor is
-    serialized preorder with tags [Sum 1], [Product 2], [Negated 3],
+    Expressions are stored here as compact polynomial fingerprints: the
+    top-level product chain is flattened into its factor list, and each factor
+    is serialized preorder with tags [Sum 1], [Product 2], [Negated 3],
     [Scaled 4] (scalar inlined after the tag), and arity-fixed leaves
     [Advice 10], [Fixed 20], [Instance 50] (column index and rotation
     offset inlined), [Constant 30] (value inlined).  Field constants are
     the canonical residues in [[0, p)] (Pallas base field); the [ZArith]
-    number notation is required for the decimal form. *)
+    number notation is required for the decimal form. Exact expression-tree
+    presentation is checked separately by T1: [vk/print.v] prints the derived
+    compiled AST directly, without a printer-only reassociation. *)
 
 Require Import Stdlib.ZArith.ZArith.
 Require Import Garden.Halo2.serialize.
@@ -26,15 +30,17 @@ Local Open Scope Z_scope.
 
 Module OrchardCompiledPinned.
 
-  (** Column counts of the compiled system (post-compression). *)
+  (** Deployed column-count targets for the compiled system
+      (post-compression). *)
   Definition num_fixed_columns : Z := 29.
   Definition num_advice_columns : Z := 10.
   Definition num_instance_columns : Z := 1.
   Definition num_selectors : Z := 56.
   Definition num_gates : nat := 193.
 
-  (** Fixed columns before selector compression; the combination columns are
-      allocated on top of these to reach [num_fixed_columns]. *)
+  (** Deployed targets for the pre-compression fixed-column and generated
+      combination-column counts. The configure interpreter and selector
+      compressor derive both values before comparing them here. *)
   Definition base_fixed_columns : Z := 14.
   Definition num_combinations : nat := 15.
 
@@ -239,9 +245,9 @@ Module OrchardCompiledPinned.
       [20; 28; 0; 1; 30; 1; 3; 20; 28; 0; 1; 30; 2; 3; 20; 28; 0; 1; 30; 3; 3; 20; 28; 0; 1; 30; 4; 3; 20; 28; 0; 1; 30; 5; 3; 20; 28; 0; 1; 30; 6; 3; 20; 28; 0; 10; 9; 0; 10; 9; 1] ].
 
   (** The query tables: (column index, rotation offset) pairs, in
-      verifying-key order.  The compiled-system comparison is by set
-      equality plus length, since the model collects queries in gate order
-      while the deployed keygen records them in configure order. *)
+      verifying-key order. The metadata-driven compiler records the same
+      first-registration order, and the certificates compare these lists by
+      exact sequence equality. *)
   Definition advice_queries : list (Z * Z) :=
     [(0, 0); (1, 0); (2, 0); (3, 0); (4, 0); (5, 0); (6, 0); (7, 0); (8, 0); (9, 0); (9, 1); (9, -1); (2, 1); (3, 1); (4, 1); (5, 1); (0, 1); (1, 1); (7, 1); (8, 1); (6, -1); (1, -1); (6, 1); (7, -1); (8, -1)].
 
@@ -268,8 +274,10 @@ Module OrchardCompiledPinned.
       [ [20; 0; 0]; [20; 1; 0]; [20; 2; 0] ];
       [ [20; 0; 0]; [20; 1; 0]; [20; 2; 0] ] ].
 
-  (** The equality-enabled (permutation) columns, in verifying-key order:
-      instance 0, advice 0..9, then fixed 3, 8, 9, 10. *)
+  (** Deployed target for the equality-enabled columns in verifying-key order:
+      instance 0, advice 0..9, then fixed 3, 8, 9, 10. The complete ordered
+      list is independently derived from [enable_equality] and
+      [enable_constant] operations in the formal configure program. *)
   Definition permutation_columns : list Raw.ColumnRef.t :=
     [ {| Raw.ColumnRef.kind := Raw.ColumnKind.Instance_; Raw.ColumnRef.index := 0 |};
       {| Raw.ColumnRef.kind := Raw.ColumnKind.Advice; Raw.ColumnRef.index := 0 |};
@@ -287,7 +295,8 @@ Module OrchardCompiledPinned.
       {| Raw.ColumnRef.kind := Raw.ColumnKind.Fixed; Raw.ColumnRef.index := 9 |};
       {| Raw.ColumnRef.kind := Raw.ColumnKind.Fixed; Raw.ColumnRef.index := 10 |} ].
 
-  (** The constants column: a single fixed column (index 3). *)
+  (** Deployed target for the constants list. The formal configure program
+      independently derives the single fixed column at index 3. *)
   Definition constants : list Z := [3].
 
 End OrchardCompiledPinned.

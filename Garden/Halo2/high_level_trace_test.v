@@ -50,6 +50,21 @@ Module HighLevelTraceTest.
     𝓒.Bind (𝓒.CreateLookup test_lookup) (fun _ =>
     𝓒.Ret (seed + 1)))).
 
+  Definition precise_selected_constraint : Constraint.t test_columns :=
+    Constraint.Select (columns := test_columns) tt
+      (Constraint.EitherZeroToPrecise
+        (Expression.Advice (columns := test_columns) tt Rotation.cur)
+        (Expression.Constant (columns := test_columns) 5)).
+
+  (** The precise zero-product disjunction retains Rust's left-associated
+      selected multiplication tree. *)
+  Example precise_selected_constraint_polynomial :
+    Configure.constraint_to_expression precise_selected_constraint =
+      ((Expression.Selector (columns := test_columns) tt ✖️
+        Expression.Advice (columns := test_columns) tt Rotation.cur) ✖️
+        Expression.Constant (columns := test_columns) 5).
+  Proof. reflexivity. Qed.
+
   Definition expected_gate : Gate.t Configure.indexed_columns := {|
     Gate.name := "test gate";
     Gate.constraints := [
@@ -75,6 +90,141 @@ Module HighLevelTraceTest.
         HighLevelTrace.ConfigureOp.CreateGate expected_gate;
         HighLevelTrace.ConfigureOp.CreateLookup expected_lookup
       ]).
+  Proof. reflexivity. Qed.
+
+  Definition metadata_indices : Metadata.IndexMap.t test_columns := {|
+    Metadata.IndexMap.selector := fun _ => 0;
+    Metadata.IndexMap.fixed := fun _ => 1;
+    Metadata.IndexMap.lookup := fun _ => 0;
+    Metadata.IndexMap.advice := fun _ => 0;
+    Metadata.IndexMap.instance_ := fun _ => 0;
+  |}.
+
+  Definition metadata_operations : list (Metadata.Operation.t test_columns) := [
+    Metadata.Operation.AllocateLookupTable
+      (tt : test_columns.(Columns.Lookup));
+    Metadata.Operation.AllocateFixed
+      (tt : test_columns.(Columns.Fixed));
+    Metadata.Operation.AllocateAdvice
+      (tt : test_columns.(Columns.Advice));
+    Metadata.Operation.AllocateInstance
+      (tt : test_columns.(Columns.Instance_));
+    Metadata.Operation.allocate_simple_selector
+      (tt : test_columns.(Columns.Selector));
+    Metadata.Operation.QueryLookup
+      (tt : test_columns.(Columns.Lookup));
+    Metadata.Operation.QueryFixed
+      (tt : test_columns.(Columns.Fixed));
+    Metadata.Operation.QueryAdvice
+      (tt : test_columns.(Columns.Advice)) Rotation.prev;
+    Metadata.Operation.QueryAdvice
+      (tt : test_columns.(Columns.Advice)) Rotation.prev;
+    Metadata.Operation.QueryInstance
+      (tt : test_columns.(Columns.Instance_)) Rotation.next;
+    Metadata.Operation.EnableEqualityAdvice
+      (tt : test_columns.(Columns.Advice));
+    Metadata.Operation.EnableEqualityAdvice
+      (tt : test_columns.(Columns.Advice));
+    Metadata.Operation.EnableEqualityInstance
+      (tt : test_columns.(Columns.Instance_));
+    Metadata.Operation.EnableConstant
+      (tt : test_columns.(Columns.Fixed));
+    Metadata.Operation.EnableConstant
+      (tt : test_columns.(Columns.Fixed));
+    Metadata.Operation.SetMinimumDegree 9
+  ].
+
+  Definition metadata_program : 𝓒 test_columns unit :=
+    𝓒.Metadata metadata_operations.
+
+  Definition expected_metadata_state : Metadata.State.t := {|
+    Metadata.State.counts := {|
+      Metadata.Counts.fixed := 2;
+      Metadata.Counts.advice := 1;
+      Metadata.Counts.instance_ := 1;
+      Metadata.Counts.selectors := 1;
+    |};
+    Metadata.State.selector_types := [true];
+    Metadata.State.lookup_columns := [0];
+    Metadata.State.queries := {|
+      Metadata.Queries.advice := [(0, -1); (0, 0)];
+      Metadata.Queries.fixed := [(0, 0); (1, 0)];
+      Metadata.Queries.instance_ := [(0, 1); (0, 0)];
+    |};
+    Metadata.State.permutation_columns := [
+      {| Metadata.IndexedColumn.kind := Metadata.IndexedColumn.Advice;
+         Metadata.IndexedColumn.index := 0 |};
+      {| Metadata.IndexedColumn.kind := Metadata.IndexedColumn.Instance_;
+         Metadata.IndexedColumn.index := 0 |};
+      {| Metadata.IndexedColumn.kind := Metadata.IndexedColumn.Fixed;
+         Metadata.IndexedColumn.index := 1 |}
+    ];
+    Metadata.State.constants := [1];
+    Metadata.State.minimum_degree := Some 9%nat;
+    Metadata.State.valid := true;
+  |}.
+
+  (** Lookup-table and ordinary fixed allocations share one counter.  Queries,
+      equality columns, and constants retain first-use order and suppress
+      duplicates as Halo2 does. *)
+  Example run_metadata_smoke :
+    𝓒.run_metadata_unit
+      metadata_indices metadata_program Metadata.State.empty =
+      expected_metadata_state.
+  Proof. reflexivity. Qed.
+
+  (** Configure metadata has no gate-or-lookup effect. *)
+  Example run_metadata_erased :
+    𝓒.run_unit metadata_program ConstraintSystem.empty =
+      ConstraintSystem.empty.
+  Proof. reflexivity. Qed.
+
+  Example metadata_rejects_out_of_order_allocation :
+    (Metadata.run
+      (Indices.to_metadata test_indices)
+      [Metadata.Operation.AllocateAdvice
+        (tt : test_columns.(Columns.Advice))]
+      Metadata.State.empty).(Metadata.State.valid) = false.
+  Proof. reflexivity. Qed.
+
+  Definition mapped_metadata_operations :
+      list (Metadata.Operation.t Configure.indexed_columns) := [
+    Metadata.Operation.AllocateLookupTable
+      (30 : Configure.indexed_columns.(Columns.Lookup));
+    Metadata.Operation.AllocateFixed
+      (20 : Configure.indexed_columns.(Columns.Fixed));
+    Metadata.Operation.AllocateAdvice
+      (40 : Configure.indexed_columns.(Columns.Advice));
+    Metadata.Operation.AllocateInstance
+      (50 : Configure.indexed_columns.(Columns.Instance_));
+    Metadata.Operation.allocate_simple_selector
+      (10 : Configure.indexed_columns.(Columns.Selector));
+    Metadata.Operation.QueryLookup
+      (30 : Configure.indexed_columns.(Columns.Lookup));
+    Metadata.Operation.QueryFixed
+      (20 : Configure.indexed_columns.(Columns.Fixed));
+    Metadata.Operation.QueryAdvice
+      (40 : Configure.indexed_columns.(Columns.Advice)) Rotation.prev;
+    Metadata.Operation.QueryAdvice
+      (40 : Configure.indexed_columns.(Columns.Advice)) Rotation.prev;
+    Metadata.Operation.QueryInstance
+      (50 : Configure.indexed_columns.(Columns.Instance_)) Rotation.next;
+    Metadata.Operation.EnableEqualityAdvice
+      (40 : Configure.indexed_columns.(Columns.Advice));
+    Metadata.Operation.EnableEqualityAdvice
+      (40 : Configure.indexed_columns.(Columns.Advice));
+    Metadata.Operation.EnableEqualityInstance
+      (50 : Configure.indexed_columns.(Columns.Instance_));
+    Metadata.Operation.EnableConstant
+      (20 : Configure.indexed_columns.(Columns.Fixed));
+    Metadata.Operation.EnableConstant
+      (20 : Configure.indexed_columns.(Columns.Fixed));
+    Metadata.Operation.SetMinimumDegree 9
+  ].
+
+  Example eval_configure_metadata_smoke :
+    HighLevelTrace.eval_configure test_indices metadata_program =
+      (tt, [HighLevelTrace.ConfigureOp.Metadata mapped_metadata_operations]).
   Proof. reflexivity. Qed.
 
   Definition region_index_of (region : Z) : Z := region.

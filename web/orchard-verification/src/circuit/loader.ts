@@ -152,6 +152,8 @@ function formatExpression(value: unknown): string {
       return `(${formatExpression(node.left)}) = (${formatExpression(node.right)})`;
     case "Either":
       return `(${formatExpression(node.left)}) ∨ (${formatExpression(node.right)})`;
+    case "EitherZeroToPrecise":
+      return `(${formatExpression(node.left)}) = 0 ∨ (${formatExpression(node.right)}) = 0`;
     case "EqualZeroToPrecise":
       return `(${formatExpression(pick(node, "expression", "expr", "value"))}) = 0`;
     case "Boolean":

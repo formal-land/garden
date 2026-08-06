@@ -1,154 +1,235 @@
-# Orchard verifying-key commitment provenance
+# Orchard verifying-key provenance
 
-This directory derives the 29 fixed-column and 15 permutation-column
-commitments printed in the deployed Post-NU6.3 Orchard verifying key. The
-executable model mirrors the Halo 2 keygen equation
+Garden derives every field of the deployed Post-NU6.3 Orchard
+`vk.pinned()` description from its formal circuit, its explicit formal
+configure-metadata trace, and the selected deployment parameters, then
+compares the result with the deployed description. Equality of that metadata
+trace with the Rust builder remains an external JSON translation-validation
+check. The compiler, setup, and MSM computations do not consume the deployed
+VK literals; those literals occur only as right-hand-side equality targets.
+The public end-to-end result is the premise-free generated theorem
+
+```coq
+OrchardVkProvenance.orchard_vk_fully_derived :
+  OrchardVkFullAbstract.certificate
+```
+
+Its two main VK-field claims are kept separate for review:
+
+- `OrchardVkFullAbstract.non_commitment_certificate` is parameterized by an
+  explicit commitment-coordinate view and covers setup/domain values, the
+  configured and compiled constraint system, exact Debug-dump parity (T1),
+  and the compact transcript representation (T2).
+- `OrchardVkAbstract.certificate`, exposed separately by
+  `orchard_vk_commit_lagrange_refined`, proves the 29 fixed-column and 15
+  permutation-column commitment equations.
+
+The aggregate additionally carries the fixed-grid replay, usable-row
+equality, checked inverse-domain caches, permutation-label schedule, and the
+coordinate bridge that instantiates T1 and T2 with the derived commitments.
+
+The literals in `vk/data.v` and `compiled/pinned.v` are right-hand-side
+equality targets. They are not fed into the compiler, setup computation, or
+the full certificate's explicit printer input. Optimized domain and
+commitment code does use efficient checked caches such as `PolyDomain.omega`;
+the public certificate explicitly connects their inverse-root and inverse-size
+witnesses to the setup-derived domain.
+
+## Configure and compilation provenance
+
+`Orchard/configure_metadata.v` gives an explicit typed formal trace of the
+keygen-relevant builder operations and installs it in the same free configure
+program that creates Garden's gates and lookups. The ordinary gate/lookup
+interpreter ignores this metadata node;
+`Orchard/compiled/configuration.v` interprets it with ordered deduplication
+and derives:
+
+- 14 fixed columns before compression, 10 advice columns, one instance
+  column, and 56 selectors;
+- selector kind for every selector: `QLookup`, `QRunning`,
+  `QSinsemilla1_1`, and `QSinsemilla1_2` are complex, and the other 52 are
+  simple;
+- the first-registration order of all advice, fixed, and instance queries;
+- the complete equality-enabled column order: instance 0, advice 0 through
+  9, then fixed 3, 8, 9, and 10;
+- lookup-table allocation to fixed columns 0, 1, and 2;
+- the constants list `[3]`; and
+- an unset minimum degree (`None`).
+
+`Compile.compile_from_metadata` uses those values rather than fields copied
+from `compiled/pinned.v`. Selector compression derives 15 combination
+columns, hence 29 fixed columns after compression. The closed
+`OrchardCompiledCertificate.certificate` checks the compression shape and
+selector-assignment coverage, then compares the resulting 193 compiled gates,
+exact ordered query tables, permutation columns, lookups, constants, counts,
+and minimum degree with the deployed targets.
+
+The gate AST printed by `vk/print.v` is the compiled AST itself. The precise
+either-zero constraint constructor preserves Rust's left-associated product
+tree for the two curve checks, so there is no printer-only rotation or
+reassociation patch. T1 therefore checks the actual derived expression tree,
+including query indices, against the deployed Debug dump byte for byte.
+
+## Setup and domain provenance
+
+The chosen Vesta curve and `Params::new(11)` exponent are deployment inputs.
+From them, and from the compiled system's derived degree 9 with minimum degree
+unset, `Orchard/vk/setup.v` and `setup_compiled.v` derive:
+
+- `k = 11` and a 2,048-row domain;
+- `extended_k = 14` as the first exponent whose domain holds
+  `2^11 * (9 - 1)` coefficients;
+- `omega` by the two repeated-squaring loops of Halo 2's
+  `EvaluationDomain::new`, starting from the Pasta root of unity; and
+- the printed base- and scalar-field modulus strings from the Vesta field
+  definitions.
+
+The cached domain and string literals are again equality witnesses. The
+certificate checks both that exponent 14 fits and that its predecessor does
+not. The full certificate also states that the FFT's cached `omega_inv` is an
+inverse of this derived `omega`, that `n_inv` is the inverse of the derived
+domain size, and that the permutation-label `delta` is obtained from the
+Pasta generator/two-adicity schedule.
+
+## Commitment provenance
+
+For every one of the 44 columns, the executable model checks the Halo 2
+key-generation equation
 
 ```text
 commit_lagrange(Params::new(11), column_evaluations, Blind::default())
-  = pinned verifying-key point
+  = deployed verifying-key point
 ```
 
-for every one of the 44 columns. Generated literals are witnesses, not
-assumptions: small Rocq leaves recompute and check each stage before the
-generated aggregate bundles the results. Its closed
-`orchard_vk_commit_lagrange_refined` theorem has type
-`OrchardVkAbstract.certificate`: all 44 deployed points are equal to the
-library-level group/polynomial `commit_lagrange` specification. The
-`params_well_formed` side condition used to refine that specification to the
-raw-base `Params::new(11)` MSM is discharged inside the certificate.
+The commitment graph covers this chain:
 
-## What is checked
+1. `ModelColumns.v` replays Garden's synthesis events into the fixed plane and
+   installs the selector-combination columns emitted by the metadata-driven
+   compiler. `ModelColumnsCorrect.v` connects the primitive-array evaluator
+   to `RawGrid`/`with_combinations` semantics.
+2. `Sigma.v` checks the 15 permutation evaluation vectors against
+   `OrchardCompiled.orchard_sigma`. Their complete column order comes from the
+   formal configure trace, not from the deployed commitment list.
+3. `Domain.v` checks bit reversal, inverse-root and power tables, `omega`,
+   `delta`, and the inverse of 2048.
+4. `FFT.v` evaluates the 2,048-point inverse FFT and checks each result against
+   its generated scalar-vector witness.
+5. `Srs.v` checks every base in the exact `Params::new(11)` hash-to-curve
+   message schedule, including `w` and `u`, and connects accepted SSWU
+   witnesses to `GroupHashVesta.group_hash`.
+6. `Jacobian.v` evaluates a width-8 Pippenger MSM in low and high 128-bit
+   halves. `AssemblyCheck.v` shifts the high half, recombines it, adds the
+   mandatory default blind `[1]w`, and checks the deployed affine point.
+7. `DomainRefinement.v`, `JacobianRefinement.v`, `MsmRefinement.v`, and
+   `CommitmentRefinement.v` prove that these primitive computations denote
+   the ordinary field, Vesta group, inverse-FFT, and
+   `VkMsm.commit_lagrange` definitions.
 
-The certificate graph covers the following chain.
+Thus the deployed coordinate pairs are checked outputs of the mathematical
+commitment computation, not unrelated affine witnesses.
 
-1. `ModelColumns.v` replays Garden's own synthesis events into a flat
-   primitive-array fixed plane and installs the selector-combination columns
-   emitted by `Compile.compile`. `ModelColumnsCorrect.v` connects that fast
-   evaluator to the ordinary `RawGrid`/`with_combinations` semantics.
-2. `Sigma.v` checks each packed generated permutation column against
-   `OrchardCompiled.orchard_sigma` and evaluates its
-   `delta^column * omega^row` labels. This part inherits the existing pinned
-   `permutation_columns` list and ordering; it derives the commitments
-   conditional on that configuration, rather than independently deriving
-   the full list from copied cells.
-3. `Domain.v` checks the bit-reversal table, inverse-root recurrence,
-   `omega` and `delta` power tables, and the inverse of 2048 against the
-   domain constants already used by the compiled-system proof.
-4. `FFT.v` performs the 2048-point inverse FFT.  A calibration leaf proves
-   that its decoded output is exactly the generated standard scalar vector.
-5. `Srs.v` enforces the exact `Params::new(11)` message schedule, canonical
-   Montgomery coordinates, and the hash-to-field and SSWU witness equations
-   for every base, including `w` and `u`, in 64-point shards. The witness
-   equations, point reconstruction, and curve membership evaluate over
-   five-limb Montgomery words (`GroupHash/sswu_vesta_words.v`), with the
-   BLAKE2b-XMD hash-to-field stage on `Z` bytes. A generic
-   square-root-independence theorem connects every accepted witness to the
-   canonical `GroupHashVesta.group_hash` definition.
-6. `Jacobian.v` performs a width-8 Pippenger MSM.  The low and high 128-bit
-   halves compile independently and each proves an ordinary Rocq equality to
-   an exact generated Jacobian representative.  `AssemblyCheck.v` shifts the
-   high half by 128 bits, adds the default blinding generator `w`, and checks
-   the deployed affine point.
-7. `DomainRefinement.v`, `JacobianRefinement.v`, and `MsmRefinement.v` prove
-   the semantic refinement of those optimized primitive operations.  The
-   inverse FFT is identified with `VkMsm.intt`; every window, bucket update,
-   doubling, addition, and split-MSM recombination is transported to the
-   abstract Vesta group; and `VkMsm.commit_lagrange_intt` connects that MSM
-   with the mathematical group inverse FFT used by Halo 2.
+The optimized replay keeps the computational leaves tractable without
+changing that chain. The expensive post-hash SRS field equations, inversions,
+point reconstruction, and curve-membership checks evaluate over five-limb
+Montgomery words in 64-point shards, while the BLAKE2b-XMD hash-to-field stage
+stays on `Z` bytes. A generic
+square-root-independence theorem connects accepted SSWU witnesses to the
+canonical group hash. FFT calibration leaves connect decoded primitive-array
+outputs to ordinary scalar vectors, and the independently compiled low and
+high Pippenger halves each expose an exact Jacobian representative before
+assembly.
 
-`Checks.commitment_certificate_sound` rewrites the two exact half-MSM
-equalities into the assembly check. `CommitmentRefinement.v` then composes
-the calibration, SRS, primitive-arithmetic, and pinned-coordinate refinements.
-Thus the aggregate establishes the executable committed point, its equality
-to the abstract `commit_lagrange`, and the connection between the two affine
-witnesses.
+The emitter also records its independently recomputed affine result for each
+MSM in the existing per-column data module. That independence is a generator
+and oracle reproducibility property outside the kernel. Inside Rocq,
+`VkCommitmentsCertificate` assembles the 44 emitted witnesses into a printer
+coordinate view and checks that view against the deployed right-hand side;
+the commitment refinement separately proves `commit_lagrange` equals that
+same right-hand side. `OrchardVkFullAbstract.coordinate_certificate` combines
+the two equalities and therefore connects every entry of the explicit view to
+mathematical `commit_lagrange`.
+Consequently the T1 and T2 fields of `orchard_vk_fully_derived` are stated for
+the printer instantiated with the recomputed view; the pinned coordinate lists
+are substitution targets, not hidden computational inputs to that printer.
 
-## Representation and parallelism
+## Representation, generation, and memory
 
-Field elements use five little-endian radix-`2^63` words.  Montgomery
-addition and multiplication use Rocq's primitive `uint63` instructions;
-2048-element vectors and 255 Pippenger buckets use primitive arrays whose
-updates are threaded linearly through every loop.
+Field elements use five little-endian radix-`2^63` limbs. Montgomery
+arithmetic uses primitive `uint63` operations, while 2,048-element vectors
+and 255 Pippenger buckets use linearly threaded primitive arrays. The proof
+graph is sharded by inverse FFT, low/high MSM half, final assembly, 64-point
+SRS range, sigma column, and domain table.
 
-The proof graph deliberately has separate leaves for:
-
-- each inverse FFT;
-- each low and high MSM half;
-- each final assembly;
-- each 64-point SRS shard;
-- each sigma column; and
-- each domain table.
-
-The default is conservative because several Rocq workers can consume much
-more memory than their source size suggests:
+Generated `.v` sources are deterministic, ignored build artifacts. Ordinary
+`make -C Garden` builds the hand-written refinement layer, the 129 generated
+data modules, and the full kernel replay of 278 generated certificate modules
+(229 computational leaves and 49 aggregate or packaging modules). The
+explicit target below performs the same replay in phases with per-group
+worker caps for memory-constrained builders:
 
 ```sh
 make -C Garden orchard-vk-provenance
 ```
 
-`make -C Garden` builds the whole development, including the kernel
-replay of the 278 generated certificate modules (229 computational
-leaves and 49 aggregate or packaging modules); a default build
-kernel-checks `OrchardVkProvenance.orchard_vk_commit_lagrange_refined`.
-The explicit target above performs the same replay in phases with
-per-group worker caps for memory-constrained builders.  PR CI runs the
-default build together with the deterministic-source-generation check
-and the independent all-44-point oracle.
+The last generated aggregate contains both
+`orchard_vk_commit_lagrange_refined` and `orchard_vk_fully_derived`; a default
+build kernel-checks both. PR CI runs the default build together with the
+deterministic-source-generation check and the independent all-44-point
+oracle.
 
-A memory-rich 32-core builder can expose 32-way parallelism for generated
-data and cheap record-packaging leaves with:
+The default job limits are deliberately conservative. SRS, inverse-FFT,
+Pippenger, and assembly workers retain much more memory than their source
+sizes suggest, and concurrent heavy workers have caused OOM kills. On a
+measured memory-rich builder, cheap generated-data and packaging work can be
+raised to 32 workers with
 
 ```sh
 make -C Garden orchard-vk-provenance VK_PROVENANCE_JOBS=32
 ```
 
-The memory-heavy job groups are independently capped. Builders that have
-measured sufficient headroom can raise, for example,
-`VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`, or
-`VK_PROVENANCE_MSM_JOBS`. Their one-worker defaults bound aggregate memory.
-The generated-source inventories, job controls, and recipes for these targets
-are kept in `Garden/vk-provenance.mk`; the main Makefile contains only the
-ordinary-build integration points.
+The heavy groups remain separately capped by
+`VK_PROVENANCE_SRS_JOBS`, `VK_PROVENANCE_CALIBRATION_JOBS`,
+`VK_PROVENANCE_MSM_JOBS`, and `VK_PROVENANCE_ASSEMBLY_JOBS`; raise them only
+after measuring available memory.
 
-The sigma mapping is split into 15 primitive-word shards. Packing
-`(column,row)` as `column * 2048 + row` avoids the elaboration-time Peano-term
-blow-up of a 30,720-pair `nat` representation.
-
-To run the independent Python diagnostic or regenerate every untrusted
-witness:
+Generation and the independent diagnostic can be run separately:
 
 ```sh
+make -C Garden orchard-vk-provenance-generated-check
 make -C Garden orchard-vk-provenance-oracle-check
 make -C Garden orchard-vk-provenance-witnesses
 ```
 
-The Python implementation uses only the standard library and independently
-reproduces all 44 pinned points, but it is not in the trusted proof path.
+The standard-library-only Python oracle independently reproduces the 44
+points, but neither it nor the emitter is in the theorem's trusted path.
+Rocq checks the emitted values as witnesses.
 
-## Proof and trust boundary
+## Trust boundary
 
-The 229 closed computational leaves use `vm_cast_no_check`: Boolean checks
-cast `eq_refl true`, while each MSM leaf casts reflexivity at its expected
-Jacobian point. Rocq's kernel compares the cast term's type with the goal by
-VM conversion. This performs the concrete computation once during kernel
-checking instead of once in the `vm_compute` tactic and again when checking
-the resulting `eq_refl`. The executable arithmetic contains no
-project-specific `Axiom` or `Admitted`. Its logical refinement layer proves
-the primitive multiply/add carry equations, the five-word CIOS sweep, and
-modular correctness of five-limb Montgomery multiplication for a canonical
-operand. The certificates ultimately rely on Rocq's standard `PrimInt63`,
-`PrimArray`, and VM-conversion primitives.
+The closed computational leaves use `vm_cast_no_check`: the kernel checks
+the cast's source and target types by VM conversion. The refinement layer has
+no project-specific `Axiom` or `Admitted`; it relies on Rocq's standard
+`PrimString`, `PrimInt63`, `PrimArray`, VM-conversion, and associated
+primitive laws.
 
-The refinement chain is complete up to the library-level mathematical
-`commit_lagrange`: it proves field canonicality, inverse-FFT semantics,
-Jacobian group-law semantics, Pippenger semantics, the mandatory default
-blind `[1]w`, and equality with every pinned coordinate. Generated `.v`
-sources are ignored build artifacts and can be reproduced exactly by the
-emitter; their small closed facts are checked by Rocq's kernel when built.
+The theorem establishes provenance relative to four explicit modeling and
+deployment choices: Garden's formal Orchard circuit, its formal configure
+metadata trace, Vesta, and `k = 11`.
+The deployed Debug dump and its 44 points are equality targets, while T1 and
+T2 connect the printer instantiated with explicit emitted MSM-coordinate
+witnesses to the target bytes and transcript value; the T2 statement prefixes
+the actual computed compact-string length rather than a cached numeric length.
+The public certificate also carries the fixed-column replay/compiled-grid
+certificate and the equality between the synthesis usable-row bound and the
+compiled domain's usable-row count.
+The external JSON comparisons connect Garden's configure and synthesis
+traces to the Rust implementation, including configure metadata, with
+selector kinds reconstructed from the implementation's selector-compression
+snapshot. That translation-validation step trusts extraction, the Rust
+snapshot producers, and the Python comparator; it is outside Rocq's kernel.
 
-This theorem does not prove cryptographic verifier soundness, knowledge
-soundness, or extractability. It also intentionally treats Garden's compiled
-Orchard column configuration and pinned VK coordinate list as the objects
-whose compilation provenance is being established; those protocol-level
-choices are not independently re-specified here.
+This work does not prove cryptographic verifier soundness, polynomial-
+commitment binding, Fiat–Shamir security, knowledge soundness, or
+extractability. Nor does it independently justify the protocol's choice of
+Vesta, `k = 11`, or this circuit: it proves what the selected formal inputs
+compile to and that those results equal the deployed VK targets.

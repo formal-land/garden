@@ -92,6 +92,7 @@ def source_inputs() -> list[Path]:
     return [
         Path(__file__).resolve(),
         Path(oracle.__file__).resolve(),
+        oracle.ROOT / "Garden/Orchard/Snapshots/circuit_configure_generated_from_model.json",
         oracle.ROOT / "Garden/Orchard/Snapshots/circuit_synthesis_generated_from_model.json",
         oracle.ROOT
         / "Garden/Orchard/Snapshots/circuit_selector_compression_generated_from_implementation.json",
@@ -555,19 +556,26 @@ def emit_column_data(
     coefficients: list[int],
     low_projective: JacobianPoint,
     high_projective: JacobianPoint,
+    derived_coordinates: oracle.Point,
 ) -> None:
+    if derived_coordinates is None:
+        raise AssertionError("derived commitment unexpectedly is identity")
+    derived_x, derived_y = derived_coordinates
     cap = kind.capitalize()
     module = f"Vk{cap}{index:02d}Data"
     coeff_body = ";\n  ".join(
         words_term(value, oracle.P, False, "  ") for value in coefficients
     )
     source = f"""(** Generated untrusted {kind} column {index} witnesses. *)
-From Stdlib Require Import Lists.List Numbers.Cyclic.Int63.Uint63.
+From Stdlib Require Import ZArith Lists.List Numbers.Cyclic.Int63.Uint63.
 Require Import Garden.Prim63.Words.
 Require Import Garden.Orchard.vk.provenance.DataTypes.
 Import ListNotations.
 Local Open Scope uint63_scope.
+Local Open Scope Z_scope.
 Module {module}.
+Definition derived_coordinates : Z * Z :=
+  (0x{derived_x:064x}, 0x{derived_y:064x}).
 Definition coefficients : list Prim63Words.words5 := [
   {coeff_body}
 ].
@@ -593,7 +601,7 @@ def emit_data() -> None:
     emit_srs(bases, w, u, witness_rows)
     emit_sigma(mapping)
 
-    for absolute, (column, wanted) in enumerate(zip(evaluations, pinned)):
+    for absolute, column in enumerate(evaluations):
         coefficients = oracle.ifft(column)
         low_projective = jacobian_pippenger_range(
             coefficients, bases, 0, HALF_WINDOWS
@@ -608,6 +616,7 @@ def emit_data() -> None:
             jacobian_of_affine(w),
         )
         assembled = jacobian_to_affine(assembled_projective)
+        wanted = pinned[absolute]
         if assembled != wanted:
             raise AssertionError(f"split MSM mismatch for column {absolute}")
         kind = "fixed" if absolute < 29 else "permutation"
@@ -615,6 +624,7 @@ def emit_data() -> None:
         emit_column_data(
             kind, index, coefficients,
             low_projective, high_projective,
+            assembled,
         )
         print(f"[{absolute + 1:02d}/44] emitted {kind} {index}")
 
@@ -1009,6 +1019,16 @@ def emit_commitment_certificates() -> None:
         f"    {prefix.lower()} := Vk{prefix}Certificate.checked;"
         for prefix, _, _, _ in aggregates
     )
+    fixed_coordinate_values = ";\n    ".join(
+        f"{data}.derived_coordinates"
+        for prefix, data, _, _ in aggregates
+        if prefix.startswith("Fixed")
+    )
+    permutation_coordinate_values = ";\n    ".join(
+        f"{data}.derived_coordinates"
+        for prefix, data, _, _ in aggregates
+        if prefix.startswith("Permutation")
+    )
     fixed_cases = "".join(
         "  destruct index as [|index]; "
         f"[exact (VkFixed{index:02d}Certificate.abstract_sound "
@@ -1027,7 +1047,9 @@ def emit_commitment_certificates() -> None:
         CERTS / "Commitments.v",
         "(** Generated aggregation of all 44 commitment certificates. *)\n"
         "From Stdlib Require Import Lia.\n"
+        "From Stdlib Require Import ZArith Lists.List.\n"
         "Require Import Garden.Orchard.vk_msm.\n"
+        "Require Import Garden.Orchard.vk.data.\n"
         "Require Import Garden.Orchard.vk.provenance.Checks.\n"
         "Require Import Garden.Orchard.vk.provenance.Abstract.\n"
         "Require Import Garden.Orchard.vk.provenance.ColumnValues.\n"
@@ -1040,6 +1062,19 @@ def emit_commitment_certificates() -> None:
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Sigma.\n"
         + imports
         + "\n\nModule VkCommitmentsCertificate.\n"
+        "Import ListNotations.\n"
+        "Definition fixed_coordinates : list (Z * Z) := [\n    "
+        + fixed_coordinate_values
+        + "\n  ].\n"
+        "Definition permutation_coordinates : list (Z * Z) := [\n    "
+        + permutation_coordinate_values
+        + "\n  ].\n\n"
+        "Theorem fixed_coordinates_match_deployed :\n"
+        "  fixed_coordinates = VkPinnedData.fixed_commitments.\n"
+        "Proof. vm_cast_no_check (@eq_refl _ VkPinnedData.fixed_commitments). Qed.\n\n"
+        "Theorem permutation_coordinates_match_deployed :\n"
+        "  permutation_coordinates = VkPinnedData.permutation_commitments.\n"
+        "Proof. vm_cast_no_check (@eq_refl _ VkPinnedData.permutation_commitments). Qed.\n\n"
         "Record certificate : Prop := {\n"
         + record_fields.rstrip(";")
         + "\n}.\n\nDefinition checked : certificate :=\n  {|\n"
@@ -1078,6 +1113,9 @@ def emit_main_certificate() -> None:
     write(
         CERTS / "Main.v",
         "(** * Kernel-checked provenance of the Orchard VK commitments *)\n"
+        "Require Import Garden.Halo2.plonkish.main.\n"
+        "Require Import Garden.Orchard.compiled.main.\n"
+        "Require Import Garden.Orchard.vk.print.\n"
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Domain.\n"
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Sigma.\n"
         "Require Import Garden.Orchard.vk.provenance.generated.certificates.Srs.\n"
@@ -1086,6 +1124,8 @@ def emit_main_certificate() -> None:
         "Require Import Garden.Orchard.vk.provenance.Abstract.\n"
         "Require Import Garden.Orchard.vk.provenance.Sigma.\n"
         "Require Import Garden.Orchard.vk.provenance.ModelColumnsCorrect.\n"
+        "Require Import Garden.Orchard.compiled.algebraic.\n"
+        "Require Import Garden.Orchard.vk.full_abstract.\n"
         "Module OrchardVkProvenance.\n"
         "Record certificate : Prop := {\n"
         "  fixed_column_model : VkModelColumnsCorrect.certificate;\n"
@@ -1118,6 +1158,40 @@ def emit_main_certificate() -> None:
         "    exact (VkCommitmentsCertificate.permutation_abstract_sound\n"
         "      VkDomainCertificate.checked Hsrs Hparams\n"
         "      VkSigmaCertificate.checked index Hindex).\n"
+        "Qed.\n"
+        "\nTheorem orchard_synthesis_usable_rows :\n"
+        "  Garden.Orchard.circuit.orchard_usable_rows =\n"
+        "    Plonkish.Domain.usable_rows OrchardCompiled.orchard_domain.\n"
+        "Proof.\n"
+        "  unfold Garden.Orchard.circuit.orchard_usable_rows.\n"
+        "  symmetry. exact OrchardCompiledAlgebraic.orchard_usable_rows.\n"
+        "Qed.\n"
+        "\nDefinition derived_commitment_coordinates :\n"
+        "    VkPinnedPrint.commitment_coordinates := {|\n"
+        "  VkPinnedPrint.fixed_commitment_coordinates :=\n"
+        "    VkCommitmentsCertificate.fixed_coordinates;\n"
+        "  VkPinnedPrint.permutation_commitment_coordinates :=\n"
+        "    VkCommitmentsCertificate.permutation_coordinates;\n"
+        "|}.\n"
+        "\nTheorem derived_commitment_coordinates_match_deployed :\n"
+        "  derived_commitment_coordinates =\n"
+        "    VkPinnedPrint.pinned_commitment_coordinates.\n"
+        "Proof.\n"
+        "  unfold derived_commitment_coordinates,\n"
+        "    VkPinnedPrint.pinned_commitment_coordinates.\n"
+        "  rewrite VkCommitmentsCertificate.fixed_coordinates_match_deployed.\n"
+        "  rewrite VkCommitmentsCertificate.permutation_coordinates_match_deployed.\n"
+        "  reflexivity.\n"
+        "Qed.\n"
+        "\nTheorem orchard_vk_fully_derived :\n"
+        "  OrchardVkFullAbstract.certificate.\n"
+        "Proof.\n"
+        "  exact (OrchardVkFullAbstract.assemble\n"
+        "    VkModelColumnsCorrect.checked\n"
+        "    orchard_synthesis_usable_rows\n"
+        "    derived_commitment_coordinates\n"
+        "    derived_commitment_coordinates_match_deployed\n"
+        "    orchard_vk_commit_lagrange_refined).\n"
         "Qed.\n"
         "End OrchardVkProvenance.\n",
     )

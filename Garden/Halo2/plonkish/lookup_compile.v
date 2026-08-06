@@ -98,8 +98,8 @@ Lemma compile_lookups_substituted
           constants).(CompiledSystem.selector_assignments)))
     system.(ConstraintSystem.lookups).
 Proof.
-  unfold Compile.compile, Compile.assignment_replacement,
-    substitute_lookup.
+  unfold Compile.compile, Compile.compile_with_minimum,
+    Compile.assignment_replacement, substitute_lookup.
   cbv zeta.
   destruct (Compress.process _ _ _) as [combinations assignments].
   reflexivity.
@@ -586,10 +586,14 @@ Section WithPrime.
         (constants : list Z)
         (compiled : CompiledSystem.t)
         (table_rows : Z)
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hview : forall column row value : Z,
           PlonkishCompile.combination_view compiled column row = Some value ->
           cgrid.(RawGrid.cell) Raw.ColumnKind.Fixed column row = value)
@@ -619,7 +623,7 @@ Section WithPrime.
       pose proof
         (compile_lookups_substituted system infos num_fixed_columns
           permutation_columns constants) as Hlookups.
-      rewrite <- Hcompiled in Hlookups.
+      rewrite <- Hcompiled_lookups, <- Hcompiled_selectors in Hlookups.
       set (replacement :=
         Compile.assignment_replacement
           compiled.(CompiledSystem.selector_assignments)) in *.
@@ -714,10 +718,14 @@ Section WithPrime.
         (compiled : CompiledSystem.t)
         (events : list Raw.Event.t)
         (table_rows : Z)
-        (Hcompiled :
-          compiled =
-          Compile.compile system infos num_fixed_columns permutation_columns
-            constants)
+        (Hcompiled_lookups :
+          compiled.(CompiledSystem.lookups) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.lookups))
+        (Hcompiled_selectors :
+          compiled.(CompiledSystem.selector_assignments) =
+          (Compile.compile system infos num_fixed_columns permutation_columns
+            constants).(CompiledSystem.selector_assignments))
         (Hview : forall column row value : Z,
           PlonkishCompile.combination_view compiled column row = Some value ->
           cgrid.(RawGrid.cell) Raw.ColumnKind.Fixed column row = value)
@@ -742,8 +750,9 @@ Section WithPrime.
       pose proof
         (fun row Hrow =>
           lookup_compile_correct domain system infos num_fixed_columns
-            permutation_columns constants compiled table_rows Hcompiled
-            Hview Hact Hexact Hlookup_avoid row Hrow) as Hlookup_iff.
+            permutation_columns constants compiled table_rows
+            Hcompiled_lookups Hcompiled_selectors Hview Hact Hexact
+            Hlookup_avoid row Hrow) as Hlookup_iff.
       unfold plonkish_accepts_compiled, PlonkishMock.plonkish_accepts.
       split;
         intros (Hgates & Hlookups & Hcopies);
@@ -770,10 +779,14 @@ Section WithPrime.
       (grid : RawGrid.t)
       (compiled : CompiledSystem.t)
       (table_rows : Z)
-      (Hcompiled :
-        compiled =
-        Compile.compile system infos num_fixed_columns permutation_columns
-          constants)
+      (Hcompiled_lookups :
+        compiled.(CompiledSystem.lookups) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.lookups))
+      (Hcompiled_selectors :
+        compiled.(CompiledSystem.selector_assignments) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.selector_assignments))
       (Hact : forall s row : Z,
         0 <= row < Domain.n domain ->
         grid.(RawGrid.sel) s row =
@@ -807,7 +820,7 @@ Section WithPrime.
         (fun _ _ => eq_refl) (fun _ _ => eq_refl) (fun _ _ => eq_refl)
         (with_combination_planes_off compiled grid)
         domain system infos num_fixed_columns permutation_columns constants
-        compiled table_rows Hcompiled
+        compiled table_rows Hcompiled_lookups Hcompiled_selectors
         (with_combination_planes_view compiled grid)
         Hact Hexact Hlookup_avoid row Hrow).
   Qed.
@@ -823,10 +836,14 @@ Section WithPrime.
       (compiled : CompiledSystem.t)
       (events : list Raw.Event.t)
       (table_rows : Z)
-      (Hcompiled :
-        compiled =
-        Compile.compile system infos num_fixed_columns permutation_columns
-          constants)
+      (Hcompiled_lookups :
+        compiled.(CompiledSystem.lookups) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.lookups))
+      (Hcompiled_selectors :
+        compiled.(CompiledSystem.selector_assignments) =
+        (Compile.compile system infos num_fixed_columns permutation_columns
+          constants).(CompiledSystem.selector_assignments))
       (Hact : forall s row : Z,
         0 <= row < Domain.n domain ->
         grid.(RawGrid.sel) s row =
@@ -854,7 +871,7 @@ Section WithPrime.
         (fun _ _ => eq_refl) (fun _ _ => eq_refl) (fun _ _ => eq_refl)
         (with_combination_planes_off compiled grid)
         domain system infos num_fixed_columns permutation_columns constants
-        compiled events table_rows Hcompiled
+        compiled events table_rows Hcompiled_lookups Hcompiled_selectors
         (with_combination_planes_view compiled grid)
         Hact Hexact Hlookup_avoid).
   Qed.

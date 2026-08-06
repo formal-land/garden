@@ -448,7 +448,7 @@ Section Placed.
     cbn [eval_named_constraint].
     destruct constraint as
       [ selector body | lhs rhs | expression | expression range
-      | lhs rhs | expression ];
+      | lhs rhs | left right | expression ];
       try discriminate Hguarded.
     cbn [eval_constraint].
     intros Hnonzero.

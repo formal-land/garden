@@ -24,13 +24,9 @@ Definition witness_point_gate : Gate.t columns := {|
     let on_curve := curve_eqn Advice.A0 Advice.A1 in
     Constraints.with_selector Selector.QWitnessPoint [
       (Some "x == 0 v on_curve",
-        Constraint.Either
-          (Constraint.EqualZeroToPrecise x_cur)
-          (Constraint.EqualZeroToPrecise on_curve));
+        Constraint.EitherZeroToPrecise x_cur on_curve);
       (Some "y == 0 v on_curve",
-        Constraint.Either
-          (Constraint.EqualZeroToPrecise y_cur)
-          (Constraint.EqualZeroToPrecise on_curve))
+        Constraint.EitherZeroToPrecise y_cur on_curve)
     ];
 |}.
 

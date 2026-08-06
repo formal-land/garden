@@ -56,8 +56,9 @@ axiom-free" claim, and every `Print Assumptions` audit, must run on a full
 `.vo` build that actually executes the relevant certificate `vm_compute`s.
 `make all` builds every certificate in the development, including the 278
 generated Orchard VK provenance certificate modules; a default build
-suffices for auditing `orchard_vk_commit_lagrange_refined`. Treat `-vos`
-as "compiles and type-checks", not "verified".
+suffices for auditing `orchard_vk_commit_lagrange_refined` and the combined
+`orchard_vk_fully_derived`. Treat `-vos` as "compiles and type-checks", not
+"verified".
 Cautionary tale: `circuit_proof/ladder/main.v`'s `full_window_correct`
 `Qed`s were authored and only ever compiled `-vos`, so they sat unverified
 until their first `-vok` (2026-07-02). Under the forward-progress policy,
@@ -972,9 +973,15 @@ That figure was measured over the 399 files of
 pinned-vk, transcript-representation, and VK-provenance layers. Ordinary
 `make` includes the checked-in provenance refinements, the 129 generated
 data modules, and the 278 generated certificate modules, all outside that
-historical total. A clean default build on a 32-core builder measures
-16 m wall for the sources predating the certificate replay plus roughly
-22 min CPU for the replay itself.
+historical total. Before the full-VK aggregate changes, a clean default build
+on a 32-core builder measured 16 m wall for the sources predating the
+certificate replay plus roughly 22 min CPU for the replay itself. The
+configure-metadata,
+setup/domain, exact-gate-AST, and full-VK aggregate changes were separately
+validated by the complete four-worker `orchard-vk-provenance` replay on
+2026-08-05. That validation run was not recorded as a clean benchmark, so it
+supplies no updated whole-tree or end-to-end provenance timing; do not use
+the historical figures below as its timing.
 The 2026-07-06 figure (≈ 1 570 s CPU over 275 files,
 ≈ 212 s ideal wall, wall clock set by the Sinsemilla chain `sinsemilla_s` →
 `chip_proof` → `hash_to_point_round_proof` → `circuit_proof/merkle.v`)
@@ -1034,14 +1041,17 @@ predates the completeness-instance layer entirely. Heavy leaves:
   `compiled` global build (shared by every later `vm_compute` sentence in
   the file), `orchard_compiled_eq` is 1.5 s, and everything else —
   `finite_domain_ok_b` included — is < 0.2 s.
-- `Orchard/compiled/check.v` (2026-07-17): ≈ 4.7 s — the twelve
-  pinned-vk parity certificates against
+- `Orchard/compiled/check.v` (2026-07-17, before configure metadata was added):
+  ≈ 4.7 s — the then-current pinned-vk parity certificates against
   `circuit_description_post_nu6_3`, each a
   `vm_cast_no_check` of an `eq_refl` comparing a projection of
   `OrchardCompiledCheck.compiled` (the compiled Orchard system) with the
-  pinned literal; the first sentence pays the one-time `compiled` global
-  build shared by the rest. `compiled/pinned.v` (the pinned literal
-  data) is ≈ 1.1 s; the five
+  deployed target; the first sentence pays the one-time `compiled` global
+  build shared by the rest. The current file additionally derives exact
+  configure-order queries, complete permutation columns, constants, counts,
+  selector kinds, and minimum degree before comparing them; its post-change
+  timing is not recorded here. `compiled/pinned.v` (the target literal data)
+  was ≈ 1.1 s; the five
   `Halo2/plonkish/{main,compile,mock,sigma,orbit}.v` proof-layer files
   are each < 1 s (generic theorems, no concrete-instance `vm_compute`).
 - `Orchard/compiled/algebraic.v`: ≈ 21 s / 1.3 GB — the L1
@@ -1053,7 +1063,8 @@ predates the completeness-instance layer entirely. Heavy leaves:
   `coset_lbl_inj` proof keeps every `lia` scoped with `clear -` — the
   unscoped form cost ≈ 4.5 min across six calls (18–76 s each) in the
   hypothesis context carrying the `Fpow`-heavy coset equations.
-- The `transcript_repr` T1 leaves: `Orchard/vk/parity.v` ≈ 6.5 s —
+- The `transcript_repr` T1 leaves (before the printer switched every
+  non-commitment field to its derived source): `Orchard/vk/parity.v` ≈ 6.5 s —
   the byte-parity certificate (`vm_cast_no_check` of a primitive-string
   equality between the printed pretty rendering and the 1.3 MB imported
   dump) plus the compact-length certificate; the first pays the shared
@@ -1211,7 +1222,7 @@ help, but do NOT retry swapping the `cbn` for `lazy` — `lazy` inlines the
 later rewrite pattern; `cbn`'s refolding is load-bearing there.
 
 
-### VK-commitment MSM and Vesta SRS provenance
+### Full VK provenance: configure, setup, MSM, and Vesta SRS
 
 The default build checks the 278 generated certificate modules: 229
 computational leaves and 49 aggregate or packaging modules. The explicit
@@ -1219,6 +1230,14 @@ computational leaves and 49 aggregate or packaging modules. The explicit
 with per-group worker caps. The detailed
 proof graph and trust boundary are documented in
 [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
+The final generated packaging module now exposes both the commitment-only
+`orchard_vk_commit_lagrange_refined` and the premise-free full aggregate
+`orchard_vk_fully_derived`. The latter adds the configure-derived counts,
+selector kinds/compression inputs, exact query and permutation order,
+constants/minimum degree, setup-derived domain/modulus fields, exact gate AST,
+and T1/T2 records. Those hand-written pieces are cheap relative to the MSM
+graph, but they still require an ordinary full `.vo` build; `.vos` does not
+validate their `Qed`s.
 
 The generated graph contains 32 independent 64-base SRS shards plus the
 `w`/`u` shard. Each of the 44 commitments has an inverse-FFT calibration,
@@ -1226,7 +1245,7 @@ two 1024-base Pippenger halves, a final assembly, and a packaging module.
 Domain-table and 15 sigma-column certificates supply the remaining
 computational leaves.
 
-A serialized full replay measured on 2026-08-04 spent approximately 4 h 04
+A serialized commitment replay measured on 2026-08-04 spent approximately 4 h 04
 min in the SRS job group and 2 h 15 min in the commitment certificate groups.
 Every job-group default is one worker because concurrent SRS, inverse-FFT,
 Pippenger, and assembly workers retain enough generated terms to exhaust the
@@ -1241,12 +1260,16 @@ closed expression in the tactic and then makes the kernel evaluate it again
 when checking `eq_refl`; the cast asks the kernel to perform a single VM
 conversion. A serialized representative batch containing one domain leaf,
 one sigma leaf, one SRS shard, one inverse-FFT calibration, both MSM halves,
-and one assembly leaf took **374.01 s wall** after the change. A subsequent
-default-settings replay checked every domain and sigma leaf and SRS shards
-00–04 before being stopped once the repeated SRS template was established.
-The 2026-08-04 figures above therefore remain the most recent complete
-all-278-module measurement; do not extrapolate the representative batch as a
-new full-replay timing.
+and one assembly leaf took **374.01 s wall** after the change.
+
+The subsequent 2026-08-05 validation replay completed the entire
+`orchard-vk-provenance` target with four workers in each parallel phase and
+the final aggregate serialized at one worker. It checked all generated
+certificate modules and the final `orchard_vk_fully_derived` `.vo`. The run
+was not instrumented as a controlled benchmark, so no end-to-end wall, CPU,
+or peak-memory total is claimed. The 2026-08-04 figures above remain a
+historical measurement of the earlier commitment graph, and the
+representative batch must not be extrapolated into a new full-replay timing.
 
 **Montgomery-word SRS entry check (2026-08-05).** `VkSrs.check_entry_fast`
 evaluates the per-entry SSWU witness check over five-limb `PallasQ`

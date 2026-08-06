@@ -17,6 +17,7 @@ VK_PROVENANCE_ORACLE := ../scripts/generate_vk_provenance.py
 VK_PROVENANCE_GENERATOR_INPUTS := \
 	$(VK_PROVENANCE_EMITTER) \
 	$(VK_PROVENANCE_ORACLE) \
+	Orchard/Snapshots/circuit_configure_generated_from_model.json \
 	Orchard/Snapshots/circuit_synthesis_generated_from_model.json \
 	Orchard/Snapshots/circuit_selector_compression_generated_from_implementation.json \
 	Orchard/vk/data.v

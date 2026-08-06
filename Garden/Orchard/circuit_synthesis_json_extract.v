@@ -7,6 +7,7 @@ Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.Synthesis.
 Require Garden.Orchard.circuit.
 Require Garden.Orchard.columns.
+Require Import Garden.Orchard.compiled.configuration.
 Require Garden.Orchard.circuit_synthesis_layout.
 
 Extraction Language OCaml.
@@ -35,6 +36,13 @@ Definition model_configure_trace : list HighLevelTrace.ConfigureOp.t :=
       Garden.Orchard.columns.Index.indices
       Garden.Orchard.circuit.configure).
 
+(** Builder metadata used by key generation, interpreted from the same
+    configure program.  Its JSON view is compared externally with Halo 2's
+    implementation snapshot; the closed Rocq compilation certificate does
+    not trust that comparison. *)
+Definition model_configure_metadata : Metadata.State.t :=
+  OrchardConfigure.state.
+
 Definition model_layout_trace : list HighLevelTrace.LayoutNode.t :=
   snd
     (HighLevelTrace.eval_layouter
@@ -45,6 +53,7 @@ Definition model_layout_trace : list HighLevelTrace.LayoutNode.t :=
 
 Extraction "orchard_synthesis_model.ml"
   model_configure
+  model_configure_metadata
   model_synthesis_events
   model_configure_trace
   model_layout_trace.

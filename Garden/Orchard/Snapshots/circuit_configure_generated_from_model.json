@@ -320,5 +320,17 @@
   {"input":{"tag":"Sum","args":[{"tag":"Product","args":[{"tag":"Selector","selector":"29"},{"tag":"Sum","args":[{"tag":"Scaled","expr":{"tag":"Product","args":[{"tag":"Sum","args":[{"tag":"Advice","column":"8","rotation":"0"},{"tag":"Advice","column":"9","rotation":"0"}]},{"tag":"Sum","args":[{"tag":"Advice","column":"5","rotation":"0"},{"tag":"Negated","expr":{"tag":"Sum","args":[{"tag":"Product","args":[{"tag":"Advice","column":"8","rotation":"0"},{"tag":"Advice","column":"8","rotation":"0"}]},{"tag":"Negated","expr":{"tag":"Advice","column":"5","rotation":"0"}},{"tag":"Negated","expr":{"tag":"Advice","column":"6","rotation":"0"}}]}}]}]},"scale":"14474011154664524427946373126085988481681528240970780357977338382174983815169"},{"tag":"Negated","expr":{"tag":"Product","args":[{"tag":"Advice","column":"8","rotation":"0"},{"tag":"Sum","args":[{"tag":"Advice","column":"5","rotation":"0"},{"tag":"Negated","expr":{"tag":"Advice","column":"6","rotation":"0"}}]}]}}]}]},{"tag":"Scaled","expr":{"tag":"Sum","args":[{"tag":"Constant","value":"1"},{"tag":"Negated","expr":{"tag":"Selector","selector":"29"}}]},"scale":"21285653556795296467031706491948305595095309413618206259690549906869937136771"}]},"table":"2"}
 ]}
     ]
+  },
+  "vk_metadata": {
+    "valid": true,
+    "columns": {"advice":10,"fixed":14,"instance":1},
+    "selector_types": [true,true,false,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,false,true,true,true,false,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true,true],
+    "lookup_fixed_columns": [0,1,2],
+    "advice_queries": [{"column":0,"rotation":0},{"column":1,"rotation":0},{"column":2,"rotation":0},{"column":3,"rotation":0},{"column":4,"rotation":0},{"column":5,"rotation":0},{"column":6,"rotation":0},{"column":7,"rotation":0},{"column":8,"rotation":0},{"column":9,"rotation":0},{"column":9,"rotation":1},{"column":9,"rotation":-1},{"column":2,"rotation":1},{"column":3,"rotation":1},{"column":4,"rotation":1},{"column":5,"rotation":1},{"column":0,"rotation":1},{"column":1,"rotation":1},{"column":7,"rotation":1},{"column":8,"rotation":1},{"column":6,"rotation":-1},{"column":1,"rotation":-1},{"column":6,"rotation":1},{"column":7,"rotation":-1},{"column":8,"rotation":-1}],
+    "fixed_queries": [{"column":3,"rotation":0},{"column":0,"rotation":0},{"column":11,"rotation":0},{"column":4,"rotation":0},{"column":5,"rotation":0},{"column":6,"rotation":0},{"column":7,"rotation":0},{"column":8,"rotation":0},{"column":9,"rotation":0},{"column":10,"rotation":0},{"column":12,"rotation":0},{"column":1,"rotation":0},{"column":2,"rotation":0},{"column":13,"rotation":0}],
+    "instance_queries": [{"column":0,"rotation":0}],
+    "permutation_columns": [{"kind":"instance","index":0},{"kind":"advice","index":0},{"kind":"advice","index":1},{"kind":"advice","index":2},{"kind":"advice","index":3},{"kind":"advice","index":4},{"kind":"advice","index":5},{"kind":"advice","index":6},{"kind":"advice","index":7},{"kind":"advice","index":8},{"kind":"advice","index":9},{"kind":"fixed","index":3},{"kind":"fixed","index":8},{"kind":"fixed","index":9},{"kind":"fixed","index":10}],
+    "constants": [3],
+    "minimum_degree": null
   }
 }

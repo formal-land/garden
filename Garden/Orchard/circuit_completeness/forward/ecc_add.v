@@ -574,7 +574,8 @@ Module OrchardCompletenessForwardEccAdd.
   Qed.
 
   (** The two witness-point constraint bodies: curve-or-sentinel at the
-      witnessed cells. *)
+      witnessed cells.  Compilation preserves their deployed
+      left-associated products [(q * x) * curve] and [(q * y) * curve]. *)
   Lemma witness_point_eval (Γ : Assignment.t columns RegionId.t)
       (region : RegionId.t) (row : Z) (P : Point.t)
       (HA0 : Γ.(Assignment.advice) A0 region row = Point.x P)

@@ -282,9 +282,23 @@ def load_events() -> list[dict[str, object]]:
     return json.loads(path.read_text())["events"]
 
 
+def load_vk_metadata() -> dict[str, object]:
+    path = ROOT / "Garden/Orchard/Snapshots/circuit_configure_generated_from_model.json"
+    metadata = json.loads(path.read_text()).get("vk_metadata")
+    if not isinstance(metadata, dict) or metadata.get("valid") is not True:
+        raise AssertionError("model configure snapshot has no valid vk_metadata")
+    return metadata
+
+
 def fixed_evaluations(events: list[dict[str, object]]) -> list[list[int]]:
-    columns = [[0] * N for _ in range(14)]
-    selector_rows: list[set[int]] = [set() for _ in range(56)]
+    metadata = load_vk_metadata()
+    configured_columns = metadata["columns"]
+    assert isinstance(configured_columns, dict)
+    base_fixed_count = int(configured_columns["fixed"])
+    selector_types = metadata["selector_types"]
+    assert isinstance(selector_types, list)
+    columns = [[0] * N for _ in range(base_fixed_count)]
+    selector_rows: list[set[int]] = [set() for _ in selector_types]
     for event in events:
         tag = event["tag"]
         if tag == "AssignFixed":
@@ -314,18 +328,26 @@ def fixed_evaluations(events: list[dict[str, object]]) -> list[list[int]]:
                 values[row] = label
         assert int(combination["fixed_column"]["index"]) == len(columns)
         columns.append(values)
-    assert len(columns) == 29 and all(len(column) == N for column in columns)
+    assert len(columns) == base_fixed_count + len(compression["combinations"])
+    assert all(len(column) == N for column in columns)
     return [[value % P for value in column] for column in columns]
 
 
-PERMUTATION_COLUMNS = [
-    ("Instance_", 0),
-    *(("Advice", i) for i in range(10)),
-    ("Fixed", 3),
-    ("Fixed", 8),
-    ("Fixed", 9),
-    ("Fixed", 10),
-]
+def permutation_columns() -> list[tuple[str, int]]:
+    kind_names = {
+        "advice": "Advice",
+        "fixed": "Fixed",
+        "instance": "Instance_",
+    }
+    values = load_vk_metadata()["permutation_columns"]
+    assert isinstance(values, list)
+    return [
+        (kind_names[str(column["kind"])], int(column["index"]))
+        for column in values
+    ]
+
+
+PERMUTATION_COLUMNS = permutation_columns()
 
 
 def cell_of_json(value: dict[str, object]) -> tuple[int, int]:

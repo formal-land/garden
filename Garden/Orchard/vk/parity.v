@@ -1,8 +1,9 @@
 (** * T1: byte parity of the printed pinned description with the dump.
 
     The dump-parity certificate of the [transcript_repr] byte channel: the
-    in-model printer ([vk/print.v]), run in pretty mode over the
-    compiled Orchard system and the pinned literals, reproduces
+    legacy/default printer instance ([vk/print.v]), run in pretty mode over
+    the metadata-derived compiled Orchard system, setup computation, and
+    deployed commitment-coordinate target, reproduces
     [orchard/src/circuit_data/circuit_description_post_nu6_3] — the
     [format!("{:#?}\n", vk.pinned())] Debug dump the orchard test suite
     asserts against the Post-NU6.3 verifying key
@@ -13,10 +14,10 @@
     the 193 compiled gate polynomials with their selector-indicator
     factors and keygen query indices, the query tables, the permutation
     columns, the lookup arguments, the constants column, the domain
-    constants, and the pinned literals of [vk/data.v] (moduli
-    strings, [extended_k], the 44 commitment coordinate pairs,
-    [minimum_degree]) — retiring the offline-transcription trust of the
-    literal files, which T1 pins to the deployed dump.
+    constants, and the setup/domain values.  This legacy theorem uses the
+    deployed 44 commitment pairs; [OrchardVkFullAbstract] transports T1 to an
+    explicit generated coordinate view and separately proves that every view
+    entry denotes the corresponding mathematical [commit_lagrange] result.
 
     The compact rendering [VkPinnedPrint.vk_pinned_compact] of the same
     printer is the string [s] whose BLAKE2b-512 hash (personalized
@@ -41,19 +42,24 @@ Proof. vm_cast_no_check (@eq_refl PrimInt63.int 1285701%uint63). Qed.
 
 (** T1: the pretty rendering equals the dump byte-for-byte. *)
 Lemma vk_pinned_dump_parity :
-  VkPinnedPrint.vk_pinned_pretty = VkPinnedBytes.dump.
+  VkPinnedPrint.vk_pretty_with
+    VkPinnedPrint.pinned_commitment_coordinates = VkPinnedBytes.dump.
 Proof.
   vm_cast_no_check (@eq_refl PrimString.string VkPinnedBytes.dump).
 Qed.
 
 Lemma vk_pinned_pretty_length :
-  PrimString.length VkPinnedPrint.vk_pinned_pretty = 1285701%uint63.
+  PrimString.length
+    (VkPinnedPrint.vk_pretty_with
+      VkPinnedPrint.pinned_commitment_coordinates) = 1285701%uint63.
 Proof. now rewrite vk_pinned_dump_parity, dump_length. Qed.
 
 (** The compact rendering's byte count: the value of the [le64] length
     prefix of the [transcript_repr] hash input ([285134 = 0x459ce]). *)
 Lemma vk_pinned_compact_length :
-  PrimString.length VkPinnedPrint.vk_pinned_compact = 285134%uint63.
+  PrimString.length
+    (VkPinnedPrint.vk_compact_with
+      VkPinnedPrint.pinned_commitment_coordinates) = 285134%uint63.
 Proof. vm_cast_no_check (@eq_refl PrimInt63.int 285134%uint63). Qed.
 
 End VkPinnedParity.

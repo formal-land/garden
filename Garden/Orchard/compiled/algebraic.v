@@ -1,9 +1,9 @@
-(** * Algebraic acceptance of the pinned Orchard system, down to the Action statement.
+(** * Algebraic acceptance of the derived Orchard system, down to the Action statement.
 
     The L1 rung of the refinement ladder for the concrete Orchard action
     circuit: [orchard_algebraic_accepts] states the three all-challenge
     identity families ([PlonkishAlgebraic.algebraic_accepts]) over the
-    compiled pinned system [OrchardCompiledCheck.compiled], the pinned
+    configure-derived system [OrchardCompiledCheck.compiled], the checked
     evaluation-domain root [PolyDomain.omega] (k = 11, n = 2048), the
     permutation chunking [chunk_len = cs.degree() - 2] read off the
     modeled system degree, and the coset label assignment
@@ -53,7 +53,7 @@ Require Import Garden.Halo2.plonkish.algebraic.
 Require Import Garden.Orchard.columns.
 Require Import Garden.Orchard.circuit_synthesis_layout.
 Require Import Garden.Orchard.circuit_operational.
-Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.check.
 Require Import Garden.Orchard.compiled.main.
 Require Garden.Orchard.circuit.
@@ -409,20 +409,31 @@ Qed.
 (** ** The permutation chunking of the deployed verifier
 
     [chunk_len = cs.degree() - 2] ([plonk/permutation/verifier.rs]); the
-    modeled system degree of the pinned Orchard system is [9]. *)
+    modeled system degree of the derived Orchard system is [9]. *)
 
-Definition orchard_chunk_len : nat :=
-  (system_degree orchard_indexed_system - 2)%nat.
+Definition orchard_configured_degree : nat :=
+  system_degree_with_minimum orchard_indexed_system
+    OrchardConfigure.minimum_degree.
+
+Definition orchard_chunk_len : nat := (orchard_configured_degree - 2)%nat.
 
 Lemma orchard_degree : system_degree orchard_indexed_system = 9%nat.
 Proof.
   vm_cast_no_check (@eq_refl nat 9%nat).
 Qed.
 
+Lemma orchard_configured_degree_eq : orchard_configured_degree = 9%nat.
+Proof.
+  unfold orchard_configured_degree.
+  rewrite OrchardConfigure.minimum_degree_eq.
+  fold (system_degree orchard_indexed_system).
+  exact orchard_degree.
+Qed.
+
 Lemma orchard_chunk_pos : (0 < orchard_chunk_len)%nat.
 Proof.
   unfold orchard_chunk_len.
-  rewrite orchard_degree.
+  rewrite orchard_configured_degree_eq.
   lia.
 Qed.
 
@@ -888,15 +899,15 @@ Proof.
   reflexivity.
 Qed.
 
-(** ** Algebraic acceptance of the pinned Orchard system *)
+(** ** Algebraic acceptance of the derived Orchard system *)
 
-(** The permutation cell values of a witness grid over the pinned
+(** The permutation cell values of a witness grid over the configure-derived
     permutation columns. *)
 Definition orchard_perm_values (grid : RawGrid.t) : Sigma.cell -> Z :=
   OrchardCompiled.permutation_cell_value
-    OrchardCompiledPinned.permutation_columns grid.
+    OrchardConfigure.permutation_columns grid.
 
-(** The all-challenge identity package over the compiled pinned system:
+(** The all-challenge identity package over the compiled derived system:
     the vanishing quotient for the 193 compiled gate polynomials (through
     polynomials [Es] agreeing with the grid on [H]), the four permutation
     product rules against the [delta^i omega^j] coset labels and the σ of
@@ -934,13 +945,16 @@ Proof.
     OrchardCompiled.orchard_domain PolyDomain.omega PolyDomain.k
     orchard_k_ge PolyDomain.pallas_p_gt2 PolyDomain.omega_order_full
     PolyDomain.omega_order_half orchard_n_pow
-    orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
-    OrchardCompiledPinned.permutation_columns OrchardCompiledPinned.constants
+    orchard_indexed_system OrchardCompiledCheck.orchard_infos
+    OrchardConfigure.base_fixed_columns
+    OrchardConfigure.permutation_columns OrchardConfigure.constants
     OrchardCompiledCheck.compiled orchard_events advice instance_ grid
     orchard_table_rows 15 orchard_chunk_len (orchard_perm_values grid)
     coset_lbl OrchardCompiled.orchard_sigma Es
-    Hreplay OrchardCompiled.orchard_compiled_eq orchard_gates_bound
-    orchard_k_nonneg OrchardCompiled.orchard_blinding_nonneg
+    Hreplay OrchardCompiled.orchard_compiled_lookups_eq
+    OrchardCompiled.orchard_compiled_selector_assignments_eq
+    orchard_gates_bound orchard_k_nonneg
+    OrchardCompiled.orchard_blinding_nonneg
     orchard_ur_nonneg orchard_chunk_pos orchard_big coset_lbl_inj
     orchard_sigma_range orchard_sigma_fix Hcanon orchard_tr_pos
     orchard_tr_le orchard_hp_pts orchard_theta_bounds
@@ -993,7 +1007,7 @@ Proof.
       Haccepts)).
 Qed.
 
-(** The chain end: algebraic acceptance of the pinned system, together
+(** The chain end: algebraic acceptance of the derived system, together
     with the four witness-honesty side conditions, gives the §4.18.4
     Action statement and [ValidActionInputs] of the realized
     assignment. *)
@@ -1048,14 +1062,14 @@ Qed.
     invariant the σ construction already maintains. *)
 
 Lemma orchard_permutation_columns_length :
-  List.length OrchardCompiledPinned.permutation_columns = 15%nat.
+  List.length OrchardConfigure.permutation_columns = 15%nat.
 Proof.
   vm_cast_no_check (@eq_refl nat 15%nat).
 Qed.
 
 (** The assembly's cell domain is the permutation cell space. *)
 Lemma orchard_cell_dom_space (c : Sigma.cell) :
-  cell_dom OrchardCompiledPinned.permutation_columns
+  cell_dom OrchardConfigure.permutation_columns
     OrchardCompiled.orchard_n_rows c <->
   PermutationPoly.space_cell OrchardCompiled.orchard_domain 15 c.
 Proof.
@@ -1072,7 +1086,7 @@ Lemma orchard_sigma_space_dom (c : Sigma.cell) :
 Proof.
   intros Hc.
   exact (proj1 (orchard_cell_dom_space _)
-    (sigma_of_copies_dom OrchardCompiledPinned.permutation_columns
+    (sigma_of_copies_dom OrchardConfigure.permutation_columns
       OrchardCompiled.orchard_n_rows OrchardCompiled.orchard_copies
       OrchardCompiled.orchard_sigma OrchardCompiled.orchard_sigma_eq c
       (proj2 (orchard_cell_dom_space c) Hc))).
@@ -1085,7 +1099,7 @@ Lemma orchard_sigma_space_inj (c d : Sigma.cell) :
   Sigma.perm OrchardCompiled.orchard_sigma d -> c = d.
 Proof.
   intros Hc Hd Heq.
-  exact (sigma_of_copies_inj OrchardCompiledPinned.permutation_columns
+  exact (sigma_of_copies_inj OrchardConfigure.permutation_columns
     OrchardCompiled.orchard_n_rows OrchardCompiled.orchard_copies
     OrchardCompiled.orchard_sigma OrchardCompiled.orchard_sigma_eq c d
     (proj2 (orchard_cell_dom_space c) Hc)
@@ -1156,7 +1170,7 @@ Definition orchard_algebraic_accepts_regular (grid : RawGrid.t)
     (orchard_perm_values grid) coset_lbl OrchardCompiled.orchard_sigma Es.
 
 (** The compiled satisfaction triple of the R2 assembly yields algebraic
-    acceptance of the pinned system: the converse of
+    acceptance of the derived system: the converse of
     [orchard_algebraic_sound] at the regular challenges. *)
 Theorem orchard_algebraic_complete
     (advice instance_ : Z -> Z -> Z) (grid : RawGrid.t) (Es : list Poly.t)
@@ -1174,12 +1188,16 @@ Proof.
     OrchardCompiled.orchard_domain PolyDomain.omega PolyDomain.k
     orchard_k_ge PolyDomain.pallas_p_gt2 PolyDomain.omega_order_full
     PolyDomain.omega_order_half orchard_n_pow
-    orchard_indexed_system OrchardCompiledCheck.orchard_infos 14
-    OrchardCompiledPinned.permutation_columns OrchardCompiledPinned.constants
-    OrchardCompiledCheck.compiled advice instance_ grid orchard_table_rows
+    orchard_indexed_system OrchardCompiledCheck.orchard_infos
+    OrchardConfigure.base_fixed_columns
+    OrchardConfigure.permutation_columns OrchardConfigure.constants
+    OrchardCompiledCheck.compiled advice instance_ grid
+    orchard_table_rows
     15 orchard_chunk_len (orchard_perm_values grid) coset_lbl
     OrchardCompiled.orchard_sigma Es
-    OrchardCompiled.orchard_compiled_eq orchard_gates_bound orchard_k_nonneg
+    OrchardCompiled.orchard_compiled_lookups_eq
+    OrchardCompiled.orchard_compiled_selector_assignments_eq
+    orchard_gates_bound orchard_k_nonneg
     OrchardCompiled.orchard_blinding_nonneg orchard_ur_nonneg
     orchard_chunk_pos orchard_tr_le
     (OrchardCompiled.orchard_selector_plane advice instance_ grid Hreplay)

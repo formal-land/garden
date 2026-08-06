@@ -49,6 +49,10 @@ let json_pstring value = json_string (Pstring.to_string value)
 
 let json_z value = json_string (string_of_z value)
 
+let json_z_number value = string_of_z value
+
+let json_bool value = if value then "true" else "false"
+
 let json_index value = json_z (Obj.magic value : M.z)
 
 let json_option_pstring = function
@@ -216,6 +220,8 @@ let rec json_constraint_tree = function
       json_range_check expression range
   | M.Constraint.Either (left, right) ->
       json_product_tree (json_constraint_tree left) (json_constraint_tree right)
+  | M.Constraint.EitherZeroToPrecise (left, right) ->
+      json_product_tree (json_expression_tree left) (json_expression_tree right)
   | M.Constraint.EqualZeroToPrecise expression ->
       json_expression_tree expression
 
@@ -266,6 +272,11 @@ let rec json_semantic_constraint = function
       Printf.sprintf "{\"tag\":\"Either\",\"left\":%s,\"right\":%s}"
         (json_semantic_constraint left)
         (json_semantic_constraint right)
+  | M.Constraint.EitherZeroToPrecise (left, right) ->
+      Printf.sprintf
+        "{\"tag\":\"EitherZeroToPrecise\",\"left\":%s,\"right\":%s}"
+        (json_expression left)
+        (json_expression right)
   | M.Constraint.EqualZeroToPrecise expression ->
       Printf.sprintf
         "{\"tag\":\"EqualZeroToPrecise\",\"expression\":%s}"
@@ -375,6 +386,8 @@ let json_configure_trace_operation stats operation_index = function
         (json_string (Printf.sprintf "lookup-argument:%d" lookup_index))
         lookup_index
         (json_lookup lookup)
+  | M.HighLevelTrace.ConfigureOp.Metadata _ ->
+      failwith "metadata operations are rendered in vk_metadata"
 
 type layout_trace_stats = {
   mutable layout_node_count : int;
@@ -509,9 +522,16 @@ let write_structure_json path =
     configure_constraint_count = 0;
   } in
   let configure_operations =
+    let visible_operations =
+      List.filter
+        (function
+          | M.HighLevelTrace.ConfigureOp.Metadata _ -> false
+          | _ -> true)
+        M.model_configure_trace
+    in
     List.mapi
       (json_configure_trace_operation configure_stats)
-      M.model_configure_trace
+      visible_operations
   in
   let layout_stats = {
     layout_node_count = 0;
@@ -583,6 +603,28 @@ let write_synthesis_json path =
       Printf.fprintf channel "}\n")
 
 let write_configure_json path =
+  let metadata = M.model_configure_metadata in
+  let counts = metadata.counts in
+  let queries = metadata.queries in
+  let json_query (column, rotation) =
+    Printf.sprintf "{\"column\":%s,\"rotation\":%s}"
+      (json_z_number column)
+      (json_z_number rotation)
+  in
+  let json_indexed_kind = function
+    | M.Metadata.IndexedColumn.Advice -> json_string "advice"
+    | M.Metadata.IndexedColumn.Fixed -> json_string "fixed"
+    | M.Metadata.IndexedColumn.Instance_ -> json_string "instance"
+  in
+  let json_indexed_column (column : M.Metadata.IndexedColumn.t) =
+    Printf.sprintf "{\"kind\":%s,\"index\":%s}"
+      (json_indexed_kind column.kind)
+      (json_z_number column.index)
+  in
+  let json_minimum_degree = function
+    | None -> "null"
+    | Some degree -> string_of_int (int_of_nat degree)
+  in
   let channel = open_out path in
   Fun.protect
     ~finally:(fun () -> close_out channel)
@@ -593,6 +635,39 @@ let write_configure_json path =
         (json_list ~indent:4 json_gate M.model_configure.gates);
       Printf.fprintf channel "    \"lookups\": %s\n"
         (json_list ~indent:4 json_lookup M.model_configure.lookups);
+      Printf.fprintf channel "  },\n";
+      Printf.fprintf channel "  \"vk_metadata\": {\n";
+      Printf.fprintf channel
+        "    \"valid\": %s,\n" (json_bool metadata.valid);
+      Printf.fprintf channel
+        "    \"columns\": {\"advice\":%s,\"fixed\":%s,\"instance\":%s},\n"
+        (json_z_number counts.advice)
+        (json_z_number counts.fixed)
+        (json_z_number counts.instance_);
+      Printf.fprintf channel
+        "    \"selector_types\": %s,\n"
+        (json_inline_list json_bool metadata.selector_types);
+      Printf.fprintf channel
+        "    \"lookup_fixed_columns\": %s,\n"
+        (json_inline_list json_z_number metadata.lookup_columns);
+      Printf.fprintf channel
+        "    \"advice_queries\": %s,\n"
+        (json_inline_list json_query queries.advice);
+      Printf.fprintf channel
+        "    \"fixed_queries\": %s,\n"
+        (json_inline_list json_query queries.fixed);
+      Printf.fprintf channel
+        "    \"instance_queries\": %s,\n"
+        (json_inline_list json_query queries.instance_);
+      Printf.fprintf channel
+        "    \"permutation_columns\": %s,\n"
+        (json_inline_list json_indexed_column metadata.permutation_columns);
+      Printf.fprintf channel
+        "    \"constants\": %s,\n"
+        (json_inline_list json_z_number metadata.constants);
+      Printf.fprintf channel
+        "    \"minimum_degree\": %s\n"
+        (json_minimum_degree metadata.minimum_degree);
       Printf.fprintf channel "  }\n";
       Printf.fprintf channel "}\n")
 

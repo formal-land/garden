@@ -1,11 +1,10 @@
-(** * Verified Debug printer for the pinned verifying-key description.
+(** * Verified Debug printer for the deployed verifying-key description.
 
-    A structural printer from the model's compiled system
-    ([OrchardCompiledCheck.compiled], the [Plonkish.Compile.compile] output
-    the twelve parity certificates pin) plus the pinned literals of
-    [vk/data.v], to the byte string of Rust's [Debug] rendering of
-    [vk.pinned()].  The printer is parameterized on the alternate-form flag
-    [alt], mirroring [core::fmt]: [alt = true] yields the pretty [{:#?}]
+    A structural printer from the model's metadata-driven compiled system,
+    the setup/domain computation, and an explicit commitment-coordinate
+    input, to the byte string of Rust's [Debug] rendering of [vk.pinned()].
+    The printer is parameterized on the alternate-form flag [alt], mirroring
+    [core::fmt]: [alt = true] yields the pretty [{:#?}]
     rendering (the in-tree dump [circuit_description_post_nu6_3], the T1
     parity target), [alt = false] the compact [{:?}] rendering (the string [s]
     hashed into [transcript_repr] by [keygen_vk],
@@ -25,8 +24,9 @@
     - [Expression] ([halo2 plonk/circuit.rs]): [Sum]/[Product]/[Negated]/
       [Scaled]/[Constant] as tuple structs; query leaves as structs with
       fields [query_index], [column_index], [rotation] — [query_index] is
-      resolved by position in the pinned keygen-order query table of the
-      leaf's column kind (the model does not carry query indices);
+      resolved by position in the configure-derived keygen-order query table
+      of the leaf's column kind (the expression model does not carry query
+      indices);
     - [Rotation]: derived tuple struct over a signed decimal;
     - [Column { index, column_type }] with the bare kind marker
       ([Advice]/[Fixed]/[Instance]);
@@ -41,13 +41,12 @@
       [permutation::VerifyingKey { commitments }], and the quoted [&str]
       moduli.
 
-    The gate list is [printed_gates]: the compiled gates with the deployed
-    builder's top-level product association restored on the two gates whose
-    modeled association differs (the flattened-fingerprint parity
-    certificate [gate_polynomials_match] compares modulo exactly this
-    re-association); [printed_gates_gate_fp] proves the fingerprints are
-    unchanged, and the T1 byte parity ([vk/parity.v]) certifies the
-    printed bytes against the deployed dump. *)
+    The gate list is [printed_gates], definitionally the configure-derived
+    compiled gates.  Garden's precise either-zero constructor preserves the
+    deployed builder's left-associated product tree, including the two curve
+    checks that previously required a printer-only reassociation.  The T1
+    byte parity ([vk/parity.v]) therefore certifies the compiled AST itself
+    against the deployed dump. *)
 
 Require Import Stdlib.ZArith.ZArith.
 Require Import Stdlib.Strings.PrimString.
@@ -56,10 +55,11 @@ Require Import Garden.Field.Field.
 Require Import Garden.Halo2.main.
 Require Import Garden.Halo2.serialize.
 Require Import Garden.Halo2.plonkish.main.
-Require Import Garden.Halo2.plonkish.poly_domain.
-Require Import Garden.Orchard.compiled.pinned.
+Require Import Garden.Orchard.compiled.configuration.
 Require Import Garden.Orchard.compiled.check.
 Require Import Garden.Orchard.vk.data.
+Require Import Garden.Orchard.vk.provenance.OrchardCombinationCount.
+Require Import Garden.Orchard.vk.setup.
 
 Import ListNotations.
 Import Plonkish.
@@ -245,11 +245,10 @@ Definition pp_column (alt : bool) (d : nat) (kind : PrimString.string)
 (** ** Query-index resolution
 
     The model carries no query indices; every query leaf resolves its
-    [query_index] by position in the pinned keygen-order query table of its
-    column kind ([compiled/pinned.v]; set-equal to the model's
-    collected tables by the query parity certificates).  The same pinned
-    tables are printed as the query sections, so the internal consistency
-    of leaf indices and tables is forced by the byte parity. *)
+    [query_index] by position in the configure-derived keygen-order query
+    table of its column kind.  The same derived tables are printed as the
+    query sections.  The deployed tables occur only as equality targets in
+    [compiled/check.v], not as inputs to this printer. *)
 
 Fixpoint index_of_go (q : Z * Z) (l : list (Z * Z)) (i : Z) : Z :=
   match l with
@@ -257,14 +256,30 @@ Fixpoint index_of_go (q : Z * Z) (l : list (Z * Z)) (i : Z) : Z :=
   | x :: rest => if Queries.query_eqb x q then i else index_of_go q rest (i + 1)
   end.
 
+(** Query tables are read from the formal configure state.  The generated
+    selector-combination columns use a small checked cache whose equality to
+    the actual compression output is [OrchardCombinationCount.columns_checked].
+    Keeping these tables independent of the full compiled record prevents
+    every expression leaf from replaying selector compression during VM
+    rendering. *)
+Definition printed_advice_queries : list (Z * Z) :=
+  OrchardConfigure.advice_queries.
+
+Definition printed_fixed_queries : list (Z * Z) :=
+  Compile.add_combination_queries OrchardConfigure.fixed_queries
+    OrchardCombinationCount.checked_columns.
+
+Definition printed_instance_queries : list (Z * Z) :=
+  OrchardConfigure.instance_queries.
+
 Definition advice_index (c r : Z) : Z :=
-  index_of_go (c, r) OrchardCompiledPinned.advice_queries 0.
+  index_of_go (c, r) printed_advice_queries 0.
 
 Definition fixed_index (c r : Z) : Z :=
-  index_of_go (c, r) OrchardCompiledPinned.fixed_queries 0.
+  index_of_go (c, r) printed_fixed_queries 0.
 
 Definition instance_index (c r : Z) : Z :=
-  index_of_go (c, r) OrchardCompiledPinned.instance_queries 0.
+  index_of_go (c, r) printed_instance_queries 0.
 
 (** Query leaf: a struct with the field name [query_index] (the Rust field
     is [index]), then [column_index], then [rotation]. *)
@@ -332,77 +347,6 @@ Fixpoint pp_expr (alt : bool) (d : nat)
       cclose alt d ")" acc
   end.
 
-(** ** The printed gate list
-
-    The deployed gate builder's product chains are applications of Rust's
-    left-associative [*]; the model's [constraint_to_expression] groups the
-    same factor sequence differently on two gates (indices 6 and 7, the
-    curve-equation checks), whose top-level product is rotated one step
-    here to the deployed association.  [gate_polynomials_match]
-    ([compiled/check.v]) compares gates by flattened factor
-    fingerprint precisely because of this re-association;
-    [printed_gates_gate_fp] below proves the rotation preserves those
-    fingerprints, so the printed gates are the parity-certified
-    polynomials. *)
-
-Definition rotate_top (e : Expression.t Configure.indexed_columns)
-    : Expression.t Configure.indexed_columns :=
-  match e with
-  | Expression.Product l (Expression.Product a b) =>
-      Expression.Product (Expression.Product l a) b
-  | _ => e
-  end.
-
-Definition assoc_fixed_gate
-    (ig : nat * Expression.t Configure.indexed_columns)
-    : Expression.t Configure.indexed_columns :=
-  let '(i, g) := ig in
-  if orb (Nat.eqb i 6) (Nat.eqb i 7) then rotate_top g else g.
-
-Definition printed_gates : list (Expression.t Configure.indexed_columns) :=
-  List.map assoc_fixed_gate
-    (List.combine
-      (List.seq 0
-        (List.length
-          OrchardCompiledCheck.compiled.(CompiledSystem.gates)))
-      OrchardCompiledCheck.compiled.(CompiledSystem.gates)).
-
-Lemma rotate_top_gate_fp (e : Expression.t Configure.indexed_columns) :
-  OrchardCompiledCheck.gate_fp (rotate_top e)
-  = OrchardCompiledCheck.gate_fp e.
-Proof.
-  destruct e; try reflexivity.
-  destruct e2; try reflexivity.
-  unfold OrchardCompiledCheck.gate_fp; cbn [OrchardCompiledCheck.factors].
-  now rewrite List.app_assoc.
-Qed.
-
-Lemma map_assoc_fixed_gate_fp
-    (s : list nat) (l : list (Expression.t Configure.indexed_columns)) :
-  List.length s = List.length l ->
-  List.map OrchardCompiledCheck.gate_fp
-    (List.map assoc_fixed_gate (List.combine s l))
-  = List.map OrchardCompiledCheck.gate_fp l.
-Proof.
-  revert s; induction l as [| g l IH]; intros s Hlen;
-    destruct s as [| i s]; simpl in *; try reflexivity; try discriminate.
-  f_equal.
-  - unfold assoc_fixed_gate.
-    destruct (orb (Nat.eqb i 6) (Nat.eqb i 7));
-      [apply rotate_top_gate_fp | reflexivity].
-  - apply IH; congruence.
-Qed.
-
-(** The printed gates carry exactly the parity-certified fingerprints. *)
-Lemma printed_gates_gate_fp :
-  List.map OrchardCompiledCheck.gate_fp printed_gates
-  = List.map OrchardCompiledCheck.gate_fp
-      OrchardCompiledCheck.compiled.(CompiledSystem.gates).
-Proof.
-  apply map_assoc_fixed_gate_fp.
-  apply List.length_seq.
-Qed.
-
 (** ** Sections of the description *)
 
 (** Query-table entry: the tuple [(Column { .. }, Rotation(..))]. *)
@@ -438,8 +382,7 @@ Definition pp_permutation_argument (alt : bool) (d : nat)
   let acc := emit "columns: " acc in
   let acc :=
     pp_list_go alt (S d) (pp_colref alt (S (S d)))
-      OrchardCompiledCheck.compiled.(CompiledSystem.permutation_columns)
-      acc in
+      OrchardConfigure.permutation_columns acc in
   sclose alt d acc.
 
 (** [lookup::Argument { input_expressions, table_expressions }].  Inputs
@@ -461,8 +404,8 @@ Definition pp_lookup_argument (alt : bool) (d : nat)
     pp_list_go alt (S d)
       (fun pair acc =>
         pp_query alt (S (S d)) "Fixed"
-          (fixed_index (OrchardCompiledCheck.table_fixed_column (snd pair)) 0)
-          (OrchardCompiledCheck.table_fixed_column (snd pair)) 0 acc)
+          (fixed_index (OrchardConfigure.lookup_fixed_column (snd pair)) 0)
+          (OrchardConfigure.lookup_fixed_column (snd pair)) 0 acc)
       lk.(LookupArgument.pairs) acc in
   sclose alt d acc.
 
@@ -476,52 +419,63 @@ Definition pp_option_Z (alt : bool) (d : nat) (o : option Z)
       cclose alt d ")" acc
   end.
 
+Definition option_nat_to_Z (value : option nat) : option Z :=
+  match value with
+  | Some value => Some (Z.of_nat value)
+  | None => None
+  end.
+
+Definition num_fixed_columns : Z :=
+  OrchardConfigure.base_fixed_columns +
+    Z.of_nat (List.length OrchardCombinationCount.checked_columns).
+
 (** [PinnedEvaluationDomain { k, extended_k, omega }]. *)
 Definition pp_domain (alt : bool) (d : nat) (acc : list PrimString.string)
     : list PrimString.string :=
   let acc := sopen alt d "PinnedEvaluationDomain" acc in
   let acc := emit "k: " acc in
-  let acc := emit (dec_Z (Z.of_nat PolyDomain.k)) acc in
+  let acc := emit (dec_Z (Z.of_nat OrchardVkSetup.k)) acc in
   let acc := csep alt d acc in
   let acc := emit "extended_k: " acc in
-  let acc := emit (dec_Z VkPinnedData.extended_k) acc in
+  let acc := emit (dec_Z (Z.of_nat OrchardVkSetup.extended_k)) acc in
   let acc := csep alt d acc in
   let acc := emit "omega: " acc in
-  let acc := emit (hex64 PolyDomain.omega) acc in
+  let acc := emit (hex64 OrchardVkSetup.omega_from_pasta_root) acc in
   sclose alt d acc.
 
 (** [PinnedConstraintSystem], fields in declaration order. *)
 Definition pp_cs (alt : bool) (d : nat) (acc : list PrimString.string)
     : list PrimString.string :=
+  let compiled := OrchardCompiledCheck.compiled in
   let acc := sopen alt d "PinnedConstraintSystem" acc in
   let acc := emit "num_fixed_columns: " acc in
-  let acc := emit (dec_Z OrchardCompiledPinned.num_fixed_columns) acc in
+  let acc := emit (dec_Z num_fixed_columns) acc in
   let acc := csep alt d acc in
   let acc := emit "num_advice_columns: " acc in
-  let acc := emit (dec_Z OrchardCompiledPinned.num_advice_columns) acc in
+  let acc := emit (dec_Z OrchardConfigure.num_advice_columns) acc in
   let acc := csep alt d acc in
   let acc := emit "num_instance_columns: " acc in
-  let acc := emit (dec_Z OrchardCompiledPinned.num_instance_columns) acc in
+  let acc := emit (dec_Z OrchardConfigure.num_instance_columns) acc in
   let acc := csep alt d acc in
   let acc := emit "num_selectors: " acc in
-  let acc := emit (dec_Z OrchardCompiledPinned.num_selectors) acc in
+  let acc := emit (dec_Z OrchardConfigure.num_selectors) acc in
   let acc := csep alt d acc in
   let acc := emit "gates: " acc in
   let acc :=
-    pp_list_go alt (S d) (pp_expr alt (S (S d))) printed_gates acc in
+    pp_list_go alt (S d) (pp_expr alt (S (S d)))
+      compiled.(CompiledSystem.gates) acc in
   let acc := csep alt d acc in
   let acc := emit "advice_queries: " acc in
   let acc :=
-    pp_queries alt (S d) "Advice" OrchardCompiledPinned.advice_queries acc in
+    pp_queries alt (S d) "Advice" printed_advice_queries acc in
   let acc := csep alt d acc in
   let acc := emit "instance_queries: " acc in
   let acc :=
-    pp_queries alt (S d) "Instance" OrchardCompiledPinned.instance_queries
-      acc in
+    pp_queries alt (S d) "Instance" printed_instance_queries acc in
   let acc := csep alt d acc in
   let acc := emit "fixed_queries: " acc in
   let acc :=
-    pp_queries alt (S d) "Fixed" OrchardCompiledPinned.fixed_queries acc in
+    pp_queries alt (S d) "Fixed" printed_fixed_queries acc in
   let acc := csep alt d acc in
   let acc := emit "permutation: " acc in
   let acc := pp_permutation_argument alt (S d) acc in
@@ -529,30 +483,47 @@ Definition pp_cs (alt : bool) (d : nat) (acc : list PrimString.string)
   let acc := emit "lookups: " acc in
   let acc :=
     pp_list_go alt (S d) (pp_lookup_argument alt (S (S d)))
-      OrchardCompiledCheck.compiled.(CompiledSystem.lookups) acc in
+      compiled.(CompiledSystem.lookups) acc in
   let acc := csep alt d acc in
   let acc := emit "constants: " acc in
   let acc :=
     pp_list_go alt (S d)
       (fun c acc => pp_column alt (S (S d)) "Fixed" c acc)
-      OrchardCompiledCheck.compiled.(CompiledSystem.constants) acc in
+      OrchardConfigure.constants acc in
   let acc := csep alt d acc in
   let acc := emit "minimum_degree: " acc in
-  let acc := pp_option_Z alt (S d) VkPinnedData.minimum_degree acc in
+  let acc := pp_option_Z alt (S d)
+    (option_nat_to_Z OrchardConfigure.minimum_degree) acc in
   sclose alt d acc.
 
 (** [PinnedVerificationKey], fields in declaration order. *)
-Definition pp_vk_fields (alt : bool) (acc : list PrimString.string)
+(** The commitment coordinates are an explicit printer input.  The deployed
+    literals below are only the legacy/default instance; the provenance
+    aggregate supplies an explicit generated witness view and connects every
+    entry of that view to mathematical [commit_lagrange]. *)
+Record commitment_coordinates : Set := {
+  fixed_commitment_coordinates : list (Z * Z);
+  permutation_commitment_coordinates : list (Z * Z);
+}.
+
+Definition pinned_commitment_coordinates : commitment_coordinates := {|
+  fixed_commitment_coordinates := VkPinnedData.fixed_commitments;
+  permutation_commitment_coordinates := VkPinnedData.permutation_commitments;
+|}.
+
+Definition pp_vk_fields_with
+    (commitments : commitment_coordinates)
+    (alt : bool) (acc : list PrimString.string)
     : list PrimString.string :=
   let acc := sopen alt 0 "PinnedVerificationKey" acc in
   let acc := emit "base_modulus: " acc in
   let acc := emit dquote acc in
-  let acc := emit VkPinnedData.base_modulus acc in
+  let acc := emit OrchardVkSetup.base_modulus acc in
   let acc := emit dquote acc in
   let acc := csep alt 0 acc in
   let acc := emit "scalar_modulus: " acc in
   let acc := emit dquote acc in
-  let acc := emit VkPinnedData.scalar_modulus acc in
+  let acc := emit OrchardVkSetup.scalar_modulus acc in
   let acc := emit dquote acc in
   let acc := csep alt 0 acc in
   let acc := emit "domain: " acc in
@@ -563,33 +534,52 @@ Definition pp_vk_fields (alt : bool) (acc : list PrimString.string)
   let acc := csep alt 0 acc in
   let acc := emit "fixed_commitments: " acc in
   let acc :=
-    pp_list_go alt 1 pp_point VkPinnedData.fixed_commitments acc in
+    pp_list_go alt 1 pp_point
+      commitments.(fixed_commitment_coordinates) acc in
   let acc := csep alt 0 acc in
   let acc := emit "permutation: " acc in
   let acc := sopen alt 1 "VerifyingKey" acc in
   let acc := emit "commitments: " acc in
   let acc :=
-    pp_list_go alt 2 pp_point VkPinnedData.permutation_commitments acc in
+    pp_list_go alt 2 pp_point
+      commitments.(permutation_commitment_coordinates) acc in
   let acc := sclose alt 1 acc in
   sclose alt 0 acc.
+
+Definition pp_vk_fields :=
+  pp_vk_fields_with pinned_commitment_coordinates.
 
 (** The printer: [alt = true] is the pretty [{:#?}] rendering, [alt =
     false] the compact [{:?}] rendering.  The accumulator is reversed with
     the linear [rev_append] ([List.rev] is quadratic and dominates the
     whole computation on a 10^5-fragment list). *)
-Definition pp_vk (alt : bool) : PrimString.string :=
-  join (List.rev_append (pp_vk_fields alt []) []).
+Definition pp_vk_with (commitments : commitment_coordinates) (alt : bool)
+    : PrimString.string :=
+  join (List.rev_append (pp_vk_fields_with commitments alt []) []).
+
+Definition pp_vk : bool -> PrimString.string :=
+  pp_vk_with pinned_commitment_coordinates.
+
+Definition vk_pretty_with (commitments : commitment_coordinates)
+    : PrimString.string :=
+  PrimString.cat (pp_vk_with commitments true) nl.
 
 (** The pretty dump content: [format!("{:#?}\n", vk.pinned())] — the
-    rendering plus one trailing newline.  T1 target. *)
+    rendering plus one trailing newline.  T1 target.  Keep the legacy name as
+    a direct instance of the parameterized printer, so consumers need no
+    conversion-heavy wrapper lemma. *)
 Definition vk_pinned_pretty : PrimString.string :=
-  PrimString.cat (pp_vk true) nl.
+  vk_pretty_with pinned_commitment_coordinates.
 
 (** The compact string [s = format!("{:?}", vk.pinned())] — the exact
     input (after the [le64] length prefix) of the BLAKE2b-512
     [transcript_repr] hash.  T2 consumes this. *)
+Definition vk_compact_with (commitments : commitment_coordinates)
+    : PrimString.string :=
+  pp_vk_with commitments false.
+
 Definition vk_pinned_compact : PrimString.string :=
-  pp_vk false.
+  vk_compact_with pinned_commitment_coordinates.
 
 (** ** Byte view (for the T2 hash input) *)
 
@@ -600,7 +590,12 @@ Definition pstring_bytes (s : PrimString.string) : list Z :=
   List.map (byte_at s)
     (List.seq 0 (Z.to_nat (Uint63.to_Z (PrimString.length s)))).
 
+Definition vk_compact_bytes_with (commitments : commitment_coordinates)
+    : list Z :=
+  pstring_bytes (vk_compact_with commitments).
+
 Definition vk_pinned_compact_bytes : list Z :=
-  pstring_bytes vk_pinned_compact.
+  pstring_bytes
+    (vk_compact_with pinned_commitment_coordinates).
 
 End VkPinnedPrint.

@@ -66,7 +66,9 @@ Module VkCommitmentColumns.
         (List.seq row fuel).
   Proof.
     revert row.
-    induction fuel as [|fuel IH]; intros row; cbn; [reflexivity |].
+    induction fuel as [|fuel IH]; intros row;
+      cbn [VkModelColumns.collect_from List.seq List.map];
+      [reflexivity |].
     now rewrite IH.
   Qed.
 

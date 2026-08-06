@@ -63,6 +63,11 @@ jobs:
             make orchard-vk-provenance-generated-check
             make orchard-vk-provenance-oracle-check
             make snapshot
+            # The configure metadata prelude is a formal model of Halo 2
+            # builder operations.  Keep its counts, selector kinds, exact
+            # query order, permutation columns, constants and minimum degree
+            # in parity with the implementation snapshots.
+            make orchard-configure-json-compare
             make orchard-structure-json-from-model
             cd ..
           endGroup

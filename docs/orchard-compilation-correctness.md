@@ -52,8 +52,42 @@ constraint system of `serialize.v`. It is a port, not an invention: the
 selector packing follows `halo2_proofs/src/plonk/circuit/compress_selectors.rs`
 (`process`) and its caller `ConstraintSystem::compress_selectors`, and the
 permutation follows `halo2_proofs/src/plonk/permutation/keygen.rs`
-(`Assembly::copy`). Concrete Orchard figures below are `vm_compute`d from the
-model, not quoted.
+(`Assembly::copy`). Concrete Orchard figures below are computed from the
+model, then compared with the deployed description.
+
+### Configure metadata
+
+Gates and lookups are not all that Halo 2's `configure` method records. The
+builder also retains allocation counts, selector kinds, first-query order,
+equality-enabled columns, constants columns, and an optional minimum degree.
+Those fields affect `vk.pinned()` even when they do not affect the relational
+meaning of a gate.
+
+`Halo2/main.v` therefore gives the free configure language a typed metadata
+operation. `Orchard/configure_metadata.v` supplies an explicit formal trace
+of those operations in Orchard's builder order, and
+`Orchard/compiled/configuration.v` interprets it with the same ordered
+deduplication as `ConstraintSystem`. This trace is not reconstructed from the
+gate/lookup AST alone: its parity with Rust's builder operations is the
+external configure-JSON check described below. It is nevertheless distinct
+from the deployed VK targets and is the actual compiler input used by the
+kernel-checked provenance theorem. The resulting state is checked as valid
+and derives:
+
+- 14 pre-compression fixed columns, 10 advice columns, one instance column,
+  and 56 selectors;
+- complex selectors `QLookup`, `QRunning`, `QSinsemilla1_1`, and
+  `QSinsemilla1_2` (numeric selectors `[2; 3; 25; 29]`), with all other
+  selectors simple;
+- lookup-table fixed columns 0, 1, and 2;
+- equality-enabled columns in exact order: instance 0, advice 0 through 9,
+  then fixed 3, 8, 9, and 10;
+- constants `[3]`; and
+- `minimum_degree = None`.
+
+`Compile.compile_from_metadata` consumes this derived state. The deployed
+literals in `compiled/pinned.v` are comparison targets, not arguments to the
+compiler.
 
 ### The cyclic domain
 
@@ -66,11 +100,11 @@ the row predicates `l_0` / `l_last` / `l_blind`. Rows split as
 (usable_rows, n)      blinding rows
 ```
 
-For Orchard: `k = 11`, `n = 2048`, `blinding_factors = 5`, `usable_rows = 2042`,
-so rows 2042 through 2047 carry no circuit content. `blinding_factors` is
-itself derived, as in Rust: the maximum number of distinct rotations at which
-one advice column is queried (at least 3), plus one multiopen evaluation, plus
-one spare.
+For Orchard: the deployment selects `k = 11`, hence `n = 2048`;
+`blinding_factors = 5` and `usable_rows = 2042`, so rows 2042 through 2047
+carry no circuit content. `blinding_factors` is itself derived, as in Rust:
+the maximum number of distinct rotations at which one advice column is
+queried (at least 3), plus one multiopen evaluation, plus one spare.
 
 This is the first place the model stops idealizing. The relational layer (L4)
 quantifies gates over ℤ with regions as independent address spaces; from L2
@@ -99,11 +133,11 @@ which is a nonzero constant where the column reads `v`, and `0` where it reads
 `0` or any other member's root. The compiled gates then contain no
 `Expression.Selector` leaf at all — `CompiledSystem.selector_free_b`.
 
-Orchard: **56 selectors**, of which **4** take a column each — the complex
-ones, `[2; 3; 25; 29]`, which `process` sees as degree-0 — and **52** are
-packed into the remaining 11, giving **15 combination columns** in total, so
-14 base fixed columns become **29** after compression. Gate count: **193**.
-System degree: **9**.
+Orchard: **56 selectors**, whose kinds come from the configure trace. The
+four complex selectors `[2; 3; 25; 29]` take a column each, while the **52**
+simple selectors are packed into the remaining 11, giving **15 combination
+columns** in total. Thus the configure-derived 14 base fixed columns become
+**29** after compression. Gate count: **193**. System degree: **9**.
 
 The correctness statement is deliberately *allocation-independent*: no theorem
 mentions which combination column a selector landed in. The hypotheses
@@ -136,10 +170,45 @@ indexed selector-carrying system or the compiled one
 
 ### Query tables
 
-`Queries.t` collects the rotations at which each column is read: Orchard ends
-with **25 advice / 29 fixed / 1 instance** queries. The model collects them in
-gate order and the deployed keygen in configure order, so the parity
-certificate compares them as *sets* plus length, not as sequences.
+Halo 2 assigns a `query_index` on the first registration of each distinct
+column/rotation pair, so equality as sets is insufficient. The configure
+metadata interpreter retains that order exactly. Orchard's 25 advice queries
+are
+
+```text
+(A0,0), ..., (A9,0),
+(A9,+1), (A9,-1), (A2,+1), (A3,+1), (A4,+1), (A5,+1),
+(A0,+1), (A1,+1), (A7,+1), (A8,+1),
+(A6,-1), (A1,-1), (A6,+1), (A7,-1), (A8,-1)
+```
+
+The 14 base fixed queries are
+
+```text
+(3,0), (0,0), (11,0), (4,0), (5,0), (6,0), (7,0),
+(8,0), (9,0), (10,0), (12,0), (1,0), (2,0), (13,0)
+```
+
+and selector compression appends `(14,0)` through `(28,0)`, for **29 fixed
+queries** total. The single instance query is `(0,0)`. The three query
+certificates now prove sequence equality with the deployed keygen order, and
+the printer resolves every leaf's `query_index` against these derived lists.
+
+### Evaluation-domain presentation fields
+
+`Orchard/vk/setup.v` executes the relevant `EvaluationDomain::new` sizing and
+root schedules. The configured minimum degree is unset, the compiled system
+degree is 9, and the selected `k` is 11; the least fitting extended-domain
+exponent is therefore 14. The certificate checks both that exponent 14 fits
+`2^11 * (9 - 1)` coefficients and that exponent 13 does not. It derives
+`omega` by the two Rust repeated-squaring loops from the Pasta root of unity,
+and renders the base/scalar modulus strings from Garden's Vesta field
+definitions. The deployed domain and modulus literals are equality targets,
+not printer inputs. The optimized commitment layer retains checked
+`PolyDomain.omega`, `VkMsm.omega_inv`, and `VkMsm.n_inv` caches for feasible
+reduction. The full certificate explicitly proves that the latter two are
+inverses of the setup-derived root and domain size; it also exposes the Pasta
+generator schedule for the permutation-label `delta`.
 
 ## The correctness theorems
 
@@ -255,14 +324,14 @@ subsection; the certificates themselves follow it.
 The chain has three links:
 
 ```
-   Rust configure   ≟   model_configure ─────────┐
-        (structural JSON diff)                   │
-                                                 ├─ Compile.compile ─> compiled system
-   Rust synthesis   ≟   synthesize_events ───────┘          │
-        (byte-identical JSON)                               │  vk/print.v
-                                                            ▼
-                                          printed vk.pinned()  ≟  circuit_description_post_nu6_3
-                                                       (T1, byte-exact, in-kernel)
+Rust configure  ≟  model configure + metadata ──┐
+    (structural JSON diff)                      │
+                                                ├─ compile_from_metadata ─> compiled system
+Rust synthesis  ≟  synthesize_events ──────────┘                         │
+    (exact JSON event stream)                                             │ vk/print.v
+                                                                          ▼
+                                      printed vk.pinned()  ≟  circuit_description_post_nu6_3
+                                                           (T1, byte-exact, in-kernel)
 ```
 
 **Link 1 — the JSON comparison pins the compiler's inputs.** Halo 2 keygen
@@ -275,22 +344,28 @@ compared against snapshots the Rust side emits from two ignored Orchard tests:
 
 | | Rocq object | Rust snapshot | Result |
 |---|---|---|---|
-| configure | `model_configure` — 55 gates, 3 lookups | `circuit_configure_generated_from_implementation.json` | **structurally identical**; the files differ in whitespace only (121,960 vs 118,360 bytes), and compare equal as JSON |
-| synthesis | `model_synthesis_events` — 19,679 events | `circuit_synthesis_generated_from_implementation.json` | **byte-identical**, 2,477,271 bytes each |
+| configure relation | `model_configure` — 55 gates, 3 lookups | `circuit_configure_generated_from_implementation.json` | structural JSON comparison |
+| configure keygen metadata | `model_configure_metadata` | `action_circuit.highlevel.json` plus `circuit_selector_compression_generated_from_implementation.json` | counts, selector kinds, lookup allocations, ordered queries, equality columns, constants, and minimum degree |
+| synthesis | `model_synthesis_events` — 19,679 events | `circuit_synthesis_generated_from_implementation.json` | exact event-stream comparison |
 
 Run by `make orchard-configure-json-compare` and
 `make orchard-synthesis-json-compare`, whose comparators
 (`scripts/compare_orchard_*.py`) normalize the configure formatting. The
-configure JSON deliberately carries *only* gates and lookups — no query
-tables, permutation columns, constants column or minimum degree.
+metadata comparison reconstructs the Rust-side view from the high-level
+configure snapshot and selector-compression assignments; it is deliberately
+separate from the in-kernel certificate described below.
 
 **Link 2 — the exported objects are the compiler's inputs, in the kernel.**
 This is what makes the two ends one chain rather than two unrelated tests. The
 objects the extraction exports are the objects the compilation stack compiles:
 
-- `orchard_indexed_system`, the system `Compile.compile` is applied to, is
+- `orchard_indexed_system`, the system `Compile.compile_from_metadata` is
+  applied to, is
   `Configure.to_indexed Index.indices (𝓒.run_unit circuit.configure
   ConstraintSystem.empty)` — syntactically the extraction's `model_configure`;
+- `OrchardConfigure.state` is
+  `𝓒.run_metadata_unit … circuit.configure Metadata.State.empty` — exactly
+  the extraction's `model_configure_metadata`; and
 - `orchard_events`, the stream the selector activations and copies are read
   off, is `orchard_synthesis_events ++ orchard_constants_events` (19,315 +
   364), and `orchard_events_synthesize_events` — a `Qed` lemma in
@@ -306,10 +381,10 @@ reasons about; it is not evidence about a parallel artifact.
 
 **Why both links are needed.** Neither end subsumes the other:
 
-- the configure JSON omits the metadata Halo 2 derives — query tables, the
-  permutation and constants columns, `minimum_degree`, the domain constants —
-  which is what the vk end addresses (with the pass-through caveat recorded
-  under [The component certificates](#the-component-certificates));
+- the configure comparison covers the builder metadata, but it remains an
+  external translation-validation check; the in-kernel configure interpreter
+  and vk certificates are what prevent those values from being silently
+  passed through from the deployed target;
 - the vk describes the constraint system only. `vk.pinned()` says nothing
   about *synthesis*, so no amount of byte-parity there can witness that the
   Rocq circuit writes the cells the Rust circuit writes. The 19,679-event
@@ -320,7 +395,8 @@ matters.** T1 is a kernel-checked conversion. The JSON comparison is *not*
 kernel-checked: it trusts the OCaml extraction, the hand-written driver
 (`scripts/orchard_synthesis_json.ml`), the Rust generators and the Python
 comparators, none of which appear in any `Print Assumptions` output. Both
-comparisons pass on the committed snapshots as of this writing.
+comparisons must be rerun after changes to the configure or synthesis model;
+the documentation does not treat a `.vos` build as evidence that they pass.
 
 The two ends also differ in how they age. The vk certificates are `.vo`
 proofs, so they cannot fall silently out of date: a circuit change that would
@@ -338,59 +414,64 @@ event traces themselves rests on the JSON diff.
 
 ### The component certificates
 
-`Orchard/compiled/check.v` proves twelve `vm_compute` certificates comparing
-`Compile.compile` applied to the model's own `orchard_indexed_system` against
-`compiled/pinned.v`, transcribed from the deployed key:
+`Orchard/compiled/certificate.v` packages the closed checks on
+`Compile.compile_from_metadata` applied to Garden's own
+`orchard_indexed_system`. The deployed data in `compiled/pinned.v` appears
+only on the right-hand side:
 
-- `gate_polynomials_match` — all **193** compiled gate polynomials, *including
-  the selector-indicator factors*. This is the strongest of the twelve: since
-  the indicators encode which combination column and which root each selector
-  received, matching them pins the entire 56-selector → column assignment
-  wherever a selector occurs;
-- `gate_count_match` (193), `combination_count_match` (15, hence 29 fixed
-  columns), `selector_assignments_cover` (all 56 selectors assigned),
-  `compiled_selector_free` (no selector survives in a gate);
-- `advice_queries_match` / `fixed_queries_match` / `instance_queries_match`
-  (25 / 29 / 1, as set equality plus length);
-- `lookup_inputs_match` / `lookup_tables_match` — the three lookup arguments,
-  input and table expressions pairwise;
-- `constants_column_match` — the constants columns *derived from the event
-  stream* (the distinct fixed columns the floor planner's constants tail
-  writes) equal the pinned `[3]`;
-- `copy_columns_in_permutation` — every column carrying an equality copy in
-  the stream is among the pinned permutation columns. **Inclusion, not
-  equality**: fixed columns 8, 9 and 10 are equality-enabled but never copied
-  by synthesis, so the full 15-column list cannot be recovered from the
-  stream.
+- `configure_state_valid` and `configure_counts_match` check the typed
+  allocation trace and its 14 fixed / 10 advice / 1 instance / 56 selector
+  counts;
+- `gate_polynomials_match` checks all **193** compiled polynomials, including
+  selector-indicator factors, while `gate_count_match`,
+  `combination_count_match`, `selector_assignments_cover`, and
+  `compiled_selector_free` check the packing shape and complete selector
+  elimination;
+- `advice_queries_match`, `fixed_queries_match`, and
+  `instance_queries_match` prove **exact sequence equality** for all 25 / 29 /
+  1 query entries, hence determine every printed `query_index`;
+- `permutation_columns_match` proves equality of the complete ordered
+  configure-derived list — instance 0, advice 0 through 9, fixed 3, 8, 9,
+  and 10 — rather than inferring only the subset used by synthesis copies;
+- `configure_constants_match` and `minimum_degree_match` derive `[3]` and
+  `None`; the independent `constants_column_match` and
+  `copy_columns_in_permutation` checks connect those configure choices with
+  the concrete synthesis stream; and
+- `lookup_inputs_match` and `lookup_tables_match` check the three compiled
+  lookup arguments, including allocation of their table columns.
 
-**Two fields are pass-through, and the source says so.** The model's
-`ConstraintSystem.t` does not carry the permutation column list or the
-constants column, so `Compile.compile` is *given* them from the pinned
-description. Those two fields of `compiled` are therefore not parity evidence
-— comparing them against the pinned data would be circular. What covers them
-instead are the two stream-derived cross-checks just listed: an equality for
-the constants column, and only an inclusion for the permutation columns.
+There is no longer a permutation/constants pass-through boundary. Fixed
+columns 8, 9, and 10 illustrate why the configure trace is necessary: they
+are equality-enabled even though synthesis never copies them, so the event
+stream alone could establish only inclusion.
 
-Comparison is by expression fingerprint: the top-level product chain flattened
-into factors, each serialized preorder. The flattening absorbs a product
-re-association between the model's gate builder and the deployed one (it
-affects two gates); every other node — rotations and canonical field constants
-included — is compared exactly.
+The compact gate checker still fingerprints a top-level product as its factor
+sequence, which is sufficient for polynomial parity. Separately, the formal
+constraint AST now has a precise either-zero node whose serialization is the
+deployed left-associated product tree. `vk/print.v` prints the compiled gates
+directly — no `rotate_top` or printer-only reassociation — and the byte-level
+T1 check below establishes exact AST presentation parity.
 
 ### The byte-level anchor
 
-The twelve certificates compare against *transcribed literals*, which leaves
-the transcription itself as trusted input. `Orchard/vk/` removes that:
+The component certificates compare against *transcribed literals*, which
+leaves the transcription itself as trusted input. `Orchard/vk/` removes that:
 
 - **T1, `vk_pinned_dump_parity`** — a verified in-model printer, run over the
-  compiled system and the pinned literals, reproduces
+  metadata-derived compiled system, setup/domain computation, and an explicit
+  commitment-coordinate input, reproduces
   `orchard/src/circuit_data/circuit_description_post_nu6_3` — the
   `format!("{:#?}\n", vk.pinned())` dump the Orchard test suite asserts
   against the deployed key — **byte for byte, all 1,285,701 bytes**. Since the
-  printed bytes are *produced from the model's compiled system*, this certifies
-  the gate polynomials, query tables, permutation columns, lookup arguments,
-  constants column and domain constants as bytes, and simultaneously retires
-  the offline-transcription trust in the literal files.
+  non-commitment bytes are *produced from the configure and setup
+  computations*, this certifies the exact gate AST, ordered query tables,
+  permutation columns, lookup arguments, constants, counts, moduli, and
+  domain values as presented bytes. The generated full certificate
+  instantiates this printer with 44 explicit MSM-coordinate witnesses and
+  proves both that they equal the deployed point literals and, transitively,
+  that they denote the mathematical `commit_lagrange` results. The emitter
+  and independent Python oracle recompute those witness literals, but that
+  generator-level independence is outside the kernel trust path.
 - **T2, `transcript_repr_spec`** — the verifying key's Fiat–Shamir binding
   scalar computed in-model: BLAKE2b-512, personalized `"Halo2-Verify-Key"`,
   over `le64(len s) ‖ s` for the compact rendering `s` of the same printer,
@@ -410,30 +491,24 @@ test suite, not by us.
 
 ### What the anchor reaches, and what it does not
 
-**Reaches.** The compilation certificates cover every field that feeds
-`vk.pinned()`, subject to the provenance of each field's value. The fields
-fall into three classes:
+**Reaches.** The certificates cover every field that feeds `vk.pinned()`, with
+the following provenance split:
 
-- **Model-derived or independently model-cross-checked fields:** every gate
-  polynomial, selector-compression assignment (through the indicator
-  factors), lookup argument expression, the constants column, and the domain
-  values `k` and `omega`. The constants column is supplied to
-  `Compile.compile` as pinned configuration, but
-  `constants_column_match` checks it against the event stream. A
-  hand-translation error in a gate — a wrong rotation, a dropped term, or a
-  swapped constant — changes a gate polynomial and therefore changes the dump.
-- **Pinned configuration and presentation literals:** the four column and
-  selector counts, the keygen-order query tables, the permutation-column list,
-  the modulus strings, `extended_k`, and `minimum_degree`. They live across
-  `compiled/pinned.v` and `vk/data.v`; T1 proves their printed bytes agree with
-  the implementation dump. The component certificates cross-check each query
-  table against the model as set equality plus length, the fixed-column total
-  through the combination count, selector-assignment coverage over the
-  hardcoded model range `0..55`, the constants column by equality, and copied
-  columns by inclusion in the permutation list. They do not derive the printed
-  selector count, exact query ordering, or complete permutation list.
+- **Configure- and compiler-derived fields:** all column and selector counts,
+  selector kinds and compression assignments, the exact gate AST and lookup
+  expressions, ordered query tables, complete permutation-column order,
+  constants, and `minimum_degree`. A hand-translation error in a gate, query,
+  equality enable, or allocation changes the derived description and breaks a
+  certificate or T1.
+- **Setup-derived fields:** `extended_k`, `omega`, and both modulus strings are
+  computed from the chosen Vesta curve, `k = 11`, and compiled degree 9. The
+  setup certificate connects the lightweight domain calculation to the actual
+  compiled system degree.
 - **Commitment coordinates with mathematical provenance:** the 29 fixed and
-  15 permutation coordinate pairs are literals in `vk/data.v`, and
+  15 permutation coordinate witnesses are emitted from the recomputed MSM
+  results, assembled as
+  `OrchardVkProvenance.derived_commitment_coordinates`, and checked equal to
+  the deployed literals in `vk/data.v`. In addition,
   `OrchardVkProvenance.orchard_vk_commit_lagrange_refined` proves
   `OrchardVkAbstract.certificate` with no theorem premises. Its fields
   establish `VkMsm.params_well_formed` and, at every valid index, equality
@@ -448,15 +523,26 @@ fall into three classes:
   inputs with the compiled grid after `with_combinations` for every successful
   Orchard event replay. The permutation inputs use
   `OrchardCompiled.orchard_sigma`, which `OrchardCompiled.orchard_sigma_eq`
-  derives from the copy obligations relative to
-  `OrchardCompiledPinned.permutation_columns`. The generated
+  derives from the copy obligations over the configure-derived complete
+  permutation list. The generated
   `orchard_vk_commitments_derived` package bundles the fixed-column replay,
   domain, sigma, SRS, and executable commitment certificates. The separate
   `orchard_vk_commit_lagrange_refined` theorem consumes the latter four
   certificate families to prove `OrchardVkAbstract.certificate`; the fixed
-  replay result is part of the provenance graph, not a field of that abstract
-  record. See
+  replay result is part of the provenance graph and is explicitly packaged in
+  the full public certificate (together with synthesis/compiled-domain
+  usable-row equality), although it is not a field of the narrower abstract
+  commitment record. See
   [`Orchard/vk/provenance/README.md`](../Garden/Orchard/vk/provenance/README.md).
+  The generated `orchard_vk_fully_derived` theorem combines this record with
+  setup, compiled-system, T1, and T2 certificates in
+  `OrchardVkFullAbstract.certificate`. Its T1 and T2 statements use the
+  printer instantiated with `derived_commitment_coordinates`, not a printer
+  definition whose commitment inputs are fixed to `VkPinnedData`; T2 prefixes
+  the actual computed compact-rendering length. The independent Python
+  recomputation of the emitted coordinates remains a diagnostic outside the
+  kernel, while the kernel theorem connects each explicit witness to
+  `commit_lagrange` transitively through the deployed equality target.
 
 **Does not reach:**
 
@@ -468,13 +554,12 @@ fall into three classes:
   is *not* kernel-checked — together with the in-kernel event-replay bridge of
   [`operational-soundness.md`](operational-soundness.md) over the imported
   floor-planner placement.
-- **An independent specification of the configured VK columns.** The
-  commitment theorem uses Garden's compiled fixed-column configuration and
-  `OrchardCompiledPinned.permutation_columns` as its commitment inputs. It
-  proves the Halo2 commitment equation for those inputs; it does not supply a
-  separate protocol-level specification from which the column selection and
-  ordering follow. The equation models Halo2's commitment operation rather
-  than interpreting Rust semantics.
+- **An independent protocol specification selecting this configuration.** The
+  configure trace now derives the complete fixed and permutation column
+  choices and order. What remains a modeling choice is Garden's formal
+  Orchard circuit itself, together with Vesta and `k = 11`. Equality of that
+  formal configure/synthesis program with Rust is translation validation by
+  the external JSON comparisons, not a theorem about Rust semantics.
 - **Anything the dump omits.** Two circuits agreeing on `vk.pinned()` agree on
   everything a verifier is configured by, but the dump is a description, not a
   denotation — it is evidence of agreement, not a proof of it.
@@ -503,9 +588,21 @@ The last profile is Rocq's primitive integer and array interface used by the
 five-word Montgomery arithmetic and linearly threaded arrays. It contains no
 Garden-specific axiom. The theorem has no premises: `VkMsm.params_well_formed`
 and all 44 equalities in `OrchardVkAbstract.certificate` are discharged by the
-sharded `vm_compute` certificates. Generated coefficients, SRS witnesses,
+sharded closed computational certificates (currently using
+`vm_cast_no_check`). Generated coefficients, SRS witnesses,
 projective partial sums, and domain tables are data inside those closed
 propositions, not logical premises of the aggregate theorem.
+
+The generated `orchard_vk_fully_derived` theorem is also premise-free and
+adds the hand-written setup, configure/compilation, T1, and T2 records to that
+commitment result. After the complete four-worker `.vo` provenance replay on
+2026-08-05, `Print Assumptions
+OrchardVkProvenance.orchard_vk_fully_derived` reported 52 standard
+Rocq/Corelib/Stdlib primitive-interface declarations: the 48 commitment
+interfaces itemized above plus `PrimString.make`, `PrimString.length`,
+`PrimString.get`, and `PrimString.cat`, together with the configured
+impredicative `Set`. It introduced no Garden-specific or classical axiom. A
+`.vos` development build would not establish this audit.
 
 The L0 names `IPABinding`, `MultiopenReduction`, and
 `FiatShamirChallengeGood` are definitions taken as explicit premises where

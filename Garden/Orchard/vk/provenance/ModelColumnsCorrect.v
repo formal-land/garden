@@ -16,6 +16,7 @@ Require Import Garden.Halo2.plonkish.compile.
 Require Import Garden.Orchard.circuit_operational.
 Require Import Garden.Orchard.compiled.check.
 Require Import Garden.Orchard.compiled.main.
+Require Import Garden.Orchard.vk.parameters.
 Require Import Garden.Orchard.vk.provenance.ModelColumns.
 Require Import Garden.Orchard.vk.provenance.CompressShape.
 Require Import Garden.Orchard.vk.provenance.OrchardCompressShape.
@@ -27,6 +28,23 @@ Local Open Scope Z_scope.
 Module VkModelColumnsCorrect.
 
   Import VkModelColumns.
+
+  (** The executable fixed-column rectangle, the compiled permutation
+      assembly, and [Params::new] all use the same [2^k] row domain. *)
+  Lemma rows_nat_from_parameters :
+    rows_nat = Nat.pow 2 OrchardVkParameters.k.
+  Proof. vm_compute. reflexivity. Qed.
+
+  Lemma orchard_n_rows_from_parameters :
+    OrchardCompiled.orchard_n_rows = Nat.pow 2 OrchardVkParameters.k.
+  Proof. vm_compute. reflexivity. Qed.
+
+  Lemma rows_nat_eq_orchard_n_rows :
+    rows_nat = OrchardCompiled.orchard_n_rows.
+  Proof.
+    rewrite rows_nat_from_parameters, orchard_n_rows_from_parameters.
+    reflexivity.
+  Qed.
 
   (** Specializing the primitive-array axiom to [Z] once avoids an
       expensive universe/transparent-constant conversion at each use. *)

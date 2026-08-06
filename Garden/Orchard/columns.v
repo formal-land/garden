@@ -3,6 +3,8 @@ Require Import Garden.Halo2.Synthesis.
 Require Garden.Halo2.serialize.
 Require Export Garden.Orchard.regions.
 
+Import ListNotations.
+
 Module Advice.
   Inductive t : Set :=
   | A0
@@ -15,6 +17,9 @@ Module Advice.
   | A7
   | A8
   | A9.
+
+  Definition all : list t :=
+    [A0; A1; A2; A3; A4; A5; A6; A7; A8; A9].
 End Advice.
 
 Module Lookup.
@@ -22,6 +27,8 @@ Module Lookup.
   | TableIdx
   | TableX
   | TableY.
+
+  Definition all : list t := [TableIdx; TableX; TableY].
 End Lookup.
 
 Module Fixed.
@@ -37,11 +44,19 @@ Module Fixed.
   | FixedZ
   | QSinsemilla2_1
   | QSinsemilla2_2.
+
+  Definition all : list t :=
+    [LagrangeCoeffs0; LagrangeCoeffs1; LagrangeCoeffs2;
+     LagrangeCoeffs3; LagrangeCoeffs4; LagrangeCoeffs5;
+     LagrangeCoeffs6; LagrangeCoeffs7; FixedZ;
+     QSinsemilla2_1; QSinsemilla2_2].
 End Fixed.
 
 Module Instance_.
   Inductive t : Set :=
   | Primary.
+
+  Definition all : list t := [Primary].
 End Instance_.
 
 Module Selector.
@@ -102,6 +117,26 @@ Module Selector.
   | QNoteCommitNewRho
   | QNoteCommitNewPsi
   | QNoteCommitNewYCanon.
+
+  Definition all : list t :=
+    [QOrchard; QAdd; QLookup; QRunning; QBitshift;
+     QWitnessPoint; QWitnessPointNonId; QAddIncomplete; QEccAdd;
+     QMulIncompleteHi1; QMulIncompleteHi2; QMulIncompleteHi3;
+     QMulIncompleteLo1; QMulIncompleteLo2; QMulIncompleteLo3;
+     QMulDecomposeVar; QMulOverflow; QMulLsb; QMulFixedRunningSum;
+     QMulFixedFull; QMulFixedShort; QMulFixedBaseField;
+     QPoseidonFull; QPoseidonPartial; QPoseidonPadAndAdd;
+     QSinsemilla1_1; QSinsemilla4_1; QCondSwap1; QMerkleDecompose1;
+     QSinsemilla1_2; QSinsemilla4_2; QCondSwap2; QMerkleDecompose2;
+     QCommitIvk;
+     QNoteCommitOldB; QNoteCommitOldD; QNoteCommitOldE;
+     QNoteCommitOldG; QNoteCommitOldH; QNoteCommitOldGd;
+     QNoteCommitOldPkd; QNoteCommitOldValue; QNoteCommitOldRho;
+     QNoteCommitOldPsi; QNoteCommitOldYCanon;
+     QNoteCommitNewB; QNoteCommitNewD; QNoteCommitNewE;
+     QNoteCommitNewG; QNoteCommitNewH; QNoteCommitNewGd;
+     QNoteCommitNewPkd; QNoteCommitNewValue; QNoteCommitNewRho;
+     QNoteCommitNewPsi; QNoteCommitNewYCanon].
 End Selector.
 
 Definition columns : Columns.t := {|
