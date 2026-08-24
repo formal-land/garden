@@ -25,12 +25,35 @@ jobs:
     - name: Check out Garden
       uses: actions/checkout@v4
     - name: Check out implementation repositories
-      run: git submodule update --init --recursive third-party/halo2 third-party/orchard
+      run: |
+        git submodule update --init --recursive third-party/halo2 third-party/orchard
+        git submodule update --init third-party/rocq-of-rust
     - name: Install the Orchard Rust toolchain
       uses: dtolnay/rust-toolchain@1.85.1
     - name: Cache Rust build artifacts
       uses: Swatinem/rust-cache@v2
       with:
-        workspaces: third-party/orchard -> target
+        workspaces: |
+          third-party/orchard -> target
+          tools/orchard-verifier-fixtures -> target
     - name: Regenerate and check implementation snapshots
       run: scripts/check_orchard_implementation_snapshots.sh
+    - name: Check Orchard verifier fixtures in Rust debug mode
+      run: |
+        cargo run --locked \
+          --manifest-path tools/orchard-verifier-fixtures/Cargo.toml -- \
+          --check \
+          --output Garden/Orchard/Verifier/Snapshots/post_nu6_3.json
+    - name: Check Orchard verifier fixtures in Rust release mode
+      run: |
+        cargo run --locked --release \
+          --manifest-path tools/orchard-verifier-fixtures/Cargo.toml -- \
+          --check \
+          --output Garden/Orchard/Verifier/Snapshots/post_nu6_3.json
+    - name: Check generated Rocq fixtures
+      run: tools/generate_orchard_verifier_snapshots.py --check
+    - name: Check materialized Rocq verifier runtime data
+      run: |
+        python3 tools/generate_orchard_verifier_runtime_data.py \
+          third-party/orchard/src/circuit_data/circuit_description_post_nu6_3.json \
+          Garden/Orchard/Verifier/PostNu6_3Data.v --check

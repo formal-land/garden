@@ -8,5 +8,7 @@ OpenVM/Sha256/pretty_print.v
 Plonky3/keccak/pretty_print.v
 # Extraction entry point for the Orchard model JSON generator.
 Orchard/circuit_synthesis_json_extract.v
+# Extraction entry point for executable Orchard verifier snapshot replay.
+Orchard/Verifier/Snapshots/Extract.v
 # Transient caches left by the rocq-mcp server; not part of the project.
 rocq_mcp_cache

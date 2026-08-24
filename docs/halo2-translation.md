@@ -328,7 +328,7 @@ snapshot is produced by ignored Orchard tests, and the structured Rocq model
 snapshot is produced by extraction:
 
 ```sh
-git submodule update --init --recursive
+git submodule update --init --recursive third-party/halo2 third-party/orchard
 scripts/check_orchard_implementation_snapshots.sh
 opam exec -- make -C Garden orchard-json-from-model
 opam exec -- make -C Garden orchard-configure-json-compare
