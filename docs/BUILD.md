@@ -10,10 +10,22 @@ the Rocq structure and parity snapshots rather than committed.
 
 ## Setting Up Dependency Submodules
 
-Fetch the necessary codes from submodule repositories:
+Fetch the implementation repositories recursively, and fetch the Rocq Rust
+model without its translator fixtures and nested implementation repositories:
 ```sh
-git submodule update --init --recursive
+git submodule update --init --recursive \
+  third-party/Plonky3 \
+  third-party/brevis \
+  third-party/circom \
+  third-party/circomlib \
+  third-party/halo2 \
+  third-party/orchard
+git submodule update --init third-party/rocq-of-rust
 ```
+
+Garden compiles the minimal MIT-licensed Rocq source closure directly from
+`third-party/rocq-of-rust/RocqOfRust`. The rocq-of-rust nested submodules are
+not build inputs and remain uninitialized.
 
 ## Install Opam Environment
 
@@ -150,7 +162,7 @@ To regenerate and verify the Orchard Rust implementation snapshots from the
 pinned `third-party/halo2` and `third-party/orchard` submodules:
 
 ```sh
-git submodule update --init --recursive
+git submodule update --init --recursive third-party/halo2 third-party/orchard
 scripts/check_orchard_implementation_snapshots.sh
 ```
 
@@ -172,6 +184,131 @@ make orchard-vk-pinned
 make orchard-vk-pinned-check
 cd ..
 ```
+
+## Orchard proof-verifier fixtures
+
+The Post-NU6.3 proof-verifier corpus lives at
+`Garden/Orchard/Verifier/Snapshots/post_nu6_3.json`. Its Rust producer invokes
+the public pinned `orchard::Proof::verify` path on deterministic restricted and
+unrestricted one-action proofs, a restricted two-action proof, and mutations
+covering every transcript-read block, canonical decoding, instance binding,
+multiopen, and IPA. The JSON contains raw proof bytes and exactly ten canonical
+little-endian public scalars per action.
+
+The fixture producer pins and requires the
+`x86_64-unknown-linux-gnu` Rust target with a 64-bit `usize`; it exits instead of
+writing a corpus on another target. The corpus contains exactly 40 authored
+cases, and its authored semantic manifest contains 44 verifier/read-schedule
+branch IDs. The producer and translator require exactly 40 cases and exactly
+44 unique IDs, and check that every ID names at least one case. These counts
+describe the maintained test inventory, not measured Rust source-line, branch,
+or instruction coverage. The corpus has four `verified` and 36 `rejected`
+outcomes; it has no panic case.
+
+Regenerate the JSON, its Rocq fixture module, and the compact verifier runtime
+data with:
+
+```sh
+cd Garden
+make orchard-verifier-snapshots
+make orchard-verifier-runtime-data
+cd ..
+```
+
+The runtime-data generator consumes Orchard's pinned
+`circuit_description_post_nu6_3.json` and materializes only the 193 compiled
+gates and three lookup arguments needed during verification.
+`PostNu6_3Materialization.v` proves those literals equal to the independently
+derived Garden circuit values, so the Python generator is not an unchecked
+equivalence boundary.
+
+The Rust freshness check uses the crate's lockfile, validates that the index
+gitlinks and clean initialized submodules match the recorded commits, and then
+builds the deterministic proofs; it can take several minutes. Final verifier
+acceptance runs both Rust release and debug freshness, the ordinary Rocq tests,
+and the extracted all-case replay:
+
+```sh
+cd Garden
+make orchard-verifier-snapshots-check
+make orchard-verifier-snapshots-debug-check
+make orchard-verifier-tests
+cd ..
+```
+
+`orchard-verifier-snapshots-check` is the locked Rust release-mode freshness
+check; `orchard-verifier-snapshots-debug-check` repeats it in debug mode. The
+two modes must produce identical proof bytes and outcomes. The named verifier
+target reads the checked-in corpus and does not itself run the Rust prover. It
+checks the generated Rocq fixture module, the compact runtime data, the
+runtime-data materialization theorem, the verifier unit tests, Replay, the
+fixed-SRS assurance modules, and the extracted all-40 behavioral comparison.
+
+The 64-bit OCaml runtime preflight must pass before extraction. The replay
+build target also depends on this check, but running it explicitly gives a
+clear diagnostic before generating or compiling OCaml.
+
+The replay, report normalization, fixture preparation, and verifier remain
+ordinary Rocq definitions. A valid case exceeded 120 seconds under
+`vm_compute`, and this Rocq build has native reduction disabled, so exhaustive
+behavioral replay uses a small OCaml extraction harness instead. The harness
+maps both `nat` and `Z` to unbounded Zarith integers
+(`ExtrOcamlNatBigInt`/`ExtrOcamlZBigInt`) and uses Rocq's standard Int63 and
+persistent-array runtime mappings. Thus snapshot indices, proof-list lengths,
+and other logical `nat`/`Z` values are unbounded; the optimized field and MSM
+kernels deliberately use `Uint63` words and primitive-array indices on a
+64-bit OCaml runtime. `make orchard-verifier-replay-build` checks that runtime
+width as part of the build. The execution-test trusted computing base includes
+Rocq extraction, the explicit rocq-of-rust type-metadata erasures, Zarith, the
+Int63, PArray, and PrimString runtime mappings, the OCaml compiler and runtime,
+and the handwritten replay driver. It is not a kernel theorem or a general
+extracted-verifier API.
+
+At the Rust-shaped boundary, wire bytes use the rocq-of-rust integer carrier
+with exact checked and wrapping `u8` operations, and the pinned Rust producer
+fixes `usize` to 64 bits. Verifier scalar and base-field operations are reduced
+modulo the corresponding Pasta moduli. Reader offsets, lengths, and fixture IDs
+are logical Rocq naturals; they agree with Rust `usize` for every physically
+realizable 64-bit slice in this corpus, but the public Rocq list API does not
+carry a separate proposition that its length is at most `usize::MAX`.
+
+`make orchard-verifier-replay-build` typechecks the Rocq entry point, extracts
+it, and compiles and links the ignored executable. The exact all-case command
+is:
+
+```sh
+cd Garden
+make orchard-verifier-replay-extracted
+```
+
+It exits nonzero unless all 40 recorded outcomes match, including treating
+`BackendUnavailable` as a mismatch. It remains a standalone target for
+localized reruns and is also a dependency of `orchard-verifier-tests`, so CI
+cannot accept a successful extraction or link without the `--all` execution.
+
+The verifier keeps a Rust-shaped MSM for auditability, while its fixed-SRS
+evaluation path has a proved refinement to that reference MSM under the stated
+point-well-formedness and checked-SRS premises. The replay module normalizes
+the Rocq report and compares it with each recorded Rust outcome.
+
+The concrete fixed-SRS premises come from generated provenance certificate
+shards. Some of those shards use `vm_cast_no_check` to discharge very large
+closed computations. That use does not appear as an axiom in `Print
+Assumptions`, so an empty assumptions report does not remove this trusted
+computation step from the assurance boundary.
+
+Orchard's typed `Instance` API makes malformed instance encodings unreachable
+in the Rust producer; separate executable Rocq examples exercise Garden's
+untyped invalid-byte, invalid-width, noncanonical-scalar, and non-boolean-flag
+boundaries.
+
+The differential corpus is behavioral evidence for the pinned implementation;
+it does not assert a proof of Rust-to-Rocq equivalence or Halo2 soundness. In
+addition to the extracted-execution trust boundary above, the differential
+oracle trusts the pinned Rust toolchain and Orchard/Halo2 sources, the fixture
+producer, Serde serialization, and the Python JSON-to-Rocq translator. The
+separate runtime-data materialization theorem checks that the generated gate
+and lookup literals equal Garden's independently derived circuit values.
 
 ## Orchard Verification Visualization
 

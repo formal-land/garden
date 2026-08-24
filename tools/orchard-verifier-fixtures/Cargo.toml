@@ -1,0 +1,20 @@
+[package]
+name = "garden-orchard-verifier-fixtures"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.85.1"
+publish = false
+
+[dependencies]
+ff = "0.13"
+group = "0.13"
+halo2_proofs = { path = "../../third-party/halo2/halo2_proofs", default-features = false, features = ["batch", "floor-planner-v1-legacy-pdqsort"] }
+hex = "0.4"
+orchard = { path = "../../third-party/orchard", default-features = false, features = ["circuit", "multicore", "std"] }
+pasta_curves = { version = "0.5.2", features = ["glv"] }
+rand_chacha = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+[patch.crates-io]
+halo2_proofs = { path = "../../third-party/halo2/halo2_proofs" }

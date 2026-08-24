@@ -24,8 +24,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    - name: Download Git submodules
-      run: git submodule update --init --recursive
+    - name: Download implementation submodules
+      run: |
+        git submodule update --init --recursive \
+          third-party/Plonky3 \
+          third-party/brevis \
+          third-party/circom \
+          third-party/circomlib \
+          third-party/halo2 \
+          third-party/orchard
+    - name: Download the Rocq Rust model
+      run: git submodule update --init third-party/rocq-of-rust
     - uses: coq-community/docker-coq-action@v1
       with:
         custom_image: ghcr.io/formal-land/garden-rocq-ci:rocq-9.0.1
@@ -60,8 +69,16 @@ jobs:
             # oracle stay as diagnostics.  One worker per runner vCPU;
             # measured per-worker peaks fit inside the runner's memory.
             make -j"$(nproc)"
+            # The named verifier suite includes proof assurances, freshness
+            # checks, extraction, and the exact all-40 Rust/Rocq replay.  Bound
+            # this computational check independently from the wider Rocq job.
+            timeout --signal=TERM --kill-after=30s 40m \
+              make orchard-verifier-tests
             make orchard-vk-provenance-generated-check
             make orchard-vk-provenance-oracle-check
+            python3 ../tools/generate_orchard_verifier_snapshots.py \
+              Orchard/Verifier/Snapshots/post_nu6_3.json \
+              Orchard/Verifier/Snapshots/Generated.v --check
             make snapshot
             # The configure metadata prelude is a formal model of Halo 2
             # builder operations.  Keep its counts, selector kinds, exact

@@ -6,6 +6,12 @@
 .PHONY: orchard-structure-json-from-model orchard-circuit-visualization-json orchard-circuit-visualization-check
 .PHONY: orchard-circuit-grid-json orchard-circuit-grid-check orchard-circuit-grid-test
 .PHONY: orchard-vk-pinned orchard-vk-pinned-check
+.PHONY: orchard-verifier-snapshots orchard-verifier-snapshots-check
+.PHONY: orchard-verifier-snapshots-debug-check orchard-verifier-snapshots-generated
+.PHONY: orchard-verifier-snapshots-generated-check
+.PHONY: orchard-verifier-runtime-data orchard-verifier-runtime-data-check
+.PHONY: orchard-verifier-tests orchard-verifier-replay-build orchard-verifier-ocaml-runtime-check
+.PHONY: orchard-verifier-replay-case0 orchard-verifier-replay-extracted
 
 # The VK provenance graph is large and branch-specific, so its inventories,
 # generator rules, job controls, and explicit build targets live separately.
@@ -15,6 +21,18 @@ include vk-provenance.mk
 # depending on whether a developer happens to have generated it already.
 VFILES := $(shell find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort)
 
+# Garden uses the computational integer core from rocq-of-rust.  Listing the
+# exact MIT-licensed source closure here keeps the Rust translator, link plugin,
+# generated translations, and nested upstream submodules outside the build.
+ROCQ_OF_RUST_ROOT := ../third-party/rocq-of-rust/RocqOfRust
+ROCQ_OF_RUST_VFILES := \
+	$(ROCQ_OF_RUST_ROOT)/M.v \
+	$(ROCQ_OF_RUST_ROOT)/RecordUpdate.v \
+	$(ROCQ_OF_RUST_ROOT)/lib/lib.v \
+	$(ROCQ_OF_RUST_ROOT)/RocqOfRust.v \
+	$(ROCQ_OF_RUST_ROOT)/links/M.v
+PROJECT_VFILES := $(VFILES) $(ROCQ_OF_RUST_VFILES)
+
 # The ordinary project build covers every source the generated makefile
 # knows: hand-written Rocq sources, generated literal-data modules, and the
 # 278 generated provenance certificate modules.  `make orchard-vk-provenance`
@@ -23,11 +41,14 @@ VFILES := $(shell find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -
 
 default: all
 
-CoqMakefile: $(VFILES) blacklist.txt $(VK_PROVENANCE_STATE) $(VK_PROVENANCE_MANIFEST) $(VK_PROVENANCE_GENERATED_VFILES)
+CoqMakefile: $(PROJECT_VFILES) blacklist.txt $(VK_PROVENANCE_STATE) $(VK_PROVENANCE_MANIFEST) $(VK_PROVENANCE_GENERATED_VFILES)
 	echo "-R . Garden" > _CoqProject
+	echo "-R $(ROCQ_OF_RUST_ROOT) RocqOfRust" >> _CoqProject
+	echo "-docroot Garden" >> _CoqProject
 	echo "-arg -impredicative-set -arg -w -arg -stdlib-vector" >> _CoqProject
 	# The checked-in sources and generated manifest are deliberately separate.
 	find -L . -path './$(VK_PROVENANCE_GENERATED_DIR)' -prune -o -name "*.v" -print | grep -v -f blacklist.txt | sort >> _CoqProject
+	for source in $(ROCQ_OF_RUST_VFILES); do echo "$$source"; done >> _CoqProject
 	cat $(VK_PROVENANCE_MANIFEST) >> _CoqProject
 	rocq makefile -f _CoqProject -o $@
 
@@ -151,6 +172,123 @@ orchard-vk-pinned:
 
 orchard-vk-pinned-check:
 	python3 ../scripts/generate_vk_pinned.py --check
+
+ORCHARD_VERIFIER_SNAPSHOTS := Orchard/Verifier/Snapshots
+ORCHARD_VERIFIER_JSON := $(ORCHARD_VERIFIER_SNAPSHOTS)/post_nu6_3.json
+ORCHARD_VERIFIER_GENERATED := $(ORCHARD_VERIFIER_SNAPSHOTS)/Generated.v
+ORCHARD_VERIFIER_GENERATOR := ../tools/generate_orchard_verifier_snapshots.py
+ORCHARD_VERIFIER_RUST_MANIFEST := ../tools/orchard-verifier-fixtures/Cargo.toml
+ORCHARD_VERIFIER_RUNTIME_SOURCE := ../third-party/orchard/src/circuit_data/circuit_description_post_nu6_3.json
+ORCHARD_VERIFIER_RUNTIME_DATA := Orchard/Verifier/PostNu6_3Data.v
+ORCHARD_VERIFIER_RUNTIME_GENERATOR := ../tools/generate_orchard_verifier_runtime_data.py
+ORCHARD_VERIFIER_REPLAY_BUILD := _build/orchard_verifier_replay
+ORCHARD_VERIFIER_REPLAY_EXTRACT := Orchard/Verifier/Snapshots/Extract.v
+ORCHARD_VERIFIER_REPLAY_ML := $(ORCHARD_VERIFIER_REPLAY_BUILD)/orchard_verifier_replay.ml
+ORCHARD_VERIFIER_REPLAY_MLI := $(ORCHARD_VERIFIER_REPLAY_BUILD)/orchard_verifier_replay.mli
+ORCHARD_VERIFIER_REPLAY_CMX := $(ORCHARD_VERIFIER_REPLAY_BUILD)/orchard_verifier_replay.cmx
+ORCHARD_VERIFIER_REPLAY_DRIVER_CMX := $(ORCHARD_VERIFIER_REPLAY_BUILD)/orchard_verifier_replay_driver.cmx
+ORCHARD_VERIFIER_REPLAY_EXE := $(ORCHARD_VERIFIER_REPLAY_BUILD)/orchard_verifier_replay
+
+orchard-verifier-snapshots:
+	cargo run --locked --release --manifest-path $(ORCHARD_VERIFIER_RUST_MANIFEST) -- \
+	  --output $(ORCHARD_VERIFIER_JSON)
+	python3 $(ORCHARD_VERIFIER_GENERATOR) \
+	  $(ORCHARD_VERIFIER_JSON) $(ORCHARD_VERIFIER_GENERATED)
+
+orchard-verifier-snapshots-generated:
+	python3 $(ORCHARD_VERIFIER_GENERATOR) \
+	  $(ORCHARD_VERIFIER_JSON) $(ORCHARD_VERIFIER_GENERATED)
+
+orchard-verifier-snapshots-generated-check:
+	python3 $(ORCHARD_VERIFIER_GENERATOR) \
+	  $(ORCHARD_VERIFIER_JSON) $(ORCHARD_VERIFIER_GENERATED) --check
+
+orchard-verifier-snapshots-check:
+	cargo run --locked --release --manifest-path $(ORCHARD_VERIFIER_RUST_MANIFEST) -- \
+	  --check --output $(ORCHARD_VERIFIER_JSON)
+	python3 $(ORCHARD_VERIFIER_GENERATOR) \
+	  $(ORCHARD_VERIFIER_JSON) $(ORCHARD_VERIFIER_GENERATED) --check
+
+orchard-verifier-snapshots-debug-check:
+	cargo run --locked --manifest-path $(ORCHARD_VERIFIER_RUST_MANIFEST) -- \
+	  --check --output $(ORCHARD_VERIFIER_JSON)
+
+orchard-verifier-runtime-data:
+	python3 $(ORCHARD_VERIFIER_RUNTIME_GENERATOR) \
+	  $(ORCHARD_VERIFIER_RUNTIME_SOURCE) $(ORCHARD_VERIFIER_RUNTIME_DATA)
+
+orchard-verifier-runtime-data-check:
+	python3 $(ORCHARD_VERIFIER_RUNTIME_GENERATOR) \
+	  $(ORCHARD_VERIFIER_RUNTIME_SOURCE) $(ORCHARD_VERIFIER_RUNTIME_DATA) --check
+
+orchard-verifier-tests: \
+	Halo2/Verifier/Tests.vo \
+	Halo2/Verifier/CoreTests.vo \
+	Halo2/Verifier/Eval/CommitmentTests.vo \
+	Orchard/Verifier/Tests.vo \
+	Orchard/Verifier/PostNu6_3Materialization.vo \
+	Orchard/Verifier/Snapshots/Generated.vo \
+	Orchard/Verifier/Snapshots/Replay.vo \
+	Orchard/Verifier/Assurance.vo \
+	Orchard/Verifier/InstanceCommitmentAssurance.vo \
+	orchard-verifier-snapshots-generated-check \
+	orchard-verifier-runtime-data-check \
+	orchard-verifier-replay-extracted
+
+$(ORCHARD_VERIFIER_REPLAY_ML) $(ORCHARD_VERIFIER_REPLAY_MLI) &: \
+	$(ORCHARD_VERIFIER_REPLAY_EXTRACT) \
+	Orchard/Verifier/Snapshots/Replay.vo CoqMakefile \
+	| orchard-verifier-ocaml-runtime-check
+	mkdir -p $(ORCHARD_VERIFIER_REPLAY_BUILD)
+	rocq compile -impredicative-set \
+	  -R . Garden -R $(ROCQ_OF_RUST_ROOT) RocqOfRust \
+	  $(ORCHARD_VERIFIER_REPLAY_EXTRACT)
+	test -s $(ORCHARD_VERIFIER_REPLAY_ML)
+	test -s $(ORCHARD_VERIFIER_REPLAY_MLI)
+
+$(ORCHARD_VERIFIER_REPLAY_CMX): $(ORCHARD_VERIFIER_REPLAY_ML) \
+	$(ORCHARD_VERIFIER_REPLAY_MLI)
+	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith \
+	  -I $(ORCHARD_VERIFIER_REPLAY_BUILD) \
+	  -c $(ORCHARD_VERIFIER_REPLAY_MLI)
+	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith \
+	  -I $(ORCHARD_VERIFIER_REPLAY_BUILD) \
+	  -c $(ORCHARD_VERIFIER_REPLAY_ML)
+
+$(ORCHARD_VERIFIER_REPLAY_DRIVER_CMX): $(ORCHARD_VERIFIER_REPLAY_CMX) \
+	../scripts/orchard_verifier_replay.ml
+	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith,unix \
+	  -I $(ORCHARD_VERIFIER_REPLAY_BUILD) \
+	  -c -o $@ ../scripts/orchard_verifier_replay.ml
+
+$(ORCHARD_VERIFIER_REPLAY_EXE): $(ORCHARD_VERIFIER_REPLAY_CMX) \
+	$(ORCHARD_VERIFIER_REPLAY_DRIVER_CMX)
+	ocamlfind ocamlopt -package rocq-runtime.kernel,zarith,unix -linkpkg \
+	  -I $(ORCHARD_VERIFIER_REPLAY_BUILD) \
+	  $(ORCHARD_VERIFIER_REPLAY_CMX) \
+	  $(ORCHARD_VERIFIER_REPLAY_DRIVER_CMX) \
+	  -o $@
+
+orchard-verifier-ocaml-runtime-check:
+	@test "$$(ocamlopt -config-var word_size)" = 64 || { \
+	  echo "Orchard verifier replay requires a 64-bit OCaml runtime" >&2; \
+	  exit 1; \
+	}
+
+orchard-verifier-replay-build: \
+	orchard-verifier-ocaml-runtime-check \
+	orchard-verifier-snapshots-generated-check \
+	orchard-verifier-runtime-data-check \
+	$(ORCHARD_VERIFIER_REPLAY_EXE)
+
+orchard-verifier-replay-case0: orchard-verifier-replay-build
+	$(ORCHARD_VERIFIER_REPLAY_EXE) --case0
+
+# CI and [orchard-verifier-tests] use this exact all-40 behavioral replay.
+# It exits nonzero for any Rust/Rocq mismatch; BackendUnavailable is always a
+# mismatch rather than a successful parser-only result.
+orchard-verifier-replay-extracted: orchard-verifier-replay-build
+	$(ORCHARD_VERIFIER_REPLAY_EXE) --all
 
 # Detect OS and set appropriate commands
 UTILHEADNAME_S := $(shell uname -s)

@@ -16,3 +16,8 @@
 [submodule "third-party/orchard"]
 	path = third-party/orchard
 	url = https://github.com/formal-land/orchard.git
+[submodule "third-party/rocq-of-rust"]
+	path = third-party/rocq-of-rust
+	url = https://github.com/formal-land/rocq-of-rust.git
+	shallow = true
+	fetchRecurseSubmodules = false
