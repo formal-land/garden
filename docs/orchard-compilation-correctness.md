@@ -43,7 +43,13 @@ The L-numbering is the one used in
 [`operational-soundness.md`](operational-soundness.md). L2 and L1 are this
 document. L3 and the two unnumbered rows above it are the companions; L0 is
 recorded as named hypotheses in `Halo2/plonkish/boundary.v` and is *not*
-proved.
+proved. The transcribed verifier
+([`docs/orchard-verifier-translation.md`](orchard-verifier-translation.md))
+consumes a query-indexed `ConstraintSystem`;
+`Halo2/halo2_proofs/from_compiled.v` rebuilds those CS fields from a
+`CompiledSystem.t` by resolving each `(column, rotation)` leaf to its
+query-table index (`reindex_preserves_eval` is the row-evaluation
+agreement). Cryptographic VK fields stay parameters.
 
 ## What keygen actually does
 

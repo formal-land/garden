@@ -44,6 +44,7 @@ files (review only; not part of the Rocq build).
 | `halo2_proofs/poly/commitment/verifier.v` | `poly/commitment/verifier.rs` (IPA) |
 | `halo2_proofs/poly/multiopen.v` | `poly/multiopen.rs`, `multiopen/verifier.rs` |
 | `halo2_proofs/plonk.v` | `plonk.rs`, `plonk/error.rs` (verify-time VK) |
+| `halo2_proofs/from_compiled.v` | (Garden: `CompiledSystem.t` → query-indexed CS / VK) |
 | `halo2_proofs/plonk/verifier.v` | `plonk/verifier.rs` |
 | `halo2_proofs/plonk/vanishing/verifier.v` | `plonk/vanishing/verifier.rs` |
 | `halo2_proofs/plonk/permutation/verifier.v` | `plonk/permutation/verifier.rs` |
@@ -66,7 +67,10 @@ Submodule pins: `third-party/halo2` `cca1dd70c5ac76daa7d9773eb9a26e33ceea9a6a`,
   pull fiat-crypto / Coqprime. The affine group law is \(y^2 = x^3 + 5\)
   over \(F_{pallas_q}\), the same curve as `EllipticCurve.Vesta`.
 - VK binding scalar and compiled CS: `Orchard/vk/`, `Orchard/compiled/` (not
-  rebuilt by this transcription; `verify_proof` takes a Rocq `VerifyingKey`)
+  rebuilt by this transcription; `verify_proof` takes a Rocq `VerifyingKey`).
+  `halo2_proofs/from_compiled.v` fills that VK's constraint-system fields
+  from a `CompiledSystem.t`; commitments, domain, and the transcript
+  binding scalar remain parameters.
 
 ## Tests
 
@@ -79,16 +83,57 @@ Default-suite checks (`Garden/Orchard/verifier/tests.v` and per-module
 - IPA `compute_b` / `compute_s`
 - Orchard wrapper rejects `disableCrossAddress = 1` under a FixedPostNu6_2 key
 - `verify_proof` rejects a wrong instance-column count
+- `from_compiled`: `query_index` first-match and missing; `reindex` evaluation
+  of a two-leaf sum against `cell_evals`
 
 Orchard already ships serialized proofs that `Proof::verify` accepts
 (`third-party/orchard/src/circuit_data/circuit_proof_test_case_*.bin`). Replaying
 one through the full IPA+MSM at `k = 11` is the same cost class as VK
 provenance and is not part of the ordinary `make` leaf.
 
+## Compiled-system glue
+
+[`Garden/Halo2/halo2_proofs/from_compiled.v`](../Garden/Halo2/halo2_proofs/from_compiled.v)
+rebuilds the transcribed verifier's `ConstraintSystem` from an L2
+`CompiledSystem.t` (`Halo2/plonkish/main.v`):
+
+- `query_index` is the first-match position of `(column, rotation offset)`
+  in a query table, the same resolution [`Orchard/vk/print.v`](../Garden/Orchard/vk/print.v)
+  uses as `index_of_go`.
+- `reindex` replaces each `Advice` / `Fixed` / `Instance_` leaf by that
+  query index. Selector leaves (absent from a compressed system) become
+  `Constant 0`.
+- `constraint_system_of` fills instance/advice counts, the three query
+  tables, singleton gate-polynomial lists (the flattening
+  `gate_expressions` in `plonk/verifier.rs` performs), lookup input/table
+  expressions (table side: current-rotation fixed query of
+  `lookup_as_fixed`), permutation columns, `blinding_factors`, and
+  `degree`.
+- `vk_of_orchard` installs that CS and `cs_degree`, and takes the
+  evaluation domain, fixed commitments, permutation commitments, and
+  transcript binding scalar as parameters.
+
+`reindex_preserves_eval` is the row-evaluation agreement: on a
+selector-free expression whose leaves sit in the query tables, the
+verifier's `Expression.evaluate` against the three `cell_evals` lists
+(each query `(col, rot)` read at `row + rot` and reduced into
+`F_{pallas_p}`) equals `eval_at_row`. That row evaluator is the residue
+arithmetic of `eval_expression` in [`Halo2/proof.v`](../Garden/Halo2/proof.v)
+at `p = pallas_p` (`UnOp.from` = `Fp.from`, `BinOp.add` = `Fp.add`, and
+the matching `mul` / `opp`). The file depends only on the verifier Pasta
+stack, not on `Field.Field`.
+
+Lookup table columns are Garden `Lookup` indices. Halo 2 stores them as
+`TableColumn` (a fixed column); `lookup_as_fixed` is that map. For Orchard
+it is the identity, certified by
+`OrchardConfigure.lookup_fixed_columns_eq` in
+[`compiled/configuration.v`](../Garden/Orchard/compiled/configuration.v).
+
 ## Out of scope
 
 - Automatic `rocq-of-rust` THIR translation or vendoring `RocqOfRust/`
-- Proving the transcription equivalent to `algebraic_accepts`
+- Proving `verify_proof = Ok` implies `algebraic_accepts` /
+  `algebraic_accepts_at`
 - Discharging `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood`
 - `BatchVerifier` / `create_proof`
 - Re-translating the Action circuit
