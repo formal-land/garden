@@ -50,6 +50,9 @@ consumes a query-indexed `ConstraintSystem`;
 `CompiledSystem.t` by resolving each `(column, rotation)` leaf to its
 query-table index (`reindex_preserves_eval` is the row-evaluation
 agreement). Cryptographic VK fields stay parameters.
+`Halo2/plonkish/verifier_sound.v` lifts an accepted `verify_proof` at
+that CS to `algebraic_accepts_at`, using the named L0 hypotheses of
+`boundary.v` for openings and for goodness of the evaluation point.
 
 ## What keygen actually does
 

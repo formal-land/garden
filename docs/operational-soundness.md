@@ -375,7 +375,9 @@ verifier at the byte level.
   transcribed verifier (`Halo2/halo2_proofs/`,
   [`orchard-verifier-translation.md`](orchard-verifier-translation.md))
   is the algorithm those names talk about; `from_compiled.v` rebuilds its
-  constraint-system fields from a `CompiledSystem.t`.
+  constraint-system fields from a `CompiledSystem.t`, and
+  `plonkish/verifier_sound.v` lifts `verify_proof = Ok` to
+  `algebraic_accepts_at`.
 
 The byte-level anchor upgrades the pinned-vk trust from offline
 transcription to certified bytes (`Orchard/vk/*.v`,

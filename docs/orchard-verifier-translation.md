@@ -45,6 +45,7 @@ files (review only; not part of the Rocq build).
 | `halo2_proofs/poly/multiopen.v` | `poly/multiopen.rs`, `multiopen/verifier.rs` |
 | `halo2_proofs/plonk.v` | `plonk.rs`, `plonk/error.rs` (verify-time VK) |
 | `halo2_proofs/from_compiled.v` | (Garden: `CompiledSystem.t` → query-indexed CS / VK) |
+| `plonkish/verifier_sound.v` | (Garden: `verify_proof = Ok` ⇒ `algebraic_accepts_at`) |
 | `halo2_proofs/plonk/verifier.v` | `plonk/verifier.rs` |
 | `halo2_proofs/plonk/vanishing/verifier.v` | `plonk/vanishing/verifier.rs` |
 | `halo2_proofs/plonk/permutation/verifier.v` | `plonk/permutation/verifier.rs` |
@@ -129,11 +130,54 @@ it is the identity, certified by
 `OrchardConfigure.lookup_fixed_columns_eq` in
 [`compiled/configuration.v`](../Garden/Orchard/compiled/configuration.v).
 
+## `verify_proof = Ok` and `algebraic_accepts_at`
+
+[`Garden/Halo2/plonkish/verifier_sound.v`](../Garden/Halo2/plonkish/verifier_sound.v)
+is the L0 composition: an accepted `verify_proof` at a VK whose CS is
+`constraint_system_of compiled` yields `algebraic_accepts_at` at the
+transcript challenges `(θ, β, γ, y)`.
+
+In-model content:
+
+- `eval_combine_horner` / `eval_combine_horner_pallas`: the verifier's
+  fold `h * y + v` is evaluation of `Vanishing.combine_horner` at the
+  challenge point.
+- `peq_of_good_eval` / `peq_residual_of_eval`: one evaluation `f(x) = 0`
+  plus `FiatShamirChallengeGood` against the root set of a nonzero `f`
+  (`peq` is decidable) yields `peq f []`, so the quotient residual at
+  `x` is the zero polynomial.
+- `vanishing_accepts_at_of_row_zero`: polynomials that vanish on `H`
+  admit a single-`y` quotient of their Horner combination by `X^n − 1`
+  (`Vanishing.vanishing_sound_horner`).
+- `concatenated_horner_row_zero`: `vanishing_accepts_at` of a list at a
+  `FiatShamirChallengeGood` `y` (against `vanishing_bad`) splits into
+  per-polynomial vanishing on `H`.
+- `finalize_ok_multiopen`: `finalize = Ok` means the multiopen of the
+  vanishing query set is accepted and the IPA MSM evaluates to true.
+- `verify_proof_algebraic_accepts_at`: from the Horner identity at `x`
+  (the scalar content of `VanishingVerifier.verify` after
+  `MultiopenReduction` pins `h(x)`), `peq_residual_of_eval` plus
+  goodness of `x` produce `vanishing_accepts_at` for the gate
+  polynomials; permutation and lookup conjuncts are the leftover-zero
+  reading of those families on the domain.
+
+Named external hypotheses, in the style of
+[`Halo2/plonkish/boundary.v`](../Garden/Halo2/plonkish/boundary.v):
+
+- `IPABinding` / `MultiopenReduction`: accepted openings are true
+  evaluations of the unique committed polynomials.
+- `FiatShamirChallengeGood` at `x`, against the roots of the residual
+  `combine_horner y Es − h·(X^n−1)` when that residual is nonzero.
+- The permutation and lookup leftovers vanishing on the domain (the
+  family split of the concatenated Horner at one `y`, which
+  `concatenated_horner_row_zero` discharges once those identity
+  polynomials sit in the Horner list).
+
 ## Out of scope
 
 - Automatic `rocq-of-rust` THIR translation or vendoring `RocqOfRust/`
-- Proving `verify_proof = Ok` implies `algebraic_accepts` /
-  `algebraic_accepts_at`
 - Discharging `IPABinding` / `MultiopenReduction` / `FiatShamirChallengeGood`
+- Unfolding every `Result.and_then` of `verify_proof` down to the Horner
+  identity (that identity is the hypothesis `Hhorner_at_x`)
 - `BatchVerifier` / `create_proof`
 - Re-translating the Action circuit
