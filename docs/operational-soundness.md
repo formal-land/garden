@@ -371,7 +371,13 @@ verifier at the byte level.
   polynomial), `MultiopenReduction` (an accepted opening pins the column
   polynomials), and `FiatShamirChallengeGood` (a transcript-derived
   challenge avoids a density-bounded bad set) — `Definition`s over an
-  abstract commitment space, to be instantiated by a future L0.
+  abstract commitment space, to be instantiated by a future L0. The
+  transcribed verifier (`Halo2/halo2_proofs/`,
+  [`orchard-verifier-translation.md`](orchard-verifier-translation.md))
+  is the algorithm those names talk about; `from_compiled.v` rebuilds its
+  constraint-system fields from a `CompiledSystem.t`, and
+  `plonkish/verifier_sound.v` lifts `verify_proof = Ok` to
+  `algebraic_accepts_at`.
 
 The byte-level anchor upgrades the pinned-vk trust from offline
 transcription to certified bytes (`Orchard/vk/*.v`,

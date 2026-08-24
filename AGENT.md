@@ -8,6 +8,12 @@ Use this file as the stable entry point. Keep detailed, changing guidance in
 - `docs/BUILD.md`: local setup, dependency installation, and Rocq build commands.
 - `docs/halo2-translation.md`: conventions for translating Halo2 and Orchard
   Rust circuits into Garden/Rocq.
+- `docs/orchard-verifier-translation.md`: executable transcription of the
+  deployed Orchard Halo 2 verifier (`Proof::verify` / `plonk::verify_proof`),
+  the copied rocq-of-rust primitive types, lens/`&mut` rules, tests, the
+  compiled-system reindex glue (`halo2_proofs/from_compiled.v`), and the
+  `verify_proof = Ok` ⇒ `algebraic_accepts_at` composition
+  (`plonkish/verifier_sound.v`).
 - `docs/halo2-proof.md`: proof-facing Halo2 semantics, Poseidon determinism
   proof patterns, and tactic/performance notes.
 - `docs/chip-model-caveats.md`: what the relational `proof.v` model captures and

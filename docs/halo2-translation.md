@@ -4,6 +4,11 @@ This file records the current conventions for translating Halo2 Rust circuit
 code into Garden/Rocq. Keep it current with the code: update this when the Rocq
 DSL or translation style changes.
 
+The **deployed verifier** (Fiat–Shamir transcript, vanishing / permutation /
+lookup expression checks, multiopen, IPA) is a separate executable
+transcription, not the circuit DSL. See
+[`docs/orchard-verifier-translation.md`](orchard-verifier-translation.md).
+
 ## Code Pointers
 
 Shared translation infrastructure:
